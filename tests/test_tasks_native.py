@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.test_submissions_native import run_native
+from tests.task_runtime import run_native
 
 pytestmark = pytest.mark.runtime
 

@@ -69,7 +69,17 @@ def _command(assets: RuntimeAssets) -> list[str]:
     ]
 
 
-def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) -> int:
+def launch(
+    entry: Path,
+    args: list[str],
+    config: Config,
+    assets: RuntimeAssets,
+    *,
+    options: tuple[str, ...] = (),
+    extra_environment: dict[str, str] | None = None,
+) -> int:
+    if config.distribution is not False:
+        raise BootstrapError("Configured distribution requires the explicit LocalCluster launcher")
     if os.name != "posix":
         raise BootstrapError("The managed bootstrap currently requires POSIX process groups")
     if threading.current_thread() is not threading.main_thread():
@@ -81,6 +91,18 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
         cleanup = Path(temporary) / "cleanup"
         environment = dict(os.environ)
         environment.update(assets.environment)
+        if extra_environment is not None:
+            environment.update(extra_environment)
+        else:
+            for key in (
+                "PYBEAM_DISTRIBUTION",
+                "PYBEAM_OWNER_DIRECTORY",
+                "PYBEAM_GUARDIAN_IDENTITY",
+                "PYBEAM_CLUSTER_DIRECTORY",
+                "PYBEAM_CLUSTER_READY",
+                "PYBEAM_NODE_ALIAS",
+            ):
+                environment.pop(key, None)
         environment["PYBEAM_SHUTDOWN"] = str(shutdown)
         environment["PYBEAM_COMPLETION"] = str(completed)
         environment["PYBEAM_CLEANUP"] = str(cleanup)
@@ -93,8 +115,10 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
                 "completed": str(completed),
             }
         )
+        guardian = environment.get("PYBEAM_GUARDIAN_IDENTITY")
         state = _Shutdown()
         completion_status: int | None = None
+        announced = False
         startup_deadline = time.monotonic() + config.startup_timeout
         process: subprocess.Popen[bytes] | None = None
 
@@ -113,8 +137,11 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
             signal.signal(signal.SIGINT, forward)
             signal.signal(signal.SIGTERM, forward)
             try:
+                command = [*_command(assets), *options]
+                if "PYBEAM_OWNER_DIRECTORY" in environment:
+                    command = [sys.executable, "-m", "pybeam.runtime.guardian", "gate", *command]
                 process = subprocess.Popen(  # noqa: S603
-                    _command(assets),
+                    command,
                     env=environment,
                     start_new_session=True,
                 )
@@ -123,6 +150,13 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
             if state.received:
                 _send(process, state.received)
             while True:
+                if guardian is not None:
+                    from pybeam.runtime.ownership import Identity, resolve
+
+                    if resolve(Identity.model_validate_json(guardian)) is None:
+                        raise BootstrapError(
+                            "Guardian exited; managed execution ownership is uncertain"
+                        )
                 if completion_status is None:
                     completion_status = _completion(completed)
                     if completion_status is not None and state.deadline is None:
@@ -161,6 +195,16 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
                                 "Managed VM exit disagrees with entry status", entry_status
                             )
                     return entry_status
+                if not announced and ready.exists() and "PYBEAM_CLUSTER_READY" in environment:
+                    import psutil
+
+                    from pybeam.runtime.ownership import durable_write, identity
+
+                    durable_write(
+                        Path(environment["PYBEAM_CLUSTER_READY"]),
+                        identity(psutil.Process(process.pid)).model_dump_json(),
+                    )
+                    announced = True
                 now = time.monotonic()
                 if state.deadline is not None and now >= state.deadline:
                     entry_status = (

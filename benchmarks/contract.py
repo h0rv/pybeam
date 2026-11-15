@@ -2,6 +2,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
+from pybeam.runtime.ownership import Identity
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 type Positive = Annotated[int, Field(gt=0)]
@@ -257,11 +258,6 @@ def check_correctness(config: Config, result: AdapterResult) -> None:
         )
         if span > result.phases.measurement_ns:
             raise ValueError("Completion evidence falls outside measurement duration")
-
-
-class Identity(StrictModel):
-    pid: Positive
-    created: Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 
 class ProcessSample(StrictModel):

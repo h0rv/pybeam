@@ -1,7 +1,7 @@
 import tomllib
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -37,6 +37,52 @@ type RuntimePath = Annotated[str, Field(strict=True, min_length=1)]
 _PATH_TEXT = TypeAdapter(RuntimePath)
 
 
+type PrivatePort = Annotated[int, Field(strict=True, ge=20000, le=60000)]
+
+
+class PythonNode(BaseModel):
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+    alias: Literal["a", "b"]
+    entry: Path
+    port: PrivatePort
+
+    @field_validator("entry", mode="plain")
+    @classmethod
+    def resolve_entry(cls, value: object, info: ValidationInfo) -> Path:
+        if isinstance(value, Path):
+            return value.resolve()
+        text = _PATH_TEXT.validate_python(value)
+        directory: object = info.context
+        return ((directory if isinstance(directory, Path) else Path.cwd()) / text).resolve()
+
+
+class Distribution(BaseModel):
+    """Two trusted local nodes. No remote hosts, implicit retries, or callable transfer."""
+
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+    nodes: tuple[PythonNode, PythonNode]
+    discovery_port: PrivatePort
+    capacity: Annotated[int, Field(strict=True, ge=1, le=8)]
+    max_bytes: Annotated[int, Field(strict=True, ge=1, le=16384)]
+
+    @field_validator("nodes", mode="before")
+    @classmethod
+    def parse_nodes(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def distinct_nodes(self) -> Self:
+        if {node.alias for node in self.nodes} != {"a", "b"}:
+            raise ValueError("Declare exactly aliases a and b")
+        if len({self.discovery_port, *(node.port for node in self.nodes)}) != 3:
+            raise ValueError("Discovery and node ports must be distinct")
+        if not all(node.entry.is_file() for node in self.nodes):
+            raise ValueError("Every node must have an existing Python entry file")
+        return self
+
+
 class Config(BaseModel):
     model_config = ConfigDict(frozen=True, strict=True, extra="forbid", validate_default=True)
 
@@ -45,7 +91,7 @@ class Config(BaseModel):
     shutdown_timeout: Timeout = 5.0
     mode: Mode = Mode.MANAGED
     workers: Annotated[int, Field(ge=1, le=1)] = 1
-    distribution: bool = False
+    distribution: Literal[False] | Distribution = False
     listeners: bool = False
 
     @field_validator("mode", mode="before")
@@ -53,7 +99,7 @@ class Config(BaseModel):
     def parse_mode(cls, value: object) -> Mode:
         return Mode(TypeAdapter(str, config=ConfigDict(strict=True)).validate_python(value))
 
-    @field_validator("development_runtime", mode="before")
+    @field_validator("development_runtime", mode="plain")
     @classmethod
     def resolve_runtime(cls, value: object, info: ValidationInfo) -> Path | None:
         if value is None or isinstance(value, Path):
@@ -72,10 +118,8 @@ class Config(BaseModel):
                     self.mode
                 )
             )
-        if self.distribution or self.listeners:
-            raise ValueError(
-                "distribution and listeners must be false; managed bootstrap opens no listeners"
-            )
+        if self.listeners:
+            raise ValueError("listeners must be false; managed bootstrap opens no listeners")
         return self
 
 

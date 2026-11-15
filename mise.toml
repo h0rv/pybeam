@@ -211,3 +211,11 @@ pid=$!
 trap 'trap - INT TERM; printf "\nStopping the example...\n"; kill -TERM "$pid" 2>/dev/null || true; wait "$pid"; exit 130' INT TERM
 wait "$pid"
 '''
+
+[tasks."example:distributed"]
+description = "Explicit local two-node CLI; requires the prepared private paired runtime"
+run = ".venv/bin/python -m examples.distributed.demo"
+
+[tasks."test:distributed"]
+description = "Finite local distribution checks; never part of the default VM-free test task"
+run = "timeout 180 .venv/bin/python -m pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py --run-runtime -q"
