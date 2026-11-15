@@ -1,23 +1,26 @@
 # PyBEAM
 
-Python actors and shared state on BEAM.
+PyBEAM exposes BEAM and OTP primitives through Python APIs.
 
-PyBEAM runs Python inside the Erlang VM through erlang-python. You write typed Python methods. OTP owns the actor processes and supervision. PyBEAM provides Python interfaces and controls runtime startup and shutdown.
+Start with an async Python function and `pybeam.run(main)`. PyBEAM owns runtime startup and shutdown. Add BEAM capabilities where your application needs them.
 
-Use it when several connections need the same state owner, or when a failed actor needs a supervised replacement with an explicit lifetime. A room can own its membership and messages instead of sharing a mutable Python object between request handlers.
+Use functions for work and classes for state. Await results, exchange messages, and own lifetimes with async context managers. OTP provides process supervision. Hornbeam provides HTTP serving and BEAM services for web applications.
 
-## The programming model
+## Python semantics, BEAM primitives
 
-Declare an actor with `@pybeam.actor`. Spawn it inside an `ActorGroup`, then await its methods. Each actor handles calls serially, including while a method awaits. Arguments and results cross a serialized data boundary. The reference exposes methods, not the actor's fields.
+| Capability | Python mapping |
+| --- | --- |
+| Background jobs and tasks | Async functions perform work. Handles represent completion and cancellation under an owner. |
+| Channels | Typed sends and receives exchange data through a bounded queue. Async iteration consumes a stream. |
+| Message passing | Requests return results. Publish/subscribe sends notifications to interested receivers. |
+| Actors | Classes own state. Callers await typed methods on references. |
+| Supervision | Owned scopes define lifetimes. Restart policies define which failed processes are replaced. |
+| Web and integrations | ASGI lifespans and dependencies connect HTTP handlers to services and live updates. |
 
-Separate actors have separate state. They do not each get an isolated CPython process. The current baseline is one VM with the main Python interpreter and its GIL.
+## Compose an application
 
-For web applications, keep your ASGI framework. The examples use BEAM state with FastAPI, Litestar, or PyView. PyBEAM is not a replacement web framework or database.
+A background service can receive work, call an actor that owns shared data, and publish a completion notification. An HTTP handler can use the same services without owning the background work's lifetime. Choose each primitive for its role rather than putting the entire application in an actor.
 
-## Start here
+The [quickstart](quickstart.md) begins with ordinary async Python. The [core primitives](primitives.md) guide explains how to add messaging and supervised work. [Web and integrations](web.md) covers Hornbeam services and GenStage streams.
 
-Follow the [quickstart](quickstart.md) for installation requirements and an actor program. Read [actors and state](actors.md) before adding concurrent callers. The [web examples](web.md) show shared counters and a small room application.
-
-This is an early library. It is not published on PyPI. A supported local platform wheel is required for the consumer path. Read the [boundaries](limits.md) before choosing it for an application.
-
-Ordinary `asyncio` is enough when your application only needs concurrent I/O with task lifetimes inside one Python process. Adding BEAM is useful only if you need its state ownership or OTP behavior and accept the runtime integration cost.
+Ordinary `asyncio` is enough when you only need concurrent I/O within Python task scopes. Use PyBEAM when you also need BEAM messaging or OTP lifetimes. Read the [boundaries](limits.md) for the execution and delivery semantics.

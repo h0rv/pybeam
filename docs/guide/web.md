@@ -1,32 +1,23 @@
-# Web examples
+# Web and integrations
 
-These are source-checkout examples, not installed package commands. Prepare the runtime and optional dependencies with the [source workflow](quickstart.md#work-from-source) first. Launch commands do not implicitly build missing assets.
+Keep your ASGI framework. Use BEAM services from HTTP handlers, background services, or live connections. Hornbeam supplies ASGI serving and existing supervised services rather than a new Python web framework.
 
-## Shared counters
+## Lifespans and HTTP handlers
 
-From the repository root, run one framework example.
+Import `Beam` and `provider` from `pybeam.integrations.fastapi.dependencies`. Create the application with `FastAPI(lifespan=provider.lifespan)` and declare a route parameter as `beam: Beam`. The provider supplies service access scoped to the connection.
 
-```sh
-mise run example:fastapi
-# Or choose example:litestar or example:pyview.
-```
+The [FastAPI](../../examples/fastapi/main.py), [Litestar](../../examples/litestar/main.py), and [PyView](../../examples/pyview/main.py) examples use Hornbeam's ASGI serving path. In the [room miniapp](../../examples/discord_demo/main.py), Uvicorn instead serves FastAPI inside `ErlangEventLoop`. That example uses Hornbeam's supervised services without its HTTP listener.
 
-Open `http://127.0.0.1:8642/` in two tabs. Increment in either tab. Both read the same counter in BEAM ETS, where updates are atomic. Notifications trigger fresh reads. FastAPI and Litestar use SSE; PyView uses LiveView WebSockets. Restarting BEAM clears the counter.
+## Counters, storage, and notifications
 
-These examples use Hornbeam's ASGI serving path and existing services. They do not prove a performance advantage over a Python server.
+`await beam.incr("shared", 1, namespace="demo")` increments atomically. A delta of `0` reads the counter. `beam.store("session")` provides async `set`, `get`, and `delete` for namespaced bytes. `set` accepts `expires_in` for expiring values.
 
-## Room miniapp
+`await beam.publish(topic, payload)` publishes bytes. `provider.subscription(topic)` creates a FastAPI dependency for an owned notification stream. The counter example reads shared data again after notifications. FastAPI and Litestar send updates over SSE; PyView uses LiveView WebSockets.
 
-```sh
-mise run example:discord --port 8766
-```
+Litestar's `BeamChannelsBackend` adapts subscriptions to its channels interface. Subscription and framework merge queues have separate bounds. Disconnect cleanup belongs to the connection's owner, not to a garbage collector.
 
-Open `http://127.0.0.1:8766/rooms/general` in two separate browser sessions. Join before sending. The first session owns the crash button. After a crash, join the new room generation explicitly. State is empty after restart.
+## GenStage streams
 
-This Discord-style demo has no Discord authentication. Uvicorn serves FastAPI inside `ErlangEventLoop`. The Hornbeam integration owns its existing supervised services, but does not start Hornbeam's HTTP listener here.
+For demand-driven processing, `pybeam.integrations.genstage.pipeline.stream` owns a finite GenStage graph in an async context manager. Supply a count and an importable Python function that transforms bytes to bytes. Consume results with async iteration.
 
-Rooms have bounded history and subscription queues. Slow output disconnects after five seconds. Disconnect releases the subscription, not membership. Read the [miniapp README](../../examples/discord_demo/README.md) for exact limits and cleanup semantics.
-
-## Showcase
-
-`mise run showcase` opens the local experiment control plane on port 38921. Native measurement profiles require separately prepared trusted assets. This is a development tool, not a production service or an installation check. Do not treat its counters as comparative benchmark results.
+The [GenStage example](../../examples/genstage.py) uses a typed callback to parse requests and return results. The graph admits one request at a time, including running callback work. Context exit waits for graph cleanup. This is a bounded processing primitive, not persistent job storage or a workflow engine.

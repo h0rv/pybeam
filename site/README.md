@@ -13,7 +13,7 @@ Open http://127.0.0.1:4321/. These tasks use Node 24.21.0 only for documentation
 
 The build writes static HTML to `site/dist`. Test another hosting prefix with `DOCS_BASE=/pybeam/ mise run docs:build`. Use the same variable with `docs:serve` to preview that prefix. There is no deployment workflow.
 
-Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/actors/main.py` to keep the snippet current. Site checks do not execute native examples or establish wheel compatibility.
+Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/hello.py` to keep the snippet current. The actor example remains linked as an optional next step. Site checks do not execute native examples or establish wheel compatibility.
 
 ## Template and notices
 

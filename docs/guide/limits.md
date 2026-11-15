@@ -1,25 +1,19 @@
 # Boundaries
 
-## One local runtime
+## Execution and ownership
 
-The supported bootstrap owns one BEAM VM with one main Python interpreter. The GIL still applies. Actor ownership is not multicore Python execution, a separate interpreter per actor, or protection from a C-extension crash.
+Python runs in one BEAM VM with one main interpreter. The GIL still applies. OTP processes do not provide multicore Python execution or isolation from a C-extension crash.
 
-The managed configuration currently rejects distribution and listener options. Existing actor references are not transparent cross-node references. Do not design around remote task or actor calls as an installed feature.
+Keep ownership of background work until its body and cleanup have ended. Cancelling a waiter is not the same as stopping its work. Cancellation is cooperative; a timeout is not proof of cleanup.
 
-## No persistence or automatic replay
+## Effects and delivery
 
-Actor state and the example ETS counters are volatile. A supervisor can replace a failed child, but does not recover its previous Python state. Applications own persistence and authorization.
+A timeout or cancellation is not rollback. Work may already have changed state or performed an external write. There is no exactly-once execution guarantee. Choose retry policy explicitly.
 
-A timeout or cancellation can leave an operation with effects. There is no exactly-once execution guarantee. Make retry policy explicit, especially for writes. Pub/sub is not a durable event log.
+OTP can replace a failed process, but replacement does not restore previous Python state or replay missed messages. Actor state and ETS values are volatile. Pub/sub is not a durable event log. Applications own persistence and authorization.
 
-## Data and memory limits
+## Data and bounds
 
-Typed calls accept serialized data, not arbitrary Python objects. Resources belong to their owning actor and need explicit cleanup. Admission limits do not bound total process memory or arbitrary work inside a method.
+Serialized messages are data copies, not remote Python objects. Actor arguments and results cross this boundary. The local background service API instead passes arguments directly within its worker loop.
 
-The mailbox policy records in `pybeam.mailbox` describe limits but do not install enforcement. Use the bounded native `ActorGroup` API for actors. Do not infer guarantees for another API from a policy object's name.
-
-## Keep the scope small
-
-The public top-level API covers `actor`, `ActorGroup`, `spawn`, and `run`, with actor error types. Nodes, worker pools, Tasks, GenStage, and AI integrations are not part of this installed main API. These guides do not require them.
-
-Start with [one actor](quickstart.md), then test the failure and shutdown behavior your application needs against the actual runtime. A successful documentation build does not verify native runtime compatibility or a clean wheel installation.
+Channel credits cover queued messages and return on dequeue. Actor admission credits cover queued plus running requests and remain held until work ends. Neither is a bound on RSS, temporary serialization allocations, or arbitrary work in application code. Bound caller concurrency as well.
