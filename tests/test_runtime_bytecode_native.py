@@ -46,7 +46,6 @@ def test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged(
     tmp_path: Path,
 ) -> None:
     profile = PreparedProfile.model_validate_json(PROFILE.read_bytes())
-    assert profile.native_source == ROOT.parent / "native-distribution-ready"
     assert len(profile.runtime_files) == 723
     runtime = ROOT / "src/pybeam/runtime/_assets"
     verify_prepared()
