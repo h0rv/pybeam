@@ -33,10 +33,13 @@ from tests.showcase_fixtures import controlled_proof, controlled_walkthrough
 BASE = "http://127.0.0.1:38921"
 
 
-def test_gate__does_not_accept_unreviewed_native_root(tmp_path: Path) -> None:
+def test_gate__does_not_accept_unreviewed_native_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("examples.distributed.profile.PROFILE", tmp_path / "missing.json")
     card = next(card for card in catalog(trusted_native_root=tmp_path) if card.key == "distributed")
     assert card.disabled is not None
-    assert "FD retirement" in card.disabled
+    assert "prepared distribution profile" in card.disabled
     with TestClient(create_app(), base_url=BASE) as client:
         page = client.get("/").text
         assert "Scripted two-node walkthrough" in page

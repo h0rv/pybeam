@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 from benchmarks.profiles import NAMES, BenchmarkName, unavailable
+from examples.distributed.profile import unavailable as distribution_unavailable
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,12 +24,7 @@ class Card:
 
 
 def distributed_unavailable() -> str | None:
-    # Replace this precondition only after independent review of the prepared runtime pins.
-    # A native checkout argument or an older staged artifact is not that approval.
-    return (
-        "No reviewed prepared distribution runtime profile is supplied. Native FD retirement "
-        "approval and replacement NIF/wheel pins are required. No runtime is launched."
-    )
+    return distribution_unavailable()
 
 
 def catalog(
