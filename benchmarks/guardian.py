@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 import psutil
+from pybeam.runtime.guardian import AuthorizationError, GuardianEndpoint, acknowledge_registered
 from pydantic import TypeAdapter
 
 from benchmarks.contract import (
@@ -125,6 +126,14 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
     reason: str | None = None
     status: str = "failed"
     start = time.monotonic_ns()
+    endpoint = GuardianEndpoint(
+        directory=directory.resolve(),
+        owner=parent,
+        guardian=identity(psutil.Process()),
+        stop_file=None if control is None else Path(control.stop_file),
+        control_owner=None if control is None else control.owner,
+    )
+    durable_write(directory / "guardian.json", endpoint.model_dump_json())
     with (
         (directory / "stdout.log").open("wb") as stdout,
         (directory / "stderr.log").open("wb") as stderr,
@@ -154,6 +163,11 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     "CPU affinity unavailable here; one core is requested, not enforced."
                 )
             while True:
+                endpoint.require_active()
+                if control is not None and resolve(control.owner) is None:
+                    raise AuthorizationError("Control owner exited")
+                for registration in directory.glob("register-*.json"):
+                    acknowledge_registered(registration, owned, endpoint)
                 previous = frozenset(owned)
                 discover(owned)
                 if owned != previous:
@@ -251,9 +265,10 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                         status = "passed"
                     break
                 time.sleep(budget.sample_seconds)
-        except (OSError, ValueError, psutil.Error) as error:
+        except (AuthorizationError, OSError, ValueError, psutil.Error) as error:
             reason = type(error).__name__ + ": invalid adapter evidence or process observation"
         finally:
+            durable_write(directory / "registration.closed", "closed")
             cleanup_start = time.monotonic_ns()
             forced = sum(resolve(value) is not None for value in owned)
             survivors = cleanup(owned)

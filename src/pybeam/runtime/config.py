@@ -94,6 +94,13 @@ class Config(BaseModel):
     distribution: Literal[False] | Distribution = False
     listeners: bool = False
 
+    @field_validator("distribution", mode="before")
+    @classmethod
+    def parse_distribution(cls, value: object) -> object:
+        if value is False or isinstance(value, Distribution | dict):
+            return value
+        raise ValueError("distribution must be false or an explicit two-node configuration")
+
     @field_validator("mode", mode="before")
     @classmethod
     def parse_mode(cls, value: object) -> Mode:

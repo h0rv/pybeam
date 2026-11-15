@@ -213,7 +213,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'fastapi'", specifier = "==0.54.0" },
     { name = "uvicorn", marker = "extra == 'showcase'", specifier = ">=0.41,<1" },
 ]
-provides-extras = ["showcase", "hornbeam", "fastapi", "litestar", "pyview"]
+provides-extras = ["genstage", "showcase", "hornbeam", "fastapi", "litestar", "pyview"]
 
 [package.metadata.requires-dev]
 dev = [

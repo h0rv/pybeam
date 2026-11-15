@@ -1,9 +1,9 @@
 # Local distribution
 
-From a prepared source checkout, run:
+With a compatible runtime wheel installed, copy this example directory and run:
 
 ```sh
-.venv/bin/python -m examples.distributed.demo
+python -m examples.distributed.demo
 ```
 
 You can also use `mise run example:distributed`. Neither command builds a runtime.
@@ -39,12 +39,13 @@ durability. These limits do not bound network decoding or total process memory.
 ## Source development
 
 Use conventional CPython 3.14.10 and OTP 29.1.2. Build the paired native checkout
-with its default rebar profile, a matching `PYTHON_CONFIG`, and
-`CMAKE_BUILD_PARALLEL_LEVEL=1`. Do not build optional dependencies through this
-example. Set `PYBEAM_DEVELOPMENT_RUNTIME` to that checkout's `_build/default` if it
-is not the sibling `native-local-distribution` checkout. Prepare this checkout's
-editable Python environment separately. This is not a clean wheel installation
-claim, and no manual Erlang commands are needed when running the prepared demo.
+with a matching `PYTHON_CONFIG` and `CMAKE_BUILD_PARALLEL_LEVEL=1`.
+Do not build optional dependencies through this example. Select prepared assets
+with `[tool.pybeam].development_runtime` in your `pyproject.toml`. The normal
+runtime manifest is used when this setting is absent. No manual EPMD or cookie
+setup is needed. The three configured ports must be free. Port reservation and
+listener startup are separate OS operations, so a collision fails startup rather
+than retrying.
 
 Run `mise run test:distributed` for the explicit finite tests. Ordinary core tests
 do not start these VMs. The fixed `double` definition is an example operation,

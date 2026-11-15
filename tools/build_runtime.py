@@ -15,6 +15,7 @@ class OTPVersions:
     erts: str
     kernel: str
     stdlib: str
+    crypto: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ MACHO_MAGICS = frozenset(
 FAT_MAGICS = frozenset(
     bytes.fromhex(value) for value in ("cafebabe", "bebafeca", "cafebabf", "bfbafeca")
 )
-ERTS_EXECUTABLES = ("beam.smp", "erlexec", "erl_child_setup", "inet_gethost")
+ERTS_EXECUTABLES = ("beam.smp", "erlexec", "erl_child_setup", "inet_gethost", "epmd")
 
 
 def macho_magic(path: Path) -> bytes:
@@ -123,9 +124,11 @@ def audit_binary(path: Path, *, python_nif: bool = False) -> MachO:
 
 def otp_information(erl: Path) -> OTPVersions:
     expression = (
+        "application:load(crypto), "
         "io:put_chars(json:encode(#{erts => list_to_binary(erlang:system_info(version)), "
         "kernel => list_to_binary(element(2, application:get_key(kernel, vsn))), "
-        "stdlib => list_to_binary(element(2, application:get_key(stdlib, vsn)))})), halt()."
+        "stdlib => list_to_binary(element(2, application:get_key(stdlib, vsn))), "
+        "crypto => list_to_binary(element(2, application:get_key(crypto, vsn)))})), halt()."
     )
     raw: object = json.loads(run([str(erl), "+S", "1:1", "-noshell", "-eval", expression]))
     if not isinstance(raw, dict):
@@ -137,7 +140,7 @@ def otp_information(erl: Path) -> OTPVersions:
             raise ValueError("Invalid OTP version: " + key)
         return value
 
-    return OTPVersions(version("erts"), version("kernel"), version("stdlib"))
+    return OTPVersions(version("erts"), version("kernel"), version("stdlib"), version("crypto"))
 
 
 def erlang_string(path: Path) -> str:
@@ -199,8 +202,8 @@ def stage_runtime(
         release = work / "pybeam"
         release.with_suffix(".rel").write_text(
             '{{release,{{"pybeam","0.1.0"}},{{erts,"{}"}},'
-            '[{{kernel,"{}"}},{{stdlib,"{}"}},{{erlang_python,"{}",load}}]}}.\n'.format(
-                versions.erts, versions.kernel, versions.stdlib, native_version
+            '[{{kernel,"{}"}},{{stdlib,"{}"}},{{crypto,"{}"}},{{erlang_python,"{}",load}}]}}.\n'.format(
+                versions.erts, versions.kernel, versions.stdlib, versions.crypto, native_version
             )
         )
         expression = (
@@ -250,7 +253,10 @@ def stage_runtime(
                     item.unlink()
         for cache in staged.rglob("__pycache__"):
             shutil.rmtree(cache)
-        code_paths = [str(app.relative_to(staged) / "ebin")]
+        code_paths = [
+            str(app.relative_to(staged) / "ebin"),
+            "lib/crypto-" + versions.crypto + "/ebin",
+        ]
         if hornbeam is not None and hornbeam_license is not None:
             code_paths.append(str(stage_hornbeam(hornbeam, hornbeam_license, staged)))
         nif = priv / "py_nif.so"

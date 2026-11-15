@@ -46,6 +46,58 @@ class Registration(BaseModel):
     generation: Annotated[str, Field(min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$")]
 
 
+class GuardianEndpoint(BaseModel):
+    """Borrow an existing local guardian's registration directory and lifetime.
+
+    The borrower never starts or stops this guardian. Its owner must durably
+    record and acknowledge each birth before any nested entry is authorized.
+    """
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    directory: Path
+    owner: Identity
+    guardian: Identity
+    stop_file: Path | None = None
+    control_owner: Identity | None = None
+
+    def require_active(self) -> None:
+        _require_live(self.owner, "Outer owner exited before execution authorization")
+        _require_live(self.guardian, "Outer guardian exited before execution authorization")
+        if self.control_owner is not None:
+            _require_live(self.control_owner, "Outer control owner exited before authorization")
+        if (self.directory / "registration.closed").exists() or (
+            self.stop_file is not None and self.stop_file.exists()
+        ):
+            raise AuthorizationError("Outer owner cancelled execution authorization")
+
+
+def register_borrowed(endpoint: GuardianEndpoint, local: Registration) -> None:
+    endpoint.require_active()
+    _authorize_execution(local)
+    registration = Registration(
+        process=local.process,
+        owner=endpoint.owner,
+        guardian=endpoint.guardian,
+        generation=secrets.token_hex(16),
+    )
+    path = endpoint.directory / ("register-" + str(local.process.pid) + ".json")
+    durable_write(path, registration.model_dump_json())
+    ack = path.with_suffix(".ack")
+    deadline = time.monotonic() + 5
+    while not ack.exists():
+        endpoint.require_active()
+        _authorize_execution(local)
+        if time.monotonic() > deadline:
+            raise AuthorizationError("No outer guardian acknowledgment; entry is sealed")
+        time.sleep(0.01)
+    if Registration.model_validate_json(ack.read_text()) != registration:
+        raise AuthorizationError("Outer acknowledgment has a different identity or generation")
+    ack.unlink()
+    endpoint.require_active()
+    _authorize_execution(local)
+
+
 def _require_live(value: Identity, message: str) -> None:
     if resolve(value) is None:
         raise AuthorizationError(message)
@@ -69,6 +121,29 @@ def _acknowledge(
     except AuthorizationError:
         path.unlink(missing_ok=True)
         raise
+
+
+def acknowledge_registered(path: Path, owned: set[Identity], endpoint: GuardianEndpoint) -> None:
+    registration = Registration.model_validate_json(path.read_text())
+    if registration.owner != endpoint.owner or registration.guardian != endpoint.guardian:
+        raise AuthorizationError("Registration belongs to a different owner or guardian")
+    endpoint.require_active()
+    process = resolve(registration.process)
+    if process is None:
+        raise AuthorizationError("Cannot register an exited native process")
+    ancestors = {identity(parent) for parent in process.parents() if parent.pid > 0}
+    if registration.process not in owned and not ancestors.intersection(owned):
+        raise AuthorizationError("Native process has no registered owner")
+    owned.add(registration.process)
+    record(endpoint.directory, owned, "tracking")
+    ack = path.with_suffix(".ack")
+    _acknowledge(ack, registration, endpoint.owner, endpoint.guardian)
+    try:
+        endpoint.require_active()
+    except AuthorizationError:
+        ack.unlink(missing_ok=True)
+        raise
+    path.unlink()
 
 
 def _authorize_execution(registration: Registration) -> None:
@@ -97,6 +172,15 @@ def spawn_owned(directory: Path, argv: tuple[str, ...], *, timeout: float = 5.0)
 def supervise(directory: Path, owner: Identity) -> None:
     owned: set[Identity] = set()
     guardian = identity(psutil.Process())
+    external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
+    endpoint = None if external is None else GuardianEndpoint.model_validate_json(external)
+    if endpoint is not None:
+        register_borrowed(
+            endpoint,
+            Registration(
+                process=guardian, owner=owner, guardian=guardian, generation=secrets.token_hex(16)
+            ),
+        )
     environment = dict(
         os.environ,
         PYBEAM_GUARDIAN_IDENTITY=guardian.model_dump_json(),
@@ -109,6 +193,8 @@ def supervise(directory: Path, owner: Identity) -> None:
     record(directory, owned, "tracking")
     try:
         while resolve(owner) is not None and not (directory / "stop").exists():
+            if endpoint is not None:
+                endpoint.require_active()
             if time.monotonic() > deadline:
                 raise TimeoutError("Local cluster lifetime exceeded")
             request = directory / "spawn.request.json"
@@ -135,23 +221,16 @@ def supervise(directory: Path, owner: Identity) -> None:
                 )
                 request.unlink()
             for path in directory.glob("register-*.json"):
-                registration = Registration.model_validate_json(path.read_text())
-                if registration.owner != owner or registration.guardian != guardian:
-                    raise AuthorizationError(
-                        "Registration belongs to a different owner or guardian"
-                    )
-                _require_live(owner, "Owner exited before process registration")
-                value = registration.process
-                process = resolve(value)
-                if process is None:
-                    raise RuntimeError("Cannot register an exited native process")
-                ancestors = {identity(parent) for parent in process.parents() if parent.pid > 0}
-                if value not in owned and not ancestors.intersection(owned):
-                    raise RuntimeError("Native process has no registered owner")
-                owned.add(value)
-                record(directory, owned, "tracking")
-                _acknowledge(path.with_suffix(".ack"), registration, owner, guardian)
-                path.unlink()
+                acknowledge_registered(
+                    path,
+                    owned,
+                    GuardianEndpoint(
+                        directory=directory,
+                        owner=owner,
+                        guardian=guardian,
+                        stop_file=directory / "stop",
+                    ),
+                )
             for child in children:
                 child.poll()
             previous = frozenset(owned)
@@ -203,6 +282,9 @@ def gate(command: list[str]) -> None:
     if Registration.model_validate_json(ack.read_text()) != authorization:
         raise AuthorizationError("Ownership acknowledgment has a different identity or generation")
     ack.unlink()
+    external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
+    if external is not None:
+        register_borrowed(GuardianEndpoint.model_validate_json(external), authorization)
     _authorize_execution(authorization)
     os.execv(command[0], command)  # noqa: S606
 

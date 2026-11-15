@@ -5,7 +5,9 @@ type Outcome = tuple[Literal[True], bytes] | tuple[Literal[False], BaseException
 
 @final
 class Body:
-    def __init__(self, invoke: Callable[[bytes], Awaitable[bytes]]) -> None: ...
+    def __init__(
+        self, invoke: Callable[[bytes], Awaitable[bytes]], *, dedicated_loop: bool = False
+    ) -> None: ...
 
 async def open_group(count: int, max_bytes: int) -> tuple[object, object]: ...
 async def start(

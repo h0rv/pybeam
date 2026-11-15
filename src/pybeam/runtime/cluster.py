@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pybeam.runtime.assets import RuntimeAssets, discover_assets
 from pybeam.runtime.config import BootstrapError, Config, Distribution
-from pybeam.runtime.guardian import spawn_owned
+from pybeam.runtime.guardian import GuardianEndpoint, spawn_owned
 from pybeam.runtime.ownership import (
     Identity,
     Registry,
@@ -63,9 +63,16 @@ class LocalCluster:
     The context must be entered from the main thread. This is a local-source experimental API.
     """
 
-    def __init__(self, distribution: Distribution, *, config: Config | None = None) -> None:
+    def __init__(
+        self,
+        distribution: Distribution,
+        *,
+        config: Config | None = None,
+        guardian: GuardianEndpoint | None = None,
+    ) -> None:
         self.distribution = distribution
         self.config = Config() if config is None else config
+        self._external_guardian = guardian
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._guardian: subprocess.Popen[bytes] | None = None
         self._guardian_identity: Identity | None = None
@@ -120,6 +127,10 @@ class LocalCluster:
             with os.fdopen(descriptor, "w") as stream:
                 stream.write(secrets.token_hex(32))
             environment = dict(os.environ)
+            environment.pop("PYBEAM_OUTER_GUARDIAN", None)
+            if self._external_guardian is not None:
+                self._external_guardian.require_active()
+                environment["PYBEAM_OUTER_GUARDIAN"] = self._external_guardian.model_dump_json()
             environment.update(
                 HOME=str(home),
                 ERL_EPMD_PORT=str(self.distribution.discovery_port),

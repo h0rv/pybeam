@@ -98,6 +98,7 @@ def launch(
                 "PYBEAM_DISTRIBUTION",
                 "PYBEAM_OWNER_DIRECTORY",
                 "PYBEAM_GUARDIAN_IDENTITY",
+                "PYBEAM_OUTER_GUARDIAN",
                 "PYBEAM_CLUSTER_DIRECTORY",
                 "PYBEAM_CLUSTER_READY",
                 "PYBEAM_NODE_ALIAS",

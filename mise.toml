@@ -296,8 +296,8 @@ wait "$pid"
 '''
 
 [tasks."example:distributed"]
-description = "Explicit local two-node CLI; requires the prepared private paired runtime"
-run = ".venv/bin/python -m examples.distributed.demo"
+description = "Private finite two-node CLI with an installed or explicitly prepared runtime"
+run = "uv run --locked python -m examples.distributed.demo"
 
 [tasks."test:distributed-model"]
 description = "Bounded source-only ingress model; requires explicit private native source and Alloy jar"
@@ -311,5 +311,5 @@ timeout 120 java -jar "$PYBEAM_ALLOY_JAR" exec -t none -o "$output/solutions" "$
 '''
 
 [tasks."test:distributed"]
-description = "Finite local distribution checks; never part of the default VM-free test task"
-run = "timeout 180 .venv/bin/python -m pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py --run-runtime -q"
+description = "Private finite distribution and ownership checks; never part of default VM-free tests"
+run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py tests/test_guardian_authorization.py tests/test_guardian_authorization_model.py --run-runtime -q"

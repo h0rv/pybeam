@@ -40,14 +40,22 @@ class TaskLimits(BaseModel):
 
 
 class TaskFunction[Q, R]:
-    """A typed request and result codec. Budgets cover encoded requests, not closures."""
+    """A typed request and result codec. Budgets cover requests, not closures.
+
+    dedicated_loop runs the body on its context-owned native loop instead of
+    the shared driver. It still uses the main interpreter, not an isolation VM.
+    Construct loop-bound resources inside the body and finalize them before return.
+    """
 
     def __init__(
         self,
         function: Callable[[Q], Awaitable[R]],
         request: TypeAdapter[Q],
         result: TypeAdapter[R],
+        *,
+        dedicated_loop: bool = False,
     ) -> None:
+        self._dedicated_loop = dedicated_loop
         self._function = function
         self._request = request
         self._result = result
@@ -72,7 +80,7 @@ class TaskFunction[Q, R]:
                 _body_execution.reset(job_token)
                 _body_owners.reset(token)
 
-        return Body(invoke)
+        return Body(invoke, dedicated_loop=self._dedicated_loop)
 
 
 @dataclass(frozen=True, slots=True)

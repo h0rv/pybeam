@@ -71,7 +71,7 @@ hornbeam = { path = "../hornbeam", editable = true }
 
 [tool.ty.environment]
 python-version = "3.14"
-extra-paths = ["typings", ".", "../native-otp-tasks/priv"]
+extra-paths = ["typings", ".", "../erlang-python/priv"]
 
 [tool.ty.rules]
 all = "error"

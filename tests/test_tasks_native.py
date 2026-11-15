@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.task_runtime import run_native
+from tests.native.task_helpers import run_native
 
 pytestmark = pytest.mark.runtime
 
@@ -20,17 +20,119 @@ def task_program(tmp_path: Path, source: str) -> None:
     body += textwrap.indent(textwrap.dedent(source), "    ")
     result = run_native(tmp_path, body)
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "stealing control" not in result.stdout + result.stderr
     assert "native-submission-ok" in result.stdout
 
 
+def test_tasks__dedicated_uncertainty_keeps_the_existing_watcher_until_cleanup(
+    tmp_path: Path,
+) -> None:
+    task_program(
+        tmp_path,
+        """
+        import threading
+        import erlang
+        from erlang.tasks import UncertainInflight
+        entered = threading.Event()
+        cleaning = threading.Event()
+        finish = threading.Event()
+        cleaned = threading.Event()
+        executions = []
+        async def wait_for(event):
+            async with asyncio.timeout(3):
+                while not event.is_set():
+                    await asyncio.sleep(.001)
+        async def body(value: int) -> int:
+            executions.append(value)
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cleaning.set()
+                await wait_for(finish)
+                cleaned.set()
+            return value
+        sup = await TaskSupervisor(TaskLimits(
+            capacity=1, max_bytes=100, shutdown_ms=200
+        )).__aenter__()
+        ref = await sup.start(TaskFunction(
+            body, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+        ), 42)
+        await wait_for(entered)
+        try:
+            acknowledged = await ref.cancel()
+        except UncertainInflight:
+            assert len(sup._refs) == 1
+            assert not cleaned.is_set()
+        else:
+            assert acknowledged is True and cleaned.is_set()
+        await wait_for(cleaning)
+        watcher = ref._pending
+        assert watcher is not None
+        assert not watcher.done() and not cleaned.is_set()
+        info = await async_call('_task_info', sup._group)
+        assert info['jobs'] == 1 and len(info['contexts']) == 1
+        assert info['gate']['count'] == 1
+        finish.set()
+        # Observe only the existing reply watcher. Do not cancel or submit again.
+        async with asyncio.timeout(4):
+            await asyncio.shield(watcher)
+        assert ref._pending is watcher
+        assert isinstance(await ref.exception(), asyncio.CancelledError)
+        assert cleaned.is_set() and executions == [42]
+        await sup.close()
+        assert not sup._refs
+        """,
+    )
+
+
+def test_tasks__dedicated_nested_reply_returns_to_its_original_waiter(tmp_path: Path) -> None:
+    task_program(
+        tmp_path,
+        """
+        executions = {'parent': 0, 'child': 0}
+        loops = []
+        async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=100, shutdown_ms=1500)) as sup:
+            async def child(value: int) -> int:
+                executions['child'] += 1
+                return value * 2
+            async def parent(value: int) -> int:
+                executions['parent'] += 1
+                loops.append(asyncio.get_running_loop())
+                other = await sup.start(TaskFunction(
+                    child, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+                ), value)
+                return await other
+            ref = await sup.start(TaskFunction(
+                parent, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+            ), 21)
+            pid = ref.pid
+            async with asyncio.timeout(4):
+                assert await ref == 42
+            waiter = ref._pending
+            assert waiter is not None and waiter.get_loop() is asyncio.get_running_loop()
+            assert await ref == 42
+            assert ref._pending is waiter and ref.pid is pid
+            assert executions == {'parent': 1, 'child': 1}
+            assert loops[0].is_closed()
+            info = await async_call('_task_info', sup._group)
+            assert info['jobs'] == 0 and info['contexts'] == [] and info['children'] == []
+            assert info['gate']['count'] == info['gate']['bytes'] == info['gate']['unsettled'] == 0
+        """,
+    )
+
+
+@pytest.mark.parametrize("dedicated_loop", [False, True])
 @pytest.mark.parametrize("observation", ["result", "exception"])
 def test_tasks__observed_original_exception_releases_native_ownership(
-    tmp_path: Path, observation: str
+    tmp_path: Path, observation: str, dedicated_loop: bool
 ) -> None:
     task_program(
         tmp_path,
         "        observation = "
         + repr(observation)
+        + "\n        dedicated_loop = "
+        + repr(dedicated_loop)
         + "\n"
         + """
         import gc
@@ -52,7 +154,9 @@ def test_tasks__observed_original_exception_releases_native_ownership(
                     tracebacks.append(original.__traceback__)
                     raise
             sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)).__aenter__()
-            ref = await sup.start(TaskFunction(fail, TypeAdapter(int), TypeAdapter(int)), 1)
+            ref = await sup.start(TaskFunction(
+                fail, TypeAdapter(int), TypeAdapter(int), dedicated_loop=dedicated_loop
+            ), 1)
             async def observe():
                 if observation == 'exception':
                     assert await ref.exception() is original
