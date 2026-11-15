@@ -120,7 +120,7 @@ def test_public_runtime_api__native_exports_and_execution(
         halt(0).
     """.replace("HOST_PATHS", host_python_paths()).replace(
         "PYTHON_PATHS",
-        json.dumps(f"import sys; sys.path[:0] = {[str(ROOT / 'src'), str(tmp_path)]!r}"),
+        json.dumps("import sys; sys.path[:0] = {!r}".format([str(ROOT / "src"), str(tmp_path)])),
     )
     environment = os.environ.copy()
     environment["ERL_CRASH_DUMP"] = str(tmp_path / "erl_crash.dump")

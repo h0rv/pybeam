@@ -14,7 +14,7 @@ from pybeam.supervision.ref import SupervisorRef
 
 
 async def main(parent_process: object, event_channel: object) -> bool:
-    from _erlang_impl._supervision import ChildState
+    from erlang.supervision import ChildState
 
     from tests.native.supervision_support import DemoCounter, DemoEvents, Started, Stopped
 

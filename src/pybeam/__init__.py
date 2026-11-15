@@ -1,3 +1,3 @@
-from pybeam.runtime.api import run
+from pybeam.runtime.entrypoint import run
 
 __all__ = ["run"]

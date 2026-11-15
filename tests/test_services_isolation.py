@@ -34,8 +34,6 @@ def test_services__no_web_dependency_or_standard_loop_fallback() -> None:
 import asyncio
 import sys
 sys.path[:0] = PATHS
-from tests.native.service_helpers import load_service_helpers
-load_service_helpers()
 from pybeam.services.background import ServiceSlot
 
 async def consume() -> None:
@@ -53,7 +51,7 @@ asyncio.run(check())
 assert not {'hornbeam', 'fastapi', 'litestar', 'pyview', 'httpx'} & sys.modules.keys()
 """.replace(
         "PATHS",
-        repr([str(ROOT / "src"), str(ROOT)]),
+        repr([str(ROOT / "src"), str(ROOT.parent / "erlang-python" / "priv")]),
     )
     result = subprocess.run(
         [sys.executable, "-I", "-c", code],

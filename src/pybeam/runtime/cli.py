@@ -2,8 +2,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from pybeam.runtime.api import run_file
 from pybeam.runtime.config import BootstrapError
+from pybeam.runtime.entrypoint import run_file
 
 
 def main() -> None:

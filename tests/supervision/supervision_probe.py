@@ -3,8 +3,8 @@ import sys
 from collections.abc import Awaitable
 
 import erlang
-from _erlang_impl._supervision import CapabilityUnavailable as NativeCapabilityUnavailable
-from _erlang_impl._supervision import ChildState, NativeSupervisor, SupervisorError
+from erlang.supervision import CapabilityUnavailable as NativeCapabilityUnavailable
+from erlang.supervision import ChildState, NativeSupervisor, SupervisorError
 
 from pybeam.mailbox import UnboundedMailbox
 from pybeam.supervision.config import (
@@ -28,7 +28,7 @@ async def expect_native_unavailable(operation: Awaitable[object]) -> None:
 
 
 async def exercise(parent_process: object) -> bool:
-    assert sys.modules["erlang.supervision"] is sys.modules["_erlang_impl._supervision"]
+    assert sys.modules["erlang.supervision"] is erlang.supervision
     parent = SupervisorRef.attach(parent_process, mailbox=UnboundedMailbox(), max_children=None)
     bounded_native = NativeSupervisor(
         parent_process, capacity=128, max_bytes=4096, max_children=None
