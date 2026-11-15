@@ -60,6 +60,7 @@ def _command(assets: RuntimeAssets) -> list[str]:
         "+Bi",
         "-noshell",
         "-noinput",
+        *(["-boot", str(assets.boot)] if assets.boot is not None else []),
         "-pa",
         *(str(path) for path in assets.code_paths),
         "-s",
@@ -79,6 +80,7 @@ def launch(entry: Path, args: list[str], config: Config, assets: RuntimeAssets) 
         completed = Path(temporary) / "completed"
         cleanup = Path(temporary) / "cleanup"
         environment = dict(os.environ)
+        environment.update(assets.environment)
         environment["PYBEAM_SHUTDOWN"] = str(shutdown)
         environment["PYBEAM_COMPLETION"] = str(completed)
         environment["PYBEAM_CLEANUP"] = str(cleanup)

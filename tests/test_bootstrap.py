@@ -134,6 +134,48 @@ def test_process__preserves_args_environment_cwd_stdio(
     assert output == [[str(fake_runtime), "a", "--flag"], str(fake_runtime.parent), "retained"]
 
 
+@pytest.mark.parametrize("boot", [None, Path("runtime/bin/start")])
+def test_process__command_uses_packaged_boot_without_a_script_launcher(boot: Path | None) -> None:
+    assets = RuntimeAssets(
+        Path("runtime/erts/bin/erlexec"), (Path("runtime/lib/app/ebin"),), boot=boot
+    )
+    command = process._command(assets)
+    assert command[0] == str(assets.executable)
+    assert command[-3:] == ["-s", "py_launch", "start"]
+    if boot is None:
+        assert "-boot" not in command
+    else:
+        assert command[command.index("-boot") + 1] == str(boot)
+
+
+def test_process__merges_asset_environment_without_losing_caller_environment(
+    fake_runtime: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("PYBEAM_TEST_VALUE", "caller-value")
+    monkeypatch.setenv("ROOTDIR", "stale-runtime")
+    fake_runtime.write_text(
+        "import json, os\nfrom pathlib import Path\n"
+        "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
+        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
+        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "print(json.dumps({key: os.environ[key] for key in "
+        "['ROOTDIR', 'BINDIR', 'EMU', 'PROGNAME', 'PYBEAM_TEST_VALUE']}))\n"
+    )
+    assets = RuntimeAssets(
+        Path(sys.executable), (), root_dir=fake_runtime.parent, bindir=fake_runtime.parent / "bin"
+    )
+    assert process.launch(fake_runtime, [], Config(), assets) == 0
+    assert json.loads(capfd.readouterr().out) == {
+        "ROOTDIR": str(fake_runtime.parent),
+        "BINDIR": str(fake_runtime.parent / "bin"),
+        "EMU": "beam",
+        "PROGNAME": "erl",
+        "PYBEAM_TEST_VALUE": "caller-value",
+    }
+
+
 def test_process__reports_missing_executable(tmp_path: Path) -> None:
     with pytest.raises(BootstrapError, match="Cannot start"):
         process.launch(tmp_path / "app.py", [], Config(), RuntimeAssets(tmp_path / "absent", ()))
