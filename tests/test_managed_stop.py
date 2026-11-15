@@ -34,17 +34,39 @@ from pybeam.runtime.guardian import (
     acknowledge_registered,
 )
 from pybeam.runtime.ownership import Identity, Registry, identity
+from pybeam.runtime.startup import (
+    CompleteStartup,
+    ManagedStartupCensus,
+    RegisteredLauncher,
+    StartupPlan,
+)
 
 
 def sample_ack(owner: Identity) -> ManagedCleanupAck:
     guard = Identity(pid=900002, created=2.0)
     launcher = Identity(pid=900003, created=3.0)
+    vm = Identity(pid=900004, created=4.0)
     return ManagedCleanupAck(
         owner=owner,
         guardian=guard,
-        cleanup=Registry(phase="confirmed", owned=(launcher,)),
+        cleanup=Registry(phase="confirmed", owned=(launcher, vm)),
         launchers=(launcher,),
         shutdowns=(NodeExit(alias="a", launcher=launcher, clean=True, status=143),),
+        forced_cleanup_count=0,
+    )
+
+
+def sample_census(owner: Identity) -> ManagedStartupCensus:
+    launcher = Identity(pid=900003, created=3.0)
+    vm = Identity(pid=900004, created=4.0)
+    return ManagedStartupCensus(
+        owner=owner,
+        guardian=Identity(pid=900002, created=2.0),
+        plan=StartupPlan(aliases=("a",)),
+        startup=CompleteStartup(
+            launches=(RegisteredLauncher(alias="a", launcher=launcher, vm=vm),)
+        ),
+        registry=Registry(phase="confirmed", owned=(launcher, vm)),
         forced_cleanup_count=0,
     )
 
@@ -108,6 +130,10 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     ack = sample_ack(owner)
     owned = {owner, ack.guardian, *ack.cleanup.owned}
     (tmp_path / "managed-cleanup.json").write_text(ack.model_dump_json())
+    (tmp_path / "managed-startup-census.json").write_text(sample_census(owner).model_dump_json())
+    (tmp_path / "ownership.json").write_text(
+        Registry(phase="confirmed", owned=tuple(owned)).model_dump_json()
+    )
     assert read_exit(tmp_path, owner, owned, 0) == AcknowledgedExit(ack)
     assert isinstance(read_exit(tmp_path, ack.guardian, owned, 0), UnacknowledgedExit)
     assert isinstance(read_exit(tmp_path, owner, {owner}, 0), UnacknowledgedExit)

@@ -4,6 +4,8 @@ import secrets
 import subprocess
 import sys
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Literal, assert_never
@@ -21,6 +23,21 @@ from pybeam.runtime.ownership import (
     record,
     resolve,
 )
+from pybeam.runtime.startup import (
+    LauncherBirth,
+    LauncherEntry,
+    ManagedStartupCensus,
+    PendingLauncher,
+    RegisteredEntry,
+    RegisteredLauncher,
+    ServiceEntry,
+    SpawnEntry,
+    StartupPlan,
+    VmEntry,
+    progress,
+)
+
+_SERVICE_ENTRY = ServiceEntry()
 
 
 class RegistrationPhase(StrEnum):
@@ -32,6 +49,7 @@ class SpawnRequest(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
 
     argv: tuple[str, ...] = Field(min_length=1)
+    entry: SpawnEntry = ServiceEntry()
 
 
 class SpawnReply(BaseModel):
@@ -87,6 +105,7 @@ class Registration(BaseModel):
     owner: Identity
     guardian: Identity
     generation: Annotated[str, Field(min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$")]
+    entry: RegisteredEntry = ServiceEntry()
 
 
 class GuardianEndpoint(BaseModel):
@@ -120,6 +139,39 @@ class GuardianEndpoint(BaseModel):
         self.require_lifetime()
         if self.stopping():
             raise StopRequested("Outer owner cancelled execution authorization")
+
+
+@dataclass(frozen=True, slots=True)
+class _NoCensus:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _CensusTarget:
+    endpoint: GuardianEndpoint
+    plan: StartupPlan
+
+
+def observe_vm(launches: list[LauncherBirth], registration: Registration) -> None:
+    match registration.entry:
+        case ServiceEntry():
+            return
+        case VmEntry(alias=alias, launcher=launcher):
+            for index, item in enumerate(launches):
+                if item.launcher == launcher:
+                    if item.alias != alias or isinstance(item, RegisteredLauncher):
+                        raise AuthorizationError("VM registration disagrees with launcher census")
+                    launches[index] = RegisteredLauncher(
+                        alias=alias, launcher=launcher, vm=registration.process
+                    )
+                    return
+            raise AuthorizationError("VM has no independently spawned launcher")
+        case other:
+            assert_never(other)
+
+
+def _ignore_registration(registration: Registration) -> None:
+    pass
 
 
 def register_borrowed(endpoint: GuardianEndpoint, local: Registration) -> None:
@@ -173,7 +225,13 @@ def _acknowledge(
         raise
 
 
-def acknowledge_registered(path: Path, owned: set[Identity], endpoint: GuardianEndpoint) -> None:
+def acknowledge_registered(
+    path: Path,
+    owned: set[Identity],
+    endpoint: GuardianEndpoint,
+    *,
+    before_ack: Callable[[Registration], None] = _ignore_registration,
+) -> None:
     registration = Registration.model_validate_json(path.read_text())
     if registration.owner != endpoint.owner or registration.guardian != endpoint.guardian:
         raise AuthorizationError("Registration belongs to a different owner or guardian")
@@ -181,11 +239,16 @@ def acknowledge_registered(path: Path, owned: set[Identity], endpoint: GuardianE
     process = resolve(registration.process)
     if process is None:
         raise AuthorizationError("Cannot register an exited native process")
+    if isinstance(registration.entry, VmEntry):
+        parent = process.parent()
+        if parent is None or identity(parent) != registration.entry.launcher:
+            raise AuthorizationError("VM registration has a different actual launcher parent")
     ancestors = {identity(parent) for parent in process.parents() if parent.pid > 0}
     if registration.process not in owned and not ancestors.intersection(owned):
         raise AuthorizationError("Native process has no registered owner")
     owned.add(registration.process)
     record(endpoint.directory, owned, "tracking")
+    before_ack(registration)
     ack = path.with_suffix(".ack")
     _acknowledge(ack, registration, endpoint.owner, endpoint.guardian)
     try:
@@ -207,12 +270,24 @@ def _authorize_execution(registration: Registration) -> None:
     _require_live(registration.owner, "Owner exited before execution authorization")
 
 
-def spawn_owned(directory: Path, argv: tuple[str, ...], *, timeout: float = 5.0) -> Identity:
+def spawn_owned(
+    directory: Path,
+    argv: tuple[str, ...],
+    *,
+    timeout: float = 5.0,
+    entry: SpawnEntry = _SERVICE_ENTRY,
+) -> Identity:
+    if (directory / "registration.closed").exists() or (directory / "stop").exists():
+        raise StopRequested("Local spawn admission is sealed")
     reply = directory / "spawn.reply.json"
     reply.unlink(missing_ok=True)
-    durable_write(directory / "spawn.request.json", SpawnRequest(argv=argv).model_dump_json())
+    durable_write(
+        directory / "spawn.request.json", SpawnRequest(argv=argv, entry=entry).model_dump_json()
+    )
     deadline = time.monotonic() + timeout
     while not reply.exists():
+        if (directory / "registration.closed").exists() or (directory / "stop").exists():
+            raise StopRequested("Local spawn admission is sealed")
         if time.monotonic() >= deadline:
             raise TimeoutError("Guardian did not acknowledge owned process startup")
         time.sleep(0.01)
@@ -224,6 +299,40 @@ def supervise(directory: Path, owner: Identity) -> None:
     guardian = identity(psutil.Process())
     external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
     endpoint = None if external is None else GuardianEndpoint.model_validate_json(external)
+    launches: list[LauncherBirth] = []
+    target = (
+        _CensusTarget(
+            endpoint,
+            StartupPlan.model_validate_json((directory / "startup-plan.json").read_bytes()),
+        )
+        if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop)
+        else _NoCensus()
+    )
+
+    def write_census(registry: Registry, forced: int = 0) -> None:
+        match target:
+            case _NoCensus():
+                return
+            case _CensusTarget(endpoint=borrowed, plan=plan):
+                durable_write(
+                    borrowed.directory / "managed-startup-census.json",
+                    ManagedStartupCensus(
+                        owner=owner,
+                        guardian=guardian,
+                        plan=plan,
+                        startup=progress(plan, tuple(launches)),
+                        registry=registry,
+                        forced_cleanup_count=forced,
+                    ).model_dump_json(),
+                )
+            case other:
+                assert_never(other)
+
+    def before_ack(registration: Registration) -> None:
+        if isinstance(target, _CensusTarget):
+            observe_vm(launches, registration)
+            write_census(Registry(phase="tracking", owned=tuple(owned)))
+
     if endpoint is not None:
         register_borrowed(
             endpoint,
@@ -275,6 +384,9 @@ def supervise(directory: Path, owner: Identity) -> None:
                 children.append(child)
                 value = identity(psutil.Process(child.pid))
                 owned.add(value)
+                if isinstance(target, _CensusTarget) and isinstance(command.entry, LauncherEntry):
+                    launches.append(PendingLauncher(alias=command.entry.alias, launcher=value))
+                    write_census(Registry(phase="tracking", owned=tuple(owned)))
                 record(directory, owned, "tracking")
                 durable_write(
                     directory / "spawn.reply.json", SpawnReply(identity=value).model_dump_json()
@@ -292,6 +404,7 @@ def supervise(directory: Path, owner: Identity) -> None:
                         guardian=guardian,
                         stop_file=directory / "stop",
                     ),
+                    before_ack=before_ack,
                 )
             for child in children:
                 child.poll()
@@ -330,6 +443,9 @@ def supervise(directory: Path, owner: Identity) -> None:
         streams.close()
         (directory / "home" / ".erlang.cookie").unlink(missing_ok=True)
         record(directory, owned, "uncertain" if survivors else "confirmed")
+        write_census(
+            Registry.model_validate_json((directory / "ownership.json").read_bytes()), forced
+        )
         if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
             durable_write(
                 directory / "guardian-exit.json",
@@ -350,8 +466,17 @@ def gate(command: list[str]) -> None:
         raise AuthorizationError("Missing owner identity; entry is sealed")
     owner = Identity.model_validate_json(owner_text)
     guardian = Identity.model_validate_json(os.environ["PYBEAM_GUARDIAN_IDENTITY"])
+    external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
+    endpoint = None if external is None else GuardianEndpoint.model_validate_json(external)
+    alias = os.environ.get("PYBEAM_NODE_ALIAS")
+    entry: RegisteredEntry = ServiceEntry()
+    if alias is not None and endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
+        parent = psutil.Process().parent()
+        if parent is None:
+            raise AuthorizationError("VM registration has no launcher parent")
+        entry = VmEntry(alias=alias, launcher=identity(parent))
     authorization = Registration(
-        process=value, owner=owner, guardian=guardian, generation=secrets.token_hex(16)
+        process=value, owner=owner, guardian=guardian, generation=secrets.token_hex(16), entry=entry
     )
     _require_live(owner, "Owner exited before process registration")
     _require_live(guardian, "Guardian exited before ownership transfer")
@@ -368,9 +493,8 @@ def gate(command: list[str]) -> None:
     if Registration.model_validate_json(ack.read_text()) != authorization:
         raise AuthorizationError("Ownership acknowledgment has a different identity or generation")
     ack.unlink()
-    external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
-    if external is not None:
-        register_borrowed(GuardianEndpoint.model_validate_json(external), authorization)
+    if endpoint is not None:
+        register_borrowed(endpoint, authorization)
     _authorize_execution(authorization)
     os.execv(command[0], command)  # noqa: S606
 

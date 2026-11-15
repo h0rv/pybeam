@@ -29,6 +29,7 @@ from pybeam.runtime.ownership import (
     resolve,
 )
 from pybeam.runtime.process import launch
+from pybeam.runtime.startup import LauncherEntry, StartupPlan
 
 
 class _NodeLaunch(BaseModel):
@@ -176,6 +177,12 @@ class LocalCluster:
             # Ignore inherited Erlang flags; they may override cookie, ports, or startup.
             for key in ("ERL_FLAGS", "ERL_AFLAGS", "ERL_ZFLAGS"):
                 environment.pop(key, None)
+            durable_write(
+                self.directory / "startup-plan.json",
+                StartupPlan(
+                    aliases=tuple(node.alias for node in self.distribution.nodes)
+                ).model_dump_json(),
+            )
             self._guardian = subprocess.Popen(  # noqa: S603
                 [
                     sys.executable,
@@ -280,6 +287,7 @@ class LocalCluster:
                 "pybeam.runtime.cluster",
                 str(self.directory / (alias + ".launch.json")),
             ),
+            entry=LauncherEntry(alias=alias),
         )
         self._launchers[alias] = value
         self._launcher_history.append(value)

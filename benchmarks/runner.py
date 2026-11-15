@@ -13,7 +13,6 @@ from typing import Literal
 
 import psutil
 from examples.distributed.models import WalkthroughProof
-from pybeam.runtime.cluster import ManagedCleanupAck
 from pybeam.runtime.guardian import ImmediateStop
 from pydantic import TypeAdapter, ValidationError
 
@@ -29,6 +28,7 @@ from benchmarks.contract import (
     StrictModel,
     check_correctness,
 )
+from benchmarks.managed import UnacknowledgedExit, parse_cleanup
 from benchmarks.metrics import describe
 from benchmarks.ownership import (
     Control,
@@ -203,7 +203,10 @@ def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> 
                 or outcome.cleanup_state != "confirmed"
             ):
                 raise ValueError("Cancelled outcome lacks a cooperative managed policy")
-            ManagedCleanupAck.model_validate_json((directory / "managed-cleanup.json").read_bytes())
+            registry = Registry.model_validate_json((directory / "ownership.json").read_bytes())
+            parsed = parse_cleanup(directory, set(registry.owned), outcome.returncode)
+            if isinstance(parsed, UnacknowledgedExit):
+                raise ValueError(parsed.reason)
         return TrialSummary(
             trial=index,
             outcome=outcome,

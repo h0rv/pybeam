@@ -82,6 +82,7 @@ def serve(
                         "native-ready.json",
                         "inner-cleanup.json",
                         "managed-cleanup.json",
+                        "managed-startup-census.json",
                     ):
                         source = trial / name
                         if source.is_file():

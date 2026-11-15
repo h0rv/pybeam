@@ -5,6 +5,7 @@ from typing import Literal, assert_never
 
 from pybeam.runtime.cluster import ManagedCleanupAck
 from pybeam.runtime.ownership import Identity, resolve
+from pybeam.runtime.startup import ManagedStartupCensus
 
 
 class StopSignal(StrEnum):
@@ -86,8 +87,8 @@ class Draining:
 type ExecutionPhase = Active | Draining
 
 
-def read_exit(
-    directory: Path, adapter: Identity, owned: set[Identity], returncode: int
+def parse_cleanup(
+    directory: Path, owned: set[Identity], returncode: int | None
 ) -> AcknowledgedExit | UnacknowledgedExit:
     if returncode != 0:
         return UnacknowledgedExit("Managed adapter exited unsuccessfully")
@@ -95,14 +96,46 @@ def read_exit(
         ack = ManagedCleanupAck.model_validate_json(
             (directory / "managed-cleanup.json").read_bytes()
         )
+        census = ManagedStartupCensus.model_validate_json(
+            (directory / "managed-startup-census.json").read_bytes()
+        )
     except OSError, ValueError:
         return UnacknowledgedExit("Managed cleanup ACK missing or invalid")
     if (
-        ack.owner != adapter
-        or ack.guardian not in owned
-        or not set(ack.cleanup.owned).issubset(owned)
+        ack.owner != census.owner
+        or ack.guardian != census.guardian
+        or census.owner not in owned
+        or census.guardian not in owned
+        or set(census.registry.owned) != owned - {census.owner, census.guardian}
     ):
         return UnacknowledgedExit("Managed cleanup ACK belongs to different process births")
+    if (
+        census.registry.phase != "confirmed"
+        or census.forced_cleanup_count != 0
+        or set(ack.cleanup.owned) != set(census.registry.owned)
+        or len(ack.cleanup.owned) != len(census.registry.owned)
+        or set(ack.launchers) != {item.launcher for item in census.launches}
+        or {(item.alias, item.launcher) for item in ack.shutdowns}
+        != {(item.alias, item.launcher) for item in census.launches}
+    ):
+        return UnacknowledgedExit("Managed cleanup ACK omits or changes independent startup census")
     if any(resolve(value) is not None for value in owned):
         return UnacknowledgedExit("Managed cleanup ACK left registered processes alive")
     return AcknowledgedExit(ack)
+
+
+def read_exit(
+    directory: Path, adapter: Identity, owned: set[Identity], returncode: int
+) -> AcknowledgedExit | UnacknowledgedExit:
+    result = parse_cleanup(directory, owned, returncode)
+    match result:
+        case AcknowledgedExit(ack):
+            if ack.owner != adapter:
+                return UnacknowledgedExit(
+                    "Managed cleanup ACK belongs to a different adapter birth"
+                )
+            return result
+        case UnacknowledgedExit():
+            return result
+        case _:
+            assert_never(result)

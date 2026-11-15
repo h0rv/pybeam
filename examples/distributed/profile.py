@@ -14,7 +14,7 @@ from pybeam.runtime.optional_manifest import contained, verify_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "build/distribution-ready-profile.json"
-PROFILE_SHA256 = "34a0073a7d3f72335f5098d8684ee703d3d44a28aa0c0ba55d9227537bc48787"
+PROFILE_SHA256 = "d006e254235ce54978161735407360530c72e3f30e2e7a119d28fb75be26534d"
 
 
 class PreparedProfile(BaseModel):
