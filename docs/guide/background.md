@@ -1,16 +1,19 @@
 # Background services
 
-Start async work, retain its handle, and wait for cleanup when stopping it.
+Run a periodic heartbeat and wait for cleanup when stopping it.
 
-Save this function as `background_body.py`.
+Save this function as `background_body.py`. The service entry must be a module-level async function in an importable module, so it can be found by module and name. A closure cannot be used.
 
 ```python
 import asyncio
 
 
-async def watch() -> None:
+async def watch(ready: asyncio.Event) -> None:
     try:
-        await asyncio.Event().wait()
+        while True:
+            print("heartbeat")
+            ready.set()
+            await asyncio.sleep(1)
     finally:
         print("cleanup complete")
 ```
@@ -28,10 +31,10 @@ from pybeam.services.background import ServiceSlot
 
 async def main() -> None:
     slot = ServiceSlot(capacity=1)
-    service = slot.start(watch)
+    ready = asyncio.Event()
+    service = slot.start(watch, ready)
     try:
-        await asyncio.sleep(0.01)
-        print(service.state)
+        await ready.wait()
     finally:
         await service.stop()
     print(service.state)
@@ -41,6 +44,6 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `running`, `cleanup complete`, then `cancelled`. The slot admits one live service. Its entry must be an importable module-level async function, not a closure.
+The service prints `heartbeat` once per second until stopped. The entry waits for the first heartbeat, then stops it. You will see `cleanup complete`, then `cancelled`. The event confirms that work started without relying on a timed sleep.
 
-`stop` requests cooperative cancellation and waits for cleanup. A timeout from `wait` or `stop` does not prove the body has ended. This local API passes Python arguments directly; it does not serialize them.
+The slot admits one live service. Retain its handle and call `stop` in `finally`. `stop` requests cooperative cancellation and waits for cleanup. A timeout from `wait` or `stop` does not prove the body has ended. Arguments are passed directly, not serialized.

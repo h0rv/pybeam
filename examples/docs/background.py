@@ -8,10 +8,10 @@ from pybeam.services.background import ServiceSlot
 
 async def main() -> None:
     slot = ServiceSlot(capacity=1)
-    service = slot.start(watch)
+    ready = asyncio.Event()
+    service = slot.start(watch, ready)
     try:
-        await asyncio.sleep(0.01)
-        print(service.state)
+        await ready.wait()
     finally:
         await service.stop()
     print(service.state)

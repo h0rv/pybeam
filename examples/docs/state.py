@@ -9,8 +9,6 @@ async def main() -> None:
     print(await store.get("status"))
     await store.set("status", b"published")
     print(await store.get("status"))
-    print(await beam.incr("visits", 1, namespace="documents"))
-    print(await beam.incr("visits", 2, namespace="documents"))
     await store.delete("status")
 
 

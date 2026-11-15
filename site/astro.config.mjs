@@ -3,13 +3,14 @@ import { satteri } from "@astrojs/markdown-satteri";
 import { defineHastPlugin } from "satteri";
 import { fileURLToPath } from "node:url";
 import { relative } from "node:path";
-import { rewriteLink, repositoryRoot } from "./src/links.mjs";
+import { rewriteLink, repositoryRoot, redirects, withBase } from "./src/links.mjs";
 import { pybeamLight, pybeamDark } from "./src/pybeam-themes.mjs";
 import { codeBlocks } from "./src/code-blocks.mjs";
 
 export default defineConfig({
   site: process.env.DOCS_SITE || "https://h0rv.github.io",
   base: process.env.DOCS_BASE || "/",
+  redirects: Object.fromEntries(Object.entries(redirects).map(([from, to]) => ["/" + from, withBase(to, process.env.DOCS_BASE || "/")])),
   trailingSlash: "always",
   devToolbar: { enabled: false },
   markdown: {

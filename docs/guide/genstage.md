@@ -1,6 +1,6 @@
-# GenStage
+# Finite GenStage sample
 
-Transform requests under demand and consume the results with async iteration.
+Consume a fixed sample of transformed messages. In `stream(2, uppercase)`, `2` is the number of sample requests. The count must be 1 to 16. This API supplies its own `héllo` requests; it does not accept your records.
 
 Save the callback as `genstage_transform.py`.
 

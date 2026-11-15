@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { pages, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
+import { pages, navigation, redirects, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
 import { join } from "node:path";
 
 test("root and project hosting paths preserve trailing slashes", () => {
@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "quickstart/", "runtime/", "actors/", "messaging/", "state/", "subscriptions/", "supervision/", "background/", "genstage/", "web/", "limits/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "actors/", "messaging/", "background/", "web/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -25,11 +25,11 @@ test("only curated Markdown sources map to site pages", () => {
 });
 
 test("relative guide links, anchors and queries respect deployment base", () => {
-  assert.equal(rewriteLink("runtime.md#async-python", "docs/guide/index.md"), "/runtime/#async-python");
-  assert.equal(rewriteLink("actors.md?view=plain#actors", "docs/guide/quickstart.md", "/pybeam/"),
+  assert.equal(rewriteLink("actors.md#after-a-failure", "docs/guide/index.md"), "/actors/#after-a-failure");
+  assert.equal(rewriteLink("actors.md?view=plain#actors", "docs/guide/index.md", "/pybeam/"),
     "/pybeam/actors/?view=plain#actors");
   assert.equal(rewriteLink("index.md", "docs/guide/actors.md", "/pybeam/"), "/pybeam/");
-  assert.equal(rewriteLink("../../examples/actors/main.py", "docs/guide/quickstart.md"),
+  assert.equal(rewriteLink("../../examples/actors/main.py", "docs/guide/index.md"),
     "https://github.com/h0rv/pybeam/blob/main/examples/actors/main.py");
   for (const href of ["https://example.com/docs", "//example.com", "#memory", "mailto:help@example.com"])
     assert.equal(rewriteLink(href, "docs/guide/index.md", "/pybeam/"), href);
@@ -45,12 +45,12 @@ test("public guides explain API use without contributor or installation workflow
 });
 
 test("the first runnable snippet matches the ordinary async Python example", () => {
-  const markdown = readFileSync(join(repositoryRoot, "docs/guide/quickstart.md"), "utf8");
+  const markdown = readFileSync(join(repositoryRoot, "docs/guide/index.md"), "utf8");
   const snippet = markdown.match(/```python\n([\s\S]*?)```/)?.[1];
   assert.equal(snippet, readFileSync(join(repositoryRoot, "examples/docs/hello.py"), "utf8"));
   assert.match(snippet, /pybeam\.run\(main\)/);
   assert.doesNotMatch(snippet, /ActorGroup|@pybeam\.actor/);
-  assert.match(markdown, /\[actor\]\(actors\.md\)/);
+  assert.match(markdown, /\[Actors\]\(actors\.md\)/);
 });
 
 test("each concept has complete source-associated Python examples", () => {
@@ -69,7 +69,16 @@ test("each concept has complete source-associated Python examples", () => {
 test("the homepage puts Python before explanations and links to the first actions", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/index.md"), "utf8");
   assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 25);
-  assert.match(markdown, /\[Get started\]\(quickstart\.md\)/);
+  assert.equal(navigation.filter(({ label }) => label === "Get started").length, 1);
+  assert.equal(redirects["quickstart/"], "");
+  assert.doesNotMatch(markdown, /quickstart|Overview/);
   assert.match(markdown, /\[Actors\]\(actors\.md\)/);
   assert.doesNotMatch(markdown, /\| Capability/);
+});
+
+test("five task links replace grouped capability navigation", () => {
+  assert.equal(navigation.length, 5);
+  assert.ok(navigation.every((page) => !("group" in page)));
+  assert.ok(!navigation.some(({ path }) => path === "genstage/"));
+  assert.deepEqual(Object.keys(redirects), ["quickstart/", "runtime/", "state/", "subscriptions/", "supervision/", "limits/"]);
 });
