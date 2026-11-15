@@ -12,7 +12,9 @@ from zipfile import ZipFile
 
 import pytest
 
-from pybeam.runtime.optional import OptionalManifest
+from pybeam.runtime.config import BootstrapError
+from pybeam.runtime.optional import OptionalManifest, read_manifest
+from tools.runtime_wheel import audit_optional
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -190,5 +192,58 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
     assert rejected.returncode != 0
     assert "Optional runtime artifact is unavailable" in rejected.stderr
     module.write_bytes(saved)
+    manifest_file = optional / "manifest.json"
+    saved_manifest = manifest_file.read_bytes()
+
+    def invalid_manifest_is_rejected() -> None:
+        with pytest.raises(BootstrapError, match="Optional runtime artifact"):
+            read_manifest(optional)
+        with pytest.raises((ValueError, OSError)):
+            audit_optional(optional)
+        result = run(python, application / "genstage.py", environment)
+        assert result.returncode != 0
+        assert "Optional runtime artifact is unavailable" in result.stderr
+        assert "GenStage transformed" not in result.stdout
+
+    for field, value in (
+        ("otp_version", "0.0.0"),
+        ("sources", {"elixir": "0" * 40, "gen_stage": "0" * 40}),
+    ):
+        document: object = json.loads(saved_manifest)
+        assert isinstance(document, dict)
+        document[field] = value
+        try:
+            manifest_file.write_text(json.dumps(document))
+            invalid_manifest_is_rejected()
+        finally:
+            manifest_file.write_bytes(saved_manifest)
+    extra = module.with_name("unapproved.beam")
+    extra.write_bytes(b"unapproved but hash-declared code")
+    document = json.loads(saved_manifest)
+    assert isinstance(document, dict)
+    files: object = document["files"]
+    assert isinstance(files, list)
+    files.append(
+        {
+            "path": str(extra.relative_to(optional)),
+            "sha256": hashlib.sha256(extra.read_bytes()).hexdigest(),
+        }
+    )
+    try:
+        manifest_file.write_text(json.dumps(document))
+        invalid_manifest_is_rejected()
+    finally:
+        extra.unlink()
+        manifest_file.write_bytes(saved_manifest)
+    external = tmp_path / "external-manifest.json"
+    external.write_bytes(saved_manifest)
+    manifest_file.unlink()
+    manifest_file.symlink_to(external)
+    try:
+        invalid_manifest_is_rejected()
+    finally:
+        manifest_file.unlink()
+        manifest_file.write_bytes(saved_manifest)
+    print("INSTALLED_MANIFEST_NEGATIVES source/OTP/extra-beam/external-manifest rejected")
     print("INSTALLED_DIRECTORY", moved)
     print("INSTALLED_WHEEL", wheel)
