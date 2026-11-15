@@ -22,7 +22,7 @@ from examples.distributed.models import (
     StateObserved,
     WalkthroughProof,
 )
-from examples.distributed.policy import walkthrough_budget
+from examples.distributed.policy import walkthrough_budget, walkthrough_stop
 from examples.showcase.catalog import ROOT, Card, distributed_unavailable
 
 
@@ -190,6 +190,7 @@ class Jobs:
                     python_source=str(ROOT),
                     repeats=1,
                     purpose="walkthrough",
+                    stop_policy=walkthrough_stop(),
                     budget=walkthrough_budget(),
                     adapter_command=(sys.executable, "-m", "examples.showcase.distributed"),
                 )

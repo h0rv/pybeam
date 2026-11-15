@@ -78,6 +78,7 @@ def serve(port: int, audit: Path, *, hold: bool = False) -> None:
                         "outcome.json",
                         "native-ready.json",
                         "inner-cleanup.json",
+                        "managed-cleanup.json",
                     ):
                         source = trial / name
                         if source.is_file():

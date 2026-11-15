@@ -11,14 +11,14 @@ import time
 from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
-from typing import Self
+from typing import Annotated, Self
 
 import psutil
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pybeam.runtime.assets import RuntimeAssets, discover_assets
 from pybeam.runtime.config import BootstrapError, Config, Distribution
-from pybeam.runtime.guardian import GuardianEndpoint, spawn_owned
+from pybeam.runtime.guardian import GuardianEndpoint, GuardianExit, ManagedStop, spawn_owned
 from pybeam.runtime.ownership import (
     Identity,
     Registry,
@@ -49,6 +49,33 @@ class NodeExit(BaseModel):
     status: int
 
 
+class ManagedCleanupAck(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    owner: Identity
+    guardian: Identity
+    cleanup: Registry
+    launchers: tuple[Identity, ...]
+    shutdowns: tuple[NodeExit, ...]
+    forced_cleanup_count: Annotated[int, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def acknowledged(self) -> Self:
+        if self.owner == self.guardian:
+            raise ValueError("Managed cleanup requires distinct owner and guardian births")
+        if self.cleanup.phase != "confirmed" or self.forced_cleanup_count != 0:
+            raise ValueError("Managed cleanup was uncertain or forced")
+        if (
+            len(set(self.launchers)) != len(self.launchers)
+            or {item.launcher for item in self.shutdowns} != set(self.launchers)
+            or len(self.shutdowns) != len(self.launchers)
+            or any(not item.clean for item in self.shutdowns)
+            or not set(self.launchers).issubset(self.cleanup.owned)
+        ):
+            raise ValueError("Managed cleanup lacks an exact launcher/VM ACK")
+        return self
+
+
 class _Phase(StrEnum):
     NEW = "new"
     STARTING = "starting"
@@ -73,6 +100,15 @@ class LocalCluster:
         self.distribution = distribution
         self.config = Config() if config is None else config
         self._external_guardian = guardian
+        if (
+            guardian is not None
+            and isinstance(guardian.stop_policy, ManagedStop)
+            and self.config.shutdown_timeout != guardian.stop_policy.node_shutdown_seconds
+        ):
+            raise BootstrapError("Managed stop policy differs from the node cleanup budget")
+        self._owner_identity = identity(psutil.Process())
+        self._launcher_history: list[Identity] = []
+        self._forced_cleanup_count = 0
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._guardian: subprocess.Popen[bytes] | None = None
         self._guardian_identity: Identity | None = None
@@ -246,6 +282,7 @@ class LocalCluster:
             ),
         )
         self._launchers[alias] = value
+        self._launcher_history.append(value)
         self.identities.append(value)
         deadline = time.monotonic() + self.config.startup_timeout
         while not ready.exists():
@@ -274,7 +311,7 @@ class LocalCluster:
         if not marker.exists():
             raise BootstrapError("Owned launcher did not acknowledge VM cleanup: " + alias)
         outcome = NodeExit.model_validate_json(marker.read_text())
-        if outcome.launcher != value or not outcome.clean:
+        if outcome.alias != alias or outcome.launcher != value or not outcome.clean:
             raise BootstrapError("Owned VM cleanup failed: " + alias)
         if outcome not in self.shutdowns:
             self.shutdowns.append(outcome)
@@ -300,6 +337,22 @@ class LocalCluster:
             self._phase = _Phase.CLOSED
         if failure is not None:
             raise failure
+        endpoint = self._external_guardian
+        if (
+            endpoint is not None
+            and isinstance(endpoint.stop_policy, ManagedStop)
+            and self.cleanup is not None
+            and self._guardian_identity is not None
+        ):
+            ack = ManagedCleanupAck(
+                owner=self._owner_identity,
+                guardian=self._guardian_identity,
+                cleanup=self.cleanup,
+                launchers=tuple(self._launcher_history),
+                shutdowns=tuple(self.shutdowns),
+                forced_cleanup_count=self._forced_cleanup_count,
+            )
+            durable_write(endpoint.directory / "managed-cleanup.json", ack.model_dump_json())
 
     def _finish_guardian(self) -> None:
         guardian = self._guardian
@@ -325,6 +378,7 @@ class LocalCluster:
             or registry.phase != "confirmed"
             or any(resolve(value) is not None for value in owned)
         ):
+            self._forced_cleanup_count += sum(resolve(value) is not None for value in owned)
             survivors = cleanup(owned)
             guardian.wait(timeout=1)
             unknown_spawn = registry.phase == "spawning"
@@ -336,6 +390,14 @@ class LocalCluster:
         self.cleanup = Registry.model_validate_json(journal.read_text())
         if self.cleanup.phase != "confirmed":
             raise BootstrapError("Cluster ownership cleanup is uncertain")
+        endpoint = self._external_guardian
+        if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
+            report = GuardianExit.model_validate_json(
+                (self.directory / "guardian-exit.json").read_bytes()
+            )
+            if report.registry != self.cleanup:
+                raise BootstrapError("Managed guardian cleanup journal differs")
+            self._forced_cleanup_count += report.forced_cleanup_count
         self._guardian = None
 
     def __exit__(

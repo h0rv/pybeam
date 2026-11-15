@@ -1,10 +1,14 @@
 import sys
 from pathlib import Path
 
+import psutil
+
 from examples.distributed.demo import demonstration
 from examples.distributed.models import Observation
 from examples.showcase.catalog import ROOT, distributed_unavailable
-from pybeam.runtime.guardian import GuardianEndpoint
+from pybeam.runtime.cluster import ManagedCleanupAck
+from pybeam.runtime.guardian import GuardianEndpoint, ImmediateStop, StopRequested
+from pybeam.runtime.ownership import identity
 
 
 def walkthrough(directory: Path, guardian: GuardianEndpoint) -> None:
@@ -33,7 +37,17 @@ def main() -> None:
     guardian = GuardianEndpoint.model_validate_json((directory / "guardian.json").read_text())
     if guardian.directory != directory:
         raise ValueError("Guardian registration directory differs from owned trial")
-    walkthrough(directory, guardian)
+    try:
+        walkthrough(directory, guardian)
+    except StopRequested:
+        if isinstance(guardian.stop_policy, ImmediateStop):
+            raise
+        ack = ManagedCleanupAck.model_validate_json(
+            (directory / "managed-cleanup.json").read_bytes()
+        )
+        if ack.owner != identity(psutil.Process()):
+            raise ValueError("Managed stop acknowledgment belongs to a different adapter") from None
+        guardian.require_lifetime()
 
 
 if __name__ == "__main__":

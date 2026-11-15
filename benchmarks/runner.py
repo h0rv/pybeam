@@ -13,6 +13,8 @@ from typing import Literal
 
 import psutil
 from examples.distributed.models import WalkthroughProof
+from pybeam.runtime.cluster import ManagedCleanupAck
+from pybeam.runtime.guardian import ImmediateStop
 from pydantic import TypeAdapter, ValidationError
 
 from benchmarks.contract import (
@@ -189,10 +191,19 @@ def recover_guardian(directory: Path, returncode: int | None) -> Outcome:
 
 
 def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> TrialSummary:
-    if outcome.status == "walkthrough":
+    if outcome.status in {"walkthrough", "cancelled"}:
         if config.purpose != "walkthrough":
             raise ValueError("Nonmeasurement outcome cannot satisfy a benchmark")
-        WalkthroughProof.model_validate_json((directory / "adapter.json").read_text())
+        if outcome.status == "walkthrough":
+            WalkthroughProof.model_validate_json((directory / "adapter.json").read_text())
+        else:
+            if (
+                isinstance(config.stop_policy, ImmediateStop)
+                or outcome.forced_cleanup_count != 0
+                or outcome.cleanup_state != "confirmed"
+            ):
+                raise ValueError("Cancelled outcome lacks a cooperative managed policy")
+            ManagedCleanupAck.model_validate_json((directory / "managed-cleanup.json").read_bytes())
         return TrialSummary(
             trial=index,
             outcome=outcome,

@@ -4,14 +4,16 @@ import secrets
 import subprocess
 import sys
 import time
+from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal, assert_never
 
 import psutil
 from pydantic import BaseModel, ConfigDict, Field
 
 from pybeam.runtime.ownership import (
     Identity,
+    Registry,
     cleanup,
     discover,
     durable_write,
@@ -19,6 +21,11 @@ from pybeam.runtime.ownership import (
     record,
     resolve,
 )
+
+
+class RegistrationPhase(StrEnum):
+    OPEN = "open"
+    SEALED = "sealed"
 
 
 class SpawnRequest(BaseModel):
@@ -35,6 +42,42 @@ class SpawnReply(BaseModel):
 
 class AuthorizationError(RuntimeError):
     pass
+
+
+class StopRequested(AuthorizationError):
+    pass
+
+
+class ImmediateStop(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    kind: Literal["immediate"] = "immediate"
+
+
+class ManagedStop(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    kind: Literal["managed"] = "managed"
+    node_shutdown_seconds: Annotated[float, Field(gt=0, le=5, allow_inf_nan=False)] = 5.0
+    guardian_seconds: Literal[8] = 8
+
+    @property
+    def grace_seconds(self) -> float:
+        return 2 * (self.node_shutdown_seconds + 2) + self.guardian_seconds
+
+    @property
+    def guardian_grace_seconds(self) -> float:
+        return self.guardian_seconds - 2
+
+
+type StopPolicy = Annotated[ImmediateStop | ManagedStop, Field(discriminator="kind")]
+
+
+class GuardianExit(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    registry: Registry
+    forced_cleanup_count: Annotated[int, Field(ge=0)]
 
 
 class Registration(BaseModel):
@@ -60,16 +103,23 @@ class GuardianEndpoint(BaseModel):
     guardian: Identity
     stop_file: Path | None = None
     control_owner: Identity | None = None
+    stop_policy: StopPolicy = ImmediateStop()
 
-    def require_active(self) -> None:
+    def require_lifetime(self) -> None:
         _require_live(self.owner, "Outer owner exited before execution authorization")
         _require_live(self.guardian, "Outer guardian exited before execution authorization")
         if self.control_owner is not None:
             _require_live(self.control_owner, "Outer control owner exited before authorization")
-        if (self.directory / "registration.closed").exists() or (
+
+    def stopping(self) -> bool:
+        return (self.directory / "registration.closed").exists() or (
             self.stop_file is not None and self.stop_file.exists()
-        ):
-            raise AuthorizationError("Outer owner cancelled execution authorization")
+        )
+
+    def require_active(self) -> None:
+        self.require_lifetime()
+        if self.stopping():
+            raise StopRequested("Outer owner cancelled execution authorization")
 
 
 def register_borrowed(endpoint: GuardianEndpoint, local: Registration) -> None:
@@ -193,12 +243,22 @@ def supervise(directory: Path, owner: Identity) -> None:
     record(directory, owned, "tracking")
     try:
         while resolve(owner) is not None and not (directory / "stop").exists():
+            admission = RegistrationPhase.OPEN
             if endpoint is not None:
-                endpoint.require_active()
+                match endpoint.stop_policy:
+                    case ImmediateStop():
+                        endpoint.require_active()
+                    case ManagedStop():
+                        endpoint.require_lifetime()
+                        if endpoint.stopping():
+                            admission = RegistrationPhase.SEALED
+                            durable_write(directory / "registration.closed", "draining")
+                    case other:
+                        assert_never(other)
             if time.monotonic() > deadline:
                 raise TimeoutError("Local cluster lifetime exceeded")
             request = directory / "spawn.request.json"
-            if request.exists():
+            if request.exists() and admission is RegistrationPhase.OPEN:
                 command = SpawnRequest.model_validate_json(request.read_text())
                 _require_live(owner, "Owner exited before owned process startup")
                 record(directory, owned, "spawning")
@@ -220,7 +280,9 @@ def supervise(directory: Path, owner: Identity) -> None:
                     directory / "spawn.reply.json", SpawnReply(identity=value).model_dump_json()
                 )
                 request.unlink()
-            for path in directory.glob("register-*.json"):
+            for path in (
+                directory.glob("register-*.json") if admission is RegistrationPhase.OPEN else ()
+            ):
                 acknowledge_registered(
                     path,
                     owned,
@@ -244,6 +306,20 @@ def supervise(directory: Path, owner: Identity) -> None:
             if child.poll() is None:
                 with contextlib.suppress(ProcessLookupError):
                     os.killpg(child.pid, 15)
+        if (
+            endpoint is not None
+            and isinstance(endpoint.stop_policy, ManagedStop)
+            and (directory / "stop").exists()
+            and resolve(owner) is not None
+        ):
+            grace = time.monotonic() + endpoint.stop_policy.guardian_grace_seconds
+            while any(resolve(value) is not None for value in owned):
+                if resolve(owner) is None or time.monotonic() >= grace:
+                    break
+                for child in children:
+                    child.poll()
+                time.sleep(0.01)
+        forced = sum(resolve(value) is not None for value in owned)
         survivors = cleanup(owned)
         from pybeam.runtime.process import _stop_owned
 
@@ -254,6 +330,16 @@ def supervise(directory: Path, owner: Identity) -> None:
         streams.close()
         (directory / "home" / ".erlang.cookie").unlink(missing_ok=True)
         record(directory, owned, "uncertain" if survivors else "confirmed")
+        if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
+            durable_write(
+                directory / "guardian-exit.json",
+                GuardianExit(
+                    registry=Registry.model_validate_json(
+                        (directory / "ownership.json").read_bytes()
+                    ),
+                    forced_cleanup_count=forced,
+                ).model_dump_json(),
+            )
 
 
 def gate(command: list[str]) -> None:

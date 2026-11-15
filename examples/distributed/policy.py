@@ -1,6 +1,8 @@
 from typing import Final
 
 from benchmarks.contract import Budget
+from pybeam.runtime.config import Config
+from pybeam.runtime.guardian import ManagedStop
 
 MAX_VMS: Final = 2
 PROCESS_LIMIT: Final = 16
@@ -18,6 +20,10 @@ CONTEXTS_PER_REQUEST: Final = 2
 THREAD_LIMIT: Final = (
     MAX_VMS * VM_BASE_THREADS + ADMITTED_TASKS * CONTEXTS_PER_REQUEST + (PROCESS_LIMIT - MAX_VMS)
 )
+
+
+def walkthrough_stop() -> ManagedStop:
+    return ManagedStop(node_shutdown_seconds=Config().shutdown_timeout)
 
 
 def walkthrough_budget() -> Budget:

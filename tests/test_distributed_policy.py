@@ -17,6 +17,7 @@ from examples.distributed.policy import (
     THREAD_LIMIT,
     VM_BASE_THREADS,
     walkthrough_budget,
+    walkthrough_stop,
 )
 from examples.showcase.catalog import ROOT
 from pybeam.runtime.ownership import Identity, identity
@@ -68,12 +69,18 @@ def test_walkthrough_policy__excess_still_triggers_the_existing_watchdog(
     config = Config(
         python_source=str(ROOT),
         purpose="walkthrough",
+        stop_policy=walkthrough_stop(),
         repeats=1,
         budget=walkthrough_budget(),
         adapter_command=(sys.executable, "-c", "import time; time.sleep(5)"),
     )
     (tmp_path / "config.json").write_text(config.model_dump_json())
-    outcome = guardian.supervise(tmp_path, identity(psutil.Process()))
+    stop = tmp_path / "stop.request"
+    stop.touch()
+    owner = identity(psutil.Process())
+    outcome = guardian.supervise(
+        tmp_path, owner, guardian.Control(owner=owner, stop_file=str(stop))
+    )
     assert outcome.status == "failed"
     assert outcome.reason == (
         "Owned thread count budget exceeded"

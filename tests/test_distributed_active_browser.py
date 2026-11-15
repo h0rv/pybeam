@@ -10,14 +10,17 @@ import httpx
 import pytest
 from playwright.sync_api import APIResponse, Route, expect, sync_playwright
 
+from examples.distributed.policy import walkthrough_stop
 from examples.distributed.profile import verify_prepared
 from examples.showcase.catalog import ROOT
+from pybeam.runtime.cluster import ManagedCleanupAck
 from pybeam.runtime.ownership import Registry, resolve
 from tests.fixtures.distributed_native_hold import InnerCleanup, NativeReady
 from tests.fixtures.distributed_native_server import Audit, JobAudit
 from tests.test_distributed_ready_browser import BASE, CHROME, PORT, wait_audit
 
 pytestmark = [pytest.mark.browser, pytest.mark.runtime]
+ACK_DEADLINE = walkthrough_stop().grace_seconds + 4
 
 
 def created_job(audit: Audit, previous: frozenset[str]) -> JobAudit | None:
@@ -127,7 +130,9 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                     if action == "cancel":
                         a.route("**/cancel/" + job.id, delay)
                         row_a.get_by_role("button", name=re.compile("^Cancel")).click()
-                        expect(row_a).to_have_attribute("data-status", "stopped", timeout=20000)
+                        expect(row_a).to_have_attribute(
+                            "data-status", "stopped", timeout=int(ACK_DEADLINE * 1000)
+                        )
                         expect(row_b).to_have_attribute("data-status", "stopped")
                         route, reply = held.pop()
                         assert reply.status == 204
@@ -136,15 +141,21 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                     else:
                         # Both SSE connections and both verified VMs are still live here.
                         process.terminate()
-                        process.wait(timeout=20)
+                        process.wait(timeout=ACK_DEADLINE)
                     audit = Audit.model_validate_json(audit_path.read_bytes())
                     actual = next(item for item in audit.jobs if item.id == job.id)
                     assert actual.outcome is not None and actual.registry is not None
+                    assert actual.outcome.status == "cancelled"
                     assert actual.outcome.cleanup_state == "confirmed"
                     assert not actual.outcome.cleanup_survivors
                     assert all(resolve(birth) is None for birth in actual.registry.owned)
                     assert all(resolve(birth) is None for birth in ready.outer.owned)
                     assert actual.outcome.forced_cleanup_count == 0
+                    ack = ManagedCleanupAck.model_validate_json(
+                        (tmp_path / (job.id + ".managed-cleanup.json")).read_bytes()
+                    )
+                    assert ack.forced_cleanup_count == 0 and len(ack.shutdowns) == 2
+                    assert all(item.clean for item in ack.shutdowns)
                     cleanup_path = tmp_path / (job.id + ".inner-cleanup.json")
                     assert cleanup_path.is_file(), "No real inner cleanup/VM shutdown ACK"
                     inner = InnerCleanup.model_validate_json(cleanup_path.read_bytes())
@@ -156,7 +167,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         second.close()
                         wait_audit(audit_path, subscribers=0)
                         process.terminate()
-                        process.wait(timeout=20)
+                        process.wait(timeout=ACK_DEADLINE)
                     audit = wait_audit(audit_path, subscribers=0)
                     assert audit.close_calls == 1
                     assert (
@@ -167,4 +178,4 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
         finally:
             if process.poll() is None:
                 process.terminate()
-                process.wait(timeout=20)
+                process.wait(timeout=ACK_DEADLINE)
