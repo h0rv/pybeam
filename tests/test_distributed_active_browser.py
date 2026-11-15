@@ -7,20 +7,23 @@ import time
 from pathlib import Path
 
 import httpx
+import psutil
 import pytest
 from playwright.sync_api import APIResponse, Route, expect, sync_playwright
+from pydantic import TypeAdapter
 
 from examples.distributed.policy import walkthrough_stop
 from examples.distributed.profile import verify_prepared
 from examples.showcase.catalog import ROOT
 from pybeam.runtime.cluster import ManagedCleanupAck
-from pybeam.runtime.ownership import Registry, resolve
+from pybeam.runtime.ownership import Registry, identity, resolve
 from tests.fixtures.distributed_native_hold import InnerCleanup, NativeReady
 from tests.fixtures.distributed_native_server import Audit, JobAudit
-from tests.test_distributed_ready_browser import BASE, CHROME, PORT, wait_audit
+from tests.test_distributed_ready_browser import CHROME, wait_audit
 
 pytestmark = [pytest.mark.browser, pytest.mark.runtime]
-ACK_DEADLINE = walkthrough_stop().grace_seconds + 4
+# Existing HTTP connection drain followed by the bounded managed shutdown.
+ACK_DEADLINE = 2 + walkthrough_stop().grace_seconds
 
 
 def created_job(audit: Audit, previous: frozenset[str]) -> JobAudit | None:
@@ -65,27 +68,39 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
 ) -> None:
     verify_prepared()
     assert CHROME.is_file()
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", PORT))
     audit_path = tmp_path / "audit.json"
-    with (tmp_path / "server.log").open("wb") as log:
+    with (
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener,
+        (tmp_path / "server.log").open("wb") as log,
+    ):
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        host, port = TypeAdapter(tuple[str, int]).validate_python(
+            listener.getsockname(), strict=True
+        )
+        base = "http://" + host + ":" + str(port)
+        (tmp_path / "private-url.txt").write_text(base)
         process = subprocess.Popen(
             [
                 sys.executable,
                 "-m",
                 "tests.fixtures.distributed_native_server",
-                str(PORT),
+                str(port),
                 str(audit_path),
                 "held",
+                str(listener.fileno()),
             ],
             cwd=ROOT,
             env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
+            pass_fds=(listener.fileno(),),
             stdout=log,
             stderr=log,
         )
+        server_birth = identity(psutil.Process(process.pid))
+        (tmp_path / "server-identity.json").write_text(server_birth.model_dump_json())
         try:
             deadline = time.monotonic() + 15
-            with httpx.Client(base_url=BASE, timeout=1) as client:
+            with httpx.Client(base_url=base, timeout=1) as client:
                 while True:
                     assert process.poll() is None, (tmp_path / "server.log").read_text()
                     try:
@@ -102,8 +117,8 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                 try:
                     first, second = browser.new_context(), browser.new_context()
                     a, b = first.new_page(), second.new_page()
-                    a.goto(BASE)
-                    b.goto(BASE)
+                    a.goto(base)
+                    b.goto(base)
                     audit = wait_audit(audit_path, subscribers=2)
                     previous = frozenset(job.id for job in audit.jobs)
                     held: list[tuple[Route, APIResponse]] = []
@@ -139,9 +154,19 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         route.fulfill(response=reply)
                         expect(row_a).to_have_attribute("data-status", "stopped")
                     else:
-                        # Both SSE connections and both verified VMs are still live here.
+                        # Keep both browser SSE connections open throughout server shutdown.
+                        assert resolve(server_birth) is not None
+                        assert all(resolve(node.birth) is not None for node in ready.nodes)
+                        before = wait_audit(audit_path, subscribers=2)
+                        (tmp_path / "before-sigterm.json").write_text(before.model_dump_json())
+                        started = time.monotonic()
                         process.terminate()
                         process.wait(timeout=ACK_DEADLINE)
+                        (tmp_path / "sigterm-elapsed-seconds.txt").write_text(
+                            str(time.monotonic() - started)
+                        )
+                        assert process.returncode in (0, -15)
+                        assert resolve(server_birth) is None
                     audit = Audit.model_validate_json(audit_path.read_bytes())
                     actual = next(item for item in audit.jobs if item.id == job.id)
                     assert actual.outcome is not None and actual.registry is not None

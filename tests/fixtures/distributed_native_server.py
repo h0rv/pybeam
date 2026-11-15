@@ -1,4 +1,5 @@
 import asyncio
+import socket
 import sys
 from pathlib import Path
 from typing import override
@@ -38,7 +39,9 @@ class Audit(BaseModel):
     jobs: tuple[JobAudit, ...]
 
 
-def serve(port: int, audit: Path, *, hold: bool = False) -> None:
+def serve(
+    port: int, audit: Path, *, hold: bool = False, listener: socket.socket | None = None
+) -> None:
     class NativeHoldConfig(RunConfig):
         @field_validator("adapter_command")
         @classmethod
@@ -138,14 +141,23 @@ def serve(port: int, audit: Path, *, hold: bool = False) -> None:
         patch.setattr(showcase, "Jobs", ObservedJobs)
         if hold:
             patch.setattr(showcase_jobs, "Config", NativeHoldConfig)
-        uvicorn.run(
-            create_app(Settings(port=port)),
-            host="127.0.0.1",
-            port=port,
-            access_log=False,
-            timeout_graceful_shutdown=2,
+        server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(Settings(port=port)),
+                host="127.0.0.1",
+                port=port,
+                access_log=False,
+                timeout_graceful_shutdown=2,
+            )
         )
+        server.run(sockets=None if listener is None else [listener])
 
 
 if __name__ == "__main__":
-    serve(int(sys.argv[1]), Path(sys.argv[2]), hold=sys.argv[3:] == ["held"])
+    if len(sys.argv) == 5:
+        with socket.socket(fileno=int(sys.argv[4])) as listener:
+            serve(
+                int(sys.argv[1]), Path(sys.argv[2]), hold=sys.argv[3] == "held", listener=listener
+            )
+    else:
+        serve(int(sys.argv[1]), Path(sys.argv[2]), hold=sys.argv[3:] == ["held"])
