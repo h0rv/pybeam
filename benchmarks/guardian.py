@@ -163,11 +163,6 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     "CPU affinity unavailable here; one core is requested, not enforced."
                 )
             while True:
-                endpoint.require_active()
-                if control is not None and resolve(control.owner) is None:
-                    raise AuthorizationError("Control owner exited")
-                for registration in directory.glob("register-*.json"):
-                    acknowledge_registered(registration, owned, endpoint)
                 previous = frozenset(owned)
                 discover(owned)
                 if owned != previous:
@@ -241,6 +236,8 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     reason = "Artifact byte budget exceeded"
                 if reason is not None:
                     break
+                for registration in directory.glob("register-*.json"):
+                    acknowledge_registered(registration, owned, endpoint)
                 if process.poll() is not None:
                     if process.returncode != 0:
                         reason = "Adapter exited unsuccessfully"

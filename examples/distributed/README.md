@@ -1,6 +1,7 @@
 # Local distribution
 
-With a compatible runtime wheel installed, copy this example directory and run:
+With a compatible runtime wheel installed, copy this directory to
+`examples/distributed` in your project and run:
 
 ```sh
 python -m examples.distributed.demo

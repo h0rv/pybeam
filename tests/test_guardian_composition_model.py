@@ -8,18 +8,32 @@ class State:
     outer_recorded: bool = False
     acknowledged: bool = False
     granted: bool = False
-    active: bool = True
+    owner_alive: bool = True
+    control_alive: bool = True
+    cancelled: bool = False
     inner_alive: bool = True
     outer_alive: bool = True
+
+    @property
+    def can_authorize(self) -> bool:
+        return (
+            self.owner_alive
+            and self.control_alive
+            and not self.cancelled
+            and self.inner_alive
+            and self.outer_alive
+        )
 
 
 def successors(state: State, *, composed: bool) -> tuple[State, ...]:
     following = [
-        replace(state, active=False),
+        replace(state, owner_alive=False),
+        replace(state, control_alive=False),
+        replace(state, cancelled=True),
         replace(state, inner_alive=False),
         replace(state, outer_alive=False),
     ]
-    if state.active and state.inner_alive and state.outer_alive:
+    if state.can_authorize:
         following.append(replace(state, inner_recorded=True))
         if state.inner_recorded:
             following.append(replace(state, outer_recorded=True))
@@ -49,7 +63,7 @@ def test_composition__grant_requires_both_durable_journals() -> None:
         not state.granted or (state.inner_recorded and state.outer_recorded) for state in states
     )
     for state in states:
-        if not state.active or not state.inner_alive or not state.outer_alive:
+        if not state.can_authorize:
             assert all(child.granted == state.granted for child in successors(state, composed=True))
 
 
