@@ -11,7 +11,7 @@ genstage_hash() {
 }
 
 genstage_preflight() {
-    local root="$1" native="$2" wheel="$3" reviewed_sdk="$4"
+    local root="$1" native="$2" wheel="$3" reviewed_sdk="$4" reviewed_native="$5" source_nif="$6"
     local name actual status
     [[ "$-" == *e* && "$-" == *u* ]] || genstage_abort 'Bash errexit and nounset are required'
     case ":$SHELLOPTS:" in
@@ -35,7 +35,7 @@ genstage_preflight() {
     status="$(git -C "$root" status --porcelain)" || genstage_abort 'cannot inspect SDK status'
     [[ -z "$status" ]] || genstage_abort 'SDK source is dirty'
     actual="$(git -C "$native" rev-parse HEAD)" || genstage_abort 'cannot read native HEAD'
-    [[ "$actual" == 3234b697c4fcec478858aac99a320583439f40a3 ]] || genstage_abort 'native HEAD changed'
+    [[ "$actual" == "$reviewed_native" ]] || genstage_abort 'native HEAD is not the explicitly reviewed commit'
     status="$(git -C "$native" status --porcelain)" || genstage_abort 'cannot inspect native status'
     [[ -z "$status" ]] || genstage_abort 'native source is dirty'
     actual="$(git -C "$native" rev-parse HEAD:c_src)" || genstage_abort 'cannot read native C source tree'
@@ -48,7 +48,7 @@ genstage_preflight() {
     [[ "$actual" == "$declared_python" ]] || genstage_abort 'project environment does not use the declared mise Python'
     actual="$(mise where erlang@29.1.2)" || genstage_abort 'cannot locate the declared OTP'
     [[ "$(<"$actual/releases/29/OTP_VERSION")" == 29.1.2 ]] || genstage_abort 'declared OTP version changed'
-    genstage_hash "$native/priv/py_nif.so" 6d80e6506fa4f347226b2b593df1dba05f224257c2292f058759c6b8f5047b1a
+    genstage_hash "$source_nif" 6d80e6506fa4f347226b2b593df1dba05f224257c2292f058759c6b8f5047b1a
 }
 
 genstage_verify_generation() {

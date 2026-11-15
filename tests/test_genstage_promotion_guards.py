@@ -36,8 +36,8 @@ def test_failed_precondition__aborts_before_any_exchange(
     options = "set -eu" if defect == "pipefail" else "set -euo pipefail"
     command = (
         options + '\nsource "$1"\n'
-        'exchange() { printf "exchange\\n" >> "$6"; }\n'
-        'genstage_preflight "$2" "$3" "$4" "$5"\n'
+        'exchange() { printf "exchange\\n" >> "$8"; }\n'
+        'genstage_preflight "$2" "$3" "$4" "$5" "$6" "$7"\n'
         'exchange "$@"\n'
     )
     result = subprocess.run(
@@ -51,6 +51,8 @@ def test_failed_precondition__aborts_before_any_exchange(
             str(native),
             str(wheel),
             reviewed,
+            "explicit-reviewed-native",
+            str(native / "py_nif.so"),
             str(marker),
         ],
         env=environment,
