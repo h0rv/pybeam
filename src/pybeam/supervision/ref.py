@@ -10,7 +10,7 @@ from pybeam.supervision.config import (
 from pybeam.supervision.errors import CapabilityUnavailable
 
 if TYPE_CHECKING:
-    from _erlang_impl._supervision import ChildSnapshot, NativeSupervisor
+    from erlang.supervision import ChildSnapshot, NativeSupervisor
 
 
 def require_unbounded(policy: MailboxPolicy) -> None:
@@ -53,7 +53,7 @@ class SupervisorRef:
         require_unbounded(self.mailbox)
         if self.max_children is not None:
             raise CapabilityUnavailable("atomic native maximum-child admission is unavailable")
-        from _erlang_impl._supervision import NativeSupervisor
+        from erlang.supervision import NativeSupervisor
 
         return NativeSupervisor(self._process, capacity=None, max_bytes=None, max_children=None)
 
