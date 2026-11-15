@@ -28,6 +28,8 @@ FRAMEWORK_TESTS = frozenset(
         "test_distributed_showcase.py",
         "test_distributed_showcase_browser.py",
         "test_distributed_ready_browser.py",
+        "test_distributed_active_browser.py",
+        "test_distributed_active_harness.py",
         "test_showcase_shutdown.py",
         "test_showcase.py",
         "test_showcase_benchmarks.py",

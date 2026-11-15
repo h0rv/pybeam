@@ -5,11 +5,13 @@ from typing import override
 
 import pytest
 import uvicorn
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from benchmarks.contract import Config as RunConfig
 from benchmarks.contract import Outcome, ResourceSample
 from examples.distributed.models import Observation, WalkthroughProof
 from examples.showcase import app as showcase
+from examples.showcase import jobs as showcase_jobs
 from examples.showcase.app import Settings, create_app
 from examples.showcase.jobs import Job, Jobs
 from pybeam.runtime.ownership import Registry, durable_write
@@ -36,7 +38,15 @@ class Audit(BaseModel):
     jobs: tuple[JobAudit, ...]
 
 
-def serve(port: int, audit: Path) -> None:
+def serve(port: int, audit: Path, *, hold: bool = False) -> None:
+    class NativeHoldConfig(RunConfig):
+        @field_validator("adapter_command")
+        @classmethod
+        def fixed_test_observer(cls, command: tuple[str, ...]) -> tuple[str, ...]:
+            if command == (sys.executable, "-m", "examples.showcase.distributed"):
+                return (sys.executable, "-m", "tests.fixtures.distributed_native_adapter")
+            return command
+
     class ObservedJobs(Jobs):
         close_calls = 0
 
@@ -66,6 +76,8 @@ def serve(port: int, audit: Path) -> None:
                         "stderr.log",
                         "ownership.json",
                         "outcome.json",
+                        "native-ready.json",
+                        "inner-cleanup.json",
                     ):
                         source = trial / name
                         if source.is_file():
@@ -123,6 +135,8 @@ def serve(port: int, audit: Path) -> None:
 
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(showcase, "Jobs", ObservedJobs)
+        if hold:
+            patch.setattr(showcase_jobs, "Config", NativeHoldConfig)
         uvicorn.run(
             create_app(Settings(port=port)),
             host="127.0.0.1",
@@ -133,4 +147,4 @@ def serve(port: int, audit: Path) -> None:
 
 
 if __name__ == "__main__":
-    serve(int(sys.argv[1]), Path(sys.argv[2]))
+    serve(int(sys.argv[1]), Path(sys.argv[2]), hold=sys.argv[3:] == ["held"])
