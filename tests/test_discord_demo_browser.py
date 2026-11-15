@@ -30,12 +30,10 @@ async def miniapp(
     request: pytest.FixtureRequest,
     tmp_path: Path,
 ) -> AsyncGenerator[Miniapp]:
-    if request.config.getoption("run_runtime") is not True:
-        pytest.skip("Requires --run-runtime")
-    if request.config.getoption("run_browser") is not True:
-        pytest.skip("Requires --run-browser")
+    if not request.config.getoption("run_runtime") or not request.config.getoption("run_browser"):
+        pytest.fail("Native browser acceptance requires --run-browser --run-runtime")
     if not await asyncio.to_thread(CHROME.is_file):
-        pytest.skip("Google Chrome is not installed")
+        pytest.fail("--run-browser requested, but Google Chrome is not installed: " + str(CHROME))
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]

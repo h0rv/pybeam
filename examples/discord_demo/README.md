@@ -12,4 +12,12 @@ This example needs locally staged Python 3.14 native assets with actor groups an
 
 Leave is disabled until the room domain provides its native leave method. Disconnect releases the subscription, not membership. Changing rooms navigates to a new page and closes the old stream.
 
+Chrome acceptance is opt-in, separate from unit tests:
+
+```sh
+uv run --extra fastapi --extra hornbeam pytest tests/test_discord_demo_browser.py --run-runtime --run-browser
+```
+
+An explicitly requested browser run fails if Chrome or the native runtime is unavailable. Without the flags, browser tests are deselected, not reported as passing.
+
 Rooms are limited to eight members and 100 events per generation. Only the latest 32 messages remain in history. Messages are limited to 256 characters and 1024 UTF-8 bytes. Native subscription queues are bounded. Slow output disconnects after five seconds. Failed or cancelled writes are never automatically retried and can have effects. There is no durability or Discord authentication.

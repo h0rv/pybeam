@@ -47,6 +47,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    if config.getoption("run_browser") and not config.getoption("run_runtime"):
+        raise pytest.UsageError("--run-browser requires --run-runtime")
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if config.getoption("run_browser"):
+        return
+    browser = [item for item in items if item.get_closest_marker("browser") is not None]
+    if browser:
+        items[:] = [item for item in items if item.get_closest_marker("browser") is None]
+        config.hook.pytest_deselected(items=browser)
+
+
 @pytest.fixture(scope="session")
 def runtime_server_factory(
     request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
