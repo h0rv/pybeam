@@ -286,13 +286,20 @@
       "type": "string"
     },
     "native_source": {
-      "title": "Native Source",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Native Source"
     }
   },
   "required": [
-    "python_source",
-    "native_source"
+    "python_source"
   ],
   "title": "Config",
   "type": "object"
