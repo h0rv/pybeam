@@ -6,7 +6,7 @@ import { pages, withBase } from "../src/links.mjs";
 
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const base = (process.env.DOCS_BASE || "/").replace(/\/?$/, "/");
-const origin = "https://docs.invalid";
+const origin = new URL(process.env.DOCS_SITE || "https://h0rv.github.io").origin;
 let checked = 0;
 
 function walk(directory) {
