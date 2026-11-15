@@ -1,19 +1,29 @@
 # Boundaries
 
-## Execution and ownership
+A deadline stops waiting; it does not roll back completed effects.
 
-Python runs in one BEAM VM with one main interpreter. The GIL still applies. OTP processes do not provide multicore Python execution or isolation from a C-extension crash.
+```python
+import asyncio
 
-Keep ownership of background work until its body and cleanup have ended. Cancelling a waiter is not the same as stopping its work. Cancellation is cooperative; a timeout is not proof of cleanup.
+import pybeam
 
-## Effects and delivery
 
-A timeout or cancellation is not rollback. Work may already have changed state or performed an external write. There is no exactly-once execution guarantee. Choose retry policy explicitly.
+async def main() -> None:
+    changes: list[str] = []
+    try:
+        async with asyncio.timeout(0.01):
+            changes.append("sent")
+            await asyncio.sleep(1)
+    except TimeoutError:
+        print(changes)
 
-OTP can replace a failed process, but replacement does not restore previous Python state or replay missed messages. Actor state and ETS values are volatile. Pub/sub is not a durable event log. Applications own persistence and authorization.
 
-## Data and bounds
+if __name__ == "__main__":
+    pybeam.run(main)
+```
 
-Serialized messages are data copies, not remote Python objects. Actor arguments and results cross this boundary. The local background service API instead passes arguments directly within its worker loop.
+This prints `['sent']`. The change happened before the timeout. The same principle applies to actor methods and external writes. Choose retries explicitly; execution is not exactly once.
 
-Channel credits cover queued messages and return on dequeue. Actor admission credits cover queued plus running requests and remain held until work ends. Neither is a bound on RSS, temporary serialization allocations, or arbitrary work in application code. Bound caller concurrency as well.
+Python runs in one VM with one main interpreter and its GIL. OTP processes do not isolate C-extension crashes or provide multicore Python execution.
+
+Actor admission bounds queued plus running requests and encoded bytes, not RSS. Service state and messages are not durable. Supervision replaces processes; applications own persistence and authorization.

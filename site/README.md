@@ -15,7 +15,11 @@ The build writes static HTML to `site/dist`. Test another hosting prefix with `D
 
 `.github/workflows/docs-pages.yml` runs these same npm commands with Node only. Pull requests check both `/` and `/pybeam/` without accessing Pages or deploying. Main pushes and manual runs on main also build with the existing Pages origin and path, then deploy `site/dist`. A repository admin must first enable Pages with GitHub Actions as its source. The workflow does not enable Pages or change its domain. Other manual branches only run checks.
 
-Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/hello.py` to keep the snippet current. The actor example remains linked as an optional next step. Site checks do not execute native examples or establish wheel compatibility.
+Edit the concept pages in `docs/guide/`. `src/links.mjs` is the explicit publication and grouped navigation list. Its `examples` entries associate every Python fence with a complete file in `examples/docs/`. Tests require exact source equality. Research documents and repository artifacts are not published. Relative links to other repository files point to GitHub.
+
+`npm test` checks the Python token palette and its contrast. The build also requires highlighted token spans in every rendered example. Neither command executes native Python examples.
+
+For browser checks, provide an installed Playwright module and Chrome. From `site/`, run `PLAYWRIGHT_MODULE=/path/to/playwright node scripts/check-browser.mjs`. `CHROME_EXECUTABLE` can select a browser binary. The check owns a loopback preview on `DOCS_TEST_PORT` (default 43871), measures rendered text/token contrast, and checks keyboard navigation and clipboard copying. Set `DOCS_BASE` to the same prefix used for the build. Screenshots default to `/tmp/pybeam-after-*.png`. No browser dependency is added to core Python or the Node-only CI tasks.
 
 ## Template and notices
 

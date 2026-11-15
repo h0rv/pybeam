@@ -17,12 +17,12 @@ function theme(name, type, palette) {
 }
 
 export const pybeamLight = theme("pybeam-light", "light", {
-  text: "#211d2a", background: "#f5f3f8", keyword: "#56379b",
-  string: "#14665e", builtin: "#265f85", comment: "#62596e",
-  function: "#56379b", number: "#14665e", type: "#265f85",
+  text: "#172033", background: "#f5f7fb", keyword: "#5b279e",
+  string: "#00634f", builtin: "#18529a", comment: "#505d6e",
+  function: "#18529a", number: "#8a3416", type: "#704015",
 });
 export const pybeamDark = theme("pybeam-dark", "dark", {
-  text: "#eee9f5", background: "#201c29", keyword: "#c7b5f5",
-  string: "#85d5c9", builtin: "#a3cceb", comment: "#b5aabd",
-  function: "#c7b5f5", number: "#85d5c9", type: "#a3cceb",
+  text: "#edf1f7", background: "#10151f", keyword: "#c9b1ff",
+  string: "#83dec1", builtin: "#91c2ff", comment: "#a6b0bf",
+  function: "#91c2ff", number: "#ffba98", type: "#efd18c",
 });

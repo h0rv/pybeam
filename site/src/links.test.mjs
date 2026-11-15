@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.equal(pages.length, 5);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "quickstart/", "runtime/", "actors/", "messaging/", "state/", "subscriptions/", "supervision/", "background/", "genstage/", "web/", "limits/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -25,10 +25,10 @@ test("only curated Markdown sources map to site pages", () => {
 });
 
 test("relative guide links, anchors and queries respect deployment base", () => {
-  assert.equal(rewriteLink("quickstart.md#run-async-python", "docs/guide/index.md"), "/quickstart/#run-async-python");
-  assert.equal(rewriteLink("primitives.md?view=plain#actors", "docs/guide/quickstart.md", "/pybeam/"),
-    "/pybeam/primitives/?view=plain#actors");
-  assert.equal(rewriteLink("index.md", "docs/guide/primitives.md", "/pybeam/"), "/pybeam/");
+  assert.equal(rewriteLink("runtime.md#async-python", "docs/guide/index.md"), "/runtime/#async-python");
+  assert.equal(rewriteLink("actors.md?view=plain#actors", "docs/guide/quickstart.md", "/pybeam/"),
+    "/pybeam/actors/?view=plain#actors");
+  assert.equal(rewriteLink("index.md", "docs/guide/actors.md", "/pybeam/"), "/pybeam/");
   assert.equal(rewriteLink("../../examples/actors/main.py", "docs/guide/quickstart.md"),
     "https://github.com/h0rv/pybeam/blob/main/examples/actors/main.py");
   for (const href of ["https://example.com/docs", "//example.com", "#memory", "mailto:help@example.com"])
@@ -37,7 +37,7 @@ test("relative guide links, anchors and queries respect deployment base", () => 
 
 test("public guides explain API use without contributor or installation workflows", () => {
   const processContent = /work from source|install a provided wheel|\b(?:mise|uv) (?:run|add|init|sync)\b|sibling (?:runtime |repositories|checkouts)|development_runtime|(?:platform|local) wheel|build artifacts|native (?:assets|build)|libpython|\b(?:PyPI|macOS|toolchain|worktree|roadmap)\b|\b(?:Python|CPython) \d+\.\d+|not yet merged|private branch|release gates/gi;
-  for (const { source } of pages) {
+  for (const source of ["README.md", ...pages.map(({ source }) => source)]) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     assert.doesNotMatch(markdown, processContent, source);
     assert.doesNotMatch(markdown, /^#{1,6} .*\b(?:install|setup|contributors?|development|build|packaging)\b/im, source);
@@ -47,18 +47,29 @@ test("public guides explain API use without contributor or installation workflow
 test("the first runnable snippet matches the ordinary async Python example", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/quickstart.md"), "utf8");
   const snippet = markdown.match(/```python\n([\s\S]*?)```/)?.[1];
-  assert.equal(snippet, readFileSync(join(repositoryRoot, "examples/hello.py"), "utf8"));
+  assert.equal(snippet, readFileSync(join(repositoryRoot, "examples/docs/hello.py"), "utf8"));
   assert.match(snippet, /pybeam\.run\(main\)/);
   assert.doesNotMatch(snippet, /ActorGroup|@pybeam\.actor/);
-  assert.match(markdown, /\[Counter example\]\(\.\.\/\.\.\/examples\/actors\/main\.py\)/);
+  assert.match(markdown, /\[actor\]\(actors\.md\)/);
 });
 
-test("the core guide covers work, messages, lifetimes and web composition", () => {
-  const markdown = readFileSync(join(repositoryRoot, "docs/guide/primitives.md"), "utf8");
-  const headings = markdown.match(/^## .+$/gm).join("\n");
-  for (const capability of [/jobs.*tasks/i, /channels/i, /message passing/i, /actors/i, /supervision.*lifetimes/i, /web/i])
-    assert.match(headings, capability);
-  assert.match(markdown, /ServiceSlot/);
-  assert.match(markdown, /async iteration/);
-  assert.match(markdown, /cleanup/);
+test("each concept has complete source-associated Python examples", () => {
+  for (const { source, examples } of pages) {
+    const markdown = readFileSync(join(repositoryRoot, source), "utf8");
+    const snippets = [...markdown.matchAll(/```python\n([\s\S]*?)```/g)].map((match) => match[1]);
+    assert.ok(snippets.length > 0, source);
+    assert.equal(snippets.length, examples.length, source);
+    snippets.forEach((snippet, index) => {
+      assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);
+      assert.doesNotMatch(snippet, /\.\.\.|# (?:rest|omitted)|\b(?:Any|cast)\b|type: ignore/, source);
+    });
+  }
+});
+
+test("the homepage puts Python before explanations and links to the first actions", () => {
+  const markdown = readFileSync(join(repositoryRoot, "docs/guide/index.md"), "utf8");
+  assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 25);
+  assert.match(markdown, /\[Get started\]\(quickstart\.md\)/);
+  assert.match(markdown, /\[Actors\]\(actors\.md\)/);
+  assert.doesNotMatch(markdown, /\| Capability/);
 });
