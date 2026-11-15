@@ -22,6 +22,15 @@ class Card:
     benchmark: BenchmarkName | None = None
 
 
+def distributed_unavailable() -> str | None:
+    # Replace this precondition only after independent review of the prepared runtime pins.
+    # A native checkout argument or an older staged artifact is not that approval.
+    return (
+        "No reviewed prepared distribution runtime profile is supplied. Native FD retirement "
+        "approval and replacement NIF/wheel pins are required. No runtime is launched."
+    )
+
+
 def catalog(
     trusted_hornbeam_root: Path | None = None, trusted_native_root: Path | None = None
 ) -> tuple[Card, ...]:
@@ -77,6 +86,17 @@ def catalog(
                 benchmark=name,
             )
             for name in NAMES
+        ),
+        Card(
+            "distributed",
+            "Scripted two-node walkthrough",
+            "experimental",
+            "Finite Run/Cancel scenario, not a live cluster controller. Two simultaneous VMs, "
+            "one fresh B restart, and a 120-second budget. Observed OTP receipts and reverse ACK, "
+            "temporary Task result 42, uncertainty after NodeDOWN, explicit rejoin and resubmit. "
+            "Cancellation and parent death do not roll back effects. No performance measurements.",
+            "examples/distributed/demo.py",
+            distributed_unavailable(),
         ),
         Card(
             "hold",

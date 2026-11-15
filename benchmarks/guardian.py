@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 import psutil
+from examples.distributed.models import WalkthroughProof
 from pybeam.runtime.guardian import AuthorizationError, GuardianEndpoint, acknowledge_registered
 from pydantic import TypeAdapter
 
@@ -245,7 +246,15 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     output = TypeAdapter(AdapterOutput).validate_json(
                         (directory / "adapter.json").read_text()
                     )
-                    if isinstance(output, Unsupported):
+                    if isinstance(output, WalkthroughProof):
+                        if config.purpose != "walkthrough":
+                            raise ValueError("Nonmeasurement proof cannot satisfy a benchmark")
+                        if any(resolve(value) is not None for value in owned):
+                            raise ValueError("Walkthrough completed with live owned processes")
+                        status = "walkthrough"
+                    elif config.purpose != "measurement":
+                        raise ValueError("Walkthrough requires typed nonmeasurement proof")
+                    elif isinstance(output, Unsupported):
                         status, reason = "unsupported", output.reason
                     else:
                         check_correctness(config, output)
@@ -280,7 +289,9 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
     if uncertain:
         status, reason = "failed", "Ownership uncertain; pending spawn or surviving owned process"
     return Outcome(
-        status="passed"
+        status="walkthrough"
+        if status == "walkthrough"
+        else "passed"
         if status == "passed"
         else "unsupported"
         if status == "unsupported"

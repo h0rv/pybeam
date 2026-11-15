@@ -8,18 +8,19 @@
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/static/missing.min.css">
   <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/sse.js" defer></script>
 </head>
 <body>
 <main>
   <header>
     <p>Local development tool · fixed source catalog</p>
     <h1>PyBeam control plane</h1>
-    <p>This server runs on CPython with FastAPI, not on native BEAM. Only the counter examples use BEAM state.</p>
+    <p>This server runs on CPython with Starlette and Jinja, not on native BEAM. The distributed walkthrough remains unavailable until a prepared runtime is reviewed.</p>
     <p>One job at a time, at most four queued/running and 16 retained per session.
        Benchmark comparisons always use the shared runner load lock. Logs show at most 16 KiB.
-       Each running workload has a 30-second guardian budget. Limits are sampled watchdog checks.
+       Ordinary jobs have a 30-second guardian budget. The finite distributed walkthrough has a 120-second budget. Limits are sampled watchdog checks.
        Stop requests are not rollback. Side effects may remain uncertain.</p>
-    <form action="/run-all" method="post"><button>Run all available benchmarks</button></form>
+    <form action="/run-all" method="post" hx-post="/run-all" hx-swap="none"><button>Run all available benchmarks</button></form>
     <p>Run all queues only the enabled scalar profiles, serially. Missing runtime assets disable native cards.
        Only this checkout's fixed commands are trusted. No other worktree heads are executed.</p>
   </header>
@@ -31,13 +32,16 @@
       <p>{{ card.explanation }}</p>
       {% if card.source %}<p><a href="/source/{{ card.key }}">View example code</a> · <code>{{ card.source }}</code></p>{% endif %}
       {% if card.disabled %}<p>Unavailable: {{ card.disabled }}</p>{% endif %}
-      <form action="/start/{{ card.key }}" method="post">
-        <button {% if card.disabled %}disabled{% endif %}>Start {{ card.title }}</button>
+      <form action="/start/{{ card.key }}" method="post" hx-post="/start/{{ card.key }}" hx-swap="none">
+        <button {% if card.disabled %}disabled{% endif %}>{{ 'Run' if card.key == 'distributed' else 'Start' }} {{ card.title }}</button>
       </form>
     </article>
     {% endfor %}
   </section>
-  {% include 'jobs.html' %}
+  <section id="updates" hx-sse:connect="/events" hx-config='{"sse":{"pauseOnBackground":false}}'>
+    <div id="job-refresh" hx-get="/jobs" hx-trigger="jobs-changed from:#updates" hx-target="#jobs" hx-swap="outerHTML" hx-sync="this:queue last"></div>
+    {% include 'jobs.html' %}
+  </section>
 </main>
 </body>
 </html>

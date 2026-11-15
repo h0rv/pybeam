@@ -25,6 +25,8 @@ FRAMEWORK_TESTS = frozenset(
         "test_hornbeam_boundary.py",
         "test_litestar.py",
         "test_pyview_subscription.py",
+        "test_distributed_showcase.py",
+        "test_distributed_showcase_browser.py",
         "test_showcase.py",
         "test_showcase_benchmarks.py",
         "test_showcase_browser.py",

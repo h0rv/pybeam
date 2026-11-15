@@ -5,15 +5,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
-from starlette.middleware.base import RequestResponseEndpoint
+from starlette.applications import Starlette
+from starlette.exceptions import HTTPException
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import (
+    HTMLResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
+from starlette.templating import Jinja2Templates
 
 from benchmarks.runner import TrialSummary
-from examples.showcase.catalog import ROOT, Card, catalog
+from examples.showcase.catalog import ROOT, catalog
 from examples.showcase.jobs import Job, Jobs, session_directory
 
 
@@ -36,14 +45,14 @@ class Session:
     jobs: Jobs | None = None
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None) -> Starlette:
     settings = Settings() if settings is None else settings
     session = Session()
     cards = catalog(settings.trusted_hornbeam_root, settings.trusted_native_root)
     templates = Jinja2Templates(directory=ROOT / "examples/showcase")
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(app: Starlette) -> AsyncGenerator[None]:
         temporary = session_directory()
         with temporary as directory:
             async with asyncio.TaskGroup() as group:
@@ -58,12 +67,151 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 print("Ownership uncertain; retained local journals: " + directory, flush=True)
             session.jobs = None
 
-    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.mount("/static", StaticFiles(directory=ROOT / "examples/static"), name="static")
+    def jobs() -> Jobs:
+        if session.jobs is None:
+            raise HTTPException(503, "Session not started")
+        return session.jobs
+
+    def key(request: Request) -> str:
+        value: object = request.path_params["key"]
+        if not isinstance(value, str):
+            raise HTTPException(400, "Invalid job key")
+        return value
+
+    def find_job(request: Request) -> Job:
+        job = jobs().items.get(key(request))
+        if job is None:
+            raise HTTPException(404, "Unknown job")
+        return job
+
+    def render(request: Request, *, partial: bool = False) -> HTMLResponse:
+        manager = jobs()
+        measurements = tuple(
+            Measurement(job.id, trial, job.card.title)
+            for job in manager.items.values()
+            if job.card.key == "smoke" or job.card.benchmark is not None
+            for trial in job.trials
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="jobs.html" if partial else "index.html",
+            context={
+                "cards": cards,
+                "jobs": tuple(reversed(manager.items.values())),
+                "measurements": measurements,
+                "revision": manager.revision,
+            },
+        )
+
+    def acknowledgment(request: Request) -> Response:
+        if request.headers.get("hx-request") == "true":
+            # An enhanced POST never returns a snapshot that could overwrite a later SSE read.
+            return Response(status_code=204)
+        return RedirectResponse("/#jobs", status_code=303)
+
+    async def favicon(request: Request) -> Response:
+        return Response(status_code=204)
+
+    async def index(request: Request) -> HTMLResponse:
+        return render(request)
+
+    async def job_panel(request: Request) -> HTMLResponse:
+        return render(request, partial=True)
+
+    async def events(request: Request) -> Response:
+        manager = jobs()
+        try:
+            queue = manager.subscribe()
+        except ValueError as error:
+            raise HTTPException(503, str(error)) from error
+
+        async def stream() -> AsyncGenerator[str]:
+            try:
+                while not manager.closing:
+                    try:
+                        async with asyncio.timeout(15):
+                            revision = await queue.get()
+                        yield "event: jobs-changed\nid: " + str(revision) + "\ndata: changed\n\n"
+                    except TimeoutError:
+                        yield ": heartbeat\n\n"
+            finally:
+                manager.unsubscribe(queue)
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
+
+    async def start(request: Request) -> Response:
+        card = next((card for card in cards if card.key == key(request)), None)
+        if card is None:
+            raise HTTPException(404, "Not an allowed job")
+        try:
+            jobs().start(card)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        return acknowledgment(request)
+
+    async def run_all(request: Request) -> Response:
+        manager = jobs()
+        available = tuple(
+            card for card in cards if card.disabled is None and card.benchmark is not None
+        )
+        if len(manager.items) + len(available) > 16 or (
+            sum(job.active for job in manager.items.values()) + len(available) > 4
+        ):
+            raise HTTPException(409, "Queue full")
+        for card in available:
+            manager.start(card)
+        return acknowledgment(request)
+
+    async def cancel(request: Request) -> Response:
+        jobs().stop(find_job(request))
+        return acknowledgment(request)
+
+    async def artifact(request: Request) -> Response:
+        job = find_job(request)
+        if job.card.key == "distributed":
+            if job.proof is None:
+                raise HTTPException(409, "No completed sanitized walkthrough proof")
+            return Response(
+                job.proof.model_dump_json(),
+                media_type="application/json",
+                headers={
+                    "Content-Disposition": "attachment; filename=walkthrough-" + job.id + ".json"
+                },
+            )
+        return Response(
+            "".join(trial.model_dump_json() + "\n" for trial in job.trials),
+            media_type="application/x-ndjson",
+            headers={"Content-Disposition": "attachment; filename=trials.jsonl"},
+        )
+
+    async def source(request: Request) -> PlainTextResponse:
+        card = next((card for card in cards if card.key == key(request)), None)
+        if card is None or card.source is None:
+            raise HTTPException(404, "Source not in local catalog")
+        return PlainTextResponse((ROOT / card.source).read_text())
+
+    app = Starlette(
+        lifespan=lifespan,
+        routes=[
+            Route("/favicon.ico", favicon),
+            Route("/", index),
+            Route("/jobs", job_panel),
+            Route("/events", events),
+            Route("/start/{key}", start, methods=["POST"]),
+            Route("/run-all", run_all, methods=["POST"]),
+            Route("/cancel/{key}", cancel, methods=["POST"]),
+            Route("/artifact/{key}", artifact),
+            Route("/source/{key}", source),
+            Mount("/static", StaticFiles(directory=ROOT / "examples/static"), name="static"),
+        ],
+    )
     hosts = {"127.0.0.1:" + str(settings.port), "localhost:" + str(settings.port)}
     origins = {"http://" + host for host in hosts}
 
-    @app.middleware("http")
     async def local_only(request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.headers.get("host") not in hosts:
             return PlainTextResponse("Loopback Host required", status_code=403)
@@ -90,92 +238,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    def jobs() -> Jobs:
-        if session.jobs is None:
-            raise HTTPException(503, "Session not started")
-        return session.jobs
-
-    def find_job(key: str, manager: Jobs) -> Job:
-        job = manager.items.get(key)
-        if job is None:
-            raise HTTPException(404, "Unknown job")
-        return job
-
-    def find_card(key: str) -> Card:
-        for card in cards:
-            if card.key == key:
-                return card
-        raise HTTPException(404, "Not an allowed job")
-
-    def render(request: Request, manager: Jobs, *, partial: bool = False) -> HTMLResponse:
-        measurements = tuple(
-            Measurement(job.id, trial, job.card.title)
-            for job in manager.items.values()
-            if job.card.key == "smoke" or job.card.benchmark is not None
-            for trial in job.trials
-        )
-        return templates.TemplateResponse(
-            request=request,
-            name="jobs.html" if partial else "index.html",
-            context={
-                "cards": cards,
-                "jobs": tuple(reversed(manager.items.values())),
-                "measurements": measurements,
-            },
-        )
-
-    @app.get("/favicon.ico")
-    async def favicon() -> Response:
-        return Response(status_code=204)
-
-    @app.get("/", response_class=HTMLResponse)
-    async def index(request: Request, manager: Annotated[Jobs, Depends(jobs)]) -> HTMLResponse:
-        return render(request, manager)
-
-    @app.get("/jobs", response_class=HTMLResponse)
-    async def job_panel(request: Request, manager: Annotated[Jobs, Depends(jobs)]) -> HTMLResponse:
-        return render(request, manager, partial=True)
-
-    @app.post("/start/{key}")
-    async def start(key: str, manager: Annotated[Jobs, Depends(jobs)]) -> RedirectResponse:
-        try:
-            manager.start(find_card(key))
-        except ValueError as error:
-            raise HTTPException(409, str(error)) from error
-        return RedirectResponse("/#jobs", status_code=303)
-
-    @app.post("/run-all")
-    async def run_all(manager: Annotated[Jobs, Depends(jobs)]) -> RedirectResponse:
-        available = tuple(
-            card for card in cards if card.disabled is None and card.benchmark is not None
-        )
-        if len(manager.items) + len(available) > 16 or (
-            sum(job.active for job in manager.items.values()) + len(available) > 4
-        ):
-            raise HTTPException(409, "Queue full")
-        for card in available:
-            manager.start(card)
-        return RedirectResponse("/#jobs", status_code=303)
-
-    @app.post("/cancel/{key}")
-    async def cancel(key: str, manager: Annotated[Jobs, Depends(jobs)]) -> RedirectResponse:
-        manager.stop(find_job(key, manager))
-        return RedirectResponse("/#jobs", status_code=303)
-
-    @app.get("/artifact/{key}")
-    async def artifact(key: str, manager: Annotated[Jobs, Depends(jobs)]) -> Response:
-        job = find_job(key, manager)
-        return Response(
-            "".join(trial.model_dump_json() + "\n" for trial in job.trials),
-            media_type="application/x-ndjson",
-            headers={"Content-Disposition": "attachment; filename=trials.jsonl"},
-        )
-
-    @app.get("/source/{key}", response_class=PlainTextResponse)
-    async def source(key: str) -> PlainTextResponse:
-        card = find_card(key)
-        if card.source is None:
-            raise HTTPException(404, "Source not in local catalog")
-        return PlainTextResponse((ROOT / card.source).read_text())
-
+    app.add_middleware(BaseHTTPMiddleware, dispatch=local_only)
     return app

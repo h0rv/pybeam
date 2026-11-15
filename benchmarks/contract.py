@@ -2,6 +2,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
+from examples.distributed.models import WalkthroughProof
 from pybeam.runtime.ownership import Identity
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -61,6 +62,7 @@ class Workload(StrictModel):
 class Config(StrictModel):
     schema_version: Literal[1] = 1
     backend: Literal["python", "pybeam", "erlang", "elixir"] = "python"
+    purpose: Literal["measurement", "walkthrough"] = "measurement"
     adapter_command: tuple[str, ...] = ()
     workload: Workload = Workload()
     budget: Budget = Budget()
@@ -183,7 +185,9 @@ class Unsupported(StrictModel):
     features: tuple[str, ...]
 
 
-type AdapterOutput = Annotated[AdapterResult | Unsupported, Field(discriminator="kind")]
+type AdapterOutput = Annotated[
+    AdapterResult | Unsupported | WalkthroughProof, Field(discriminator="kind")
+]
 
 
 def check_correctness(config: Config, result: AdapterResult) -> None:
@@ -286,7 +290,7 @@ class Source(StrictModel):
 
 
 class Outcome(StrictModel):
-    status: Literal["passed", "failed", "unsupported"]
+    status: Literal["passed", "failed", "unsupported", "walkthrough"]
     reason: str | None
     returncode: int | None
     cleanup_survivors: tuple[Identity, ...]
