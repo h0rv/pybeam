@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "backend": "erlang",
+  "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.native_reference"],
+  "workload": {"queue_bound_scope": "client_admission_only"},
+  "python_source": "/Users/robby/projects/worktrees/pybeam/bench-beam",
+  "native_source": "/Users/robby/projects/worktrees/pybeam/native-benchmarks"
+}
