@@ -18,9 +18,9 @@ from examples.litestar.main import (
     index,
     template_config,
 )
-from pybeam.errors import SubscriptionOverflow
-from pybeam.litestar.channels import BeamChannelsBackend
-from pybeam.litestar.store import BeamStore
+from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
+from pybeam.integrations.litestar.channels import BeamChannelsBackend
+from pybeam.integrations.litestar.store import BeamStore
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState as FakeBridge
 
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from litestar.stores.base import Store
     from litestar.types import HTTPDisconnectEvent, Message
 
-    from pybeam.services import Subscription
+    from pybeam.integrations.hornbeam import Subscription
 
 
 def setup_backend(*, max_pending: int = 128) -> tuple[FakeBridge, BeamChannelsBackend]:

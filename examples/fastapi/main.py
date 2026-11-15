@@ -10,8 +10,8 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from pybeam.services import Services, Subscription
-from pybeam.fastapi.dependencies import Beam, provider
+from pybeam.integrations.fastapi.dependencies import Beam, provider
+from pybeam.integrations.hornbeam import Services, Subscription
 
 _TOPIC = "demo:counter"
 logger = getLogger("examples.fastapi")

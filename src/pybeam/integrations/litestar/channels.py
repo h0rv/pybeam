@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, override
 
 from litestar.channels.backends.base import ChannelsBackend
 
-from pybeam.errors import SubscriptionClosed, SubscriptionOverflow
+from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Coroutine, Iterable
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from litestar.channels import ChannelsPlugin
     from litestar.channels.subscriber import Subscriber
 
-    from pybeam.services import Services
+    from pybeam.integrations.hornbeam import Services
 
 MIN_SUBSCRIPTION_BYTES = 1024
 MAX_SUBSCRIPTION_BYTES = 1048576

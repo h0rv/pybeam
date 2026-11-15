@@ -14,8 +14,8 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from examples.fastapi.main import app as example_app
 from examples.fastapi.main import counter_events, counter_subscription
 from examples.fastapi.main import provider as example_provider
-from pybeam.services import Services
-from pybeam.fastapi.dependencies import BeamProvider
+from pybeam.integrations.fastapi.dependencies import BeamProvider
+from pybeam.integrations.hornbeam import Services
 from tests.fakes import FakeServices, ServiceState
 
 

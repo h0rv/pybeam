@@ -15,11 +15,11 @@ from litestar.response.streaming import ASGIStreamingResponse
 from litestar.template.config import TemplateConfig
 from pydantic import BaseModel, Field
 
-from pybeam.services import (
+from pybeam.integrations.hornbeam import (
     Services,
     Subscription,
 )
-from pybeam.litestar.store import BeamStore
+from pybeam.integrations.litestar.store import BeamStore
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator

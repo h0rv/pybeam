@@ -20,8 +20,8 @@ from examples.pyview.main import (
     root_template,
     runtime,
 )
-from pybeam.errors import SubscriptionOverflow
-from pybeam.pyview.subscriptions import ViewSubscription
+from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
+from pybeam.integrations.pyview.subscriptions import ViewSubscription
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState
 

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from pyview.events import InfoEvent
 
-    from pybeam.services import Services, Subscription
+    from pybeam.integrations.hornbeam import Services, Subscription
 
 logger = logging.getLogger(__name__)
 

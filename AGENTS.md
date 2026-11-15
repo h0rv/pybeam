@@ -22,7 +22,7 @@ Use mise for development tools and tasks, uv for Python dependencies, and rebar3
 - Generic capabilities must not require Hornbeam's ASGI server unless their actual implementation requires it. The current counter/cache/pubsub slice uses Hornbeam's existing services.
 - Follow actual upstream runtime contracts. Investigate existing support before proposing additions.
 
-Keep one Python distribution, with optional framework dependencies and separate packages under `src/pybeam/<extension>/`. Keep initializers minimal. Core modules must not import optional frameworks, and adapters must not import other adapters. Avoid duplicate transport abstractions and speculative plugin systems.
+Keep one Python distribution. Core primitives belong in domain packages such as `pybeam.actors`, `pybeam.mailbox`, `pybeam.services`, `pybeam.supervision`, and `pybeam.runtime`. Optional framework and ecosystem adapters belong under `pybeam.integrations.<name>`. Hornbeam-specific web-service contracts belong to its integration, not core services. Keep initializers minimal. Core modules must not import integrations or optional frameworks, and framework adapters must not import other framework adapters. Avoid duplicate transport abstractions and speculative plugin systems.
 
 ## Python and examples
 

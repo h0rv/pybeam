@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Self
 
 from pybeam._shared.lifecycle import await_cleanup
-from pybeam.errors import (
+from pybeam.integrations.hornbeam.errors import (
     SubscriptionClosed,
     SubscriptionOverflow,
 )

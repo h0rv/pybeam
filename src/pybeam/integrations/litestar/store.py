@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, override
 from litestar.stores.base import Store
 
 if TYPE_CHECKING:
-    from pybeam.services import ByteStore, Services
+    from pybeam.integrations.hornbeam import ByteStore, Services
 
 
 def _seconds(duration: int | timedelta | None) -> float | None:

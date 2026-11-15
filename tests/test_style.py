@@ -35,7 +35,6 @@ def test_owned_python__has_no_fstrings_or_relative_imports() -> None:
 def test_core__does_not_import_optional_frameworks() -> None:
     forbidden = {
         "hornbeam",
-        "erlang",
         "fastapi",
         "litestar",
         "pyview",
@@ -43,14 +42,11 @@ def test_core__does_not_import_optional_frameworks() -> None:
         "htpy",
         "jinja2",
     }
-    paths = [
-        PACKAGE / "__init__.py",
-        PACKAGE / "mailbox.py",
-        PACKAGE / "errors.py",
-        PACKAGE / "services" / "__init__.py",
-        PACKAGE / "services" / "contracts.py",
-    ]
-    paths.extend((PACKAGE / "_shared").glob("*.py"))
+    paths = sorted(
+        path
+        for path in PACKAGE.rglob("*.py")
+        if "integrations" not in path.relative_to(PACKAGE).parts
+    )
     for path in paths:
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
@@ -61,10 +57,7 @@ def test_core__does_not_import_optional_frameworks() -> None:
                 names = [node.module]
             for name in names:
                 assert name.split(".")[0] not in forbidden, (path, name)
-                assert not any(
-                    name.startswith("pybeam." + plugin)
-                    for plugin in ("fastapi", "litestar", "pyview")
-                ), (path, name)
+                assert not name.startswith("pybeam.integrations"), (path, name)
 
 
 def test_subpackage_initializers__do_not_import_implementations() -> None:
@@ -72,7 +65,7 @@ def test_subpackage_initializers__do_not_import_implementations() -> None:
         if path in {
             PACKAGE / "__init__.py",
             PACKAGE / "actors" / "__init__.py",
-            PACKAGE / "services" / "__init__.py",
+            PACKAGE / "integrations" / "hornbeam" / "__init__.py",
         }:
             continue
         tree = ast.parse(path.read_text(), filename=str(path))
@@ -86,8 +79,10 @@ def test_core__imports_without_optional_dependencies() -> None:
         (
             "import sys",
             "sys.path.insert(0, 'src')",
-            "from pybeam.services import ByteStore, Services, Subscription",
-            "from pybeam.errors import SubscriptionClosed, SubscriptionOverflow",
+            "from pybeam import run",
+            "from pybeam.actors import ActorSpec, OwnedActorRef",
+            "from pybeam.mailbox import BoundedMailbox, UnboundedMailbox",
+            "from pybeam.supervision.config import SupervisorConfig",
             "from pybeam._shared.lifecycle import await_cleanup",
             "assert 'hornbeam' not in sys.modules",
             "assert 'erlang' not in sys.modules",

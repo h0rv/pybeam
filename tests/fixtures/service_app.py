@@ -10,8 +10,8 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.websockets import WebSocketDisconnect
 
-from pybeam.services import Services
-from pybeam.fastapi.dependencies import BeamProvider
+from pybeam.integrations.fastapi.dependencies import BeamProvider
+from pybeam.integrations.hornbeam import Services
 
 
 @dataclass

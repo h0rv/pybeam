@@ -19,7 +19,7 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from pybeam.pyview.subscriptions import ViewSubscription
+from pybeam.integrations.pyview.subscriptions import ViewSubscription
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from starlette.applications import Starlette
     from starlette.requests import Request
 
-    from pybeam.services import Services
+    from pybeam.integrations.hornbeam import Services
 
 TOPIC = "demo:counter"
 logger = getLogger("examples.pyview")

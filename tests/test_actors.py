@@ -100,4 +100,4 @@ def test_spec__imports_without_optional_packages() -> None:
             "assert 'erlang' not in sys.modules",
         )
     )
-    subprocess.run([sys.executable, "-I", "-S", "-c", code], check=True, timeout=10)
+    subprocess.run([sys.executable, "-I", "-c", code], check=True, timeout=10)

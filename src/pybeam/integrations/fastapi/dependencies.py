@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from starlette.requests import HTTPConnection
 
-from pybeam.services import Services, Subscription
+from pybeam.integrations.hornbeam import Services, Subscription
 
 
 async def _connect() -> Services:

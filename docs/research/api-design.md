@@ -15,7 +15,7 @@ Hornbeam's checkpoint `priv/hornbeam/api/services.py` declares `Services`, `Byte
 The following is a proposed use of inspected signatures, not a runtime result.
 
 ```python
-from pybeam.services import Services
+from pybeam.integrations.hornbeam import Services
 
 
 async def record_visit(beam: Services) -> int:
