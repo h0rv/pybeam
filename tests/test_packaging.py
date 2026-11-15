@@ -218,7 +218,8 @@ def test_staging__resolves_inputs_before_systools_changes_directory(
     license_file = tmp_path / "LICENSE"
     license_file.write_text("third-party license")
     monkeypatch.setattr(
-        "tools.build_runtime.otp_information", lambda _erl: OTPVersions("17.1.1", "11.0", "8.0")
+        "tools.build_runtime.otp_information",
+        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10"),
     )
 
     def command(arguments: list[str], *, cwd: Path | None = None) -> str:

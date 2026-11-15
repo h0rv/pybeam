@@ -39,7 +39,9 @@ def runtime_tag(assets: Path) -> str:
         or manifest.get("root_dir") != "."
     ):
         raise ValueError("Runtime must use native relocatable OTP erlexec")
-    for name in ERTS_EXECUTABLES:
+    distributed = bool(tuple(assets.glob("lib/erlang_python-*/ebin/py_distribution.beam")))
+    executables = tuple(name for name in ERTS_EXECUTABLES if name != "epmd" or distributed)
+    for name in executables:
         if not (assets / bindir / name).is_file():
             raise ValueError("Missing bundled ERTS executable: " + name)
     natives = tuple(assets.glob("lib/erlang_python-*/priv/py_nif.so"))
@@ -49,6 +51,10 @@ def runtime_tag(assets: Path) -> str:
     for required in ("notices/OTP-LICENSE.txt", "notices/erlang-python-LICENSE", "bin/start.boot"):
         if not (assets / required).is_file():
             raise ValueError("Missing runtime asset: " + required)
+    if distributed:
+        crypto = tuple(assets.glob("lib/crypto-*/priv/lib/crypto.so"))
+        if len(crypto) != 1 or not (crypto[0].parents[2] / "ebin/crypto.beam").is_file():
+            raise ValueError("Missing or ambiguous OTP crypto runtime")
     priv = natives[0].parent
     for name in (
         "_erlang_impl/__init__.py",
@@ -69,7 +75,7 @@ def runtime_tag(assets: Path) -> str:
     for path in assets.rglob("*"):
         if path.is_symlink():
             raise ValueError("Runtime assets must not contain symlinks: " + str(path))
-    required = (natives[0], *(assets / bindir / name for name in ERTS_EXECUTABLES))
+    required = (natives[0], *(assets / bindir / name for name in executables))
     for path in native_binaries(assets, required):
         info = audit_binary(path, python_nif=path == natives[0])
         if info.minimum > target:

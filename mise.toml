@@ -294,3 +294,42 @@ pid=$!
 trap 'trap - INT TERM; printf "\nStopping the example...\n"; kill -TERM "$pid" 2>/dev/null || true; wait "$pid"; exit 130' INT TERM
 wait "$pid"
 '''
+
+[tasks."example:distributed"]
+description = "Private finite two-node CLI with an installed or explicitly prepared runtime"
+run = "uv run --locked python -m examples.distributed.demo"
+
+[tasks."test:distributed-model"]
+description = "Bounded source-only ingress model; requires explicit private native source and Alloy jar"
+run = '''
+if [ -z "${PYBEAM_NATIVE_SOURCE:-}" ] || [ -z "${PYBEAM_ALLOY_JAR:-}" ]; then
+    printf 'Set PYBEAM_NATIVE_SOURCE and PYBEAM_ALLOY_JAR. No model check was run.\n' >&2
+    exit 2
+fi
+output=$(mktemp -d "${TMPDIR:-/tmp}/pybeam-ingress-model.XXXXXX")
+timeout 120 java -jar "$PYBEAM_ALLOY_JAR" exec -t none -o "$output/solutions" "$PYBEAM_NATIVE_SOURCE/test/distribution_ingress.als"
+'''
+
+[tasks."test:distributed"]
+description = "Private finite distribution and ownership checks; never part of default VM-free tests"
+run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py tests/test_guardian_authorization.py tests/test_guardian_authorization_model.py tests/test_guardian_composition.py tests/test_guardian_composition_model.py tests/test_guardian_composition_native.py --run-runtime -q"
+
+[tasks."showcase:private"]
+hide = true
+description = "Source-only local UI; the unreviewed distributed runtime remains unavailable"
+usage = 'flag "--port <port>" default="38921"'
+run = 'PYTHONPATH="$PWD/src:$PWD" uv run --no-sync python -m examples.showcase --port "${usage_port}"'
+
+[tasks."showcase:controlled-test"]
+hide = true
+description = "Finite source and mocked receipt/UI checks; no native VMs or measurements"
+run = '''
+PYTHONPATH="$PWD/src:$PWD" uv run --no-sync python -c 'import subprocess, sys; sys.exit(subprocess.run([sys.executable, "-m", "pytest", "tests/test_distributed_showcase.py", "tests/test_showcase.py", "tests/test_showcase_provenance.py", "tests/test_showcase_benchmarks.py", "--run-frameworks", "-m", "not runtime and not browser and not benchmark", "-q"], timeout=120).returncode)'
+'''
+
+[tasks."showcase:controlled-browser"]
+hide = true
+description = "Two sandboxed Chrome contexts against a mocked boundary; no native acceptance claim"
+run = '''
+PYTHONPATH="$PWD/src:$PWD" uv run --no-sync python -c 'import subprocess, sys; sys.exit(subprocess.run([sys.executable, "-m", "pytest", "tests/test_distributed_showcase_browser.py", "--run-frameworks", "--run-browser", "-q"], timeout=120).returncode)'
+'''

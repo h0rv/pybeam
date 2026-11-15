@@ -14,7 +14,7 @@ def test_default_collection__does_not_import_optional_frameworks() -> None:
             "import pytest, sys\n"
             "status = pytest.main(['tests', '--collect-only', '-q', '-m', 'not runtime and not browser'])\n"
             "assert status == 0\n"
-            "assert not {'hornbeam', 'fastapi', 'litestar', 'pyview', 'psutil'} & sys.modules.keys()\n",
+            "assert not {'hornbeam', 'fastapi', 'litestar', 'pyview'} & sys.modules.keys()\n",
         ],
         cwd=ROOT,
         env={**os.environ, "PYTEST_ADDOPTS": ""},

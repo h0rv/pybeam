@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 from benchmarks.profiles import NAMES, BenchmarkName, unavailable
+from examples.distributed.profile import unavailable as distribution_unavailable
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -20,6 +21,10 @@ class Card:
     port: int | None = None
     launcher: Path | None = None
     benchmark: BenchmarkName | None = None
+
+
+def distributed_unavailable() -> str | None:
+    return distribution_unavailable()
 
 
 def catalog(
@@ -77,6 +82,17 @@ def catalog(
                 benchmark=name,
             )
             for name in NAMES
+        ),
+        Card(
+            "distributed",
+            "Scripted two-node walkthrough",
+            "experimental",
+            "Finite Run/Cancel scenario, not a live cluster controller. Two simultaneous VMs, "
+            "one fresh B restart, and a 120-second budget. Observed OTP receipts and reverse ACK, "
+            "temporary Task result 42, uncertainty after NodeDOWN, explicit rejoin and resubmit. "
+            "Cancellation and parent death do not roll back effects. No performance measurements.",
+            "examples/distributed/demo.py",
+            distributed_unavailable(),
         ),
         Card(
             "hold",

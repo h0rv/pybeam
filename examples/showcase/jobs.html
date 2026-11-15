@@ -1,4 +1,4 @@
-<section id="jobs" hx-get="/jobs" hx-trigger="every 1s" hx-target="#jobs" hx-swap="outerHTML">
+<section id="jobs" data-revision="{{ revision }}">
   <h2>Jobs and results</h2>
   <p>{{ jobs|selectattr('active')|list|length }} queued/running. <a href="/">Refresh page</a></p>
   <p>Scalar references: bounded Python queues, OTP gen_server and the raw unbounded API on the current PyBEAM runtime.
@@ -34,12 +34,15 @@
   <article class="box" id="job-{{ job.id }}" data-status="{{ job.status }}" data-key="{{ job.card.key }}">
     <h3>{{ job.card.title }}: <span role="status">{{ job.status }}</span></h3>
     {% if job.active %}
-    <form action="/cancel/{{ job.id }}" method="post"><button>Cancel {{ job.card.title }}</button></form>
+    <form action="/cancel/{{ job.id }}" method="post" hx-post="/cancel/{{ job.id }}" hx-swap="none"><button>Cancel {{ job.card.title }}</button></form>
     {% if job.card.port and job.status == 'running' %}<a href="http://127.0.0.1:{{ job.card.port }}" target="_blank" rel="noopener">Open private demo (may still be starting)</a>{% endif %}
     {% endif %}
     {% if job.status in ['stopped', 'stopping'] %}<p>Stop requested. No rollback guarantee. Inspect cleanup survivors below.</p>{% endif %}
     {% if job.status == 'uncertain' %}<p>Ownership or cleanup is uncertain. New measurements are blocked by the shared load lease. Do not remove the lock or journal until ownership is resolved.</p>{% endif %}
     {% if job.error %}<p>{{ job.error }}</p>{% endif %}
+    {% if job.card.key == 'distributed' %}
+    {% include 'distributed.html' %}
+    {% else %}
     <pre>{{ job.logs() }}</pre>
     {% if job.provenance %}
     <details><summary>Actual source and runtime identities</summary>
@@ -82,6 +85,7 @@
       </svg>
       {% else %}<p>No throughput evidence. No chart values invented.</p>{% endif %}
     </figure>
+    {% endif %}
     {% endif %}
   </article>
   {% else %}<p>No jobs yet. Start an enabled scalar reference above.</p>{% endfor %}

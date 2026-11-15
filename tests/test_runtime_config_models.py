@@ -38,7 +38,7 @@ def test_config__rejects_invalid_timeout_at_boundary(
         ({"workers": 1.0}, ("workers",), "int_type"),
         ({"workers": 0}, ("workers",), "greater_than_equal"),
         ({"workers": 2}, ("workers",), "less_than_equal"),
-        ({"distribution": 0}, ("distribution",), "bool_type"),
+        ({"distribution": 0}, ("distribution",), "value_error"),
         ({"listeners": "false"}, ("listeners",), "bool_type"),
         ({"development_runtime": ""}, ("development_runtime",), "string_too_short"),
         ({"development_runtime": 1}, ("development_runtime",), "string_type"),
@@ -64,9 +64,14 @@ def test_config__fails_clearly_for_unsupported_modes(mode: str, tmp_path: Path) 
         parse_config({"mode": mode}, tmp_path)
 
 
-@pytest.mark.parametrize("field", ["distribution", "listeners"])
-def test_config__fails_closed_for_unsupported_capabilities(field: str, tmp_path: Path) -> None:
-    with pytest.raises(BootstrapError, match="opens no listeners"):
+@pytest.mark.parametrize(
+    "field,message",
+    [("distribution", "explicit two-node configuration"), ("listeners", "opens no listeners")],
+)
+def test_config__fails_closed_for_unsupported_capabilities(
+    field: str, message: str, tmp_path: Path
+) -> None:
+    with pytest.raises(BootstrapError, match=message):
         parse_config({field: True}, tmp_path)
 
 

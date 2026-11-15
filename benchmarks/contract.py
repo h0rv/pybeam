@@ -2,6 +2,9 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
+from examples.distributed.models import WalkthroughProof
+from pybeam.runtime.guardian import ImmediateStop, ManagedStop, StopPolicy
+from pybeam.runtime.ownership import Identity
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 type Positive = Annotated[int, Field(gt=0)]
@@ -60,6 +63,8 @@ class Workload(StrictModel):
 class Config(StrictModel):
     schema_version: Literal[1] = 1
     backend: Literal["python", "pybeam", "erlang", "elixir"] = "python"
+    purpose: Literal["measurement", "walkthrough"] = "measurement"
+    stop_policy: StopPolicy = ImmediateStop()
     adapter_command: tuple[str, ...] = ()
     workload: Workload = Workload()
     budget: Budget = Budget()
@@ -72,6 +77,10 @@ class Config(StrictModel):
 
     @model_validator(mode="after")
     def safe_smoke(self) -> Self:
+        if isinstance(self.stop_policy, ManagedStop) and self.purpose != "walkthrough":
+            raise ValueError(
+                "Managed cooperative stop is only valid for a nonmeasurement walkthrough"
+            )
         w = self.workload
         if self.backend == "pybeam" and self.native_source is None:
             raise ValueError("PyBEAM requires an explicitly configured native source checkout")
@@ -182,7 +191,9 @@ class Unsupported(StrictModel):
     features: tuple[str, ...]
 
 
-type AdapterOutput = Annotated[AdapterResult | Unsupported, Field(discriminator="kind")]
+type AdapterOutput = Annotated[
+    AdapterResult | Unsupported | WalkthroughProof, Field(discriminator="kind")
+]
 
 
 def check_correctness(config: Config, result: AdapterResult) -> None:
@@ -259,11 +270,6 @@ def check_correctness(config: Config, result: AdapterResult) -> None:
             raise ValueError("Completion evidence falls outside measurement duration")
 
 
-class Identity(StrictModel):
-    pid: Positive
-    created: Annotated[float, Field(gt=0, allow_inf_nan=False)]
-
-
 class ProcessSample(StrictModel):
     identity: Identity
     role: Literal["adapter", "descendant"]
@@ -290,7 +296,7 @@ class Source(StrictModel):
 
 
 class Outcome(StrictModel):
-    status: Literal["passed", "failed", "unsupported"]
+    status: Literal["passed", "failed", "unsupported", "walkthrough", "cancelled"]
     reason: str | None
     returncode: int | None
     cleanup_survivors: tuple[Identity, ...]

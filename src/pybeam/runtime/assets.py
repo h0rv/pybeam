@@ -124,9 +124,11 @@ def packaged_assets(root: Path) -> RuntimeAssets:
     ):
         raise BootstrapError("Packaged runtime must use native OTP erlexec")
     _validate_files(executable, paths)
+    distributed = any((path / "py_distribution.beam").is_file() for path in paths)
     required = (
         root / "bin" / "start.boot",
         *(bindir / name for name in ("beam.smp", "erl_child_setup", "inet_gethost")),
+        *((bindir / "epmd",) if distributed else ()),
         *(
             path.parent / "priv" / "py_nif.so"
             for path in paths

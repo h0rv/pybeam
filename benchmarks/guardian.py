@@ -7,9 +7,18 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import TextIO
+from typing import Literal, TextIO, assert_never
 
 import psutil
+from examples.distributed.models import WalkthroughProof
+from pybeam.runtime.guardian import (
+    AuthorizationError,
+    GuardianEndpoint,
+    ImmediateStop,
+    ManagedStop,
+    StopRequested,
+    acknowledge_registered,
+)
 from pydantic import TypeAdapter
 
 from benchmarks.contract import (
@@ -22,6 +31,19 @@ from benchmarks.contract import (
     Runtime,
     Unsupported,
     check_correctness,
+)
+from benchmarks.managed import (
+    Active,
+    AdapterRunning,
+    CleanupResult,
+    Draining,
+    ExecutionPhase,
+    FailedManagedShutdown,
+    Finished,
+    ImmediateCleanup,
+    ManagedStopped,
+    StopSignal,
+    read_exit,
 )
 from benchmarks.ownership import (
     Control,
@@ -123,8 +145,18 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
         "Detached runtimes must use guardian spawn broker; unregistered escape is unsupported.",
     ]
     reason: str | None = None
-    status: str = "failed"
+    phase: ExecutionPhase = Active()
+    completion: CleanupResult = ImmediateCleanup("Adapter did not acknowledge completion")
     start = time.monotonic_ns()
+    endpoint = GuardianEndpoint(
+        directory=directory.resolve(),
+        owner=parent,
+        guardian=identity(psutil.Process()),
+        stop_file=None if control is None else Path(control.stop_file),
+        control_owner=None if control is None else control.owner,
+        stop_policy=config.stop_policy,
+    )
+    durable_write(directory / "guardian.json", endpoint.model_dump_json())
     with (
         (directory / "stdout.log").open("wb") as stdout,
         (directory / "stderr.log").open("wb") as stderr,
@@ -154,12 +186,21 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     "CPU affinity unavailable here; one core is requested, not enforced."
                 )
             while True:
+                signal = (
+                    StopSignal.REQUESTED
+                    if control is not None and Path(control.stop_file).exists()
+                    else StopSignal.NONE
+                )
                 previous = frozenset(owned)
                 discover(owned)
                 if owned != previous:
                     record(directory, owned, "tracking")
                 request_path = directory / "spawn.request.json"
-                if request_path.exists():
+                if (
+                    request_path.exists()
+                    and signal is StopSignal.NONE
+                    and isinstance(phase, Active)
+                ):
                     request = SpawnRequest.model_validate_json(request_path.read_text())
                     index = len(children)
                     child_out = stack.enter_context(
@@ -209,7 +250,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                         processes=observed,
                     ),
                 )
-                if control is not None and Path(control.stop_file).exists():
+                if signal is StopSignal.REQUESTED and isinstance(config.stop_policy, ImmediateStop):
                     reason = "Stop requested; side effects are not rolled back"
                 elif control is not None and resolve(control.owner) is None:
                     reason = "Control owner exited"
@@ -226,16 +267,61 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                 elif artifact_size(directory) > budget.artifact_bytes:
                     reason = "Artifact byte budget exceeded"
                 if reason is not None:
+                    completion = phase.abort(reason)
                     break
+                if (
+                    signal is StopSignal.REQUESTED
+                    and isinstance(config.stop_policy, ManagedStop)
+                    and isinstance(phase, Active)
+                ):
+                    durable_write(directory / "registration.closed", "draining")
+                    phase = Draining(
+                        deadline=min(
+                            time.monotonic() + config.stop_policy.grace_seconds,
+                            start / 1e9 + budget.wall_seconds,
+                        )
+                    )
+                if isinstance(phase, Draining):
+                    returncode = process.poll()
+                    adapter_state = (
+                        AdapterRunning()
+                        if returncode is None
+                        else read_exit(directory, adapter, owned, returncode)
+                    )
+                    transition = phase.advance(now=time.monotonic(), adapter=adapter_state)
+                    match transition:
+                        case Draining():
+                            time.sleep(budget.sample_seconds)
+                            continue
+                        case ManagedStopped() | FailedManagedShutdown():
+                            completion = transition
+                            break
+                        case _:
+                            assert_never(transition)
+                try:
+                    for registration in directory.glob("register-*.json"):
+                        acknowledge_registered(registration, owned, endpoint)
+                except StopRequested:
+                    if isinstance(config.stop_policy, ImmediateStop):
+                        raise
+                    continue
                 if process.poll() is not None:
                     if process.returncode != 0:
-                        reason = "Adapter exited unsuccessfully"
+                        completion = ImmediateCleanup("Adapter exited unsuccessfully")
                         break
                     output = TypeAdapter(AdapterOutput).validate_json(
                         (directory / "adapter.json").read_text()
                     )
-                    if isinstance(output, Unsupported):
-                        status, reason = "unsupported", output.reason
+                    if isinstance(output, WalkthroughProof):
+                        if config.purpose != "walkthrough":
+                            raise ValueError("Nonmeasurement proof cannot satisfy a benchmark")
+                        if any(resolve(value) is not None for value in owned):
+                            raise ValueError("Walkthrough completed with live owned processes")
+                        completion = Finished("walkthrough")
+                    elif config.purpose != "measurement":
+                        raise ValueError("Walkthrough requires typed nonmeasurement proof")
+                    elif isinstance(output, Unsupported):
+                        completion = Finished("unsupported", output.reason)
                     else:
                         check_correctness(config, output)
                         verify_runtime_assets(config, output.runtime)
@@ -248,12 +334,15 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                             raise ValueError(
                                 "Adapter acknowledged cleanup with live owned processes"
                             )
-                        status = "passed"
+                        completion = Finished("passed")
                     break
                 time.sleep(budget.sample_seconds)
-        except (OSError, ValueError, psutil.Error) as error:
-            reason = type(error).__name__ + ": invalid adapter evidence or process observation"
+        except (AuthorizationError, OSError, ValueError, psutil.Error) as error:
+            completion = phase.abort(
+                type(error).__name__ + ": invalid adapter evidence or process observation"
+            )
         finally:
+            durable_write(directory / "registration.closed", "closed")
             cleanup_start = time.monotonic_ns()
             forced = sum(resolve(value) is not None for value in owned)
             survivors = cleanup(owned)
@@ -264,19 +353,31 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                 with contextlib.suppress(subprocess.TimeoutExpired):
                     child.wait(timeout=1.0)
     registry = Registry.model_validate_json((directory / "ownership.json").read_text())
-    uncertain = bool(survivors) or registry.phase == "spawning"
-    if uncertain:
-        status, reason = "failed", "Ownership uncertain; pending spawn or surviving owned process"
+    status: Literal["passed", "failed", "unsupported", "walkthrough", "cancelled"]
+    cleanup_state: Literal["confirmed", "uncertain"] = "confirmed"
+    match completion:
+        case Finished(status, reason):
+            pass
+        case ManagedStopped():
+            status = "cancelled"
+            reason = "Managed stop acknowledged; prior effects are not rolled back"
+        case ImmediateCleanup(reason):
+            status = "failed"
+        case FailedManagedShutdown(reason):
+            status = "failed"
+            cleanup_state = "uncertain"
+        case _:
+            assert_never(completion)
+    if survivors or registry.phase == "spawning":
+        cleanup_state = "uncertain"
+        status = "failed"
+        reason = "Ownership uncertain; pending spawn or surviving owned process"
     return Outcome(
-        status="passed"
-        if status == "passed"
-        else "unsupported"
-        if status == "unsupported"
-        else "failed",
+        status=status,
         reason=reason,
         returncode=process.returncode,
         cleanup_survivors=survivors,
-        cleanup_state="uncertain" if uncertain else "confirmed",
+        cleanup_state=cleanup_state,
         cleanup_ns=cleanup_duration,
         forced_cleanup_count=forced,
         enforcement=tuple(enforcement),

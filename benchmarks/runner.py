@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Literal
 
 import psutil
+from examples.distributed.models import WalkthroughProof
+from pybeam.runtime.guardian import ImmediateStop
 from pydantic import TypeAdapter, ValidationError
 
 from benchmarks.contract import (
@@ -26,6 +28,7 @@ from benchmarks.contract import (
     StrictModel,
     check_correctness,
 )
+from benchmarks.managed import UnacknowledgedExit, parse_cleanup
 from benchmarks.metrics import describe
 from benchmarks.ownership import (
     Control,
@@ -188,6 +191,34 @@ def recover_guardian(directory: Path, returncode: int | None) -> Outcome:
 
 
 def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> TrialSummary:
+    if outcome.status in {"walkthrough", "cancelled"}:
+        if config.purpose != "walkthrough":
+            raise ValueError("Nonmeasurement outcome cannot satisfy a benchmark")
+        if outcome.status == "walkthrough":
+            WalkthroughProof.model_validate_json((directory / "adapter.json").read_text())
+        else:
+            if (
+                isinstance(config.stop_policy, ImmediateStop)
+                or outcome.forced_cleanup_count != 0
+                or outcome.cleanup_state != "confirmed"
+            ):
+                raise ValueError("Cancelled outcome lacks a cooperative managed policy")
+            registry = Registry.model_validate_json((directory / "ownership.json").read_bytes())
+            parsed = parse_cleanup(directory, set(registry.owned), outcome.returncode)
+            if isinstance(parsed, UnacknowledgedExit):
+                raise ValueError(parsed.reason)
+        return TrialSummary(
+            trial=index,
+            outcome=outcome,
+            completed=None,
+            throughput_per_second=None,
+            latency_ns=None,
+            phases=None,
+            adapter_rss_peak_bytes=None,
+            descendants_rss_peak_bytes=None,
+            simultaneous_tree_rss_peak_bytes=None,
+            cpu_seconds_observed_by_pid={},
+        )
     samples: list[ResourceSample] = []
     path = directory / "resources.jsonl"
     if path.exists():
@@ -203,6 +234,8 @@ def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> 
     latency: Statistics | None = None
     phases: Phases | None = None
     if outcome.status == "passed":
+        if config.purpose != "measurement":
+            raise ValueError("Benchmark outcome cannot satisfy a walkthrough")
         output = TypeAdapter(AdapterOutput).validate_json((directory / "adapter.json").read_text())
         if not isinstance(output, AdapterResult):
             raise ValueError("Passing trial must contain completion evidence")
