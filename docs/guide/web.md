@@ -1,32 +1,21 @@
 # Web examples
 
-These are source-checkout examples, not installed package commands. Prepare the runtime and optional dependencies with the [source workflow](quickstart.md#work-from-source) first. Launch commands do not implicitly build missing assets.
+Keep your ASGI framework and use BEAM services for shared state. The [FastAPI counter](../../examples/fastapi/main.py) uses the same counter across connections. The [Litestar](../../examples/litestar/main.py) and [PyView](../../examples/pyview/main.py) examples use the same services.
 
 ## Shared counters
 
-From the repository root, run one framework example.
+Import `Beam` and `provider` from `pybeam.integrations.fastapi.dependencies`. Create the application with `FastAPI(lifespan=provider.lifespan)` and declare a route parameter as `beam: Beam`. The provider supplies services scoped to that connection.
 
-```sh
-mise run example:fastapi
-# Or choose example:litestar or example:pyview.
-```
+Use `await beam.incr("shared", 1, namespace="demo")` to increment atomically. A delta of `0` reads the counter. After a change, use `await beam.publish("demo:counter", str(count).encode("ascii"))` to notify subscribers.
 
-Open `http://127.0.0.1:8642/` in two tabs. Increment in either tab. Both read the same counter in BEAM ETS, where updates are atomic. Notifications trigger fresh reads. FastAPI and Litestar use SSE; PyView uses LiveView WebSockets. Restarting BEAM clears the counter.
+`provider.subscription("demo:counter")` creates a FastAPI dependency for an owned notification stream. The example reads the shared counter again after each notification rather than treating notifications as stored state. FastAPI and Litestar send updates over SSE; PyView uses LiveView WebSockets.
 
-These examples use Hornbeam's ASGI serving path and existing services. They do not prove a performance advantage over a Python server.
+For cached bytes, `beam.store("session")` returns a namespaced store with async `set`, `get`, and `delete` methods. `set` accepts `expires_in` for expiring values.
 
-## Room miniapp
+## Room state
 
-```sh
-mise run example:discord --port 8766
-```
+The [room miniapp](../../examples/discord_demo/main.py) uses actors for membership and messages. Join a room before sending. Crashing a room replaces its actor with empty state. Each participant must explicitly join the new generation.
 
-Open `http://127.0.0.1:8766/rooms/general` in two separate browser sessions. Join before sending. The first session owns the crash button. After a crash, join the new room generation explicitly. State is empty after restart.
+Uvicorn serves FastAPI inside `ErlangEventLoop`. The Hornbeam integration owns its existing supervised services, not the HTTP listener in this example.
 
-This Discord-style demo has no Discord authentication. Uvicorn serves FastAPI inside `ErlangEventLoop`. The Hornbeam integration owns its existing supervised services, but does not start Hornbeam's HTTP listener here.
-
-Rooms have bounded history and subscription queues. Slow output disconnects after five seconds. Disconnect releases the subscription, not membership. Read the [miniapp README](../../examples/discord_demo/README.md) for exact limits and cleanup semantics.
-
-## Showcase
-
-`mise run showcase` opens the local experiment control plane on port 38921. Native measurement profiles require separately prepared trusted assets. This is a development tool, not a production service or an installation check. Do not treat its counters as comparative benchmark results.
+Disconnect releases the notification subscription, not room membership. Subscription queues and room history are bounded. Slow output disconnects after five seconds. The demo has no Discord authentication or persistent message storage.

@@ -1,25 +1,19 @@
 # Boundaries
 
-## One local runtime
+## Execution
 
-The supported bootstrap owns one BEAM VM with one main Python interpreter. The GIL still applies. Actor ownership is not multicore Python execution, a separate interpreter per actor, or protection from a C-extension crash.
+Python runs in one BEAM VM with one main interpreter. The GIL still applies. Separate actor processes do not provide multicore Python execution or isolation from a C-extension crash.
 
-The managed configuration currently rejects distribution and listener options. Existing actor references are not transparent cross-node references. Do not design around remote task or actor calls as an installed feature.
+An actor serializes its calls even while a method awaits. Use separate actors for independent state owners. Use ordinary async functions when you only need concurrent I/O and no actor state.
 
-## No persistence or automatic replay
+## Effects and persistence
 
-Actor state and the example ETS counters are volatile. A supervisor can replace a failed child, but does not recover its previous Python state. Applications own persistence and authorization.
+Actor state and ETS counters are volatile. OTP can replace a failed child, but does not recover its previous Python state. Applications own persistence and authorization.
 
-A timeout or cancellation can leave an operation with effects. There is no exactly-once execution guarantee. Make retry policy explicit, especially for writes. Pub/sub is not a durable event log.
+A timeout or cancellation is not rollback. The method may already have changed state. There is no exactly-once execution guarantee or automatic replay. Make retry policy explicit, especially for writes. Pub/sub is not a durable event log.
 
-## Data and memory limits
+## Data and memory
 
-Typed calls accept serialized data, not arbitrary Python objects. Resources belong to their owning actor and need explicit cleanup. Admission limits do not bound total process memory or arbitrary work inside a method.
+Actor calls transfer serialized request and result copies, not arbitrary Python objects. Resources belong to their actor and require explicit cleanup.
 
-The mailbox policy records in `pybeam.mailbox` describe limits but do not install enforcement. Use the bounded native `ActorGroup` API for actors. Do not infer guarantees for another API from a policy object's name.
-
-## Keep the scope small
-
-The public top-level API covers `actor`, `ActorGroup`, `spawn`, and `run`, with actor error types. Nodes, worker pools, Tasks, GenStage, and AI integrations are not part of this installed main API. These guides do not require them.
-
-Start with [one actor](quickstart.md), then test the failure and shutdown behavior your application needs against the actual runtime. A successful documentation build does not verify native runtime compatibility or a clean wheel installation.
+Admission limits count accepted work and encoded request bytes. They do not bound total process memory, serialization scratch space, or the work a method can perform. Bound the number of caller tasks as well as the actor's admitted work.
