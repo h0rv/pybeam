@@ -1,0 +1,9 @@
+{
+  "python_source": ".",
+  "native_source": "../native-benchmarks",
+  "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.python_reference"],
+  "workload": {
+    "queue_bound_scope": "client_admission_only"
+  },
+  "repeats": 1
+}
