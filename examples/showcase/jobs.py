@@ -22,6 +22,7 @@ from examples.distributed.models import (
     StateObserved,
     WalkthroughProof,
 )
+from examples.distributed.policy import walkthrough_budget
 from examples.showcase.catalog import ROOT, Card, distributed_unavailable
 
 
@@ -189,7 +190,7 @@ class Jobs:
                     python_source=str(ROOT),
                     repeats=1,
                     purpose="walkthrough",
-                    budget=Budget(wall_seconds=120.0, artifact_bytes=2_097_152, processes=16),
+                    budget=walkthrough_budget(),
                     adapter_command=(sys.executable, "-m", "examples.showcase.distributed"),
                 )
             (job.directory / "config.json").write_text(config.model_dump_json())

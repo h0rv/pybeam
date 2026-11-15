@@ -6,12 +6,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from benchmarks.contract import Budget
+from examples.distributed.policy import walkthrough_budget
 from pybeam.runtime.assets import packaged_assets
 from pybeam.runtime.optional_manifest import contained, verify_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "build/distribution-ready-profile.json"
-PROFILE_SHA256 = "b46c8cce60981807a15823901da2a2c4c50b089380fc905c19382da49c56f7f7"
+PROFILE_SHA256 = "0b1f2314363862cc65411696061b73dfd040cca4d715909c8fac93d2faf4a573"
 
 
 class PreparedProfile(BaseModel):
@@ -28,6 +30,7 @@ class PreparedProfile(BaseModel):
     runtime_files: dict[str, str]
     origin_receipt_sha256: str
     compiler_jobs: Literal[0]
+    budget: Budget
 
 
 def digest(path: Path) -> str:
@@ -47,6 +50,8 @@ def verify_prepared() -> None:
     if digest(PROFILE) != PROFILE_SHA256:
         raise ValueError("Prepared distribution profile pin differs")
     profile = PreparedProfile.model_validate_json(PROFILE.read_bytes())
+    if profile.budget != walkthrough_budget():
+        raise ValueError("Prepared walkthrough resource policy differs")
     native = profile.native_source
     git = shutil.which("git")
     if git is None:

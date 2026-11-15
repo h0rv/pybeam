@@ -7,7 +7,7 @@ import pytest
 import uvicorn
 from pydantic import BaseModel, ConfigDict
 
-from benchmarks.contract import Outcome
+from benchmarks.contract import Outcome, ResourceSample
 from examples.distributed.models import Observation, WalkthroughProof
 from examples.showcase import app as showcase
 from examples.showcase.app import Settings, create_app
@@ -25,6 +25,7 @@ class JobAudit(BaseModel):
     proof: WalkthroughProof | None
     registry: Registry | None
     outcome: Outcome | None
+    peak_sample: ResourceSample | None = None
 
 
 class Audit(BaseModel):
@@ -45,6 +46,30 @@ def serve(port: int, audit: Path) -> None:
                 trial = job.directory / "result/trial-0"
                 registry = trial / "ownership.json"
                 outcome = trial / "outcome.json"
+                resources = trial / "resources.jsonl"
+                samples = (
+                    tuple(
+                        ResourceSample.model_validate_json(line)
+                        for line in resources.read_text().splitlines(keepends=True)
+                        if line.endswith("\n")
+                    )
+                    if resources.is_file()
+                    else ()
+                )
+                if outcome.is_file() and resources.is_file():
+                    durable_write(
+                        audit.with_name(job.id + ".resources.jsonl"), resources.read_text()
+                    )
+                    for name in (
+                        "config.json",
+                        "stdout.log",
+                        "stderr.log",
+                        "ownership.json",
+                        "outcome.json",
+                    ):
+                        source = trial / name
+                        if source.is_file():
+                            durable_write(audit.with_name(job.id + "." + name), source.read_text())
                 jobs.append(
                     JobAudit(
                         id=job.id,
@@ -58,6 +83,11 @@ def serve(port: int, audit: Path) -> None:
                         outcome=Outcome.model_validate_json(outcome.read_bytes())
                         if outcome.is_file()
                         else None,
+                        peak_sample=max(
+                            samples,
+                            key=lambda sample: sum(p.threads for p in sample.processes),
+                            default=None,
+                        ),
                     )
                 )
             durable_write(
