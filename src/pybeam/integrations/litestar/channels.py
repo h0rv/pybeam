@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, override
 
 from litestar.channels.backends.base import ChannelsBackend
 
-from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
+from pybeam.integrations.hornbeam.errors import SubscriptionClosed
+
+
+class MergeQueueOverflow(RuntimeError):
+    """The local framework merge queue exhausted its item capacity."""
+
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Coroutine, Iterable
@@ -139,7 +144,7 @@ class BeamChannelsBackend(ChannelsBackend):
             if self._failure is not None:
                 raise self._failure
             if self._beam is None:
-                from hornbeam.services.client import Beam
+                from pybeam.integrations.hornbeam.client import Beam
 
                 self._beam = await Beam.connect()
             self._running = True
@@ -153,7 +158,7 @@ class BeamChannelsBackend(ChannelsBackend):
                         self._queue.put_nowait((channel, receiver, payload))
                     except asyncio.QueueFull:
                         message = "Litestar backend merge queue is full"
-                        raise SubscriptionOverflow(message) from None
+                        raise MergeQueueOverflow(message) from None
                     self._wake.set()
                 self._fail(SubscriptionClosed("Litestar backend channel closed: " + channel))
         except asyncio.CancelledError:

@@ -18,8 +18,7 @@ from examples.litestar.main import (
     index,
     template_config,
 )
-from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
-from pybeam.integrations.litestar.channels import BeamChannelsBackend
+from pybeam.integrations.litestar.channels import BeamChannelsBackend, MergeQueueOverflow
 from pybeam.integrations.litestar.store import BeamStore
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState as FakeBridge
@@ -147,10 +146,10 @@ async def test_overflow__should_be_observable_and_shutdown_without_queue_space()
     await backend.publish(b"1", ["one"])
     await backend.publish(b"2", ["one"])
     await eventually(lambda: backend.failure is not None)
-    assert isinstance(backend.failure, SubscriptionOverflow)
+    assert isinstance(backend.failure, MergeQueueOverflow)
     async with asyncio.timeout(1):
         await backend.on_shutdown()
-        with pytest.raises(SubscriptionOverflow, match="merge queue"):
+        with pytest.raises(MergeQueueOverflow, match="merge queue"):
             await backend.receive_or_failure(asyncio.sleep(0))
     assert not bridge.subscriptions
 

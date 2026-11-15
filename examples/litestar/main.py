@@ -3,7 +3,6 @@ from logging import INFO, basicConfig, getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, override
 
-from hornbeam.services.client import Beam
 from litestar import Litestar, Request, get, post
 from litestar.datastructures import State
 from litestar.enums import RequestEncodingType
@@ -19,6 +18,7 @@ from pybeam.integrations.hornbeam import (
     Services,
     Subscription,
 )
+from pybeam.integrations.hornbeam.client import Beam
 from pybeam.integrations.litestar.store import BeamStore
 
 if TYPE_CHECKING:

@@ -7,7 +7,6 @@ from logging import INFO, basicConfig, getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, override
 
-from hornbeam.services.client import Beam
 from markupsafe import Markup
 from pydantic import BaseModel, Field, ValidationError
 from pyview.events import InfoEvent
@@ -19,6 +18,7 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from pybeam.integrations.hornbeam.client import Beam
 from pybeam.integrations.pyview.subscriptions import ViewSubscription
 
 if TYPE_CHECKING:

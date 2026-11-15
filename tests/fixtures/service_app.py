@@ -12,6 +12,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from pybeam.integrations.fastapi.dependencies import BeamProvider
 from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
 
 
 @dataclass
@@ -91,6 +92,44 @@ async def get_cache(
 @app.get("/subscriptions")
 async def subscriptions(beam: BeamDependency) -> dict[str, int]:
     return {"count": await beam.subscription_count()}
+
+
+@app.post("/subscription-boundary")
+async def subscription_boundary(beam: BeamDependency) -> dict[str, int]:
+    from hornbeam.api.errors import SubscriptionClosed as NativeClosed
+    from hornbeam.api.errors import SubscriptionOverflow as NativeOverflow
+
+    baseline = await beam.subscription_count()
+    async with beam.subscribe("boundary:keeper"):
+        for _ in range(260):
+            async with beam.subscribe("boundary:churn"):
+                pass
+        assert await beam.subscription_count() == baseline + 1
+    closed = beam.subscribe("boundary:closed")
+    async with closed:
+        pass
+    try:
+        await closed.receive()
+    except SubscriptionClosed as error:
+        assert isinstance(error.__cause__, NativeClosed)
+    else:
+        raise AssertionError("public closed exception was not raised")
+    async with beam.subscribe("boundary:overflow", max_bytes=1024) as overflow:
+        await beam.publish("boundary:overflow", b"x" * 4096)
+        try:
+            await overflow.receive()
+        except SubscriptionOverflow as error:
+            assert isinstance(error.__cause__, NativeOverflow)
+        else:
+            raise AssertionError("public overflow exception was not raised")
+    try:
+        await overflow.receive()
+    except SubscriptionOverflow as error:
+        assert isinstance(error.__cause__, NativeOverflow)
+    else:
+        raise AssertionError("retirement lost the retained overflow status")
+    assert await beam.subscription_count() == baseline
+    return {"cycles": 260, "subscriptions": baseline}
 
 
 @app.post("/publish/{topic}")

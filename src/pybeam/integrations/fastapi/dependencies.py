@@ -9,7 +9,7 @@ from pybeam.integrations.hornbeam import Services, Subscription
 
 
 async def _connect() -> Services:
-    from hornbeam.services.client import Beam
+    from pybeam.integrations.hornbeam.client import Beam
 
     return await Beam.connect()
 
