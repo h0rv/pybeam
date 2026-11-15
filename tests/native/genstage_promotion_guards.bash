@@ -10,6 +10,12 @@ genstage_hash() {
     [[ "${actual%% *}" == "$2" ]] || genstage_abort "hash mismatch: $1"
 }
 
+genstage_native_helper_hashes() {
+    genstage_hash "$1/src/py_application.erl" 3a116f240ec2205fe36801764ddd7508b8c1f8e6fd19c67e16aa070212ce676e
+    genstage_hash "$1/src/py_callback.erl" 653b0e77ad2bda9b49f7bfe1e55bd240e9475a24797fe5f1d29e518efa3f4435
+    genstage_hash "$1/src/py_launch.erl" fbbdf78852d71dce78594e30d7e15c4d3adc94ca91217332822a1c2ce3aa1003
+}
+
 genstage_preflight() {
     local root="$1" native="$2" wheel="$3" reviewed_sdk="$4" reviewed_native="$5" source_nif="$6"
     local name actual status
@@ -40,6 +46,7 @@ genstage_preflight() {
     [[ -z "$status" ]] || genstage_abort 'native source is dirty'
     actual="$(git -C "$native" rev-parse HEAD:c_src)" || genstage_abort 'cannot read native C source tree'
     [[ "$actual" == ff743477747ef9e882a2718f665a8d339178c221 ]] || genstage_abort 'native C source tree changed'
+    genstage_native_helper_hashes "$native"
     actual="$(uv run --locked python -c 'import sys,sysconfig; print(".".join(map(str,sys.version_info[:3])) + ("t" if sysconfig.get_config_var("Py_GIL_DISABLED") else ""))')" || genstage_abort 'cannot inspect selected Python'
     [[ "$actual" == 3.14.10 ]] || genstage_abort 'select the declared Python 3.14.10 through mise exec'
     local declared_python

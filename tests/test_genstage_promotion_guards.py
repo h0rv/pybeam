@@ -66,6 +66,32 @@ def test_failed_precondition__aborts_before_any_exchange(
     assert not marker.exists(), "An exchange occurred after a failed precondition"
 
 
+def test_changed_helper_source__aborts_before_any_exchange(tmp_path: Path) -> None:
+    native = tmp_path / "native"
+    (native / "src").mkdir(parents=True)
+    (native / "src/py_application.erl").write_text("unapproved helper source")
+    marker = tmp_path / "exchange-count"
+    result = subprocess.run(
+        [
+            "/bin/bash",
+            "-c",
+            'set -euo pipefail\nsource "$1"\ngenstage_native_helper_hashes "$2"\nprintf exchange > "$3"',
+            "helper-control",
+            str(GUARDS),
+            str(native),
+            str(marker),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5,
+    )
+    assert result.returncode != 0
+    assert "hash mismatch" in result.stderr
+    assert "py_application.erl" in result.stderr
+    assert not marker.exists()
+
+
 def test_failed_pipeline__aborts_before_any_exchange(tmp_path: Path) -> None:
     marker = tmp_path / "exchange-count"
     result = subprocess.run(
