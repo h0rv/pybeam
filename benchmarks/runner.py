@@ -343,7 +343,7 @@ def main() -> None:
     config = (
         Config.model_validate_json(args.config.read_text())
         if args.config is not None
-        else Config(python_source=str(root), native_source=str(root.parent / "native-benchmarks"))
+        else Config(python_source=str(root), native_source=str(root.parent / "erlang-python"))
     )
     output = args.output or root / "benchmarks" / "results" / (
         time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8]

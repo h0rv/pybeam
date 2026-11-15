@@ -13,7 +13,7 @@ from benchmarks.python_smoke import run
 @pytest.fixture
 def config() -> Config:
     root = Path(__file__).resolve().parents[2]
-    return Config(python_source=str(root), native_source=str(root.parent / "native-benchmarks"))
+    return Config(python_source=str(root), native_source=str(root.parent / "erlang-python"))
 
 
 def test_config__rejects_coercion_unknown_fields_and_accidental_scale(config: Config) -> None:
