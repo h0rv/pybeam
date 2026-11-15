@@ -17,8 +17,10 @@ import pytest
     ],
 )
 def test_installed_extra__imports_without_other_frameworks_or_vm(
-    extra: str, modules: tuple[str, ...], tmp_path: Path
+    extra: str, modules: tuple[str, ...], tmp_path: Path, request: pytest.FixtureRequest
 ) -> None:
+    if request.config.getoption("run_runtime") is not True:
+        pytest.skip("Requires --run-runtime before installing or launching an isolated environment")
     wheel_value = os.environ.get("PYBEAM_TEST_WHEEL")
     if wheel_value is None:
         pytest.skip("Set PYBEAM_TEST_WHEEL for isolated installed-extra gates")

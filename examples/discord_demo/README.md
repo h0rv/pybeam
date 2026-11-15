@@ -15,7 +15,7 @@ Leave stops native delivery receipts for your membership. The live view remains 
 Chrome acceptance is opt-in, separate from unit tests:
 
 ```sh
-uv run --extra fastapi --extra hornbeam pytest tests/test_discord_demo_browser.py --run-runtime --run-browser
+uv run --extra fastapi --extra hornbeam pytest tests/test_discord_demo_browser.py --run-frameworks --run-runtime --run-browser
 ```
 
 An explicitly requested browser run fails if Chrome or the native runtime is unavailable. Without the flags, browser tests are deselected, not reported as passing.

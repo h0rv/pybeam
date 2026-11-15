@@ -105,6 +105,7 @@ async def test_showcase__queue_is_bounded(tmp_path: Path) -> None:
     assert all(job.status == "stopped" for job in manager.items.values())
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("mode", ["stop", "owner_exit"])
 def test_guardian__control_reaps_owned_child(
     tmp_path: Path, mode: str, monkeypatch: pytest.MonkeyPatch

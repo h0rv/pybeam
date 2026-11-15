@@ -194,6 +194,7 @@ def test_private_build__does_not_change_existing_project_checkout(
         path.write_text("private build fixture")
     python = tmp_path / "python"
     python.touch()
+    python.with_name("python3.14-config").touch()
     expected = Source(
         path=str(native),
         sha=BASELINE,
@@ -211,6 +212,7 @@ def test_private_build__does_not_change_existing_project_checkout(
         argv: tuple[str, ...], *, env: dict[str, str], check: bool, timeout: int
     ) -> subprocess.CompletedProcess[bytes]:
         commands.append(argv)
+        assert env["PYTHON_CONFIG"] == str(python.with_name("python3.14-config"))
         return subprocess.CompletedProcess(argv, 0)
 
     monkeypatch.setattr("benchmarks.pybeam_reference_build.source", source)
@@ -221,3 +223,37 @@ def test_private_build__does_not_change_existing_project_checkout(
     assert commands[1][-2:] == ("--parallel", "2")
     assert checkout.resolve() == canonical
     assert Path(manifest.runtime_directory).is_relative_to(native)
+
+
+@pytest.mark.parametrize(
+    "escape",
+    [
+        "canonical",
+        "priv",
+        "priv/py_nif.so",
+        "_build",
+        "c_src",
+        "_build/default/lib/erlang_python/ebin/erlang_python.app",
+        "_build/default/lib/erlang_python/ebin/py_launch.beam",
+    ],
+)
+def test_private_build__rejects_canonical_or_escaping_outputs_before_commands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, escape: str
+) -> None:
+    native, canonical = tmp_path / "private", tmp_path / "canonical"
+    native.mkdir()
+    canonical.mkdir()
+    monkeypatch.setattr("benchmarks.pybeam_reference_build.CANONICAL_NATIVE", canonical)
+    if escape == "canonical":
+        native = canonical
+    else:
+        target = native / escape
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.symlink_to(canonical, target_is_directory=True)
+
+    def forbidden_source(_path: Path) -> Source:
+        pytest.fail("Unsafe roots must be rejected before source inspection or compilation")
+
+    monkeypatch.setattr("benchmarks.pybeam_reference_build.source", forbidden_source)
+    with pytest.raises(ValueError, match=r"canonical|escapes"):
+        build(native, tmp_path / "unused-python")

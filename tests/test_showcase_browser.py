@@ -26,12 +26,14 @@ def finished(job: Locator) -> None:
 
 
 @pytest.mark.browser
-@pytest.mark.skipif(not CHROME.is_file(), reason="Local Google Chrome unavailable")
+@pytest.mark.benchmark
 def test_showcase__actual_chrome_controls_and_evidence(
     tmp_path: Path, request: pytest.FixtureRequest
 ) -> None:
     if request.config.getoption("run_browser") is not True:
         pytest.skip("Requires explicit --run-browser; this local UI test needs no native server")
+    if not CHROME.is_file():
+        pytest.fail("--run-browser requested, but Google Chrome is not installed: " + str(CHROME))
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]

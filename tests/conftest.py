@@ -16,6 +16,21 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNTIME = ROOT / "_build" / "hornbeam"
 RUNTIME_LAUNCHER = ROOT.parent / "hornbeam" / "examples" / "run_asgi.escript"
+FRAMEWORK_TESTS = frozenset(
+    {
+        "test_browser_gate.py",
+        "test_discord_demo.py",
+        "test_discord_demo_browser.py",
+        "test_fastapi.py",
+        "test_hornbeam_boundary.py",
+        "test_litestar.py",
+        "test_pyview_subscription.py",
+        "test_showcase.py",
+        "test_showcase_benchmarks.py",
+        "test_showcase_browser.py",
+        "test_showcase_provenance.py",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -35,6 +50,10 @@ def is_address(value: object) -> TypeIs[tuple[object, object]]:
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
+        "--run-frameworks", action="store_true", help="Collect optional framework tests"
+    )
+    parser.addoption("--run-benchmarks", action="store_true", help="Run guarded measurement tests")
+    parser.addoption(
         "--run-runtime", action="store_true", help="Run tests on the real BEAM runtime"
     )
     parser.addoption(
@@ -47,7 +66,25 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    if not config.getoption("run_frameworks") and any(
+        Path(argument.split("::", 1)[0]).name in FRAMEWORK_TESTS for argument in config.args
+    ):
+        raise pytest.UsageError("Optional framework test files require --run-frameworks")
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    if not config.getoption("run_frameworks") and collection_path.name in FRAMEWORK_TESTS:
+        return True
+    return None
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if not config.getoption("run_benchmarks"):
+        measured = [item for item in items if item.get_closest_marker("benchmark") is not None]
+        items[:] = [item for item in items if item.get_closest_marker("benchmark") is None]
+        if measured:
+            config.hook.pytest_deselected(items=measured)
     if config.getoption("run_browser"):
         if not config.getoption("run_runtime") and any(
             item.get_closest_marker("browser") is not None

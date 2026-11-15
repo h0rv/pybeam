@@ -8,6 +8,7 @@ from benchmarks.contract import LoadedAsset, Source, StrictModel
 from benchmarks.provenance import source
 
 BASELINE = "a1ca04bfcaea817654ec7d1972f210c7a60075c4"
+CANONICAL_NATIVE = Path(__file__).resolve().parents[2] / "erlang-python"
 
 
 class BuildManifest(StrictModel):
@@ -36,10 +37,42 @@ def verify(manifest: BuildManifest, native: Path) -> None:
             raise ValueError("Build asset changed: " + item.path)
 
 
+def private_outputs(native: Path) -> None:
+    if native == CANONICAL_NATIVE.resolve():
+        raise ValueError("Benchmark preparation refuses the canonical native checkout")
+    for name in (
+        "c_src",
+        "src",
+        "priv",
+        "priv/py_nif.so",
+        "_build",
+        "_build/cmake",
+        "_build/cmake/CMakeCache.txt",
+        "_build/default/lib/erlang_python",
+        "_build/default/lib/erlang_python/ebin",
+        "_build/default/lib/erlang_python/priv",
+        "_build/pybeam-reference-build.json",
+    ):
+        if not (native / name).resolve().is_relative_to(native):
+            raise ValueError("Private build path escapes the selected checkout: " + name)
+    for directory in (native / "priv", native / "_build"):
+        for path in directory.rglob("*"):
+            if path.is_symlink() and not path.resolve().is_relative_to(native):
+                raise ValueError(
+                    "Private build output symlink escapes the selected checkout: " + str(path)
+                )
+
+
 def build(native: Path, python: Path) -> Path:
+    native = native.resolve(strict=True)
+    private_outputs(native)
     before = source(native)
     if before.dirty or before.sha != BASELINE:
         raise ValueError("Build requires the clean pinned current native source")
+    python = python.resolve(strict=True)
+    python_config = python.with_name("python3.14-config")
+    if not python_config.is_file():
+        raise ValueError("Selected Python must provide its matching python3.14-config")
     runtime = native / "_build/default/lib/erlang_python"
     ebin = runtime / "ebin"
     ebin.mkdir(parents=True, exist_ok=True)
@@ -61,9 +94,11 @@ def build(native: Path, python: Path) -> Path:
         ("cmake", "--build", str(native / "_build/cmake"), "--parallel", "2"),
         ("erlc", "-o", str(ebin), *map(str, sorted((native / "src").glob("*.erl")))),
     )
-    environment = dict(os.environ, ERL_FLAGS="+S 1:1 +A 1")
+    environment = dict(os.environ, ERL_FLAGS="+S 1:1 +A 1", PYTHON_CONFIG=str(python_config))
     for command in commands:
+        private_outputs(native)
         subprocess.run(command, env=environment, check=True, timeout=240)  # noqa: S603
+    private_outputs(native)
     shutil.copyfile(native / "src/erlang_python.app.src", ebin / "erlang_python.app")
     manifest = BuildManifest(
         native=before,

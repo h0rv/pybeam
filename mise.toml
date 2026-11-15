@@ -6,72 +6,207 @@ uv = "0.13.8"
 cmake = "4.5.0"
 
 [tasks.setup]
+description = "Link local runtime sources, sync locked dependencies, then explicitly build"
 run = [
     "mkdir -p _checkouts",
     "ln -sfn ../../hornbeam _checkouts/hornbeam",
     "ln -sfn ../../erlang-python _checkouts/erlang_python",
     "ln -sfn ../../erlang-ws _checkouts/ws",
     "ln -sfn ../../erlang-h1 _checkouts/h1",
-    "uv sync --all-extras",
+    "uv sync --locked --all-extras",
     "mise run build",
 ]
 
 [tasks.build]
-run = 'PYTHON_CONFIG="$(dirname "$(command -v python)")/python3.14-config" rebar3 as hornbeam compile'
+wait_for = ["setup"]
+description = "Explicit canonical native build, serialized and limited to two compiler jobs"
+run = "uv run --locked python tools/build_native.py"
 
 [tasks.check]
-run = ["uv run --all-extras ruff check .", "uv run --all-extras ruff format --check .", "uv run --all-extras ty check --error-on-warning"]
+description = "Lint, format and strict type checks; no VM or benchmark loads"
+run = [
+    "uv run --locked --all-extras ruff check .",
+    "uv run --locked --all-extras ruff format --check .",
+    "uv run --locked --all-extras ty check --error-on-warning",
+    "uv run --locked --project benchmarks ty check --project benchmarks --extra-search-path . --extra-search-path src --extra-search-path typings --extra-search-path ../erlang-python/priv --error-on-warning",
+]
 
 [tasks.test]
-run = "uv run --all-extras pytest -c pyproject.toml -q tests ../hornbeam/test/python/test_services.py"
+description = "Ordinary core unit tests, without optional frameworks, native VMs or measurements"
+run = "uv run --locked --isolated pytest -c pyproject.toml -q -m 'not runtime and not browser'"
+
+[tasks."test:frameworks"]
+description = "Optional adapter and app units; no native VMs, browser or measurement loads"
+run = "uv run --locked --extra hornbeam --extra fastapi --extra litestar --extra pyview --extra showcase pytest -c pyproject.toml --run-frameworks -q -m 'not runtime and not browser'"
+
+[tasks."test:hornbeam"]
+description = "Explicit sibling Hornbeam service units"
+run = "uv run --locked --extra hornbeam pytest -c pyproject.toml -q ../hornbeam/test/python/test_services.py"
 
 [tasks.integration]
-run = "uv run --all-extras pytest --run-runtime -m runtime -q"
+wait_for = ["setup", "build"]
+description = "All nonbrowser native integration tests on prebuilt assets; never builds implicitly"
+run = "uv run --locked --all-extras pytest --run-frameworks --run-runtime -m 'runtime and not browser' -q"
 
 [tasks.browser]
-description = "Test real two-tab counters on a built runtime. First: uv run playwright install chromium; or set PLAYWRIGHT_CHROMIUM_EXECUTABLE."
-run = "uv run --all-extras pytest --run-runtime --run-browser -m browser -q"
+wait_for = ["setup", "build"]
+description = "Original three-framework Chrome acceptance on private ports; missing browser fails"
+run = "uv run --locked --all-extras pytest tests/test_examples_browser.py --run-frameworks --run-runtime --run-browser -q"
+
+[tasks."test:discord-browser"]
+wait_for = ["setup", "build"]
+description = "Native miniapp and serving acceptance with explicit sandboxed Chrome"
+run = "uv run --locked --extra fastapi --extra hornbeam pytest tests/test_discord_demo_browser.py tests/test_discord_serving.py --run-frameworks --run-runtime --run-browser -q -s"
+
+[tasks."test:wheel"]
+description = "Require PYBEAM_TEST_WHEEL and verify clean installation, typing and optional-extra isolation"
+run = '''
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Set PYBEAM_TEST_WHEEL to an existing platform wheel. No wheel gate was run.\n' >&2
+    exit 2
+fi
+uv run --locked pytest tests/test_packaging.py tests/test_optional_wheel_imports.py --run-runtime -q
+'''
+
+[tasks."test:all"]
+wait_for = ["setup", "build"]
+description = "Full acceptance, including guarded measurements; requires wheel, private assets and measurement window"
+run = '''
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Full acceptance requires PYBEAM_TEST_WHEEL.\n' >&2
+    exit 2
+fi
+if [ -z "${PYBEAM_BENCHMARK_NATIVE_ROOT:-}" ]; then
+    printf 'Full acceptance requires PYBEAM_BENCHMARK_NATIVE_ROOT and an exclusive measurement window.\n' >&2
+    exit 2
+fi
+uv run --locked --all-extras pytest tests ../hornbeam/test/python/test_services.py --run-frameworks --run-runtime --run-browser --run-benchmarks -q
+mise run benchmark:test
+'''
+
+[tasks."benchmark:setup"]
+description = "Sync only the separate locked benchmark environment; no builds or measurements"
+run = "uv sync --locked --project benchmarks"
+
+[tasks."benchmark:build-erlang"]
+description = "Explicitly prepare the two OTP scalar reference modules; no NIF build or measurement"
+run = "uv run --locked --project benchmarks python -m benchmarks.native_reference --build"
+
+[tasks."benchmark:build-pybeam"]
+description = "Explicit private clean a1ca04b build; rejects canonical and escaping output paths"
+usage = 'arg "<native>" help="Private clean pinned native checkout, never the canonical checkout"'
+run = 'uv run --locked --project benchmarks python -m benchmarks.pybeam_reference_build "${usage_native}" --python "$(command -v python)"'
+
+[tasks."benchmark:python"]
+description = "Guarded uncontrolled Python scalar trials; exclusive measurement window required"
+usage = 'flag "--output <path>"'
+run = '''
+set --
+if [ -n "${usage_output:-}" ]; then set -- --output "${usage_output}"; fi
+exec uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json "$@"
+'''
+
+[tasks."benchmark:erlang"]
+description = "Guarded uncontrolled OTP scalar trials; requires explicitly prepared assets and measurement window"
+usage = 'flag "--output <path>"'
+run = '''
+set --
+if [ -n "${usage_output:-}" ]; then set -- --output "${usage_output}"; fi
+exec uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json "$@"
+'''
+
+[tasks."benchmark:pybeam"]
+description = "Guarded raw unbounded PyBEAM scalar trials, not the safe actor frontend"
+usage = '''
+arg "<native>" help="Explicit trusted private source with matching a1ca04b build manifest"
+flag "--output <path>"
+'''
+run = '''
+set --
+if [ -n "${usage_output:-}" ]; then set -- --output "${usage_output}"; fi
+exec uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json --native-source "${usage_native}" "$@"
+'''
+
+[tasks."benchmark:test"]
+description = "Full benchmark tests including actual guarded load; exclusive measurement window required"
+run = '''
+if [ -z "${PYBEAM_BENCHMARK_NATIVE_ROOT:-}" ] || [ ! -f "$PYBEAM_BENCHMARK_NATIVE_ROOT/_build/pybeam-reference-build.json" ]; then
+    printf 'Set PYBEAM_BENCHMARK_NATIVE_ROOT to a prepared private a1ca04b checkout.\n' >&2
+    exit 2
+fi
+if [ ! -f benchmarks/native_reference/_build/manifest.json ]; then
+    printf 'Prepare OTP assets explicitly with mise run benchmark:build-erlang.\n' >&2
+    exit 2
+fi
+uv run --locked --project benchmarks python -m pytest -c benchmarks/pyproject.toml benchmarks/tests -q
+'''
+
+[tasks."browser:showcase"]
+description = "Actual guarded benchmark UI measurements and cleanup; exclusive measurement window required"
+run = "uv run --locked --extra showcase pytest tests/test_showcase_browser.py --run-frameworks --run-browser --run-benchmarks -q -s"
+
+[tasks.showcase]
+description = "Local control plane; native profiles require explicitly trusted prepared private assets"
+usage = '''
+arg "[native]" help="Optional explicitly trusted private benchmark source checkout"
+flag "--port <port>" default="38921"
+'''
+run = '''
+if [ -n "${usage_native:-}" ]; then
+    exec uv run --locked --extra showcase python -m examples.showcase --port "${usage_port}" --trusted-native-root "${usage_native}"
+fi
+exec uv run --locked --extra showcase python -m examples.showcase --port "${usage_port}"
+'''
+
+[tasks."example:discord"]
+wait_for = ["setup", "build"]
+description = "Native room miniapp at /rooms/general; prebuilt staged assets required, no implicit build"
+usage = 'flag "--port <port>" default="8766"'
+run = 'exec uv run --locked --extra fastapi --extra hornbeam python -m examples.discord_demo.main --port "${usage_port}"'
+
+[tasks."example:discord-simulation"]
+wait_for = ["setup", "build"]
+description = "Standalone native room CLI with 800 receipt proof; requires staged assets"
+run = "uv run --locked python examples/discord_simulation.py"
 
 [tasks."example:prepare"]
 hide = true
 quiet = true
 run = '''
-printf 'Preparing the example runtime...\n'
-log=$(mktemp "${TMPDIR:-/tmp}/pybeam-example.XXXXXX")
-if ! mise run setup > "$log" 2>&1; then
-    printf '\nSetup failed. Full build log: %s\n\n' "$log"
-    tail -n 80 "$log"
-    exit 1
+if [ ! -f _build/hornbeam/checkouts/hornbeam/ebin/hornbeam.app ]; then
+    printf 'Runtime missing. Prepare explicitly with mise run setup before launching a counter.\n' >&2
+    exit 2
 fi
-rm "$log"
-printf '\nOpen the URL below in two browser tabs.\nIncrement either counter. Both tabs should update without reloading.\nThe counter is shared in BEAM; pub/sub tells each tab to read fresh state.\nApplication logs follow. Press Ctrl+C to stop.\n'
+uv sync --locked --all-extras
+printf '\nOpen the URL in two browser tabs. The counter is shared in BEAM. Ctrl+C stops this owned example.\n'
 '''
 
 [tasks."example:fastapi"]
+wait_for = ["setup", "build"]
 alias = "example"
-description = "Run the FastAPI counter at http://127.0.0.1:8642"
+description = "Run the FastAPI counter at PYBEAM_BIND (default 127.0.0.1:8642), without implicit build"
 quiet = true
-depends = ["example:prepare"]
-run = [{ task = "serve", args = ["examples.fastapi.main:app"] }]
+run = ["mise run example:prepare", "mise run serve -- examples.fastapi.main:app"]
 
 [tasks."example:litestar"]
-description = "Run the Litestar counter at http://127.0.0.1:8642"
+wait_for = ["setup", "build"]
+description = "Run the Litestar counter at PYBEAM_BIND, without implicit build"
 quiet = true
-depends = ["example:prepare"]
-run = [{ task = "serve", args = ["examples.litestar.main:app"] }]
+run = ["mise run example:prepare", "mise run serve -- examples.litestar.main:app"]
 
 [tasks."example:pyview"]
-description = "Run the PyView counter at http://127.0.0.1:8642"
+wait_for = ["setup", "build"]
+description = "Run the PyView counter at PYBEAM_BIND, without implicit build"
 quiet = true
-depends = ["example:prepare"]
-run = [{ task = "serve", args = ["examples.pyview.main:app"] }]
+run = ["mise run example:prepare", "mise run serve -- examples.pyview.main:app"]
 
 [tasks.serve]
+wait_for = ["setup", "build"]
 quiet = true
 output = "interleave"
 usage = 'arg "<app>" default="examples.fastapi.main:app"'
 run = '''
-escript ../hornbeam/examples/run_asgi.escript "$PWD/_build/hornbeam" "${usage_app}" "${PYBEAM_BIND:-127.0.0.1:8642}" on "$PWD" "$PWD/src" "$(uv run --quiet python -c 'import site; print(site.getsitepackages()[0])')" &
+escript ../hornbeam/examples/run_asgi.escript "$PWD/_build/hornbeam" "${usage_app}" "${PYBEAM_BIND:-127.0.0.1:8642}" on "$PWD" "$PWD/src" "$(uv run --locked --all-extras --quiet python -c 'import site; print(site.getsitepackages()[0])')" &
 pid=$!
 trap 'trap - INT TERM; printf "\nStopping the example...\n"; kill -TERM "$pid" 2>/dev/null || true; wait "$pid"; exit 130' INT TERM
 wait "$pid"

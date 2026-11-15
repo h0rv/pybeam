@@ -44,6 +44,7 @@ dev = [
   "ty>=0.0.104",
   "types-psutil>=7,<8",
   "playwright>=1.58,<2",
+  "hatchling>=1.27,<2",
 ]
 
 [build-system]
@@ -74,7 +75,7 @@ extra-paths = ["typings", ".", "../erlang-python/priv"]
 all = "error"
 
 [tool.ty.src]
-include = ["src", "tests", "examples"]
+include = ["src", "tests", "examples", "tools"]
 
 [tool.ruff]
 target-version = "py314"
@@ -100,5 +101,6 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 markers = [
     "runtime: requires a built BEAM runtime",
-    "browser: requires --run-browser, --run-runtime, and installed Chromium",
+    "browser: explicitly requested real Chromium acceptance",
+    "benchmark: guarded real load; requires --run-benchmarks and an exclusive measurement window",
 ]
