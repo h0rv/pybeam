@@ -3,7 +3,7 @@
   "backend": "pybeam",
   "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.pybeam_reference"],
   "python_source": ".",
-  "native_source": "../native-benchmark-current",
+  "native_source": "../erlang-python",
   "repeats": 3,
   "host_control": "uncontrolled_smoke",
   "workload": {

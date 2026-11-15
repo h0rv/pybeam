@@ -31,8 +31,10 @@ def test_profiles__missing_native_assets_are_not_a_pass(tmp_path: Path) -> None:
     assert unavailable("pybeam", tmp_path) is not None
 
 
-def test_current_runtime__loads_real_c_and_releases_all_actor_contexts(tmp_path: Path) -> None:
-    native = ROOT.parent / "native-benchmark-current"
+def test_current_runtime__loads_real_c_and_releases_all_actor_contexts(
+    tmp_path: Path, native_source: Path
+) -> None:
+    native = native_source
     build = native / "_build/pybeam-reference-build.json"
     if not build.is_file():
         pytest.skip("Requires the explicitly built private current native profile")

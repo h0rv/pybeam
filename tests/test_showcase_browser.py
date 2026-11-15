@@ -1,3 +1,4 @@
+import os
 import re
 import socket
 import subprocess
@@ -35,9 +36,15 @@ def test_showcase__actual_chrome_controls_and_evidence(
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
     BASE = "http://127.0.0.1:" + str(port)
+    trusted_native = os.environ.get("PYBEAM_BENCHMARK_NATIVE_ROOT")
+    argv = [sys.executable, "-m", "examples.showcase", "--port", str(port)]
+    profiles = ("python", "erlang")
+    if trusted_native is not None:
+        argv.extend(("--trusted-native-root", trusted_native))
+        profiles = (*profiles, "pybeam")
     with (tmp_path / "server.log").open("wb") as log:
         server = subprocess.Popen(
-            [sys.executable, "-m", "examples.showcase", "--port", str(port)],
+            argv,
             cwd=ROOT,
             stdout=log,
             stderr=log,
@@ -137,15 +144,17 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     == 400
                 )
                 page.get_by_role("button", name="Run all available benchmarks", exact=True).click()
-                for name in ("python", "erlang"):
+                for name in profiles:
                     profile = page.locator('[data-key="benchmark-' + name + '"]')
                     finished(profile)
                     assert "100" in profile.locator("table").inner_text()
                 comparison = page.get_by_role("table", name="Actual scalar results", exact=False)
-                assert comparison.locator("tbody tr").count() == 3
+                assert comparison.locator("tbody tr").count() == len(profiles) + 1
                 assert errors == []
                 print(
-                    "Chrome rendered actual Python and Erlang scalar results. Page and console errors:",
+                    "Chrome rendered actual scalar profiles:",
+                    profiles,
+                    "Page and console errors:",
                     errors,
                 )
                 page.get_by_role(

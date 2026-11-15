@@ -19,7 +19,7 @@ FAULTS = (
 )
 
 
-def request(fault: Fault) -> Config:
+def request(fault: Fault, native_source: Path) -> Config:
     backend = "python" if fault.backend == "smoke" else fault.backend
     config = Config.model_validate_json(
         (ROOT / "benchmarks/examples" / ("serial_" + backend + ".json")).read_text()
@@ -28,7 +28,7 @@ def request(fault: Fault) -> Config:
         update={
             "repeats": 1,
             "python_source": str(ROOT),
-            "native_source": str(ROOT.parent / "native-benchmark-current"),
+            "native_source": str(native_source) if backend == "pybeam" else None,
             "adapter_command": (
                 sys.executable,
                 "-m",
@@ -90,13 +90,14 @@ FULL_FAULTS = tuple(
 def test_actual_delivery__rejects_identity_corruption_under_guardian(
     tmp_path: Path,
     fault: Fault,
+    native_source: Path,
 ) -> None:
     if fault.backend == "pybeam":
-        manifest = ROOT.parent / "native-benchmark-current/_build/pybeam-reference-build.json"
+        manifest = native_source / "_build/pybeam-reference-build.json"
         if not manifest.exists():
             pytest.skip("Private current native build is required")
         BuildManifest.model_validate_json(manifest.read_text())
-    config = request(fault)
+    config = request(fault, native_source)
     directory = tmp_path / (fault.backend + "-" + fault.mode)
     with measurement_lock() as descriptor:
         outcome = trial(config, directory, descriptor)

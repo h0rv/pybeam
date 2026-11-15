@@ -12,17 +12,13 @@ import pytest
 
 from benchmarks.contract import AdapterResult, Config, Runtime, check_correctness
 from benchmarks.guardian import verify_runtime_assets
-from benchmarks.provenance import git
 from benchmarks.pybeam_reference_build import asset
 from benchmarks.python_smoke import run
-
-ROOT = Path(__file__).resolve().parents[2]
-NATIVE = ROOT.parent / "native-bench-pybeam"
 
 
 @pytest.fixture
 def evidence(tmp_path: Path) -> tuple[Config, AdapterResult]:
-    config = Config(python_source=str(tmp_path), native_source=str(NATIVE))
+    config = Config(python_source=str(tmp_path), native_source=None)
     output = asyncio.run(run(config))
     assert isinstance(output, AdapterResult)
     executable = tmp_path / "beam.smp"
@@ -122,7 +118,7 @@ def test_pybeam__still_requires_paired_revision_and_actual_nif_hash(
     nif = tmp_path / "py_nif.so"
     nif.write_bytes(b"fixture NIF bytes")
     config = config.model_copy(update={"backend": "pybeam", "native_source": str(tmp_path)})
-    sha = git(NATIVE, "rev-parse", "HEAD").decode().strip()
+    sha = "1" * 40
 
     def fixture_revision(_root: Path, *_args: str) -> bytes:
         return sha.encode()
