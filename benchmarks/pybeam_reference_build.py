@@ -40,12 +40,6 @@ def build(native: Path, python: Path) -> Path:
     before = source(native)
     if before.dirty or before.sha != BASELINE:
         raise ValueError("Build requires the clean pinned current native source")
-    checkout = Path(__file__).resolve().parent.parent / "_checkouts/erlang_python"
-    checkout.parent.mkdir(parents=True, exist_ok=True)
-    if not checkout.exists():
-        checkout.symlink_to(native, target_is_directory=True)
-    if checkout.resolve() != native:
-        raise ValueError("Private native checkout configuration points elsewhere")
     runtime = native / "_build/default/lib/erlang_python"
     ebin = runtime / "ebin"
     ebin.mkdir(parents=True, exist_ok=True)

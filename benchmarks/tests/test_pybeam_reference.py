@@ -1,4 +1,5 @@
 import asyncio
+import subprocess
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -9,7 +10,7 @@ import pytest
 
 from benchmarks.contract import Config, Source, Unsupported, Workload, messages
 from benchmarks.pybeam_reference import run, unsupported
-from benchmarks.pybeam_reference_build import BASELINE, BuildManifest, asset, verify
+from benchmarks.pybeam_reference_build import BASELINE, BuildManifest, asset, build, verify
 from benchmarks.pybeam_reference_worker import Room, produce
 
 
@@ -167,3 +168,56 @@ def test_build_manifest__rejects_changed_assets(
     path.write_text("changed bytes")
     with pytest.raises(ValueError, match="Build asset changed"):
         verify(manifest, tmp_path)
+
+
+def test_private_build__does_not_change_existing_project_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    checkout = project / "_checkouts/erlang_python"
+    checkout.parent.mkdir(parents=True)
+    checkout.symlink_to(canonical, target_is_directory=True)
+    monkeypatch.setattr(
+        "benchmarks.pybeam_reference_build.__file__",
+        str(project / "benchmarks/pybeam_reference_build.py"),
+    )
+    native = tmp_path / "private"
+    for name in (
+        "src/erlang_python.app.src",
+        "priv/py_nif.so",
+        "_build/cmake/CMakeCache.txt",
+    ):
+        path = native / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("private build fixture")
+    python = tmp_path / "python"
+    python.touch()
+    expected = Source(
+        path=str(native),
+        sha=BASELINE,
+        dirty=False,
+        diff_sha256="0" * 64,
+        working_tree_sha256="0" * 64,
+    )
+
+    def source(_path: Path) -> Source:
+        return expected
+
+    commands: list[tuple[str, ...]] = []
+
+    def command(
+        argv: tuple[str, ...], *, env: dict[str, str], check: bool, timeout: int
+    ) -> subprocess.CompletedProcess[bytes]:
+        commands.append(argv)
+        return subprocess.CompletedProcess(argv, 0)
+
+    monkeypatch.setattr("benchmarks.pybeam_reference_build.source", source)
+    monkeypatch.setattr("benchmarks.pybeam_reference_build.subprocess.run", command)
+    manifest = BuildManifest.model_validate_json(build(native, python).read_text())
+    assert manifest.native == expected
+    assert manifest.commands == tuple(commands)
+    assert commands[1][-2:] == ("--parallel", "2")
+    assert checkout.resolve() == canonical
+    assert Path(manifest.runtime_directory).is_relative_to(native)
