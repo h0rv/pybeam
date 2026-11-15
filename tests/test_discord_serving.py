@@ -85,7 +85,9 @@ def test_uvicorn__two_chrome_contexts_use_managed_native_loop(
         pytest.fail("--run-browser requested, but Google Chrome is not installed: " + str(CHROME))
     errors: list[str] = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        browser = playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
         try:
             first = browser.new_context()
             second = browser.new_context()

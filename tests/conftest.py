@@ -47,13 +47,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    if config.getoption("run_browser") and not config.getoption("run_runtime"):
-        raise pytest.UsageError("--run-browser requires --run-runtime")
-
-
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if config.getoption("run_browser"):
+        if not config.getoption("run_runtime") and any(
+            item.get_closest_marker("browser") is not None
+            and item.get_closest_marker("runtime") is not None
+            for item in items
+        ):
+            raise pytest.UsageError("--run-browser requires --run-runtime for native browser tests")
         return
     browser = [item for item in items if item.get_closest_marker("browser") is not None]
     if browser:

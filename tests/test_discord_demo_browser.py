@@ -84,7 +84,9 @@ async def miniapp(
 
 async def test_miniapp__shutdown_drains_live_native_stream(miniapp: Miniapp) -> None:
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
         try:
             context = await browser.new_context()
             page = await context.new_page()
@@ -105,7 +107,9 @@ async def test_miniapp__nonreading_output_peer_releases_native_subscription(
     miniapp: Miniapp,
 ) -> None:
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
         try:
             context = await browser.new_context()
             page = await context.new_page()
@@ -182,7 +186,9 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
         errors.append(request.url + ": " + str(request.failure))
 
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
         first_context = await browser.new_context()
         second_context = await browser.new_context()
         release_ack = asyncio.Event()
@@ -328,7 +334,9 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
     errors: list[str] = []
     network_errors: list[str] = []
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
         first_context = await browser.new_context()
         second_context = await browser.new_context()
         release_ack = asyncio.Event()

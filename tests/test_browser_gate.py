@@ -98,6 +98,28 @@ def test_browser_gate__explicit_browser_requires_native_runtime() -> None:
     assert "--run-browser requires --run-runtime" in result.stderr
 
 
+def test_browser_gate__local_showcase_collects_without_native_runtime() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/test_showcase_browser.py",
+            "--collect-only",
+            "--run-browser",
+            "-q",
+        ],
+        cwd=ROOT,
+        env={**os.environ, "PYTEST_ADDOPTS": ""},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "test_showcase__actual_chrome_controls_and_evidence" in result.stdout
+
+
 def test_browser_gate__explicit_native_browser_collects_real_acceptance() -> None:
     result = collect("--run-runtime", "--run-browser")
     assert result.returncode == 0, result.stdout + result.stderr
