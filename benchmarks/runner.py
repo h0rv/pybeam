@@ -326,6 +326,7 @@ def main() -> None:
     parser.add_argument("command", choices=("run", "schema"))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--native-source", type=Path, help="Explicit private native checkout")
     parser.add_argument("--control", help="Local owner identity and stop-file JSON, not HTTP input")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
@@ -343,8 +344,14 @@ def main() -> None:
     config = (
         Config.model_validate_json(args.config.read_text())
         if args.config is not None
-        else Config(python_source=str(root), native_source=str(root.parent / "erlang-python"))
+        else Config(python_source=str(root))
     )
+    if args.native_source is not None:
+        config = Config.model_validate_json(
+            config.model_copy(
+                update={"native_source": str(args.native_source.resolve())}
+            ).model_dump_json()
+        )
     output = args.output or root / "benchmarks" / "results" / (
         time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8]
     )

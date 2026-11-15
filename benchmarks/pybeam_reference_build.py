@@ -7,7 +7,7 @@ from pathlib import Path
 from benchmarks.contract import LoadedAsset, Source, StrictModel
 from benchmarks.provenance import source
 
-BASELINE = "9baab2f4c16e37fab0c98dd3417c61f0d8f4a4d3"
+BASELINE = "a1ca04bfcaea817654ec7d1972f210c7a60075c4"
 
 
 class BuildManifest(StrictModel):
@@ -30,7 +30,7 @@ def asset(path: Path) -> LoadedAsset:
 def verify(manifest: BuildManifest, native: Path) -> None:
     current = source(native)
     if current != manifest.native or current.dirty or current.sha != BASELINE:
-        raise ValueError("Native source does not match the clean legacy baseline build")
+        raise ValueError("Native source does not match the clean pinned current runtime build")
     for item in (*manifest.assets, manifest.python_executable, manifest.cmake_cache):
         if asset(Path(item.path)) != item:
             raise ValueError("Build asset changed: " + item.path)
@@ -39,7 +39,7 @@ def verify(manifest: BuildManifest, native: Path) -> None:
 def build(native: Path, python: Path) -> Path:
     before = source(native)
     if before.dirty or before.sha != BASELINE:
-        raise ValueError("Build requires the clean pinned legacy native source")
+        raise ValueError("Build requires the clean pinned current native source")
     checkout = Path(__file__).resolve().parent.parent / "_checkouts/erlang_python"
     checkout.parent.mkdir(parents=True, exist_ok=True)
     if not checkout.exists():

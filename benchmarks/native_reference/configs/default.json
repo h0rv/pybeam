@@ -4,5 +4,5 @@
   "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.native_reference"],
   "workload": {"queue_bound_scope": "client_admission_only"},
   "python_source": ".",
-  "native_source": "../native-bench-pybeam"
+  "native_source": null
 }

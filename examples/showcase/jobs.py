@@ -8,8 +8,10 @@ from typing import Literal
 
 import psutil
 
-from benchmarks.contract import Budget, Config, Workload
+from benchmarks.contract import AdapterResult, Budget, Config, Workload
 from benchmarks.ownership import Control, Registry, identity
+from benchmarks.profiles import configuration, unavailable
+from benchmarks.provenance import Provenance
 from benchmarks.runner import TrialSummary
 from examples.showcase.catalog import ROOT, Card
 
@@ -24,6 +26,8 @@ class Job:
     ] = "queued"
     error: str = ""
     trials: tuple[TrialSummary, ...] = ()
+    provenance: Provenance | None = None
+    results: tuple[AdapterResult, ...] = ()
 
     @property
     def active(self) -> bool:
@@ -43,7 +47,10 @@ class Job:
 
 
 class Jobs:
-    def __init__(self, group: asyncio.TaskGroup, directory: Path) -> None:
+    def __init__(
+        self, group: asyncio.TaskGroup, directory: Path, native: Path | None = None
+    ) -> None:
+        self.native = native
         self.group = group
         self.directory = directory
         self.items: dict[str, Job] = {}
@@ -97,12 +104,21 @@ class Jobs:
                     "" if job.card.launcher is None else str(job.card.launcher),
                 ),
             )
+            if job.card.benchmark is not None:
+                reason = unavailable(job.card.benchmark, self.native)
+                if reason is not None:
+                    job.error = reason
+                    job.status = "failed"
+                    return
+                config = configuration(job.card.benchmark, self.native)
             (job.directory / "config.json").write_text(config.model_dump_json())
             control = Control(
                 owner=identity(psutil.Process()), stop_file=str(job.directory / "stop.request")
             )
             command = (
-                sys.executable,
+                sys.executable
+                if job.card.benchmark is None
+                else str(ROOT / "benchmarks/.venv/bin/python"),
                 "-m",
                 "benchmarks",
                 "run",
@@ -129,6 +145,18 @@ class Jobs:
                         TrialSummary.model_validate_json(line)
                         for line in path.read_text().splitlines()
                     )
+                provenance = job.directory / "result/provenance.json"
+                if provenance.is_file():
+                    job.provenance = Provenance.model_validate_json(provenance.read_text())
+                job.results = tuple(
+                    AdapterResult.model_validate_json(
+                        (
+                            job.directory / "result" / ("trial-" + str(t.trial)) / "adapter.json"
+                        ).read_text()
+                    )
+                    for t in job.trials
+                    if t.outcome.status == "passed"
+                )
                 registry_path = job.directory / "result/trial-0/ownership.json"
                 uncertain = (
                     registry_path.exists()

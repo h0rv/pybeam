@@ -14,7 +14,7 @@ def main() -> None:
         "One serial job, four queued/running, 30-second guardian budget, 16 retained jobs. "
         "Ctrl+C requests owned cleanup. Clean artifacts are removed on exit. "
         "Uncertain ownership journals are retained and block new measurements, even after restart. "
-        "Python smoke only, not comparative benchmark evidence."
+        "Three scalar reference profiles, not comparative performance evidence."
     )
     parser.add_argument(
         "--port", type=int, default=38921, help="Private loopback port (default 38921)"
@@ -27,8 +27,18 @@ def main() -> None:
         "and installed framework dependencies. Never builds, fetches or executes other worktree heads "
         "without this option. Counter sessions use ports 38931-38933, never 8642.",
     )
+    parser.add_argument(
+        "--trusted-native-root",
+        type=Path,
+        help="Explicit private a1ca04b native checkout with verified benchmark build manifest. "
+        "No build or source changes are performed by the website.",
+    )
     args = parser.parse_args()
-    settings = Settings(port=args.port, trusted_hornbeam_root=args.trusted_hornbeam_root)
+    settings = Settings(
+        port=args.port,
+        trusted_hornbeam_root=args.trusted_hornbeam_root,
+        trusted_native_root=args.trusted_native_root,
+    )
     uvicorn.run(create_app(settings), host="127.0.0.1", port=settings.port, access_log=False)
 
 

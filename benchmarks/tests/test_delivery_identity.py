@@ -28,7 +28,7 @@ def request(fault: Fault) -> Config:
         update={
             "repeats": 1,
             "python_source": str(ROOT),
-            "native_source": str(ROOT.parent / "native-bench-pybeam"),
+            "native_source": str(ROOT.parent / "native-benchmark-current"),
             "adapter_command": (
                 sys.executable,
                 "-m",
@@ -45,7 +45,7 @@ def verify_failure(directory: Path, fault: Fault, config: Config, outcome: Outco
     assert not outcome.cleanup_survivors and outcome.forced_cleanup_count == 0
     summary = summarize(0, directory, config, outcome)
     assert summary.completed is summary.throughput_per_second is summary.latency_ns is None
-    if fault.backend == "smoke":
+    if fault.backend == "smoke" or fault.full_delivery:
         result = AdapterResult.model_validate_json((directory / "adapter.json").read_text())
         assert result.terminal_counts == (50, 50)
         assert len(result.receipts) == 100
@@ -75,15 +75,26 @@ def verify_failure(directory: Path, fault: Fault, config: Config, outcome: Outco
         ) in logs
 
 
-@pytest.mark.parametrize("fault", FAULTS, ids=lambda fault: fault.backend + "-" + fault.mode)
+FULL_FAULTS = tuple(
+    Fault(backend=backend, mode=mode, full_delivery=True)
+    for backend in ("python", "pybeam")
+    for mode in ("route", "duplicate_id", "substitute_id")
+)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (*FAULTS, *FULL_FAULTS),
+    ids=lambda fault: fault.backend + "-" + fault.mode + ("-full" if fault.full_delivery else ""),
+)
 def test_actual_delivery__rejects_identity_corruption_under_guardian(
     tmp_path: Path,
     fault: Fault,
 ) -> None:
     if fault.backend == "pybeam":
-        manifest = ROOT.parent / "native-bench-pybeam/_build/pybeam-reference-build.json"
+        manifest = ROOT.parent / "native-benchmark-current/_build/pybeam-reference-build.json"
         if not manifest.exists():
-            pytest.skip("Private legacy native build is required")
+            pytest.skip("Private current native build is required")
         BuildManifest.model_validate_json(manifest.read_text())
     config = request(fault)
     directory = tmp_path / (fault.backend + "-" + fault.mode)

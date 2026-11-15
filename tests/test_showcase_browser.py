@@ -136,17 +136,16 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     ).status
                     == 400
                 )
-                page.get_by_role("button", name="Run all available demos", exact=True).click()
-                page.locator('[data-key="smoke"]').first.locator('[role="status"]').filter(
-                    has_text="finished"
-                ).wait_for(timeout=20000)
-                comparison = page.get_by_role(
-                    "table", name="Python smoke runs side by side", exact=False
-                )
-                assert comparison.locator("tbody tr").count() == 2
+                page.get_by_role("button", name="Run all available benchmarks", exact=True).click()
+                for name in ("python", "erlang"):
+                    profile = page.locator('[data-key="benchmark-' + name + '"]')
+                    finished(profile)
+                    assert "100" in profile.locator("table").inner_text()
+                comparison = page.get_by_role("table", name="Actual scalar results", exact=False)
+                assert comparison.locator("tbody tr").count() == 3
                 assert errors == []
                 print(
-                    "Chrome compared two actual smoke JSONL results. Page and console errors:",
+                    "Chrome rendered actual Python and Erlang scalar results. Page and console errors:",
                     errors,
                 )
                 page.get_by_role(

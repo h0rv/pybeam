@@ -12,5 +12,5 @@
   },
   "repeats": 1,
   "python_source": ".",
-  "native_source": "../native-bench-pybeam"
+  "native_source": null
 }

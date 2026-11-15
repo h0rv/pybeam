@@ -33,7 +33,7 @@ def unsupported(config: Config) -> Unsupported | None:
         or config.unsafe_native_crash
     ):
         return Unsupported(
-            reason="Legacy raw actor adapter supports only uniform rooms.local scalar 1",
+            reason="Raw unbounded current-runtime adapter supports uniform rooms.local scalar 1",
             features=("requested workload, execution mode, or payload",),
         )
     if w.queue_bound_scope != "client_admission_only":
@@ -52,6 +52,8 @@ def run(directory: Path) -> AdapterResult | Unsupported:
     root = Path(__file__).resolve().parent.parent
     if root != Path(config.python_source).resolve():
         raise ValueError("Adapter source does not match requested Python checkout")
+    if config.native_source is None:
+        raise ValueError("PyBEAM requires an explicitly configured native checkout")
     native = Path(config.native_source).resolve()
     build_path = native / "_build/pybeam-reference-build.json"
     manifest = BuildManifest.model_validate_json(build_path.read_text())

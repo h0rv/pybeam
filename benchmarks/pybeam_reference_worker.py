@@ -9,7 +9,9 @@ from typing import ClassVar
 from weakref import ReferenceType, ref
 
 from pybeam import run
-from pybeam.actors import ActorRef, ActorSpec, OwnedActorRef, UnboundedMailbox, spawn
+from pybeam.actors.native import OwnedActorRef, spawn
+from pybeam.actors.protocol import ActorRef, ActorSpec
+from pybeam.mailbox import UnboundedMailbox
 
 from benchmarks.contract import (
     AdapterResult,
@@ -36,6 +38,12 @@ class Inventory(StrictModel):
     loaded_beams: tuple[str, ...]
 
 
+class NifContexts(StrictModel):
+    created: int
+    destroyed: int
+    live: int
+
+
 class WorkerEvidence(StrictModel):
     baseline: Inventory
     active: Inventory
@@ -48,6 +56,7 @@ class WorkerEvidence(StrictModel):
     interpreter_count: int
     context_threads_are_not_interpreters: bool = True
     actor_state_collected: bool
+    nif_contexts: tuple[NifContexts, ...]
 
 
 @dataclass(slots=True, weakref_slot=True)
@@ -140,10 +149,14 @@ async def produce(
 async def measure(directory: Path) -> AdapterResult:
     import _interpreters
 
+    from erlang.actors import context_counts
+
     config = Config.model_validate_json((directory / "config.json").read_text())
     manifest = BuildManifest.model_validate_json(
         (directory / "native-build-manifest.json").read_text()
     )
+    if config.native_source is None:
+        raise ValueError("PyBEAM requires an explicitly configured native checkout")
     w = config.workload
     warmup_sequence = messages(w, w.warmup_events)
     measured_sequence = messages(w, w.events)
@@ -151,6 +164,7 @@ async def measure(directory: Path) -> AdapterResult:
         sum(message.entity == entity for message in warmup_sequence) for entity in range(w.entities)
     )
     baseline = await inventory()
+    baseline_c = await context_counts()
     if baseline.actors:
         raise RuntimeError("Unexpected existing actors in fresh VM")
     spec = ActorSpec(Room, methods=(Room.add, Room.read, Room.reset, Room.bind))
@@ -163,6 +177,9 @@ async def measure(directory: Path) -> AdapterResult:
             await actor.call(Room.bind, entity)
         creation = time.monotonic_ns() - start
         active = await inventory()
+        active_c = await context_counts()
+        if active_c.live != baseline_c.live + w.entities:
+            raise RuntimeError("Actual loaded C context counters differ from actor inventory")
         if (
             len(active.actors) != w.entities
             or len(active.contexts) != len(baseline.contexts) + w.entities
@@ -189,6 +206,9 @@ async def measure(directory: Path) -> AdapterResult:
             await actor.stop()
         deletion = time.monotonic_ns() - start
     stopped = await inventory()
+    stopped_c = await context_counts()
+    if stopped_c.live != baseline_c.live:
+        raise RuntimeError("Actual loaded C context counters show leaked contexts")
     if stopped.actors or stopped.contexts != baseline.contexts:
         raise RuntimeError("Stopped actors left native PIDs or contexts behind")
     gc.collect()
@@ -207,6 +227,10 @@ async def measure(directory: Path) -> AdapterResult:
         interpreter_id=_interpreters.get_current()[0],
         interpreter_count=interpreter_count,
         actor_state_collected=collected,
+        nif_contexts=tuple(
+            NifContexts(created=c.created, destroyed=c.destroyed, live=c.live)
+            for c in (baseline_c, active_c, stopped_c)
+        ),
     )
     (directory / "worker-evidence.json").write_text(evidence.model_dump_json(indent=2))
     loaded = tuple(
@@ -227,7 +251,7 @@ async def measure(directory: Path) -> AdapterResult:
             otp=active.otp,
             erts=active.erts,
             elixir=None,
-            mode="legacy-unbounded-actor-prototype/worker/shared-main-interpreter",
+            mode="raw-unbounded-current-runtime/worker/shared-main-interpreter",
             gil_enabled=sys._is_gil_enabled(),
             interpreters=interpreter_count,
             workers=len(active.contexts),
@@ -265,7 +289,7 @@ async def measure(directory: Path) -> AdapterResult:
         lost=w.events - len(observations),
         cleanup_acknowledged=False,
         semantic_differences=(
-            "Legacy raw backend, not the final Pythonic actor decorator API.",
+            "Raw unbounded API on current runtime, not the new @actor safe data default.",
             "Explicit UnboundedMailbox; only the global client window is finite.",
             "Retained immutable Python int payload; no encoded transport byte bound.",
             "Worker contexts share the main interpreter and GIL; not CPU cores.",

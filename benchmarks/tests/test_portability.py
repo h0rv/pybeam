@@ -35,7 +35,10 @@ class ArchiveManifest(StrictModel):
 def test_shipped_configuration__uses_this_checkout_and_private_native_assets(name: str) -> None:
     config = Config.model_validate_json((ROOT / "benchmarks" / name).read_text())
     assert (ROOT / config.python_source).resolve() == ROOT
-    assert (ROOT / config.native_source).resolve() == ROOT.parent / "native-bench-pybeam"
+    if config.backend == "pybeam":
+        assert config.native_source == "../native-benchmark-current"
+    else:
+        assert config.native_source is None
     assert config.adapter_command[0] == "benchmarks/.venv/bin/python"
     assert (ROOT / config.adapter_command[0]).is_file()
 

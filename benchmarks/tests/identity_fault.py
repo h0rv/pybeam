@@ -16,6 +16,7 @@ from benchmarks.python_reference import Observation, Peaks, Pending
 class Fault(StrictModel):
     backend: Literal["python", "pybeam", "smoke"]
     mode: Literal["route", "duplicate_id", "substitute_id", "count"]
+    full_delivery: bool = False
 
 
 class RecordedReplies(StrictModel):
@@ -36,7 +37,8 @@ def inject_python(directory: Path, fault: Fault) -> None:
     def recorded_verify(message: Message, reply: Applied) -> None:
         if active:
             replies.append(reply)
-        original_verify(message, reply)
+        if not fault.full_delivery:
+            original_verify(message, reply)
 
     async def rotated(
         sequence: tuple[Message, ...],

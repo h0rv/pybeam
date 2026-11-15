@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from pybeam import run
-from pybeam.actors import ActorRef
+from pybeam.actors.protocol import ActorRef
 
 from benchmarks import pybeam_reference_worker as worker
 from benchmarks.contract import Applied, Message
@@ -44,8 +44,15 @@ async def main() -> None:
             actors = [*actors[1:], actors[0]]
         return await original_produce(actors, sequence, limit)
 
+    original_verify = worker.verify_applied
+
+    def verify(message: Message, reply: Applied) -> None:
+        if not fault.full_delivery:
+            original_verify(message, reply)
+
     try:
         with (
+            patch.object(worker, "verify_applied", verify),
             patch.object(worker.Room, "add", injected_add),
             patch.object(worker, "produce", injected_produce),
         ):

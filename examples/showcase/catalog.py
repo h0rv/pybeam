@@ -4,6 +4,8 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Literal
 
+from benchmarks.profiles import NAMES, BenchmarkName, unavailable
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -17,9 +19,12 @@ class Card:
     disabled: str | None
     port: int | None = None
     launcher: Path | None = None
+    benchmark: BenchmarkName | None = None
 
 
-def catalog(trusted_hornbeam_root: Path | None = None) -> tuple[Card, ...]:
+def catalog(
+    trusted_hornbeam_root: Path | None = None, trusted_native_root: Path | None = None
+) -> tuple[Card, ...]:
     runtime = ROOT / "_build/hornbeam"
     launcher = (
         None
@@ -49,6 +54,29 @@ def catalog(trusted_hornbeam_root: Path | None = None) -> tuple[Card, ...]:
             "comparison. Uncontrolled host; no comparative performance claims.",
             "benchmarks/python_smoke.py",
             None if (ROOT / ".git").exists() else "Source archive lacks required Git provenance.",
+        ),
+        *(
+            Card(
+                "benchmark-" + name,
+                name.title() + " scalar reference",
+                "verified",
+                "Uniform rooms.local: two entities, 100 events, 17 warmup, four in flight. "
+                "Current runtime cohort; uncontrolled smoke, not a winner or HTTP comparison. "
+                + (
+                    "Raw unbounded API on current runtime, not the @actor safe data default."
+                    if name == "pybeam"
+                    else "Python queues are bounded; native mailboxes are unbounded."
+                ),
+                "benchmarks/"
+                + (
+                    "native_reference/native_bench.erl"
+                    if name == "erlang"
+                    else name + "_reference.py"
+                ),
+                unavailable(name, trusted_native_root),
+                benchmark=name,
+            )
+            for name in NAMES
         ),
         Card(
             "hold",

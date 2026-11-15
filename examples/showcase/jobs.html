@@ -1,18 +1,34 @@
 <section id="jobs" hx-get="/jobs" hx-trigger="every 1s" hx-target="#jobs" hx-swap="outerHTML">
   <h2>Jobs and results</h2>
   <p>{{ jobs|selectattr('active')|list|length }} queued/running. <a href="/">Refresh page</a></p>
-  <p>Backend support: Python smoke only. PyBeam, Erlang and Elixir comparisons are unsupported.
-     Rates below describe actual completed events on an uncontrolled host. They are not cross-backend speedups.</p>
+  <p>Scalar references: bounded Python queues, OTP gen_server and the raw unbounded API on the current PyBEAM runtime.
+     This does not benchmark the new @actor safe data default. Rates describe actual completed events on an uncontrolled host, not cross-backend speedups.
+     RSS is a sampled lower bound, not PSS. CPU observations are unchanged per-PID counters.</p>
   {% if measurements %}
   <table>
-    <caption>Python smoke runs side by side · same fixed workload, uncontrolled host</caption>
-    <thead><tr><th>Job</th><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th></tr></thead>
+    <caption>Actual scalar results · serial jobs, uncontrolled host, no winner claim</caption>
+    <thead><tr><th>Backend / profile</th><th>Job</th><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th></tr></thead>
     <tbody>{% for sample in measurements %}<tr>
-      <td><a href="#job-{{ sample.job_id }}">{{ sample.job_id[:8] }}</a></td>
+      <td>{{ sample.backend }}</td><td><a href="#job-{{ sample.job_id }}">{{ sample.job_id[:8] }}</a></td>
       <td>{{ sample.trial.trial }}</td><td>{{ sample.trial.outcome.status }}</td>
       <td>{{ sample.trial.completed }}</td><td>{{ sample.trial.throughput_per_second }}</td>
     </tr>{% endfor %}</tbody>
   </table>
+  {% set rates = measurements|map(attribute='trial.throughput_per_second')|reject('none')|list %}
+  {% if rates %}
+  <figure>
+    <figcaption>Actual completed events/s. Serial uncontrolled smoke, no comparative claim.</figcaption>
+    <svg viewBox="0 0 800 {{ 40 * measurements|length + 30 }}" role="img" aria-label="Actual scalar results by profile">
+      <line x1="300" y1="0" x2="300" y2="{{ 40 * measurements|length }}" stroke="currentColor"/>
+      {% for sample in measurements %}{% if sample.trial.throughput_per_second is not none %}
+      <text x="0" y="{{ loop.index0 * 40 + 20 }}" fill="currentColor">{{ sample.backend }}</text>
+      <rect x="300" y="{{ loop.index0 * 40 }}" width="{{ 400 * sample.trial.throughput_per_second / (rates|max) }}" height="25" fill="steelblue"><title>{{ sample.trial.throughput_per_second }} events/s</title></rect>
+      {% endif %}{% endfor %}
+      <text x="300" y="{{ 40 * measurements|length + 20 }}" fill="currentColor">0</text>
+      <text x="600" y="{{ 40 * measurements|length + 20 }}" fill="currentColor">{{ '%.2f'|format(rates|max) }}</text>
+    </svg>
+  </figure>
+  {% endif %}
   {% endif %}
   {% for job in jobs %}
   <article class="box" id="job-{{ job.id }}" data-status="{{ job.status }}" data-key="{{ job.card.key }}">
@@ -25,10 +41,21 @@
     {% if job.status == 'uncertain' %}<p>Ownership or cleanup is uncertain. New measurements are blocked by the shared load lease. Do not remove the lock or journal until ownership is resolved.</p>{% endif %}
     {% if job.error %}<p>{{ job.error }}</p>{% endif %}
     <pre>{{ job.logs() }}</pre>
+    {% if job.provenance %}
+    <details><summary>Actual source and runtime identities</summary>
+      <p>Only sources actually configured for this run are listed. Python-only and pure OTP runs do not claim a PyBEAM NIF source.</p>
+      <ul>{% for source in job.provenance.sources %}<li>{{ source.path }} · {{ source.sha }} · dirty={{ source.dirty }} · content SHA256 {{ source.working_tree_sha256 }}</li>{% endfor %}</ul>
+      {% for result in job.results %}
+      <p>{{ result.runtime.mode }} · CPython {{ result.runtime.python or 'unused' }} · OTP {{ result.runtime.otp or 'unused' }} · ERTS {{ result.runtime.erts or 'unused' }} · schedulers {{ result.runtime.schedulers }} · contexts {{ result.runtime.workers }} · interpreters {{ result.runtime.interpreters }} · GIL {{ result.runtime.gil_enabled }}</p>
+      <p>Native source {{ result.runtime.native_source_sha or 'unused' }}</p>
+      <ul>{% for asset in result.runtime.loaded_assets %}<li>{{ asset.path }} · SHA256 {{ asset.sha256 }}</li>{% endfor %}</ul>
+      {% endfor %}
+    </details>
+    {% endif %}
     {% if job.trials %}
     <a href="/artifact/{{ job.id }}">Download actual trials.jsonl</a>
     <table>
-      <caption>Actual typed runner evidence · Python smoke, not a full comparison</caption>
+      <caption>Actual typed runner evidence · {{ job.card.title }}, not a full comparison</caption>
       <thead><tr><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th><th>Latency p95 ns</th><th>Tree RSS bytes</th><th>Cleanup evidence</th></tr></thead>
       <tbody>
       {% for trial in job.trials %}
@@ -57,5 +84,5 @@
     </figure>
     {% endif %}
   </article>
-  {% else %}<p>No jobs yet. Start the small Python smoke above.</p>{% endfor %}
+  {% else %}<p>No jobs yet. Start an enabled scalar reference above.</p>{% endfor %}
 </section>

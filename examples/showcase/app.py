@@ -21,12 +21,14 @@ class Settings(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
     port: Annotated[int, Field(ge=1024, le=65535)] = 38921
     trusted_hornbeam_root: Path | None = None
+    trusted_native_root: Path | None = None
 
 
 @dataclass(frozen=True)
 class Measurement:
     job_id: str
     trial: TrialSummary
+    backend: str
 
 
 @dataclass
@@ -37,7 +39,7 @@ class Session:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = Settings() if settings is None else settings
     session = Session()
-    cards = catalog(settings.trusted_hornbeam_root)
+    cards = catalog(settings.trusted_hornbeam_root, settings.trusted_native_root)
     templates = Jinja2Templates(directory=ROOT / "examples/showcase")
 
     @asynccontextmanager
@@ -45,7 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         temporary = session_directory()
         with temporary as directory:
             async with asyncio.TaskGroup() as group:
-                session.jobs = Jobs(group, Path(directory))
+                session.jobs = Jobs(group, Path(directory), settings.trusted_native_root)
                 try:
                     yield
                 finally:
@@ -107,9 +109,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def render(request: Request, manager: Jobs, *, partial: bool = False) -> HTMLResponse:
         measurements = tuple(
-            Measurement(job.id, trial)
+            Measurement(job.id, trial, job.card.title)
             for job in manager.items.values()
-            if job.card.key == "smoke"
+            if job.card.key == "smoke" or job.card.benchmark is not None
             for trial in job.trials
         )
         return templates.TemplateResponse(
@@ -144,7 +146,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/run-all")
     async def run_all(manager: Annotated[Jobs, Depends(jobs)]) -> RedirectResponse:
-        available = tuple(card for card in cards if card.disabled is None and card.key != "hold")
+        available = tuple(
+            card for card in cards if card.disabled is None and card.benchmark is not None
+        )
         if len(manager.items) + len(available) > 16 or (
             sum(job.active for job in manager.items.values()) + len(available) > 4
         ):
