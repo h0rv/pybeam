@@ -1,6 +1,6 @@
 # Messaging
 
-Send bytes to a topic and receive them through an owned subscription.
+Send an order notification to a subscriber.
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -19,6 +19,35 @@ if __name__ == "__main__":
     run(main)
 ```
 
-This prints `order-42`. Subscribe before publishing so the receiver is ready. Leaving the context releases the subscription.
+This prints `order-42`. Subscribe before publishing. Leaving the context releases the subscription. Publishing does not acknowledge that a receiver finished processing. Messages are not durable.
 
-The Hornbeam `run` function starts and stops its services alongside Python. A publish does not acknowledge that a receiver finished processing. Use [subscriptions](subscriptions.md) when a message means shared data has changed.
+## Notify readers of a changed key
+
+```python
+from pybeam.integrations.hornbeam.client import Beam
+from pybeam.integrations.hornbeam.runtime import run
+
+
+async def main() -> None:
+    beam = await Beam.connect()
+    store = beam.store("documents")
+    await store.set("status", b"draft")
+    async with beam.subscribe("documents:changed", max_bytes=4096) as changes:
+        await store.set("status", b"published")
+        await beam.publish("documents:changed", b"status")
+        async for key in changes:
+            print(await store.get(key.decode("utf-8")))
+            break
+    print(await beam.subscription_count())
+    await store.delete("status")
+
+
+if __name__ == "__main__":
+    run(main)
+```
+
+This prints `b'published'`, then `0` subscriptions after context exit. The message contains the key. Reading that key returns its current value, which might already differ from its value when the message was published.
+
+Breaking iteration does not release the subscription; leaving the context does. `max_bytes` bounds the queue. If it overflows, the subscription fails rather than silently dropping messages.
+
+For a fixed stream of sample messages, see the [GenStage sample](genstage.md).

@@ -1,6 +1,6 @@
 # Actors
 
-Give state one owner and call its typed async methods.
+Use an actor to own Python state and expose methods that change it.
 
 ```python
 import pybeam
@@ -29,6 +29,10 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `12` twice. `spawn` constructs the actor; `add` changes its state; `read` returns the current value. Leaving the group stops its children.
+This prints `12` twice. `spawn` constructs the actor. Call `add` to change its state and `read` to return the current value. Leaving the group stops its children.
 
-Call methods rather than reading `counter.value`. Requests and results are serialized copies. Each actor handles calls serially, even while a method awaits. See [supervision](supervision.md) for replacement after failure.
+Call methods rather than reading `counter.value`. Requests and results are serialized copies. Each actor handles calls serially, even while a method awaits.
+
+Actor admission bounds queued plus running requests and encoded bytes, not total memory. A timeout stops waiting; it does not undo effects. Retrying a call can repeat its effects.
+
+To replace a failed actor, see [Supervision](supervision.md).

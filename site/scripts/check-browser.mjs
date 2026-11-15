@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import { pages } from "../src/links.mjs";
+import { pages, navigation, withBase } from "../src/links.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
@@ -45,7 +45,7 @@ try {
         assert.equal((await page.goto(origin + base + path)).status(), 200);
         visited++;
         assert.equal(await page.locator("h1").count(), 1);
-        assert.equal(await page.locator(".docs-nav a").count(), pages.length);
+        assert.equal(await page.locator(".docs-nav a").count(), navigation.length);
         if (device === "desktop") assert.ok(await page.locator(".docs-nav a").first().isVisible(), "Desktop navigation must remain visible without opening a menu");
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Page overflow: " + path);
         const report = await page.evaluate(() => {
@@ -122,10 +122,15 @@ try {
   await page.locator(".sidebar > summary").click();
   await page.locator(".docs-nav").getByRole("link", { name: "Actors", exact: true }).click();
   assert.equal(await page.locator("h1").innerText(), "Actors");
-  assert.match(await page.locator("pre").innerText(), /actors\.spawn[\s\S]*counter\.add[\s\S]*counter\.read/);
+  assert.match(await page.locator("pre").first().innerText(), /actors\.spawn[\s\S]*counter\.add[\s\S]*counter\.read/);
   await page.locator(".sidebar > summary").click();
   await page.locator(".docs-nav").getByRole("link", { name: "Get started", exact: true }).click();
   assert.match(await page.locator("pre").innerText(), /pybeam\.run\(main\)/);
+  await page.goto(origin + withBase("quickstart/", base));
+  await page.waitForURL(origin + base);
+  assert.equal(await page.locator("h1").innerText(), "Get started");
+  assert.equal(await page.locator('.docs-nav a').filter({ hasText: /^Get started$/ }).count(), 1);
+  assert.equal(await page.locator('.docs-nav a[href*="quickstart"]').count(), 0);
   await context.close();
   console.log(`Chrome passed ${visited} page/theme/viewport visits at ${base}; minimum measured text contrast ${minimumContrast.toFixed(2)}:1; keyboard, clipboard, no-JS navigation.`);
 } finally {

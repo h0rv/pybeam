@@ -1,6 +1,6 @@
-# GenStage
+# Finite GenStage sample
 
-Transform requests under demand and consume the results with async iteration.
+Consume a fixed sample of transformed messages. In `stream(2, uppercase)`, `2` is the number of sample requests. The count must be 1 to 16. This API supplies its own `héllo` requests; it does not accept your records.
 
 Save the callback as `genstage_transform.py`.
 
@@ -43,6 +43,6 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `HÉLLO` twice. This finite graph supplies sample requests containing `héllo`. The callback parses each request and returns transformed bytes.
+This prints `HÉLLO` twice. The callback parses each request and returns transformed bytes.
 
 One request is admitted at a time, including running callback work. Pulling the next result permits more work. Context exit waits for graph cleanup. Requests and results are each limited to 1024 encoded bytes.

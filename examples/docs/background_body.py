@@ -1,8 +1,11 @@
 import asyncio
 
 
-async def watch() -> None:
+async def watch(ready: asyncio.Event) -> None:
     try:
-        await asyncio.Event().wait()
+        while True:
+            print("heartbeat")
+            ready.set()
+            await asyncio.sleep(1)
     finally:
         print("cleanup complete")

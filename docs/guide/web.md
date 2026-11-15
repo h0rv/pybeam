@@ -74,6 +74,6 @@ if __name__ == "__main__":
 
 Run this file with Python, then open `http://127.0.0.1:8767/docs`. Send `POST /increment`, then `GET /counter`. Both return `{"count": 1}` after the first increment in a fresh run. Stop the server with Ctrl+C.
 
-The lifespan owns application access to Hornbeam services. Uvicorn serves HTTP inside the native event loop. For Hornbeam-served ASGI applications, the FastAPI provider adapter also uses Hornbeam scope extensions to supply connection-scoped access.
+The lifespan owns application access to Hornbeam services. `loop="none"` keeps Uvicorn on the event loop supplied by Hornbeam rather than selecting another loop. The shared counter increments atomically without an actor.
 
 The [FastAPI counter](../../examples/fastapi/main.py) also demonstrates SSE. The [Litestar](../../examples/litestar/main.py) and [PyView](../../examples/pyview/main.py) examples adapt the same services to their frameworks.

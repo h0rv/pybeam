@@ -1,6 +1,6 @@
-# State and services
+# Shared state
 
-Store bytes and update a shared counter through Hornbeam services.
+Store document status and count visits without defining an actor.
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -23,6 +23,10 @@ if __name__ == "__main__":
     run(main)
 ```
 
-In a fresh run, this prints `b'draft'`, `b'published'`, `1`, and `3`. Store operations are namespaced. Counter increments are atomic; separate reads and writes are not a transaction.
+In a fresh run, this prints `b'draft'`, `b'published'`, `1`, then `3`. Keys belong to the named store. `incr` adds the amount and returns the new count as one atomic operation. Separate reads and writes are not a transaction.
 
-These values live in BEAM, not a Python dictionary. They are volatile. To notify other connections after a write, use a [subscription](subscriptions.md).
+Use an [actor](actors.md) when you need Python state and methods. Use `incr` for a shared counter without an actor.
+
+Delete stored values when they are no longer needed. Values are volatile, not persistent storage. A timeout does not undo a write. The Hornbeam `run` function starts and stops these services alongside Python.
+
+To notify readers of a change, see [Messaging](messaging.md#notify-readers-of-a-changed-key).

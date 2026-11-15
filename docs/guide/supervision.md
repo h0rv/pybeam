@@ -1,6 +1,6 @@
 # Supervision
 
-Replace a failed actor with fresh state and explicitly acquire its new generation.
+Replace a failed actor and acquire its new reference.
 
 ```python
 import pybeam
@@ -29,6 +29,6 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-`crash` deliberately kills this child for diagnosis. OTP restarts the permanent child from its constructor. `rejoin` returns a reference to that replacement.
+This prints `5`, then `1`. `crash` deliberately kills the child. OTP restarts it from its constructor, without the old state. `rejoin` returns a reference to the replacement. The old reference does not follow it, and no method is replayed.
 
-The old state is not restored, and the failed generation is not silently followed. No method is replayed. `stop` removes the child from active use; group exit cleans up the remaining children.
+`stop` removes the replacement. Leaving the group stops any remaining children.
