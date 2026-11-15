@@ -2,6 +2,7 @@ import asyncio
 
 from erlang import actors as actors
 from erlang import supervision as supervision
+from erlang import tasks as tasks
 
 class ErlangEventLoop(asyncio.AbstractEventLoop):
     def __init__(self, capsule: object = None) -> None: ...
