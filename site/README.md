@@ -15,7 +15,7 @@ The build writes static HTML to `site/dist`. Test another hosting prefix with `D
 
 `.github/workflows/docs-pages.yml` runs these same npm commands with Node only. Pull requests check both `/` and `/pybeam/` without accessing Pages or deploying. Main pushes and manual runs on main also build with the existing Pages origin and path, then deploy `site/dist`. A repository admin must first enable Pages with GitHub Actions as its source. The workflow does not enable Pages or change its domain. Other manual branches only run checks.
 
-Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/actors/main.py` to keep the snippet current. Site checks do not execute native examples or establish wheel compatibility.
+Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/hello.py` to keep the snippet current. The actor example remains linked as an optional next step. Site checks do not execute native examples or establish wheel compatibility.
 
 ## Template and notices
 

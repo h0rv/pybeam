@@ -1,21 +1,23 @@
-# Web examples
+# Web and integrations
 
-Keep your ASGI framework and use BEAM services for shared state. The [FastAPI counter](../../examples/fastapi/main.py) uses the same counter across connections. The [Litestar](../../examples/litestar/main.py) and [PyView](../../examples/pyview/main.py) examples use the same services.
+Keep your ASGI framework. Use BEAM services from HTTP handlers, background services, or live connections. Hornbeam supplies ASGI serving and existing supervised services rather than a new Python web framework.
 
-## Shared counters
+## Lifespans and HTTP handlers
 
-Import `Beam` and `provider` from `pybeam.integrations.fastapi.dependencies`. Create the application with `FastAPI(lifespan=provider.lifespan)` and declare a route parameter as `beam: Beam`. The provider supplies services scoped to that connection.
+Import `Beam` and `provider` from `pybeam.integrations.fastapi.dependencies`. Create the application with `FastAPI(lifespan=provider.lifespan)` and declare a route parameter as `beam: Beam`. The provider supplies service access scoped to the connection.
 
-Use `await beam.incr("shared", 1, namespace="demo")` to increment atomically. A delta of `0` reads the counter. After a change, use `await beam.publish("demo:counter", str(count).encode("ascii"))` to notify subscribers.
+The [FastAPI](../../examples/fastapi/main.py), [Litestar](../../examples/litestar/main.py), and [PyView](../../examples/pyview/main.py) examples use Hornbeam's ASGI serving path. In the [room miniapp](../../examples/discord_demo/main.py), Uvicorn instead serves FastAPI inside `ErlangEventLoop`. That example uses Hornbeam's supervised services without its HTTP listener.
 
-`provider.subscription("demo:counter")` creates a FastAPI dependency for an owned notification stream. The example reads the shared counter again after each notification rather than treating notifications as stored state. FastAPI and Litestar send updates over SSE; PyView uses LiveView WebSockets.
+## Counters, storage, and notifications
 
-For cached bytes, `beam.store("session")` returns a namespaced store with async `set`, `get`, and `delete` methods. `set` accepts `expires_in` for expiring values.
+`await beam.incr("shared", 1, namespace="demo")` increments atomically. A delta of `0` reads the counter. `beam.store("session")` provides async `set`, `get`, and `delete` for namespaced bytes. `set` accepts `expires_in` for expiring values.
 
-## Room state
+`await beam.publish(topic, payload)` publishes bytes. `provider.subscription(topic)` creates a FastAPI dependency for an owned notification stream. The counter example reads shared data again after notifications. FastAPI and Litestar send updates over SSE; PyView uses LiveView WebSockets.
 
-The [room miniapp](../../examples/discord_demo/main.py) uses actors for membership and messages. Join a room before sending. Crashing a room replaces its actor with empty state. Each participant must explicitly join the new generation.
+Litestar's `BeamChannelsBackend` adapts subscriptions to its channels interface. Subscription and framework merge queues have separate bounds. Disconnect cleanup belongs to the connection's owner, not to a garbage collector.
 
-Uvicorn serves FastAPI inside `ErlangEventLoop`. The Hornbeam integration owns its existing supervised services, not the HTTP listener in this example.
+## GenStage streams
 
-Disconnect releases the notification subscription, not room membership. Subscription queues and room history are bounded. Slow output disconnects after five seconds. The demo has no Discord authentication or persistent message storage.
+For demand-driven processing, `pybeam.integrations.genstage.pipeline.stream` owns a finite GenStage graph in an async context manager. Supply a count and an importable Python function that transforms bytes to bytes. Consume results with async iteration.
+
+The [GenStage example](../../examples/genstage.py) uses a typed callback to parse requests and return results. The graph admits one request at a time, including running callback work. Context exit waits for graph cleanup. This is a bounded processing primitive, not persistent job storage or a workflow engine.

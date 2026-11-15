@@ -2,42 +2,32 @@
 
 ```python
 import asyncio
-import itertools
 
 import pybeam
 
 
-@pybeam.actor
-class Counter:
-    value: int = 0
-
-    async def add(self, n: int) -> int:
-        self.value += n
-        return self.value
-
-
 async def main() -> None:
-    async with pybeam.ActorGroup() as actors:
-        first = await actors.spawn(Counter, value=0)
-        print(await first.add(1))
-        counters: list[Counter] = await asyncio.gather(
-            *map(actors.spawn, itertools.repeat(Counter, 5))
-        )
-        print(await asyncio.gather(*(counter.add(1) for counter in counters)))
-    async with pybeam.spawn(Counter, value=10) as counter:
-        print(await counter.add(2))
+    await asyncio.sleep(0.01)
+    print("Hello from Python")
 
 
 if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-## Run an actor
+## Run async Python
 
-Save this [example](../../examples/actors/main.py) as `main.py` and run it with Python. It prints `1`, then `[1, 1, 1, 1, 1]`, then `12`.
+Save this [example](../../examples/hello.py) as `main.py` and run `python main.py`. It prints `Hello from Python`.
 
-`@pybeam.actor` declares the state fields and typed async methods. `actors.spawn(Counter, value=0)` constructs one actor and returns its reference. `await first.add(1)` calls that actor's method and returns the new value.
+Write your application in the async `main` function. Use `await` and Python libraries there. `pybeam.run(main)` owns runtime startup and shutdown, so you do not create or manage a VM yourself. Pass the function, not `main()`.
 
-The five counters have independent state. Their calls can be concurrent, but each counter handles its own calls serially. Exiting the group closes its actors. `pybeam.spawn(Counter, value=10)` is the shorter context manager for owning one actor.
+## Add primitives when needed
 
-`pybeam.run(main)` owns runtime startup and shutdown. Pass the async function, not `main()`. The file is loaded again inside the VM, so objects and closures from the launching interpreter are not transferred.
+You do not need an actor to run Python on BEAM. Choose primitives for particular parts of your application.
+
+- Use [background jobs and tasks](primitives.md#background-jobs-and-tasks) for work whose completion and cleanup need an owner.
+- Use [channels](primitives.md#channels) to exchange typed messages between producers and consumers.
+- Use [actors](primitives.md#actors) when callers need methods on one state owner. The [Counter example](../../examples/actors/main.py) shows `@pybeam.actor`, awaited calls, and `ActorGroup`.
+- Use [supervision](primitives.md#supervision-and-lifetimes) to define process lifetimes and replacement after failure.
+
+For HTTP handlers and live updates, keep your framework and use the [web integrations](web.md).
