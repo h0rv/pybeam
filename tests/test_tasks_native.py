@@ -17,6 +17,186 @@ def task_program(tmp_path: Path, source: str) -> None:
     assert "native-submission-ok" in result.stdout
 
 
+@pytest.mark.parametrize("observation", ["result", "exception"])
+def test_tasks__observed_original_exception_releases_native_ownership(
+    tmp_path: Path, observation: str
+) -> None:
+    task_program(
+        tmp_path,
+        "        observation = "
+        + repr(observation)
+        + "\n"
+        + """
+        import gc
+        import weakref
+        import erlang
+        class OriginalError(Exception):
+            pass
+        baseline = erlang._actor_retained_object_stats()
+        async def scenario():
+            cause = OriginalError('cause')
+            original = OriginalError('original')
+            weak = weakref.ref(original)
+            cause_weak = weakref.ref(cause)
+            tracebacks = []
+            async def fail(value: int) -> int:
+                try:
+                    raise original from cause
+                except OriginalError:
+                    tracebacks.append(original.__traceback__)
+                    raise
+            sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)).__aenter__()
+            ref = await sup.start(TaskFunction(fail, TypeAdapter(int), TypeAdapter(int)), 1)
+            async def observe():
+                if observation == 'exception':
+                    assert await ref.exception() is original
+                else:
+                    try:
+                        await ref.result()
+                    except OriginalError as error:
+                        assert error is original
+                    else:
+                        raise AssertionError('original failure lost')
+            async with asyncio.TaskGroup() as waiters:
+                for _ in range(3):
+                    waiters.create_task(observe())
+            assert await ref.cancel() is False
+            assert await ref.exception() is original
+            assert original.__cause__ is cause
+            assert original.__suppress_context__ is True
+            names = []
+            original_traceback_found = False
+            traceback = original.__traceback__
+            while traceback is not None:
+                original_traceback_found |= traceback is tracebacks[0]
+                names.append(traceback.tb_frame.f_code.co_name)
+                traceback = traceback.tb_next
+            assert 'fail' in names
+            assert original_traceback_found
+            await sup.close()
+            await observe()
+            assert await ref.cancel() is False
+            return weak, cause_weak
+        weak, cause_weak = await scenario()
+        for _ in range(50):
+            gc.collect()
+            await asyncio.sleep(.01)
+            if weak() is None and cause_weak() is None and erlang._actor_retained_object_stats()[1:] == baseline[1:]:
+                break
+        assert weak() is None
+        assert cause_weak() is None
+        stats = erlang._actor_retained_object_stats()
+        assert stats[1:] == baseline[1:], (baseline, stats)
+        # BEAM may keep one empty result shell until its own heap collection.
+        assert stats[0] <= baseline[0] + 1
+        """,
+    )
+
+
+def test_tasks__retained_exception_helper_and_reusable_reference_controls(tmp_path: Path) -> None:
+    task_program(
+        tmp_path,
+        """
+        import gc
+        import weakref
+        import erlang
+        from _erlang_impl._actor_common import _result
+        class OriginalError(Exception):
+            pass
+        baseline = erlang._actor_retained_object_stats()
+        def make():
+            error = OriginalError('cycle')
+            weak = weakref.ref(error)
+            try:
+                _result(('error', ('python_error', erlang._actor_retain(error))))
+            except OriginalError as raised:
+                assert raised is error
+            return weak
+        weak = make()
+        for _ in range(50):
+            gc.collect()
+            await asyncio.sleep(.01)
+            if weak() is None:
+                break
+        assert weak() is None
+        def controls():
+            value = {'raw': object()}
+            def function():
+                return value
+            for original in (value, function, OriginalError('reusable')):
+                retained = erlang._actor_retain(original)
+                assert erlang._actor_unwrap(retained) is original
+                assert erlang._actor_unwrap(retained) is original
+                if not isinstance(original, BaseException):
+                    try:
+                        erlang._actor_take_exception(retained)
+                    except TypeError:
+                        pass
+                    else:
+                        raise AssertionError('non-exception was consumed')
+                    assert erlang._actor_unwrap(retained) is original
+            retained = erlang._actor_retain(OriginalError('transferred'))
+            error = erlang._actor_take_exception(retained)
+            assert type(error) is OriginalError
+            for recover in (erlang._actor_take_exception, erlang._actor_unwrap):
+                try:
+                    recover(retained)
+                except (TypeError, RuntimeError):
+                    pass
+                else:
+                    raise AssertionError('consumed reference was reused')
+        controls()
+        for _ in range(50):
+            gc.collect()
+            await asyncio.sleep(.01)
+            if erlang._actor_retained_object_stats() == baseline:
+                break
+        assert erlang._actor_retained_object_stats() == baseline
+        """,
+    )
+
+
+def test_tasks__direct_self_waits_are_denied_before_watcher_or_cancel(tmp_path: Path) -> None:
+    task_program(
+        tmp_path,
+        """
+        from pybeam.tasks import TaskOwnershipError
+        release = asyncio.Event()
+        denied = asyncio.Event()
+        descendant_release = asyncio.Event()
+        descendants = []
+        refs = []
+        async def other(value: int) -> int:
+            return value * 2
+        async def job(value: int) -> int:
+            await release.wait()
+            ref = refs[0]
+            for wait in (ref.result, ref.exception, ref.cancel):
+                try:
+                    await wait()
+                except TaskOwnershipError:
+                    assert ref._pending is None
+                else:
+                    raise AssertionError('self-dependent wait was allowed')
+            denied.set()
+            async def descendant():
+                await descendant_release.wait()
+                return await ref
+            descendants.append(asyncio.create_task(descendant()))
+            sibling = await sup.start(TaskFunction(other, TypeAdapter(int), TypeAdapter(int)), value)
+            return await sibling
+        async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=100, shutdown_ms=1000)) as sup:
+            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 21)
+            refs.append(ref)
+            release.set()
+            await denied.wait()
+            assert await ref == 42
+            descendant_release.set()
+            assert await descendants[0] == 42
+        """,
+    )
+
+
 def test_tasks__pid_barrier_original_error_temporary_exit_and_failure_containment(
     tmp_path: Path,
 ) -> None:

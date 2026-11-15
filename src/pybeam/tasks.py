@@ -13,7 +13,16 @@ if TYPE_CHECKING:
     from erlang.tasks import Body
 
 
+@dataclass(frozen=True, slots=True)
+class _BodyExecution:
+    job: object
+    task: asyncio.Task[object] | None
+
+
 _body_owners: ContextVar[tuple[object, ...]] = ContextVar("pybeam_task_body_owners", default=())
+_body_execution: ContextVar[_BodyExecution | None] = ContextVar(
+    "pybeam_task_body_execution", default=None
+)
 
 
 class TaskOwnershipError(RuntimeError):
@@ -49,16 +58,18 @@ class TaskFunction[Q, R]:
     def decode(self, payload: bytes) -> R:
         return self._result.validate_json(payload, strict=True)
 
-    def body(self, owners: tuple[object, ...]) -> Body:
+    def body(self, owners: tuple[object, ...], job: object | None = None) -> Body:
         from erlang.tasks import Body
 
         async def invoke(payload: bytes) -> bytes:
             token = _body_owners.set(owners)
+            job_token = _body_execution.set(_BodyExecution(job, asyncio.current_task()))
             try:
                 request = self._request.validate_json(payload, strict=True)
                 value = await self._function(request)
                 return self._result.dump_json(self._result.validate_python(value, strict=True))
             finally:
+                _body_execution.reset(job_token)
                 _body_owners.reset(token)
 
         return Body(invoke)
@@ -106,7 +117,9 @@ class TaskRef[T]:
         decode: Callable[[bytes], T],
         observed: Callable[[], None],
         shutdown_ms: int,
+        job: object | None = None,
     ) -> None:
+        self._job = object() if job is None else job
         self.pid = pid
         self._shutdown_ms = shutdown_ms
         self._group = group
@@ -131,7 +144,17 @@ class TaskRef[T]:
         except BaseException as error:
             return _Failure(error)
 
+    def _check_wait_owner(self) -> None:
+        execution = _body_execution.get()
+        if (
+            execution is not None
+            and execution.job is self._job
+            and execution.task is asyncio.current_task()
+        ):
+            raise TaskOwnershipError("A supervised body cannot wait for its own task completion")
+
     async def _outcome(self) -> _Success[T] | _Failure:
+        self._check_wait_owner()
         if self._pending is None:
             self._pending = asyncio.create_task(self._receive())
         return await asyncio.shield(self._pending)
@@ -148,7 +171,10 @@ class TaskRef[T]:
         return error
 
     async def result(self) -> T:
-        """Wait without cancelling the job when this waiter is cancelled."""
+        """Wait without cancelling the job when this waiter is cancelled.
+
+        A body cannot directly wait for its own completion.
+        """
         outcome = await self._outcome()
         self.observed = True
         self._observed()
@@ -168,9 +194,11 @@ class TaskRef[T]:
 
         A job may suppress cancellation and return normally. A timeout or killed
         coordinator is uncertainty, never a successful cancellation acknowledgement.
+        A body cannot directly await its own cancellation acknowledgement.
         """
         from erlang.tasks import UncertainInflight, cancel
 
+        self._check_wait_owner()
         try:
             async with asyncio.timeout(self._shutdown_ms / 1000):
                 if self._pending is None or not self._pending.done():
@@ -244,9 +272,10 @@ class TaskSupervisor:
             raise Overloaded("Task ownership slots are full, including unobserved results")
         group = self._group
         owners = (*_body_owners.get(), group)
+        job = object()
 
         def factory() -> Body:
-            return function.body(owners)
+            return function.body(owners, job)
 
         payload = function.encode(request)
         self._starting += 1
@@ -269,7 +298,7 @@ class TaskSupervisor:
         def observed() -> None:
             self._refs.pop(pid, None)
 
-        ref = TaskRef(group, pid, function.decode, observed, self._limits.shutdown_ms)
+        ref = TaskRef(group, pid, function.decode, observed, self._limits.shutdown_ms, job)
         self._refs[pid] = ref
         if cancelled:
             await ref.cancel()
