@@ -22,5 +22,5 @@ def test_native_provenance__requires_an_explicit_checkout() -> None:
 def test_source_archive__explains_missing_git_instead_of_inventing_a_revision(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(ValueError, match="source archives without .git are not supported"):
+    with pytest.raises(ValueError, match=r"source archives without \.git are not supported"):
         source(tmp_path)
