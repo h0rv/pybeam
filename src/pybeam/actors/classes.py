@@ -80,10 +80,23 @@ class Route:
     active: bool = True
 
     async def invoke(
-        self, index: int, args: tuple[object, ...], kwargs: dict[str, object]
+        self,
+        implementation: Callable[..., Awaitable[object]],
+        args: tuple[object, ...],
+        kwargs: dict[str, object],
     ) -> object:
         if not self.active:
             raise ActorStoppedError("The actor group is closed")
+        index = next(
+            (
+                index
+                for index, method in enumerate(self.methods)
+                if method.function is implementation
+            ),
+            None,
+        )
+        if index is None:
+            raise ValueError("Actor method implementation is not registered for this reference")
         method = self.methods[index]
         # This synchronous snapshot happens before native admission can suspend.
         payload = index.to_bytes(4) + method.arguments.encode(args, kwargs)
@@ -215,6 +228,7 @@ class Container:
 
 
 _DEFINITIONS: dict[type[object], Definition] = {}
+_ROUTED_METHODS: dict[Callable[..., Awaitable[object]], Method] = {}
 
 
 def definition(cls: type[object]) -> Definition:
@@ -224,16 +238,24 @@ def definition(cls: type[object]) -> Definition:
         raise TypeError("Actor classes must be decorated with @pybeam.actor") from error
 
 
-def routed(method: Method, index: int) -> Callable[..., Awaitable[object]]:
+def routed(method: Method) -> Callable[..., Awaitable[object]]:
     @wraps(method.function)
     async def invoke(state: object, *args: object, **kwargs: object) -> object:
         if isinstance(state, Reference):
-            return await reference_route(state).invoke(index, args, kwargs)
+            return await reference_route(state).invoke(method.function, args, kwargs)
         if isinstance(state, State):
             require_state(state)
         return await method.function(state, *args, **kwargs)
 
+    _ROUTED_METHODS[invoke] = method
     return invoke
+
+
+def declared_method(name: str, function: Callable[..., Awaitable[object]]) -> Method:
+    original = _ROUTED_METHODS.get(function)
+    if original is None:
+        return Method.build(name, function)
+    return Method(name, original.function, original.arguments, original.result)
 
 
 @dataclass_transform(field_specifiers=(field,))
@@ -248,6 +270,7 @@ def actor[T](cls: type[T]) -> type[T]:
     """
     if type(cls) is not type:
         raise TypeError("Actor classes do not support custom metaclasses")
+    declared_names = frozenset(vars(cls))
     members: dict[str, object] = {}
     generated = {
         "__dataclass_fields__",
@@ -300,13 +323,21 @@ def actor[T](cls: type[T]) -> type[T]:
             raise TypeError("Actor descriptors are unsupported: " + name)
     dataclass(cls)
     state = cls
-    methods = tuple(
-        Method.build(name, member)
+    interface = tuple(
+        declared_method(name, member)
         for name, member in members.items()
         if not name.startswith("__")
         and isinstance(member, FunctionType)
         and inspect.iscoroutinefunction(member)
     )
+    methods = list(interface)
+    for base in cls.__mro__[1:]:
+        inherited = _DEFINITIONS.get(base)
+        if inherited is not None:
+            for method in inherited.methods:
+                if not any(registered.function is method.function for registered in methods):
+                    methods.append(method)
+    dispatch = tuple(methods)
     namespace: dict[str, object] = {
         "__init__": Reference.__init__,
         "__getattribute__": Reference.__getattribute__,
@@ -316,10 +347,12 @@ def actor[T](cls: type[T]) -> type[T]:
         "__eq__": object.__eq__,
         "__repr__": object.__repr__,
     }
-    for index, method in enumerate(methods):
-        wrapper = routed(method, index)
-        # Also guard explicit unbound calls, including stateless methods after stop.
-        type.__setattr__(state, method.name, wrapper)
+    for method in interface:
+        wrapper = routed(method)
+        # Do not install inherited methods on the declared class: doing so would
+        # change Python's MRO, especially cooperative super() in diamonds.
+        if method.name in declared_names:
+            type.__setattr__(state, method.name, wrapper)
         namespace[method.name] = wrapper
     for name in get_type_hints(state):
         if name in {"_actor_route", "_actor_owner"}:
@@ -352,6 +385,6 @@ def actor[T](cls: type[T]) -> type[T]:
         },
     )
     _DEFINITIONS[state] = Definition(
-        state, Arguments.build(cls.__name__, state, method=False), methods, proxy, owned_state
+        state, Arguments.build(cls.__name__, state, method=False), dispatch, proxy, owned_state
     )
     return state

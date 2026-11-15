@@ -1,4 +1,5 @@
 import pybeam
+from tests.fixtures.actor_inheritance import A, Combined, Diamond, Overridden
 from tests.pythonic_actors_positive import Counter, Derived, Required
 
 async def constructor_type(actors: pybeam.ActorGroup) -> None:
@@ -55,3 +56,15 @@ async def rejoined_method(actors: pybeam.ActorGroup) -> None:
     counter = await actors.spawn(Counter)
     rejoined = await actors.rejoin(counter)
     await rejoined.add("wrong")
+
+async def inherited_argument(actors: pybeam.ActorGroup) -> None:
+    combined = await actors.spawn(Combined)
+    await A.a(combined, "wrong")
+
+async def base_return(actors: pybeam.ActorGroup) -> str:
+    overridden = await actors.spawn(Overridden)
+    return await A.a(overridden, 1)
+
+async def diamond_keyword(actors: pybeam.ActorGroup) -> None:
+    diamond = await actors.spawn(Diamond)
+    await diamond.step(1, typo=2)

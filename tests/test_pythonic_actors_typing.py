@@ -45,7 +45,7 @@ def test_pythonic_actor_types__reject_every_negative_case(tmp_path: Path) -> Non
     assert result.returncode == 1, output
     lines = [int(match[1]) for match in re.finditer(r":(\d+):\d+: error\[", output)]
     functions = [node for node in ast.parse(source).body if isinstance(node, ast.AsyncFunctionDef)]
-    assert len(functions) == 15
+    assert len(functions) == 18
     for function in functions:
         assert function.end_lineno is not None
         assert any(function.lineno <= line <= function.end_lineno for line in lines), (

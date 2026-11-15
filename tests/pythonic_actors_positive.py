@@ -4,6 +4,7 @@ from dataclasses import field
 from typing import assert_type
 
 import pybeam
+from tests.fixtures.actor_inheritance import A, Combined, Diamond, Overridden
 
 
 @pybeam.actor
@@ -35,6 +36,15 @@ class Required:
 
 async def positive() -> None:
     async with pybeam.ActorGroup() as actors:
+        combined = await actors.spawn(Combined, a_count=1, b_count=2)
+        assert_type(combined, Combined)
+        assert_type(await combined.a(n=1), int)
+        assert_type(await A.a(combined, n=1), int)
+        overridden = await actors.spawn(Overridden)
+        assert_type(await overridden.a(n=1), int)
+        assert_type(await A.a(overridden, n=1), int)
+        diamond = await actors.spawn(Diamond)
+        assert_type(await diamond.step(n=1), int)
         required = await actors.spawn(Required, value=1, label="ok")
         assert_type(required, Required)
         assert_type(await required.read(), int)
