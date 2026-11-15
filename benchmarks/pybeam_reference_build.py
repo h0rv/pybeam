@@ -69,6 +69,9 @@ def build(native: Path, python: Path) -> Path:
     before = source(native)
     if before.dirty or before.sha != BASELINE:
         raise ValueError("Build requires the clean pinned current native source")
+    jobs = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL") or "2"
+    if jobs not in {"1", "2"}:
+        raise ValueError("CMAKE_BUILD_PARALLEL_LEVEL must be 1 or 2")
     python = python.resolve(strict=True)
     python_config = python.with_name("python3.14-config")
     if not python_config.is_file():
@@ -91,10 +94,15 @@ def build(native: Path, python: Path) -> Path:
             "-DPython3_EXECUTABLE=" + str(python),
             "-DCMAKE_BUILD_TYPE=Release",
         ),
-        ("cmake", "--build", str(native / "_build/cmake"), "--parallel", "2"),
+        ("cmake", "--build", str(native / "_build/cmake"), "--parallel", jobs),
         ("erlc", "-o", str(ebin), *map(str, sorted((native / "src").glob("*.erl")))),
     )
-    environment = dict(os.environ, ERL_FLAGS="+S 1:1 +A 1", PYTHON_CONFIG=str(python_config))
+    environment = dict(
+        os.environ,
+        ERL_FLAGS="+S 1:1 +A 1",
+        PYTHON_CONFIG=str(python_config),
+        CMAKE_BUILD_PARALLEL_LEVEL=jobs,
+    )
     for command in commands:
         private_outputs(native)
         subprocess.run(command, env=environment, check=True, timeout=240)  # noqa: S603

@@ -170,9 +170,14 @@ def test_build_manifest__rejects_changed_assets(
         verify(manifest, tmp_path)
 
 
+@pytest.mark.parametrize("budget", [None, "", "1", "2", "10", "invalid"])
 def test_private_build__does_not_change_existing_project_checkout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, budget: str | None
 ) -> None:
+    if budget is None:
+        monkeypatch.delenv("CMAKE_BUILD_PARALLEL_LEVEL", raising=False)
+    else:
+        monkeypatch.setenv("CMAKE_BUILD_PARALLEL_LEVEL", budget)
     project = tmp_path / "project"
     canonical = tmp_path / "canonical"
     canonical.mkdir()
@@ -213,14 +218,21 @@ def test_private_build__does_not_change_existing_project_checkout(
     ) -> subprocess.CompletedProcess[bytes]:
         commands.append(argv)
         assert env["PYTHON_CONFIG"] == str(python.with_name("python3.14-config"))
+        assert env["CMAKE_BUILD_PARALLEL_LEVEL"] == (budget or "2")
         return subprocess.CompletedProcess(argv, 0)
 
     monkeypatch.setattr("benchmarks.pybeam_reference_build.source", source)
     monkeypatch.setattr("benchmarks.pybeam_reference_build.subprocess.run", command)
+    if budget not in {None, "", "1", "2"}:
+        with pytest.raises(ValueError, match="must be 1 or 2"):
+            build(native, python)
+        assert not commands
+        assert checkout.resolve() == canonical
+        return
     manifest = BuildManifest.model_validate_json(build(native, python).read_text())
     assert manifest.native == expected
     assert manifest.commands == tuple(commands)
-    assert commands[1][-2:] == ("--parallel", "2")
+    assert commands[1][-2:] == ("--parallel", budget or "2")
     assert checkout.resolve() == canonical
     assert Path(manifest.runtime_directory).is_relative_to(native)
 
