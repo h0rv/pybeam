@@ -13,7 +13,7 @@ from examples.distributed.demo import demonstration, wait_file
 from pybeam.distribution import Reply
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import BootstrapError, Distribution, PythonNode
-from pybeam.runtime.ownership import Identity, Registry, resolve
+from pybeam.runtime.ownership import Identity, Registry, identity, resolve
 
 pytestmark = pytest.mark.runtime
 ROOT = Path(__file__).resolve().parents[1]
@@ -155,9 +155,15 @@ def test_distribution__registration_failure_seals_user_execution(tmp_path: Path)
         "-c",
         "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()",
     ]
+    owner = identity(psutil.Process()).model_dump_json()
     result = subprocess.run(
         command,
-        env=dict(os.environ, PYBEAM_OWNER_DIRECTORY=str(tmp_path)),
+        env=dict(
+            os.environ,
+            PYBEAM_OWNER_DIRECTORY=str(tmp_path),
+            PYBEAM_OWNER_IDENTITY=owner,
+            PYBEAM_GUARDIAN_IDENTITY=owner,
+        ),
         capture_output=True,
         text=True,
         timeout=8,
