@@ -1,0 +1,551 @@
+{
+  "$defs": {
+    "AdapterResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "result",
+          "default": "result",
+          "title": "Kind",
+          "type": "string"
+        },
+        "backend": {
+          "enum": [
+            "python",
+            "pybeam",
+            "erlang",
+            "elixir"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "workload": {
+          "$ref": "#/$defs/Workload"
+        },
+        "runtime": {
+          "$ref": "#/$defs/Runtime"
+        },
+        "clock": {
+          "const": "sender_monotonic_ns",
+          "default": "sender_monotonic_ns",
+          "title": "Clock",
+          "type": "string"
+        },
+        "phases": {
+          "$ref": "#/$defs/Phases"
+        },
+        "receipts": {
+          "items": {
+            "$ref": "#/$defs/Receipt"
+          },
+          "title": "Receipts",
+          "type": "array"
+        },
+        "transport_encoding": {
+          "title": "Transport Encoding",
+          "type": "string"
+        },
+        "transport_payload_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Natural"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminal_counts": {
+          "items": {
+            "$ref": "#/$defs/Natural"
+          },
+          "title": "Terminal Counts",
+          "type": "array"
+        },
+        "entities_created": {
+          "$ref": "#/$defs/Natural"
+        },
+        "entities_deleted": {
+          "$ref": "#/$defs/Natural"
+        },
+        "queue_peak": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Natural"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inflight_peak": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Natural"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failures": {
+          "$ref": "#/$defs/Natural"
+        },
+        "recovered": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Natural"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lost": {
+          "$ref": "#/$defs/Natural"
+        },
+        "cleanup_acknowledged": {
+          "title": "Cleanup Acknowledged",
+          "type": "boolean"
+        },
+        "semantic_differences": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Semantic Differences",
+          "type": "array"
+        },
+        "unsupported_features": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Unsupported Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "backend",
+        "workload",
+        "runtime",
+        "phases",
+        "receipts",
+        "transport_encoding",
+        "transport_payload_bytes",
+        "terminal_counts",
+        "entities_created",
+        "entities_deleted",
+        "queue_peak",
+        "inflight_peak",
+        "failures",
+        "recovered",
+        "lost",
+        "cleanup_acknowledged"
+      ],
+      "title": "AdapterResult",
+      "type": "object"
+    },
+    "Family": {
+      "enum": [
+        "rooms.local",
+        "rooms.churn",
+        "rooms.isolation",
+        "failure.reset",
+        "backpressure.cancel",
+        "bridge.individual",
+        "bridge.batch",
+        "execution.modes",
+        "two_node.feasibility",
+        "bounded.longrun"
+      ],
+      "type": "string"
+    },
+    "LoadedAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "LoadedAsset",
+      "type": "object"
+    },
+    "Natural": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "scalar",
+          "enum": [
+            "scalar",
+            "structured",
+            "large_binary"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "encoding": {
+          "default": "json-utf8",
+          "title": "Encoding",
+          "type": "string"
+        },
+        "encoded_bytes": {
+          "$ref": "#/$defs/Positive",
+          "default": 1
+        },
+        "batch_size": {
+          "$ref": "#/$defs/Positive",
+          "default": 1
+        }
+      },
+      "title": "Payload",
+      "type": "object"
+    },
+    "Phases": {
+      "additionalProperties": false,
+      "properties": {
+        "creation_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "warmup_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "measurement_ns": {
+          "$ref": "#/$defs/Positive"
+        },
+        "deletion_ns": {
+          "$ref": "#/$defs/Natural"
+        }
+      },
+      "required": [
+        "creation_ns",
+        "warmup_ns",
+        "measurement_ns",
+        "deletion_ns"
+      ],
+      "title": "Phases",
+      "type": "object"
+    },
+    "Positive": {
+      "exclusiveMinimum": 0,
+      "type": "integer"
+    },
+    "Receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Natural"
+        },
+        "entity": {
+          "$ref": "#/$defs/Natural"
+        },
+        "sent_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "completed_ns": {
+          "$ref": "#/$defs/Natural"
+        }
+      },
+      "required": [
+        "id",
+        "entity",
+        "sent_ns",
+        "completed_ns"
+      ],
+      "title": "Receipt",
+      "type": "object"
+    },
+    "Runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "python": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Python"
+        },
+        "otp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Otp"
+        },
+        "erts": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Erts"
+        },
+        "elixir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Elixir"
+        },
+        "mode": {
+          "title": "Mode",
+          "type": "string"
+        },
+        "gil_enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Gil Enabled"
+        },
+        "interpreters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Positive"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Positive"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedulers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Positive"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "executable": {
+          "title": "Executable",
+          "type": "string"
+        },
+        "executable_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Executable Sha256",
+          "type": "string"
+        },
+        "native_source_sha": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Native Source Sha"
+        },
+        "loaded_assets": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LoadedAsset"
+          },
+          "title": "Loaded Assets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "python",
+        "otp",
+        "erts",
+        "elixir",
+        "mode",
+        "gil_enabled",
+        "interpreters",
+        "workers",
+        "schedulers",
+        "executable",
+        "executable_sha256",
+        "native_source_sha"
+      ],
+      "title": "Runtime",
+      "type": "object"
+    },
+    "Unsupported": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "unsupported",
+          "default": "unsupported",
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "features": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "reason",
+        "features"
+      ],
+      "title": "Unsupported",
+      "type": "object"
+    },
+    "Workload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Family",
+          "default": "rooms.local"
+        },
+        "entities": {
+          "default": 16,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "events": {
+          "default": 1000,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Events",
+          "type": "integer"
+        },
+        "warmup_events": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Warmup Events",
+          "type": "integer"
+        },
+        "seed": {
+          "$ref": "#/$defs/Natural",
+          "default": 1
+        },
+        "activity": {
+          "default": "uniform",
+          "enum": [
+            "uniform",
+            "hot_10_percent",
+            "idle"
+          ],
+          "title": "Activity",
+          "type": "string"
+        },
+        "queue_capacity": {
+          "default": 16,
+          "maximum": 1024,
+          "minimum": 1,
+          "title": "Queue Capacity",
+          "type": "integer"
+        },
+        "queue_bound_scope": {
+          "default": "destination_queue",
+          "enum": [
+            "destination_queue",
+            "client_admission_only"
+          ],
+          "title": "Queue Bound Scope",
+          "type": "string"
+        },
+        "max_inflight": {
+          "default": 16,
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Max Inflight",
+          "type": "integer"
+        },
+        "ack": {
+          "const": "applied",
+          "default": "applied",
+          "title": "Ack",
+          "type": "string"
+        },
+        "delivery": {
+          "const": "exactly_once_no_retry",
+          "default": "exactly_once_no_retry",
+          "title": "Delivery",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Payload",
+          "default": {
+            "kind": "scalar",
+            "encoding": "json-utf8",
+            "encoded_bytes": 1,
+            "batch_size": 1
+          }
+        }
+      },
+      "title": "Workload",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "result": "#/$defs/AdapterResult",
+      "unsupported": "#/$defs/Unsupported"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/AdapterResult"
+    },
+    {
+      "$ref": "#/$defs/Unsupported"
+    }
+  ]
+}

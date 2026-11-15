@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "pid": {
+          "$ref": "#/$defs/Positive"
+        },
+        "created": {
+          "exclusiveMinimum": 0,
+          "title": "Created",
+          "type": "number"
+        }
+      },
+      "required": [
+        "pid",
+        "created"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "Natural": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Positive": {
+      "exclusiveMinimum": 0,
+      "type": "integer"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "unsupported"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Reason"
+    },
+    "returncode": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Returncode"
+    },
+    "cleanup_survivors": {
+      "items": {
+        "$ref": "#/$defs/Identity"
+      },
+      "title": "Cleanup Survivors",
+      "type": "array"
+    },
+    "cleanup_ns": {
+      "$ref": "#/$defs/Natural"
+    },
+    "forced_cleanup_count": {
+      "$ref": "#/$defs/Natural"
+    },
+    "enforcement": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Enforcement",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "reason",
+    "returncode",
+    "cleanup_survivors",
+    "cleanup_ns",
+    "forced_cleanup_count",
+    "enforcement"
+  ],
+  "title": "Outcome",
+  "type": "object"
+}

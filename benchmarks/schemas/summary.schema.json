@@ -1,0 +1,346 @@
+{
+  "$defs": {
+    "Duration": {
+      "minimum": 0,
+      "type": "number"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "pid": {
+          "$ref": "#/$defs/Positive"
+        },
+        "created": {
+          "exclusiveMinimum": 0,
+          "title": "Created",
+          "type": "number"
+        }
+      },
+      "required": [
+        "pid",
+        "created"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "Natural": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Outcome": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "returncode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Returncode"
+        },
+        "cleanup_survivors": {
+          "items": {
+            "$ref": "#/$defs/Identity"
+          },
+          "title": "Cleanup Survivors",
+          "type": "array"
+        },
+        "cleanup_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "forced_cleanup_count": {
+          "$ref": "#/$defs/Natural"
+        },
+        "enforcement": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Enforcement",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "reason",
+        "returncode",
+        "cleanup_survivors",
+        "cleanup_ns",
+        "forced_cleanup_count",
+        "enforcement"
+      ],
+      "title": "Outcome",
+      "type": "object"
+    },
+    "Phase": {
+      "enum": [
+        "creation_ns",
+        "warmup_ns",
+        "measurement_ns",
+        "deletion_ns"
+      ],
+      "type": "string"
+    },
+    "Phases": {
+      "additionalProperties": false,
+      "properties": {
+        "creation_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "warmup_ns": {
+          "$ref": "#/$defs/Natural"
+        },
+        "measurement_ns": {
+          "$ref": "#/$defs/Positive"
+        },
+        "deletion_ns": {
+          "$ref": "#/$defs/Natural"
+        }
+      },
+      "required": [
+        "creation_ns",
+        "warmup_ns",
+        "measurement_ns",
+        "deletion_ns"
+      ],
+      "title": "Phases",
+      "type": "object"
+    },
+    "Positive": {
+      "exclusiveMinimum": 0,
+      "type": "integer"
+    },
+    "Quantile": {
+      "enum": [
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "type": "string"
+    },
+    "Statistics": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "$ref": "#/$defs/Positive"
+        },
+        "mean": {
+          "$ref": "#/$defs/Duration"
+        },
+        "stdev": {
+          "$ref": "#/$defs/Duration"
+        },
+        "minimum": {
+          "$ref": "#/$defs/Duration"
+        },
+        "maximum": {
+          "$ref": "#/$defs/Duration"
+        },
+        "p50": {
+          "$ref": "#/$defs/Duration"
+        },
+        "p95": {
+          "$ref": "#/$defs/Duration"
+        },
+        "p99": {
+          "$ref": "#/$defs/Duration"
+        }
+      },
+      "required": [
+        "count",
+        "mean",
+        "stdev",
+        "minimum",
+        "maximum",
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "title": "Statistics",
+      "type": "object"
+    },
+    "TrialSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "trial": {
+          "title": "Trial",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "completed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completed"
+        },
+        "throughput_per_second": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Throughput Per Second"
+        },
+        "latency_ns": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Statistics"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phases": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Phases"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "adapter_rss_peak_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Adapter Rss Peak Bytes"
+        },
+        "descendants_rss_peak_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Descendants Rss Peak Bytes"
+        },
+        "simultaneous_tree_rss_peak_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Simultaneous Tree Rss Peak Bytes"
+        },
+        "cpu_seconds_observed_by_pid": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Cpu Seconds Observed By Pid",
+          "type": "object"
+        }
+      },
+      "required": [
+        "trial",
+        "outcome",
+        "completed",
+        "throughput_per_second",
+        "latency_ns",
+        "phases",
+        "adapter_rss_peak_bytes",
+        "descendants_rss_peak_bytes",
+        "simultaneous_tree_rss_peak_bytes",
+        "cpu_seconds_observed_by_pid"
+      ],
+      "title": "TrialSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "host_control": {
+      "title": "Host Control",
+      "type": "string"
+    },
+    "trials": {
+      "items": {
+        "$ref": "#/$defs/TrialSummary"
+      },
+      "title": "Trials",
+      "type": "array"
+    },
+    "throughput_repeat_statistics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Statistics"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "latency_quantile_repeat_statistics": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Statistics"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/Quantile"
+      },
+      "title": "Latency Quantile Repeat Statistics",
+      "type": "object"
+    },
+    "phase_repeat_statistics": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Statistics"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/Phase"
+      },
+      "title": "Phase Repeat Statistics",
+      "type": "object"
+    }
+  },
+  "required": [
+    "host_control",
+    "trials",
+    "throughput_repeat_statistics",
+    "latency_quantile_repeat_statistics",
+    "phase_repeat_statistics"
+  ],
+  "title": "Summary",
+  "type": "object"
+}

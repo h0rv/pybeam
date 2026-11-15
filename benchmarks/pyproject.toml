@@ -1,0 +1,28 @@
+[project]
+name = "pybeam-benchmark-contract"
+version = "0.1.0"
+requires-python = ">=3.14,<3.15"
+dependencies = ["pydantic==2.14.3", "psutil>=7,<8"]
+
+[dependency-groups]
+dev = ["pytest>=9,<10", "ruff>=0.14,<1", "ty>=0.0.104", "types-psutil>=7,<8"]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ANN", "ASYNC", "S"]
+ignore = ["UP031", "UP032"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607"]
+
+[tool.ty.rules]
+all = "error"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

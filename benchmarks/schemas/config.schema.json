@@ -1,0 +1,299 @@
+{
+  "$defs": {
+    "Budget": {
+      "additionalProperties": false,
+      "properties": {
+        "wall_seconds": {
+          "default": 15.0,
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Wall Seconds",
+          "type": "number"
+        },
+        "tree_rss_bytes": {
+          "$ref": "#/$defs/Positive",
+          "default": 536870912
+        },
+        "processes": {
+          "default": 8,
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Processes",
+          "type": "integer"
+        },
+        "threads": {
+          "default": 32,
+          "maximum": 128,
+          "minimum": 1,
+          "title": "Threads",
+          "type": "integer"
+        },
+        "artifact_bytes": {
+          "$ref": "#/$defs/Positive",
+          "default": 16777216
+        },
+        "sample_seconds": {
+          "default": 0.02,
+          "maximum": 1,
+          "minimum": 0.01,
+          "title": "Sample Seconds",
+          "type": "number"
+        },
+        "cpu_cores_requested": {
+          "const": 1,
+          "default": 1,
+          "title": "Cpu Cores Requested",
+          "type": "integer"
+        }
+      },
+      "title": "Budget",
+      "type": "object"
+    },
+    "Family": {
+      "enum": [
+        "rooms.local",
+        "rooms.churn",
+        "rooms.isolation",
+        "failure.reset",
+        "backpressure.cancel",
+        "bridge.individual",
+        "bridge.batch",
+        "execution.modes",
+        "two_node.feasibility",
+        "bounded.longrun"
+      ],
+      "type": "string"
+    },
+    "Natural": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "scalar",
+          "enum": [
+            "scalar",
+            "structured",
+            "large_binary"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "encoding": {
+          "default": "json-utf8",
+          "title": "Encoding",
+          "type": "string"
+        },
+        "encoded_bytes": {
+          "$ref": "#/$defs/Positive",
+          "default": 1
+        },
+        "batch_size": {
+          "$ref": "#/$defs/Positive",
+          "default": 1
+        }
+      },
+      "title": "Payload",
+      "type": "object"
+    },
+    "Positive": {
+      "exclusiveMinimum": 0,
+      "type": "integer"
+    },
+    "Workload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Family",
+          "default": "rooms.local"
+        },
+        "entities": {
+          "default": 16,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Entities",
+          "type": "integer"
+        },
+        "events": {
+          "default": 1000,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Events",
+          "type": "integer"
+        },
+        "warmup_events": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Warmup Events",
+          "type": "integer"
+        },
+        "seed": {
+          "$ref": "#/$defs/Natural",
+          "default": 1
+        },
+        "activity": {
+          "default": "uniform",
+          "enum": [
+            "uniform",
+            "hot_10_percent",
+            "idle"
+          ],
+          "title": "Activity",
+          "type": "string"
+        },
+        "queue_capacity": {
+          "default": 16,
+          "maximum": 1024,
+          "minimum": 1,
+          "title": "Queue Capacity",
+          "type": "integer"
+        },
+        "queue_bound_scope": {
+          "default": "destination_queue",
+          "enum": [
+            "destination_queue",
+            "client_admission_only"
+          ],
+          "title": "Queue Bound Scope",
+          "type": "string"
+        },
+        "max_inflight": {
+          "default": 16,
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Max Inflight",
+          "type": "integer"
+        },
+        "ack": {
+          "const": "applied",
+          "default": "applied",
+          "title": "Ack",
+          "type": "string"
+        },
+        "delivery": {
+          "const": "exactly_once_no_retry",
+          "default": "exactly_once_no_retry",
+          "title": "Delivery",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/Payload",
+          "default": {
+            "kind": "scalar",
+            "encoding": "json-utf8",
+            "encoded_bytes": 1,
+            "batch_size": 1
+          }
+        }
+      },
+      "title": "Workload",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "backend": {
+      "default": "python",
+      "enum": [
+        "python",
+        "pybeam",
+        "erlang",
+        "elixir"
+      ],
+      "title": "Backend",
+      "type": "string"
+    },
+    "adapter_command": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Adapter Command",
+      "type": "array"
+    },
+    "workload": {
+      "$ref": "#/$defs/Workload",
+      "default": {
+        "id": "rooms.local",
+        "entities": 16,
+        "events": 1000,
+        "warmup_events": 100,
+        "seed": 1,
+        "activity": "uniform",
+        "queue_capacity": 16,
+        "queue_bound_scope": "destination_queue",
+        "max_inflight": 16,
+        "ack": "applied",
+        "delivery": "exactly_once_no_retry",
+        "payload": {
+          "batch_size": 1,
+          "encoded_bytes": 1,
+          "encoding": "json-utf8",
+          "kind": "scalar"
+        }
+      }
+    },
+    "budget": {
+      "$ref": "#/$defs/Budget",
+      "default": {
+        "wall_seconds": 15.0,
+        "tree_rss_bytes": 536870912,
+        "processes": 8,
+        "threads": 32,
+        "artifact_bytes": 16777216,
+        "sample_seconds": 0.02,
+        "cpu_cores_requested": 1
+      }
+    },
+    "repeats": {
+      "default": 3,
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Repeats",
+      "type": "integer"
+    },
+    "scale": {
+      "default": "smoke",
+      "enum": [
+        "smoke",
+        "explicit_progressive"
+      ],
+      "title": "Scale",
+      "type": "string"
+    },
+    "unsafe_native_crash": {
+      "default": false,
+      "title": "Unsafe Native Crash",
+      "type": "boolean"
+    },
+    "host_control": {
+      "const": "uncontrolled_smoke",
+      "default": "uncontrolled_smoke",
+      "title": "Host Control",
+      "type": "string"
+    },
+    "python_source": {
+      "title": "Python Source",
+      "type": "string"
+    },
+    "native_source": {
+      "title": "Native Source",
+      "type": "string"
+    }
+  },
+  "required": [
+    "python_source",
+    "native_source"
+  ],
+  "title": "Config",
+  "type": "object"
+}
