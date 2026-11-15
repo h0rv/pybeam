@@ -71,6 +71,10 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
     with ZipFile(wheel) as archive:
         manifest_path = "pybeam/runtime/_assets/optional/genstage/manifest.json"
         manifest = OptionalManifest.model_validate_json(archive.read(manifest_path))
+        approved = OptionalManifest.model_validate_json(
+            archive.read("pybeam/runtime/optional_specs/genstage.json")
+        )
+        assert manifest == approved
         assert manifest.otp_version == "29.1.2"
         assert {app.name for app in manifest.applications} == {
             "compiler",
@@ -138,6 +142,10 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
     probe = ROOT / ".experiment/genstage-probe/ebin"
     assert probe.is_dir(), "Compile the test-only fixture with mise run experiment:genstage-probe"
     shutil.copytree(probe, application / "probe/ebin")
+    compat = ROOT / ".experiment/application-probe"
+    shutil.copytree(compat / "ebin", application / "compat/ebin")
+    (application / "compat/priv").mkdir()
+    shutil.copyfile(compat / "stale/Elixir.GenStage.beam", application / "compat/priv/stale.beam")
     imports = subprocess.run(
         [
             str(python),
@@ -163,6 +171,7 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         assert "/Users/robby/projects" not in result.stdout + result.stderr
         assert "/mise/" not in result.stdout + result.stderr
         if name == "genstage_wheel.py":
+            assert "COMPATIBILITY_PREFLIGHT_OK" in result.stdout
             print(result.stdout)
     shutdown(python, application / "genstage_shutdown.py", environment)
     optional = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/optional/genstage"

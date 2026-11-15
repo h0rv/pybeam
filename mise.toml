@@ -259,7 +259,10 @@ depends = ["experiment:genstage-assets"]
 description = "Compile the test-only installed-wheel ownership fixture"
 run = '''
 set -eu
-mkdir -p .experiment/genstage-probe/ebin
+mkdir -p .experiment/genstage-probe/ebin .experiment/application-probe/ebin .experiment/application-probe/stale
+cp tests/native/py_application_probe.app .experiment/application-probe/ebin/
+erlc -o .experiment/application-probe/ebin tests/native/py_application_probe.erl
+erlc -o .experiment/application-probe/stale tests/native/Elixir.GenStage.erl
 cp tests/native/pybeam_genstage_probe.app .experiment/genstage-probe/ebin/
 erlc -o .experiment/genstage-probe/ebin tests/native/pybeam_genstage_probe.erl
 PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
@@ -273,6 +276,7 @@ depends = ["experiment:genstage-assets"]
 description = "Stage one private runtime and its pinned optional application assets, then build the wheel"
 run = '''
 set -eu
+export PYTHONPATH="$PWD/src:$PWD"
 otp="$(mise where erlang@29.1.2)"
 if ! test -f .experiment/OTP-LICENSE.txt; then
     curl --fail --location https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt --output .experiment/OTP-LICENSE.txt

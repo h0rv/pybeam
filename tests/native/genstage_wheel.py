@@ -53,16 +53,28 @@ async def main() -> None:
     assert "pybeam.integrations.genstage" not in sys.modules
     from genstage_callbacks import Outcome, process
 
-    from pybeam.integrations.genstage.pipeline import stream
     from pybeam.runtime.optional import read_manifest
+
+    root = Path(pybeam.__file__).parent / "runtime/_assets/optional/genstage"
+    manifest = await asyncio.to_thread(read_manifest, root)
+    compat = Path(__file__).with_name("compat") / "ebin"
+    assert (
+        await erlang.async_call(
+            "_application_start",
+            [str(compat).encode()],
+            [(b"py_application_probe", b"0.1.0")],
+            manifest.erts_version.encode(),
+        )
+        == "ok"
+    )
+    print("COMPATIBILITY_PREFLIGHT_OK stale rejected, unchanged; matching and idempotent accepted")
+    from pybeam.integrations.genstage.pipeline import stream
 
     async with stream(16, process) as events:
         results = [Outcome.model_validate_json(event) async for event in events]
     assert [item.id for item in results] == list(range(16))
     assert all(item.detail == "HÉLLO" for item in results)
     proof = RuntimeProof.model_validate(await erlang.async_call("pybeam_genstage", b"runtime"))
-    root = Path(pybeam.__file__).parent / "runtime/_assets/optional/genstage"
-    manifest = await asyncio.to_thread(read_manifest, root)
     module = Path(proof.module)
     assert module.is_relative_to(root)
     declared = next(item for item in manifest.files if item.path == module.relative_to(root))

@@ -49,9 +49,9 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling>=1.27,<2", "pydantic==2.14.3", "typing-extensions>=4.14.1,<5"]
 build-backend = "hatchling.build"
-backend-path = ["."]
+backend-path = [".", "src"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

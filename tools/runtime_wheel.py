@@ -1,40 +1,13 @@
-import hashlib
 import json
 import re
 from pathlib import Path
 
-from tools.build_genstage import ELIXIR, GENSTAGE
+from pybeam.runtime.optional_manifest import verify_manifest
 from tools.build_runtime import ERTS_EXECUTABLES, audit_binary, native_binaries, wheel_tag
 
 
 def audit_optional(root: Path) -> None:
-    manifest: object = json.loads((root / "manifest.json").read_bytes())
-    if not isinstance(manifest, dict) or manifest.get("sources") != {
-        "elixir": ELIXIR,
-        "gen_stage": GENSTAGE,
-    }:
-        raise ValueError("Optional GenStage assets must use the pinned dependency sources")
-    files: object = manifest.get("files")
-    if not isinstance(files, list) or not files:
-        raise ValueError("Optional runtime manifest must declare its files")
-    declared: set[Path] = set()
-    for item in files:
-        if not isinstance(item, dict):
-            raise ValueError("Invalid optional runtime file")
-        name: object = item.get("path")
-        expected: object = item.get("sha256")
-        if not isinstance(name, str) or not isinstance(expected, str):
-            raise ValueError("Invalid optional runtime file hash")
-        relative = Path(name)
-        if relative.is_absolute() or ".." in relative.parts or relative in declared:
-            raise ValueError("Optional runtime paths must be unique and relative")
-        declared.add(relative)
-        path = root / relative
-        if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise ValueError("Optional runtime file hash mismatch: " + name)
-    actual = {path.relative_to(root) for path in root.rglob("*") if path.is_file()}
-    if actual != declared | {Path("manifest.json")}:
-        raise ValueError("Optional runtime contains undeclared files")
+    verify_manifest(root)
 
 
 def runtime_tag(assets: Path) -> str:
