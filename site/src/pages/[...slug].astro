@@ -1,0 +1,23 @@
+---
+import type { MarkdownInstance } from "astro";
+import Layout from "../Layout.astro";
+import { pages } from "../links.mjs";
+
+export async function getStaticPaths() {
+  const files = import.meta.glob<MarkdownInstance<Record<string, unknown>>>(
+    ["../../../docs/guide/*.md"],
+  );
+  return Promise.all(pages.map(async ({ source, path: route }) => {
+    const page = await files[`../../../${source}`]();
+    const headings = await page.getHeadings();
+    return {
+      params: { slug: route.replace(/\/$/, "") || undefined },
+      props: { Content: page.Content, title: headings[0]?.text || "PyBEAM", headings, source },
+    };
+  }));
+}
+const { Content, title, headings, source } = Astro.props;
+---
+<Layout title={title} headings={headings} source={source}>
+  <Content />
+</Layout>
