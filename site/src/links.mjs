@@ -6,11 +6,18 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
-  { source: "docs/guide/index.md", path: "", label: "Overview" },
-  { source: "docs/guide/quickstart.md", path: "quickstart/", label: "Quickstart" },
-  { source: "docs/guide/primitives.md", path: "primitives/", label: "Core primitives" },
-  { source: "docs/guide/web.md", path: "web/", label: "Web and integrations" },
-  { source: "docs/guide/limits.md", path: "limits/", label: "Boundaries" },
+  { source: "docs/guide/index.md", path: "", label: "Overview", group: "Start", examples: ["examples/docs/hello.py"] },
+  { source: "docs/guide/quickstart.md", path: "quickstart/", label: "Get started", group: "Start", examples: ["examples/docs/hello.py"] },
+  { source: "docs/guide/runtime.md", path: "runtime/", label: "Async Python", group: "Start", examples: ["examples/docs/runtime.py"] },
+  { source: "docs/guide/actors.md", path: "actors/", label: "Actors", group: "Concepts", examples: ["examples/docs/actors.py"] },
+  { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", group: "Concepts", examples: ["examples/docs/messaging.py"] },
+  { source: "docs/guide/state.md", path: "state/", label: "State and services", group: "Concepts", examples: ["examples/docs/state.py"] },
+  { source: "docs/guide/subscriptions.md", path: "subscriptions/", label: "Subscriptions", group: "Concepts", examples: ["examples/docs/subscriptions.py"] },
+  { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", group: "Concepts", examples: ["examples/docs/supervision.py"] },
+  { source: "docs/guide/background.md", path: "background/", label: "Background services", group: "Concepts", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
+  { source: "docs/guide/genstage.md", path: "genstage/", label: "GenStage", group: "Concepts", examples: ["examples/docs/genstage_transform.py", "examples/docs/genstage.py"] },
+  { source: "docs/guide/web.md", path: "web/", label: "Web integration", group: "Concepts", examples: ["examples/docs/web.py"] },
+  { source: "docs/guide/limits.md", path: "limits/", label: "Boundaries", group: "Reference", examples: ["examples/docs/boundaries.py"] },
 ];
 
 export function pagePath(source) {

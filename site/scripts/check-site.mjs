@@ -25,6 +25,13 @@ for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
   {
     const blocks = [...html.matchAll(/<pre\b/g)].length;
+    assert.ok(blocks > 0, `Every page needs an executable example: ${page}`);
+    for (const [block] of html.matchAll(/<pre\b[\s\S]*?<\/pre>/g)) {
+      assert.match(block, /astro-code/, `Code must pass through Shiki: ${page}`);
+      const colors = new Set([...block.matchAll(/(?:color|--shiki-dark):\s*(#[a-f\d]{6})/gi)].map((match) => match[1]));
+      assert.ok(colors.size >= 3, `Syntax token colors must survive Markdown rendering: ${page}`);
+      assert.match(block, /<span/, `Missing highlighted token spans: ${page}`);
+    }
     const buttons = [...html.matchAll(/class="copy-code"/g)].length;
     assert.equal(buttons, blocks, `Code controls must be present in the initial HTML: ${page}`);
     assert.ok(html.includes('name="color-scheme"'), `Missing initial color scheme: ${page}`);
