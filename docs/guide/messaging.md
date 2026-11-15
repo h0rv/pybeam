@@ -1,33 +1,6 @@
-# Shared state and messages
+# Messaging
 
-Store document status, then notify readers when it changes.
-
-## Store a value
-
-```python
-from pybeam.integrations.hornbeam.client import Beam
-from pybeam.integrations.hornbeam.runtime import run
-
-
-async def main() -> None:
-    beam = await Beam.connect()
-    store = beam.store("documents")
-    await store.set("status", b"draft")
-    print(await store.get("status"))
-    await store.set("status", b"published")
-    print(await store.get("status"))
-    await store.delete("status")
-
-
-if __name__ == "__main__":
-    run(main)
-```
-
-This prints `b'draft'`, then `b'published'`. Keys belong to the named store. Delete the key when it is no longer needed. Values are volatile, not persistent storage. A timeout does not undo a write.
-
-Use an [actor](actors.md) for Python state and methods. For an atomic shared increment without an actor, use `await beam.incr("visits", 1, namespace="documents")`. Separate reads and writes are not a transaction.
-
-## Send a message
+Send an order notification to a subscriber.
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -47,8 +20,6 @@ if __name__ == "__main__":
 ```
 
 This prints `order-42`. Subscribe before publishing. Leaving the context releases the subscription. Publishing does not acknowledge that a receiver finished processing. Messages are not durable.
-
-The Hornbeam `run` function starts and stops these services alongside Python.
 
 ## Notify readers of a changed key
 

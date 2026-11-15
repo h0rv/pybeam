@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "actors/", "messaging/", "background/", "web/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "actors/", "supervision/", "state/", "messaging/", "background/", "web/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -25,7 +25,7 @@ test("only curated Markdown sources map to site pages", () => {
 });
 
 test("relative guide links, anchors and queries respect deployment base", () => {
-  assert.equal(rewriteLink("actors.md#after-a-failure", "docs/guide/index.md"), "/actors/#after-a-failure");
+  assert.equal(rewriteLink("supervision.md#supervision", "docs/guide/index.md"), "/supervision/#supervision");
   assert.equal(rewriteLink("actors.md?view=plain#actors", "docs/guide/index.md", "/pybeam/"),
     "/pybeam/actors/?view=plain#actors");
   assert.equal(rewriteLink("index.md", "docs/guide/actors.md", "/pybeam/"), "/pybeam/");
@@ -76,9 +76,23 @@ test("the homepage puts Python before explanations and links to the first action
   assert.doesNotMatch(markdown, /\| Capability/);
 });
 
-test("five task links replace grouped capability navigation", () => {
-  assert.equal(navigation.length, 5);
+test("state and supervision teach distinct operations without another introduction", () => {
+  const guide = (name) => readFileSync(join(repositoryRoot, `docs/guide/${name}.md`), "utf8");
+  assert.match(guide("supervision"), /actors\.crash[\s\S]*actors\.rejoin/);
+  assert.match(guide("supervision"), /prints `5`, then `1`/);
+  assert.doesNotMatch(guide("actors"), /actors\.crash/);
+  assert.match(guide("state"), /beam\.incr[\s\S]*atomic operation/);
+  assert.doesNotMatch(guide("state"), /beam\.subscribe|beam\.publish/);
+  for (const { source, path } of pages.filter(({ path }) => path)) {
+    assert.doesNotMatch(readFileSync(join(repositoryRoot, source), "utf8"), /Hello from Python/);
+  }
+});
+
+test("distinct concept tasks replace grouped capability navigation", () => {
+  assert.deepEqual(navigation.map(({ label }) => label), [
+    "Get started", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Web integration",
+  ]);
   assert.ok(navigation.every((page) => !("group" in page)));
   assert.ok(!navigation.some(({ path }) => path === "genstage/"));
-  assert.deepEqual(Object.keys(redirects), ["quickstart/", "runtime/", "state/", "subscriptions/", "supervision/", "limits/"]);
+  assert.deepEqual(Object.keys(redirects), ["quickstart/", "runtime/", "subscriptions/", "limits/"]);
 });

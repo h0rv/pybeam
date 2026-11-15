@@ -43,6 +43,6 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `HÉLLO` twice. This finite graph supplies sample requests containing `héllo`. The callback parses each request and returns transformed bytes.
+This prints `HÉLLO` twice. The callback parses each request and returns transformed bytes.
 
 One request is admitted at a time, including running callback work. Pulling the next result permits more work. Context exit waits for graph cleanup. Requests and results are each limited to 1024 encoded bytes.
