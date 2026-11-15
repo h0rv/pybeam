@@ -6,7 +6,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -14,6 +13,7 @@ import pytest
 
 from pybeam.runtime.config import BootstrapError
 from pybeam.runtime.optional import OptionalManifest, read_manifest
+from tests.readiness import ProcessOutput, wait_ready
 from tools.genstage_assets import HELPER_SHA256, digest, stage
 from tools.genstage_fixtures import prepare
 from tools.runtime_wheel import audit_optional
@@ -33,9 +33,15 @@ def run(python: Path, entry: Path, environment: dict[str, str]) -> subprocess.Co
     )
 
 
-def shutdown(python: Path, entry: Path, environment: dict[str, str]) -> None:
+def shutdown(
+    python: Path,
+    entry: Path,
+    environment: dict[str, str],
+    *,
+    before_activation: bool = False,
+) -> None:
     with subprocess.Popen(
-        [str(python), str(entry)],
+        [str(python), str(entry), *(["--before-activation"] if before_activation else [])],
         cwd=entry.parent,
         env=environment,
         stdout=subprocess.PIPE,
@@ -50,24 +56,45 @@ def shutdown(python: Path, entry: Path, environment: dict[str, str]) -> None:
         output = bytearray()
         try:
             with selectors.DefaultSelector() as selector:
-                selector.register(child.stdout, selectors.EVENT_READ)
-                deadline = time.monotonic() + 10
-                while b"SHUTDOWN_READY" not in output:
-                    assert time.monotonic() < deadline, output.decode()
-                    assert selector.select(timeout=1), output.decode()
-                    chunk = os.read(child.stdout.fileno(), 4096)
-                    assert chunk, output.decode()
-                    output.extend(chunk)
+                wait_ready(
+                    ProcessOutput(child, selector),
+                    output,
+                    ready_line=b"BEFORE_ACTIVATION_READY\n"
+                    if before_activation
+                    else b"SHUTDOWN_READY\n",
+                )
             child.send_signal(signal.SIGTERM)
             tail, _ = child.communicate(timeout=10)
             output.extend(tail)
             assert child.returncode == 143, output.decode()
             assert b"SHUTDOWN_CONTEXTS 1" in output, output.decode()
+            assert b"COUNTER_ACK 42" in output, output.decode()
+            assert b"PHASE owner_context_drained 1" in output, output.decode()
+            if before_activation:
+                assert b"PHASE stop phase=activation_pending" in output, output.decode()
+                assert b"PHASE graph_created" not in output, output.decode()
+                assert b"PHASE application_registered" not in output, output.decode()
+            else:
+                assert b"PHASE manifest_verified" in output, output.decode()
+                assert b"PHASE application_registration_acknowledged" in output, output.decode()
+                assert b"PHASE stop phase=graph_owned" in output, output.decode()
+            assert b"Function not registered" not in output, output.decode()
             assert b"cleanup failed" not in output, output.decode()
-        finally:
+            print(output.decode(errors="replace"))
+        except BaseException as failure:
             if child.poll() is None:
+                child.send_signal(signal.SIGTERM)
+            try:
+                tail, _ = child.communicate(timeout=10)
+                output.extend(tail)
+            except subprocess.TimeoutExpired as cleanup:
                 child.kill()
-                child.wait(timeout=5)
+                tail, _ = child.communicate(timeout=5)
+                output.extend(tail)
+                failure.add_note("Owned cleanup timed out: " + str(cleanup))
+            failure.add_note("OWNED_CLEANUP_OUTPUT\n" + output.decode(errors="replace"))
+            print(output.decode(errors="replace"))
+            raise
 
 
 @pytest.mark.runtime
@@ -195,6 +222,7 @@ def test_installed_genstage_without_developer_environment(
             assert "CURRENT_CORE_COEXISTENCE" in result.stdout
             print(result.stdout)
     shutdown(python, application / "genstage_shutdown.py", environment)
+    shutdown(python, application / "genstage_shutdown.py", environment, before_activation=True)
     optional = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/optional/genstage"
     hidden = optional.with_name("hidden")
     optional.rename(hidden)
