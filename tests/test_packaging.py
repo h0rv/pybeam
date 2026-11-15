@@ -165,6 +165,9 @@ def test_wheel_audit__rejects_universal_required_executables(
         "_erlang_impl/__init__.py",
         "_erlang_impl/_actors.py",
         "_erlang_impl/_actors.pyi",
+        "erlang-stubs/__init__.pyi",
+        "erlang-stubs/actors.pyi",
+        "erlang-stubs/supervision.pyi",
         "erlang_services.py",
         "py_isolated_child.py",
     ):
@@ -292,7 +295,16 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         assert "Root-Is-Purelib: false" in metadata
         assert "Tag: cp314-cp314-macosx_" in metadata
         assert (archive.getinfo("pybeam/runtime/_assets/bin/erl").external_attr >> 16) & 0o111
-        assert not any("hornbeam" in name.lower() for name in archive.namelist())
+        assert not any(
+            name.startswith("hornbeam/") or "/lib/hornbeam-" in name for name in archive.namelist()
+        )
+        native_priv = Path(__file__).resolve().parents[2] / "erlang-python/priv"
+        for directory in ("_erlang_impl", "erlang-stubs"):
+            for source in (native_priv / directory).rglob("*"):
+                if source.suffix in {".py", ".pyi"}:
+                    assert archive.read(str(source.relative_to(native_priv))) == source.read_bytes()
+        for name in ("erlang_services.py", "py_isolated_child.py"):
+            assert archive.read(name) == (native_priv / name).read_bytes()
         record = dist_info.removesuffix("WHEEL") + "RECORD"
         for name, digest, size in csv.reader(io.StringIO(archive.read(record).decode())):
             if name == record:
@@ -319,7 +331,21 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         [
             str(moved / "bin/python"),
             "-c",
-            "import sys; from pybeam.services.background import ServiceSlot; assert 'erlang' not in sys.modules; print(ServiceSlot.__module__)",
+            "import asyncio, sys, erlang_services\n"
+            "from pybeam.services.background import ServiceSlot\n"
+            "assert 'erlang' not in sys.modules\n"
+            "async def service():\n"
+            "    pass\n"
+            "async def verify():\n"
+            "    try:\n"
+            "        ServiceSlot(capacity=1).start(service)\n"
+            "    except RuntimeError as error:\n"
+            "        assert str(error) == 'services require a running ErlangEventLoop'\n"
+            "    else:\n"
+            "        raise AssertionError('ordinary asyncio admitted a native service')\n"
+            "asyncio.run(verify())\n"
+            "assert '_erlang_impl' not in sys.modules\n"
+            "print(erlang_services.__file__)\n",
         ],
         cwd=tmp_path,
         env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
@@ -329,8 +355,73 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         timeout=15,
     )
     assert imports.returncode == 0, imports.stdout + imports.stderr
-    assert "erlang_services" in imports.stdout
-    assert (moved / "lib/python3.14/site-packages/_erlang_impl/_actors.pyi").is_file()
+    assert str(moved / "lib/python3.14/site-packages/erlang_services.py") in imports.stdout
+    installed = moved / "lib/python3.14/site-packages"
+    assert (installed / "_erlang_impl/_actors.pyi").is_file()
+    for stub in ("__init__.pyi", "actors.pyi", "supervision.pyi"):
+        assert (installed / "erlang-stubs" / stub).is_file()
+    assert not (installed / "erlang").exists()
+    probe = tmp_path / "public_types.py"
+    probe.write_text(
+        "from typing import assert_type\n"
+        "from erlang import ErlangEventLoop\n"
+        "from erlang.actors import OwnedActor\n"
+        "from erlang.supervision import ChildState\n"
+        "from pybeam.actors import ActorRef\n"
+        "async def method(state: object, value: int, *, label: str) -> str:\n"
+        "    return label * value\n"
+        "async def verify(actor: OwnedActor, ref: ActorRef[object], child: ChildState) -> None:\n"
+        "    assert_type(await actor.call(0, method, 2, label='ok'), str)\n"
+        "    assert_type(await ref.call(method, 2, label='ok'), str)\n"
+        "    assert_type(child, ChildState)\n"
+        "loop: ErlangEventLoop\n"
+    )
+    ty = shutil.which("ty")
+    assert ty is not None
+    typing = subprocess.run(
+        [
+            ty,
+            "check",
+            "--project",
+            str(tmp_path),
+            "--python",
+            str(moved),
+            "--error-on-warning",
+            "--config",
+            "rules.all='error'",
+            str(probe),
+        ],
+        cwd=tmp_path,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert typing.returncode == 0, typing.stdout + typing.stderr
+    probe.write_text(probe.read_text().replace("2, label='ok'", "'wrong', label='ok'"))
+    rejected = subprocess.run(
+        [
+            ty,
+            "check",
+            "--project",
+            str(tmp_path),
+            "--python",
+            str(moved),
+            "--error-on-warning",
+            "--config",
+            "rules.all='error'",
+            str(probe),
+        ],
+        cwd=tmp_path,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert rejected.stdout.count("error[invalid-argument-type]") == 2, rejected.stdout
     application = tmp_path / "application-original"
     application.mkdir()
     entry = application / "main.py"

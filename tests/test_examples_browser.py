@@ -23,7 +23,7 @@ from tests.conftest import ServerFactory
 pytestmark = [pytest.mark.runtime, pytest.mark.browser]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def chromium(request: pytest.FixtureRequest) -> Generator[Browser]:
     browser_enabled: object = request.config.getoption("run_browser")
     runtime_enabled: object = request.config.getoption("run_runtime")

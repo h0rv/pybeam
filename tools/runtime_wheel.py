@@ -49,6 +49,9 @@ def runtime_tag(assets: Path) -> str:
         "_erlang_impl/__init__.py",
         "_erlang_impl/_actors.py",
         "_erlang_impl/_actors.pyi",
+        "erlang-stubs/__init__.pyi",
+        "erlang-stubs/actors.pyi",
+        "erlang-stubs/supervision.pyi",
         "erlang_services.py",
         "py_isolated_child.py",
     ):
