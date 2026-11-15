@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "backend": "pybeam",
+  "adapter_command": [
+    "benchmarks/.venv/bin/python",
+    "-m",
+    "benchmarks.pybeam_reference"
+  ],
+  "workload": {
+    "id": "rooms.local",
+    "entities": 2,
+    "events": 100,
+    "warmup_events": 17,
+    "seed": 1,
+    "activity": "uniform",
+    "queue_capacity": 4,
+    "queue_bound_scope": "client_admission_only",
+    "max_inflight": 4,
+    "ack": "applied",
+    "delivery": "exactly_once_no_retry",
+    "payload": {
+      "kind": "scalar",
+      "encoding": "json-utf8",
+      "encoded_bytes": 1,
+      "batch_size": 1
+    }
+  },
+  "budget": {
+    "wall_seconds": 15.0,
+    "tree_rss_bytes": 536870912,
+    "processes": 8,
+    "threads": 32,
+    "artifact_bytes": 16777216,
+    "sample_seconds": 0.02,
+    "cpu_cores_requested": 1
+  },
+  "repeats": 3,
+  "scale": "smoke",
+  "unsafe_native_crash": false,
+  "host_control": "uncontrolled_smoke",
+  "python_source": "/Users/robby/projects/worktrees/pybeam/benchmark-integration",
+  "native_source": "/Users/robby/projects/worktrees/pybeam/native-bench-pybeam"
+}
