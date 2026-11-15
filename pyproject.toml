@@ -95,6 +95,9 @@ ban-relative-imports = "all"
 "tests/**" = ["S101", "S603", "S607"]
 "tests/test_runtime_native.py" = ["S101", "ASYNC110"]
 
+[tool.pybeam]
+development_runtime = "../native-genstage/_build/default"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

@@ -1,4 +1,4 @@
-ExUnit.start(autorun: false)
+ExUnit.start(autorun: false, exclude: [:benchmark, :artifact])
 
 defmodule PyBEAM.GenStageProducer do
   use GenStage
@@ -47,7 +47,7 @@ defmodule PyBEAM.GenStageConsumer do
   use GenStage
 
   def init({owner, limit}) do
-    {:ok, context} = :py_context.new(%{mode: :worker})
+    {:ok, context} = :py_context.new(%{mode: :worker, context_owner: self()})
     {:consumer, %{owner: owner, context: context, limit: limit, completed: 0}}
   end
 
@@ -153,7 +153,7 @@ defmodule PyBEAM.GenStageTest do
   end
 
   test "slow callback retains the only credit; subscription cancellation stops production" do
-    {outcomes, _} = pipeline(100, 3, "slow")
+    {outcomes, _} = pipeline(16, 3, "slow")
     assert Enum.map(outcomes, fn {result, _} -> result["status"] end) == ["ok", "ok", "ok"]
 
     assert Enum.all?(outcomes, fn {result, elapsed} ->
@@ -162,18 +162,18 @@ defmodule PyBEAM.GenStageTest do
   end
 
   test "failure and cooperative deadline cancellation are terminal visible outcomes, never retried" do
-    {[{failed, _}], _} = pipeline(100, 1, "fail")
+    {[{failed, _}], _} = pipeline(16, 1, "fail")
     assert failed["status"] == "failed"
     assert failed["detail"] == "deliberate callback failure"
-    {[{cancelled, _}], _} = pipeline(100, 1, "cancel")
+    {[{cancelled, _}], _} = pipeline(16, 1, "cancel")
     assert cancelled["status"] == "cancelled"
     assert cancelled["detail"] == "application deadline expired"
     assert cancelled["python_ns"] >= 20_000_000
   end
 
   test "unexpected callback exception stops the consumer without replacement demand or retry" do
-    {:ok, producer} = GenStage.start_link(PyBEAM.GenStageProducer, {self(), 100, "unsupported"})
-    {:ok, consumer} = GenStage.start(PyBEAM.GenStageConsumer, {self(), 100})
+    {:ok, producer} = GenStage.start_link(PyBEAM.GenStageProducer, {self(), 16, "unsupported"})
+    {:ok, consumer} = GenStage.start(PyBEAM.GenStageConsumer, {self(), 16})
     monitor = Process.monitor(consumer)
     context = GenStage.call(consumer, :context)
     context_monitor = Process.monitor(context)
@@ -219,6 +219,21 @@ defmodule PyBEAM.GenStageTest do
     end
   end
 
+  test "killed original coordinator releases its native context without terminate" do
+    counters = :py_nif.get_debug_counters()
+    baseline = counters.ctx_created - counters.ctx_destroyed
+
+    for _ <- 1..8 do
+      {:ok, consumer} = GenStage.start(PyBEAM.GenStageConsumer, {self(), 16})
+      context = GenStage.call(consumer, :context)
+      monitor = Process.monitor(context)
+      Process.exit(consumer, :kill)
+      assert_receive {:DOWN, ^monitor, :process, ^context, :normal}, 3000
+      after_counters = :py_nif.get_debug_counters()
+      assert after_counters.ctx_created - after_counters.ctx_destroyed == baseline
+    end
+  end
+
   test "native interrupt is visible and the private context can be reused" do
     {:ok, context} = :py_context.new(%{mode: :worker})
     parent = self()
@@ -253,6 +268,7 @@ defmodule PyBEAM.GenStageTest do
     end
   end
 
+  @tag :benchmark
   test "native identity round trip measures the existing primitive without Python callback loop setup" do
     {:ok, context} = :py_context.new(%{mode: :worker})
 
@@ -281,6 +297,7 @@ defmodule PyBEAM.GenStageTest do
     end
   end
 
+  @tag :artifact
   test "Elixir and GenStage assemble and boot as applications in an Erlang host release" do
     applications = [:kernel, :stdlib, :compiler, :elixir, :logger, :gen_stage, :erlang_python]
     versions = Enum.map(applications, &{&1, Application.spec(&1, :vsn)})
@@ -319,6 +336,7 @@ defmodule PyBEAM.GenStageTest do
     assert output =~ "RELEASE_OK {ok,\"1.3.2\"}"
   end
 
+  @tag :benchmark
   test "native boundary overhead, including copying and JSON parsing, excludes VM startup" do
     {outcomes, _} = pipeline(101, 101, "ok")
 

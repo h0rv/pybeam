@@ -208,11 +208,53 @@ test "$(git -C .experiment/elixir rev-parse HEAD)" = 853b7cd719bce7df87be4271ee9
 test "$(git -C .experiment/gen_stage rev-parse HEAD)" = d1532fa56482bc92d90abc777439ff8be34b5b1a
 test "$(cd _checkouts/erlang_python && pwd -P)" = "$(cd ../native-genstage && pwd -P)"
 export PYTHONPATH="$PWD/examples:$PWD/src:$PWD/.experiment/venv/lib/python3.14/site-packages"
-erl -noshell -pa .experiment/elixir/lib/*/ebin \
+erl +S 2:2 -noshell -pa .experiment/elixir/lib/*/ebin \
     -pa .experiment/gen_stage/_build/dev/lib/gen_stage/ebin \
     -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
     -eval ' {ok, _} = application:ensure_all_started(elixir), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_pipeline.exs">>), halt().'
 '''
+
+[tasks."experiment:genstage-assets"]
+description = "Stage owned optional GenStage assets from the already-built pinned sources"
+run = '''
+set -eu
+test "$(git -C .experiment/elixir rev-parse HEAD)" = 853b7cd719bce7df87be4271ee91c90acdf706e1
+test "$(git -C .experiment/gen_stage rev-parse HEAD)" = d1532fa56482bc92d90abc777439ff8be34b5b1a
+test "$(cd _checkouts/erlang_python && pwd -P)" = "$(cd ../native-genstage && pwd -P)"
+mkdir -p .experiment/genstage-assets/plugin/ebin
+for app in elixir logger eex; do
+    mkdir -p ".experiment/genstage-assets/$app"
+    cp -R ".experiment/elixir/lib/$app/ebin" ".experiment/genstage-assets/$app/"
+done
+mkdir -p .experiment/genstage-assets/gen_stage
+cp -R .experiment/gen_stage/_build/dev/lib/gen_stage/ebin .experiment/genstage-assets/gen_stage/
+cp .experiment/elixir/LICENSE .experiment/genstage-assets/elixir/
+cp -R .experiment/elixir/LICENSES .experiment/genstage-assets/elixir/
+cp .experiment/gen_stage/README.md .experiment/genstage-assets/gen_stage/NOTICE.md
+erlc -o .experiment/genstage-assets/plugin/ebin src/pybeam/integrations/genstage/pybeam_genstage.erl
+PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
+    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
+    -pa .experiment/genstage-assets/gen_stage/ebin \
+    -o .experiment/genstage-assets/plugin/ebin src/pybeam/integrations/genstage/graph.ex
+'''
+
+[tasks."experiment:genstage-owned"]
+depends = ["experiment:genstage-assets"]
+description = "Verify real GenStage lifecycle and Python managed entrypoint"
+run = '''
+set -eu
+export PYTHONPATH="$PWD/tests/native:$PWD/src:$PWD:$PWD/.experiment/venv/lib/python3.14/site-packages"
+export PYBEAM_GENSTAGE_ASSETS="$PWD/.experiment/genstage-assets"
+erl +S 2:2 -noshell -pa .experiment/elixir/lib/ex_unit/ebin \
+    .experiment/genstage-assets/*/ebin ../native-genstage/_build/default/lib/erlang_python/ebin \
+    -eval 'pybeam_genstage:bootstrap(), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_owned.exs">>), halt().'
+.experiment/venv/bin/python tests/native/genstage_entry.py
+.experiment/venv/bin/python examples/genstage.py
+'''
+
+[tasks."example:genstage"]
+description = "Run the Python entrypoint with already-staged private optional assets"
+run = 'PYBEAM_GENSTAGE_ASSETS="$PWD/.experiment/genstage-assets" PYTHONPATH="$PWD/src:$PWD" .experiment/venv/bin/python examples/genstage.py'
 
 [tasks.serve]
 wait_for = ["setup", "build"]
