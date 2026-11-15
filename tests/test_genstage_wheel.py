@@ -41,6 +41,10 @@ def shutdown(python: Path, entry: Path, environment: dict[str, str]) -> None:
         bufsize=0,
     ) as child:
         assert child.stdout is not None
+        identity = subprocess.check_output(
+            ["/bin/ps", "-p", str(child.pid), "-o", "pid=,lstart=,command="], text=True
+        )
+        print("OWN_SHUTDOWN_PROCESS", identity.strip())
         output = bytearray()
         try:
             with selectors.DefaultSelector() as selector:
@@ -65,10 +69,13 @@ def shutdown(python: Path, entry: Path, environment: dict[str, str]) -> None:
 
 
 @pytest.mark.runtime
-def test_installed_genstage_without_developer_environment(tmp_path: Path) -> None:
+def test_installed_genstage_without_developer_environment(
+    tmp_path: Path, request: pytest.FixtureRequest
+) -> None:
+    if not request.config.getoption("run_runtime"):
+        pytest.skip("Requires --run-runtime and PYBEAM_TEST_WHEEL")
     value = os.environ.get("PYBEAM_TEST_WHEEL")
-    if value is None:
-        pytest.skip("Set PYBEAM_TEST_WHEEL to the privately built platform wheel")
+    assert value is not None, "Set PYBEAM_TEST_WHEEL to the current private platform wheel"
     wheel = Path(value).resolve(strict=True)
     with ZipFile(wheel) as archive:
         manifest_path = "pybeam/runtime/_assets/optional/genstage/manifest.json"
@@ -95,7 +102,7 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         )
         compiled = (
             ROOT.parent
-            / "native-genstage/_build/default/lib/erlang_python/ebin/py_application.beam"
+            / "native-genstage-current/_build/default/lib/erlang_python/ebin/py_application.beam"
         )
         assert archive.read(helper) == compiled.read_bytes()
         assert not any("libpython" in name for name in archive.namelist())
@@ -123,6 +130,7 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         [
             uv,
             "add",
+            "--offline",
             "--project",
             str(project),
             "--python",
@@ -143,6 +151,8 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         ROOT / "examples/genstage.py",
         ROOT / "examples/genstage_callbacks.py",
         ROOT / "examples/actors/main.py",
+        ROOT / "examples/discord_simulation.py",
+        ROOT / "tests/native/genstage_coexist.py",
         ROOT / "tests/native/genstage_entry.py",
         ROOT / "tests/native/genstage_owned.py",
         ROOT / "tests/native/genstage_shutdown.py",
@@ -160,7 +170,7 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         [
             str(python),
             "-c",
-            "import sys, pybeam, erlang_services; from pybeam.services.background import ServiceSlot; assert 'erlang' not in sys.modules; assert 'pybeam.integrations.genstage' not in sys.modules",
+            "import sys, pybeam, erlang_services; from pybeam.services.background import ServiceSlot; assert 'erlang' not in sys.modules; assert 'pybeam.integrations.genstage' not in sys.modules; assert 'pybeam.runtime.optional_manifest' not in sys.modules; assert not {'fastapi', 'litestar', 'pyview', 'hornbeam'} & sys.modules.keys()",
         ],
         cwd=application,
         env=environment,
@@ -182,6 +192,7 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
         assert "/mise/" not in result.stdout + result.stderr
         if name == "genstage_wheel.py":
             assert "COMPATIBILITY_PREFLIGHT_OK" in result.stdout
+            assert "CURRENT_CORE_COEXISTENCE" in result.stdout
             print(result.stdout)
     shutdown(python, application / "genstage_shutdown.py", environment)
     optional = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/optional/genstage"

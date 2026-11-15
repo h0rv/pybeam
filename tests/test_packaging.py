@@ -332,7 +332,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         assert not any(
             name.startswith("hornbeam/") or "/lib/hornbeam-" in name for name in archive.namelist()
         )
-        native_priv = Path(__file__).resolve().parents[2] / "erlang-python/priv"
+        native_priv = Path(__file__).resolve().parents[2] / "native-genstage-current/priv"
         for directory in ("_erlang_impl", "erlang-stubs"):
             for source in (native_priv / directory).rglob("*"):
                 if source.suffix in {".py", ".pyi"}:

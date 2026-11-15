@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 import pybeam
+from pybeam.actors import ActorGroup, context_counts
 
 
 @pybeam.actor
@@ -92,6 +93,38 @@ async def main() -> None:
         )
         == "ok"
     )
+    from discord_simulation import Room
+    from genstage_coexist import blocked
+
+    baseline = await context_counts()
+    async with ActorGroup(max_children=2) as actors:
+        counter = await actors.spawn(Counter, value=10)
+        room = await actors.spawn(
+            Room, room_id="coexist", max_members=2, max_events=2, history_limit=2
+        )
+        before = await actors.info(room)
+        async with stream(1, blocked) as pending, asyncio.TaskGroup() as tasks:
+
+            async def next_item() -> bytes:
+                return await anext(pending)
+
+            demand = tasks.create_task(next_item())
+            assert await erlang.async_call("genstage_coexist_ready") == "ok"
+            try:
+                assert not demand.done()
+                assert await counter.add(2) == 12
+                assert await room.join("member", epoch=0) == 1
+                await actors.crash(room)
+                replacement = await actors.rejoin(room)
+                after = await actors.info(replacement)
+                assert before.pid != after.pid and before.generation != after.generation
+                assert (await replacement.snapshot()).members == ()
+                assert not demand.done()
+            finally:
+                assert await erlang.async_call("genstage_coexist_release") == "ok"
+            assert Outcome.model_validate_json(await demand).id == 0
+    assert (await context_counts()).live == baseline.live
+    print("CURRENT_CORE_COEXISTENCE Counter/Room controls with blocked GenStage demand drained")
     owned = OwnershipProof.model_validate(await erlang.async_call("genstage_owned_probe"))
     print(
         "INSTALLED_PROOF",

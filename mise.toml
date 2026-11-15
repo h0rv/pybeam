@@ -200,65 +200,51 @@ description = "Run the PyView counter at PYBEAM_BIND, without implicit build"
 quiet = true
 run = ["mise run example:prepare", "mise run serve -- examples.pyview.main:app"]
 
-[tasks."experiment:genstage"]
-description = "Run the private GenStage/Python interoperability prototype (not the MVP gate)"
-run = '''
-set -eu
-test "$(git -C .experiment/elixir rev-parse HEAD)" = 853b7cd719bce7df87be4271ee91c90acdf706e1
-test "$(git -C .experiment/gen_stage rev-parse HEAD)" = d1532fa56482bc92d90abc777439ff8be34b5b1a
-test "$(cd _checkouts/erlang_python && pwd -P)" = "$(cd ../native-genstage && pwd -P)"
-export PYTHONPATH="$PWD/examples:$PWD/src:$PWD/.experiment/venv/lib/python3.14/site-packages"
-erl +S 2:2 -noshell -pa .experiment/elixir/lib/*/ebin \
-    -pa .experiment/gen_stage/_build/dev/lib/gen_stage/ebin \
-    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
-    -eval ' {ok, _} = application:ensure_all_started(elixir), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_pipeline.exs">>), halt().'
-'''
-
 [tasks."experiment:genstage-assets"]
-description = "Stage owned optional GenStage assets from the already-built pinned sources"
+description = "Developer-only bridge compilation for test probes, not an approved release artifact"
 run = '''
 set -eu
 test "$(git -C .experiment/elixir rev-parse HEAD)" = 853b7cd719bce7df87be4271ee91c90acdf706e1
 test "$(git -C .experiment/gen_stage rev-parse HEAD)" = d1532fa56482bc92d90abc777439ff8be34b5b1a
-test "$(cd _checkouts/erlang_python && pwd -P)" = "$(cd ../native-genstage && pwd -P)"
+test -f ../native-genstage-current/_build/default/lib/erlang_python/ebin/py_application.beam
+export ERL_FLAGS='+S 2:2'
 mkdir -p .experiment/genstage-assets/plugin/ebin
-for app in elixir logger eex; do
-    mkdir -p ".experiment/genstage-assets/$app"
-    cp -R ".experiment/elixir/lib/$app/ebin" ".experiment/genstage-assets/$app/"
-done
-mkdir -p .experiment/genstage-assets/gen_stage
-cp -R .experiment/gen_stage/_build/dev/lib/gen_stage/ebin .experiment/genstage-assets/gen_stage/
-cp .experiment/elixir/LICENSE .experiment/genstage-assets/elixir/
-cp -R .experiment/elixir/LICENSES .experiment/genstage-assets/elixir/
-cp .experiment/gen_stage/README.md .experiment/genstage-assets/gen_stage/NOTICE.md
 cp src/pybeam/integrations/genstage/pybeam_genstage.app .experiment/genstage-assets/plugin/ebin/
 erlc -o .experiment/genstage-assets/plugin/ebin src/pybeam/integrations/genstage/pybeam_genstage.erl
 PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
-    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
-    -pa .experiment/genstage-assets/gen_stage/ebin \
+    -pa ../native-genstage-current/_build/default/lib/erlang_python/ebin \
+    -pa .experiment/gen_stage/_build/dev/lib/gen_stage/ebin \
     -o .experiment/genstage-assets/plugin/ebin src/pybeam/integrations/genstage/graph.ex
 '''
 
-[tasks."experiment:genstage-owned"]
-depends = ["experiment:genstage-assets"]
-description = "Verify real GenStage lifecycle and Python managed entrypoint"
+[tasks."example:genstage"]
+description = "Run the private Python GenStage example from an explicitly selected wheel"
 run = '''
 set -eu
-export PYTHONPATH="$PWD/tests/native:$PWD/examples:$PWD/src:$PWD:$PWD/.experiment/venv/lib/python3.14/site-packages"
-erl +S 2:2 -noshell -pa .experiment/elixir/lib/ex_unit/ebin \
-    .experiment/genstage-assets/*/ebin ../native-genstage/_build/default/lib/erlang_python/ebin \
-    -eval 'application:load(erlang_python), application:set_env(erlang_python,num_contexts,1), {ok,_}=application:ensure_all_started(pybeam_genstage), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_owned.exs">>), halt().'
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Set PYBEAM_TEST_WHEEL to the current private platform wheel.\n' >&2
+    exit 2
+fi
+uv run --no-project --with "$PYBEAM_TEST_WHEEL" examples/genstage.py
 '''
 
-[tasks."example:genstage"]
-description = "Run the Python example using the built wheel"
-run = 'uv run --no-project --with ./dist/python_beam-0.1.0a1-cp314-cp314-macosx_27_0_arm64.whl examples/genstage.py'
+[tasks."test:genstage"]
+description = "Private finite GenStage units and installed-wheel integration; no builds or measurements"
+run = '''
+set -eu
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Set PYBEAM_TEST_WHEEL to the current private platform wheel.\n' >&2
+    exit 2
+fi
+uv run --locked pytest tests/test_genstage_callbacks.py tests/test_genstage_integration.py tests/test_genstage_wheel.py tests/test_packaging.py tests/test_optional_wheel_imports.py --run-runtime -q -s
+'''
 
 [tasks."experiment:genstage-probe"]
 depends = ["experiment:genstage-assets"]
 description = "Compile the test-only installed-wheel ownership fixture"
 run = '''
 set -eu
+export ERL_FLAGS='+S 2:2'
 mkdir -p .experiment/genstage-probe/ebin .experiment/application-probe/ebin .experiment/application-probe/stale
 cp tests/native/py_application_probe.app .experiment/application-probe/ebin/
 erlc -o .experiment/application-probe/ebin tests/native/py_application_probe.erl
@@ -266,14 +252,14 @@ erlc -o .experiment/application-probe/stale tests/native/Elixir.GenStage.erl
 cp tests/native/pybeam_genstage_probe.app .experiment/genstage-probe/ebin/
 erlc -o .experiment/genstage-probe/ebin tests/native/pybeam_genstage_probe.erl
 PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
-    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
-    -pa .experiment/genstage-assets/gen_stage/ebin -pa .experiment/genstage-assets/plugin/ebin \
+    -pa ../native-genstage-current/_build/default/lib/erlang_python/ebin \
+    -pa .experiment/gen_stage/_build/dev/lib/gen_stage/ebin -pa .experiment/genstage-assets/plugin/ebin \
     -o .experiment/genstage-probe/ebin tests/native/genstage_probe.ex
 '''
 
-[tasks."experiment:genstage-wheel"]
-depends = ["experiment:genstage-assets"]
-description = "Stage one private runtime and its pinned optional application assets, then build the wheel"
+[tasks."build:optional-genstage"]
+description = "Stage prebuilt current native code and exact approved optional assets; never compile C"
+usage = 'arg "<bridge>" help="Approved bridge ebin directory; every output hash must match the pinned specification"'
 run = '''
 set -eu
 export PYTHONPATH="$PWD/src:$PWD"
@@ -283,12 +269,12 @@ if ! test -f .experiment/OTP-LICENSE.txt; then
 fi
 digest="$(shasum -a 256 .experiment/OTP-LICENSE.txt)"
 test "${digest%% *}" = 809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0
-.experiment/venv/bin/python -m tools.build_runtime --otp-root "$otp" \
-    --native-app ../native-genstage/_build/default/lib/erlang_python \
-    --otp-license .experiment/OTP-LICENSE.txt --native-license ../native-genstage/LICENSE --output build/runtime
-.experiment/venv/bin/python -m tools.build_genstage --otp "$otp" \
+uv run --locked python -m tools.build_runtime --otp-root "$otp" \
+    --native-app ../native-genstage-current/_build/default/lib/erlang_python \
+    --otp-license .experiment/OTP-LICENSE.txt --native-license ../native-genstage-current/LICENSE --output build/runtime
+uv run --locked python -m tools.build_genstage --otp "$otp" \
     --elixir .experiment/elixir --genstage .experiment/gen_stage \
-    --bridge .experiment/genstage-assets/plugin/ebin --runtime build/runtime
+    --bridge "${usage_bridge}" --runtime build/runtime
 uv build --wheel --out-dir dist
 '''
 
