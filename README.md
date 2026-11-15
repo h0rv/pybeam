@@ -1,6 +1,6 @@
 # PyBEAM
 
-Python-first tools for BEAM services.
+Python-first tools for BEAM services. Read the [documentation](docs/guide/index.md).
 
 ## Examples
 

@@ -5,6 +5,31 @@ rebar = "3.28.0"
 uv = "0.13.8"
 cmake = "4.5.0"
 
+[tasks."docs:setup"]
+description = "Install only the locked documentation dependencies"
+dir = "site"
+tools = { node = "24.21.0" }
+run = "npm ci"
+
+[tasks."docs:build"]
+description = "Build static Markdown and check local links; no native build"
+dir = "site"
+tools = { node = "24.21.0" }
+run = "npm run build"
+
+[tasks."docs:serve"]
+description = "Preview documentation locally; no native runtime required"
+dir = "site"
+tools = { node = "24.21.0" }
+usage = 'flag "--port <port>" default="4321"'
+run = 'npm run dev -- --ignore-lock --host 127.0.0.1 --port "${usage_port}"'
+
+[tasks."docs:test"]
+description = "Check documentation routes, code controls and source snippets"
+dir = "site"
+tools = { node = "24.21.0" }
+run = "npm test"
+
 [tasks.setup]
 description = "Link local runtime sources, sync locked dependencies, then explicitly build"
 run = [

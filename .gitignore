@@ -171,8 +171,10 @@ conda-meta/
 # Rope project settings
 .ropeproject
 
-# mkdocs/Zensical documentation
-/site
+# Documentation build output
+site/node_modules/
+site/dist/
+site/.astro/
 
 # mypy
 .mypy_cache/

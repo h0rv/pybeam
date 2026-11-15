@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { pages, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
+import { join } from "node:path";
+
+test("root and project hosting paths preserve trailing slashes", () => {
+  for (const base of ["/", "/pybeam/", "pybeam", "/preview/docs/"]) {
+    const prefix = base === "/" ? "/" : `/${base.replace(/^\/+|\/+$/g, "")}/`;
+    assert.equal(withBase("", base), prefix);
+    assert.equal(withBase("quickstart/", base), `${prefix}quickstart/`);
+    assert.equal(withBase("missing.css", base), `${prefix}missing.css`);
+  }
+});
+
+test("only curated Markdown sources map to site pages", () => {
+  assert.equal(pages.length, 5);
+  assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
+  for (const { source, path } of pages) {
+    assert.equal(pagePath(source), path);
+    assert.ok(readFileSync(join(repositoryRoot, source), "utf8").startsWith("# "));
+  }
+  for (const source of ["README.md", "docs/research/gallery.md", "docs/guide/secret.md", "examples/actors/main.py"])
+    assert.equal(pagePath(source), null);
+});
+
+test("relative guide links, anchors and queries respect deployment base", () => {
+  assert.equal(rewriteLink("quickstart.md#run-an-actor", "docs/guide/index.md"), "/quickstart/#run-an-actor");
+  assert.equal(rewriteLink("actors.md?view=plain#own-state-through-methods", "docs/guide/quickstart.md", "/pybeam/"),
+    "/pybeam/actors/?view=plain#own-state-through-methods");
+  assert.equal(rewriteLink("index.md", "docs/guide/actors.md", "/pybeam/"), "/pybeam/");
+  assert.equal(rewriteLink("../../examples/actors/main.py", "docs/guide/quickstart.md"),
+    "https://github.com/h0rv/pybeam/blob/main/examples/actors/main.py");
+  for (const href of ["https://example.com/docs", "//example.com", "#memory", "mailto:help@example.com"])
+    assert.equal(rewriteLink(href, "docs/guide/index.md", "/pybeam/"), href);
+});
+
+test("the runnable snippet stays identical to the existing typed actor example", () => {
+  const markdown = readFileSync(join(repositoryRoot, "docs/guide/quickstart.md"), "utf8");
+  const snippet = markdown.match(/```python\n([\s\S]*?)```/)?.[1];
+  assert.equal(snippet, readFileSync(join(repositoryRoot, "examples/actors/main.py"), "utf8"));
+});
