@@ -182,7 +182,13 @@ class TaskRef[T]:
             ) from error
         if isinstance(outcome, _Failure) and isinstance(outcome.error, UncertainInflight):
             raise outcome.error
-        return isinstance(outcome, _Failure) and isinstance(outcome.error, asyncio.CancelledError)
+        cancelled = isinstance(outcome, _Failure) and isinstance(
+            outcome.error, asyncio.CancelledError
+        )
+        if cancelled:
+            self.observed = True
+            self._observed()
+        return cancelled
 
 
 class TaskSupervisor:

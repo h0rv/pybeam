@@ -604,6 +604,51 @@ def test_tasks__cancelling_close_waiter_still_finishes_resource_cleanup(tmp_path
     )
 
 
+def test_tasks__native_channel_worker_cancel_ack_drains_waiter_and_allows_replacement(
+    tmp_path: Path,
+) -> None:
+    task_program(
+        tmp_path,
+        """
+        from erlang.channel import Channel
+        channel = Channel.create_bytes(capacity=1, max_bytes=32)
+        entered = asyncio.Event()
+        cleaning = asyncio.Event()
+        finish_cleanup = asyncio.Event()
+        cleaned = asyncio.Event()
+        async def worker(value: int) -> int:
+            entered.set()
+            try:
+                await channel.receive_bytes()
+                return value
+            finally:
+                cleaning.set()
+                await finish_cleanup.wait()
+                channel.abort()
+                cleaned.set()
+        async def replacement(value: int) -> int:
+            return value * 2
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
+            ref = await sup.start(TaskFunction(worker, TypeAdapter(int), TypeAdapter(int)), 7)
+            await entered.wait()
+            assert channel.snapshot()[-1] == 1
+            cancelling = asyncio.create_task(ref.cancel())
+            await cleaning.wait()
+            assert not cancelling.done()
+            assert channel.snapshot()[-1] == 0
+            info = await async_call('_task_info', sup._group)
+            assert info['gate']['count'] == 1
+            finish_cleanup.set()
+            assert await cancelling is True
+            assert cleaned.is_set()
+            assert channel.snapshot() == (0, 0, 1, 32, True, 0)
+            fresh = await sup.start(TaskFunction(replacement, TypeAdapter(int), TypeAdapter(int)), 21)
+            assert await fresh == 42
+            assert isinstance(await ref.exception(), asyncio.CancelledError)
+    """,
+    )
+
+
 def test_tasks__litestar_after_response_handoff_returns_before_effect(tmp_path: Path) -> None:
     task_program(
         tmp_path,
