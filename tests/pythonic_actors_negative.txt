@@ -1,0 +1,57 @@
+import pybeam
+from tests.pythonic_actors_positive import Counter, Derived, Required
+
+async def constructor_type(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Counter, value="wrong")
+
+async def constructor_name(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Counter, typo=1)
+
+async def method_type(actors: pybeam.ActorGroup) -> None:
+    counter = await actors.spawn(Counter)
+    await counter.add("wrong")
+
+async def method_name(actors: pybeam.ActorGroup) -> None:
+    counter = await actors.spawn(Counter)
+    await counter.add(1, typo="wrong")
+
+async def method_missing_argument(actors: pybeam.ActorGroup) -> None:
+    counter = await actors.spawn(Counter)
+    await counter.add()
+
+async def return_type(actors: pybeam.ActorGroup) -> str:
+    counter = await actors.spawn(Counter)
+    return await counter.add(1)
+
+async def inherited_constructor(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Derived, step="wrong")
+
+async def inherited_method(actors: pybeam.ActorGroup) -> None:
+    counter = await actors.spawn(Derived)
+    await counter.add("wrong")
+
+async def single_constructor() -> None:
+    async with pybeam.spawn(Counter, value="wrong"):
+        pass
+
+async def single_method() -> None:
+    async with pybeam.spawn(Counter) as counter:
+        await counter.add("wrong")
+
+async def missing_required(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Required)
+
+async def init_false_field(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Required, value=1, private=[])
+
+async def keyword_only_field(actors: pybeam.ActorGroup) -> None:
+    await actors.spawn(Required, 1, "wrong")
+
+async def single_missing_required() -> None:
+    async with pybeam.spawn(Required):
+        pass
+
+async def rejoined_method(actors: pybeam.ActorGroup) -> None:
+    counter = await actors.spawn(Counter)
+    rejoined = await actors.rejoin(counter)
+    await rejoined.add("wrong")

@@ -774,6 +774,7 @@ version = "0.1.0a1"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -818,6 +819,7 @@ requires-dist = [
     { name = "python-multipart", marker = "extra == 'fastapi'", specifier = ">=0.0.20,<1" },
     { name = "python-multipart", marker = "extra == 'pyview'", specifier = ">=0.0.20,<1" },
     { name = "pyview-web", marker = "extra == 'pyview'", git = "https://github.com/ogrodnek/pyview.git?rev=d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972" },
+    { name = "typing-extensions", specifier = ">=4.14.1,<5" },
 ]
 provides-extras = ["hornbeam", "fastapi", "litestar", "pyview"]
 

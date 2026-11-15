@@ -1,4 +1,5 @@
-from pybeam.actors import ActorSpec, OwnedActorRef, spawn
+from pybeam.actors.native import OwnedActorRef, spawn
+from pybeam.actors.protocol import ActorSpec
 from tests.native.actor_public import Broken, Counter
 
 

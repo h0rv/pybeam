@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pybeam.actors import UnboundedMailbox
+from pybeam.actors.native import UnboundedMailbox
 from pybeam.mailbox import UnboundedMailbox as SharedUnboundedMailbox
 from tests.test_actors_typing import checker
 

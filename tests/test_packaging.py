@@ -271,6 +271,18 @@ def test_host_library__does_not_reuse_an_unrelated_compiled_prefix(
     assert _host_python_library("libpython3.14.dylib") == expected
 
 
+def test_host_library__preserves_framework_symlink_basename_for_dyld(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home = tmp_path / "Python.framework/Versions/3.14"
+    (home / "lib").mkdir(parents=True)
+    (home / "Python").touch()
+    library = home / "lib/libpython3.14.dylib"
+    library.symlink_to("../Python")
+    monkeypatch.setattr("pybeam.runtime.assets.sys.base_prefix", str(home))
+    assert _host_python_library("libpython3.14.dylib") == library
+
+
 def test_discovery__does_not_fall_back_to_an_unconfigured_checkout(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -429,7 +441,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "import sys, os, json\n"
         "from pathlib import Path\n"
         "import pybeam, pydantic\n"
-        "from pybeam.actors import ActorSpec, spawn\n"
+        "from pybeam.actors import ActorGroup, actor, spawn\n"
         "from pybeam.mailbox import UnboundedMailbox\n"
         "class Echo:\n"
         "    async def echo(self, value: int) -> int:\n"

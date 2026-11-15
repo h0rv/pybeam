@@ -82,7 +82,9 @@ def _host_python_library(name: str) -> Path:
         candidates.append(Path(libdir) / name)
     for candidate in candidates:
         if candidate.is_file():
-            return candidate.resolve()
+            # dyld resolves the requested basename in this directory. Resolving a
+            # framework symlink here would discard the libpython filename.
+            return candidate
     raise BootstrapError("Host CPython must provide a matching shared library: " + name)
 
 

@@ -6,7 +6,9 @@ from typing import ClassVar
 from weakref import ReferenceType, ref
 
 from pybeam import run
-from pybeam.actors import ActorSpec, MethodError, UnboundedMailbox, spawn
+from pybeam.actors.native import spawn
+from pybeam.actors.protocol import ActorSpec, MethodError
+from pybeam.mailbox import UnboundedMailbox
 
 
 @dataclass(slots=True, weakref_slot=True)

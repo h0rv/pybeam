@@ -1,6 +1,8 @@
 from typing import assert_type
 
-from pybeam.actors import ActorRef, ActorSpec, UnboundedMailbox, spawn
+from pybeam.actors.native import spawn
+from pybeam.actors.protocol import ActorRef, ActorSpec
+from pybeam.mailbox import UnboundedMailbox
 from tests.native.actor_public import Counter
 
 

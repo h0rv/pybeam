@@ -1,61 +1,29 @@
 import asyncio
-from dataclasses import dataclass
+import itertools
 
-from pybeam import run
-from pybeam.actors import ActorSpec, UnboundedMailbox, spawn
-
-
-@dataclass(frozen=True, slots=True)
-class Snapshot:
-    value: int
-    label: str
+import pybeam
 
 
-@dataclass(slots=True, weakref_slot=True)
+@pybeam.actor
 class Counter:
     value: int = 0
-    label: str = ""
 
-    async def add(self, amount: int, /, *, label: str) -> int:
-        old = self.value
-        await asyncio.sleep(0.001)
-        self.value = old + amount
-        self.label = label
+    async def add(self, n: int) -> int:
+        self.value += n
         return self.value
-
-    async def read(self) -> Snapshot:
-        return Snapshot(self.value, self.label)
-
-
-def show_results(results: tuple[int, ...], first: Snapshot, second: Snapshot) -> None:
-    ordered = tuple(sorted(results))
-    if ordered != tuple(range(1, 9)):
-        raise AssertionError("Concurrent increments were not serialized")
-    if first != Snapshot(8, "visits") or second != Snapshot(2, "other"):
-        raise AssertionError("Actor state was not independent")
-    print("Concurrent results: {}".format(ordered), flush=True)
-    print("First actor: value={}, label={}".format(first.value, first.label), flush=True)
-    print("Second actor: value={}, label={}".format(second.value, second.label), flush=True)
 
 
 async def main() -> None:
-    spec = ActorSpec(Counter, methods=(Counter.add, Counter.read))
-    # Finite native actor mailbox admission is not available yet.
-    async with (
-        await spawn(spec, mailbox=UnboundedMailbox()) as first,
-        await spawn(spec, mailbox=UnboundedMailbox()) as second,
-    ):
-        async with asyncio.TaskGroup() as tasks:
-            increments = [
-                tasks.create_task(first.call(Counter.add, 1, label="visits")) for _ in range(8)
-            ]
-            tasks.create_task(second.call(Counter.add, 2, label="other"))
-        show_results(
-            tuple(task.result() for task in increments),
-            await first.call(Counter.read),
-            await second.call(Counter.read),
+    async with pybeam.ActorGroup() as actors:
+        first = await actors.spawn(Counter, value=0)
+        print(await first.add(1))
+        counters: list[Counter] = await asyncio.gather(
+            *map(actors.spawn, itertools.repeat(Counter, 5))
         )
+        print(await asyncio.gather(*(counter.add(1) for counter in counters)))
+    async with pybeam.spawn(Counter, value=10) as counter:
+        print(await counter.add(2))
 
 
 if __name__ == "__main__":
-    run(main)
+    pybeam.run(main)

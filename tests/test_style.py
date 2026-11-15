@@ -5,6 +5,7 @@ from sys import executable
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src/pybeam"
+ASSETS = PACKAGE / "runtime/_assets"
 
 
 def python_files() -> list[Path]:
@@ -12,7 +13,9 @@ def python_files() -> list[Path]:
         path
         for directory in ("src", "examples", "tests", "scripts", "typings")
         for path in (ROOT / directory).rglob("*")
-        if path.suffix in {".py", ".pyi"} and "__pycache__" not in path.parts
+        if path.suffix in {".py", ".pyi"}
+        and "__pycache__" not in path.parts
+        and not path.is_relative_to(ASSETS)
     )
 
 
@@ -45,7 +48,7 @@ def test_core__does_not_import_optional_frameworks() -> None:
     paths = sorted(
         path
         for path in PACKAGE.rglob("*.py")
-        if "integrations" not in path.relative_to(PACKAGE).parts
+        if "integrations" not in path.relative_to(PACKAGE).parts and not path.is_relative_to(ASSETS)
     )
     for path in paths:
         tree = ast.parse(path.read_text(), filename=str(path))
@@ -62,7 +65,7 @@ def test_core__does_not_import_optional_frameworks() -> None:
 
 def test_subpackage_initializers__do_not_import_implementations() -> None:
     for path in PACKAGE.rglob("__init__.py"):
-        if path in {
+        if path.is_relative_to(ASSETS) or path in {
             PACKAGE / "__init__.py",
             PACKAGE / "actors" / "__init__.py",
             PACKAGE / "integrations" / "hornbeam" / "__init__.py",
@@ -80,7 +83,7 @@ def test_core__imports_without_optional_dependencies() -> None:
             "import sys",
             "sys.path.insert(0, 'src')",
             "from pybeam import run",
-            "from pybeam.actors import ActorSpec, OwnedActorRef",
+            "from pybeam import ActorGroup, actor, spawn",
             "from pybeam.mailbox import BoundedMailbox, UnboundedMailbox",
             "from pybeam.supervision.config import SupervisorConfig",
             "from pybeam._shared.lifecycle import await_cleanup",
