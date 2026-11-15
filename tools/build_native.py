@@ -11,6 +11,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# GNU make propagates flags/assignments, injected makefiles and recursive state.
+# Strip only these controls, retaining compiler and toolchain configuration.
+MAKE_CONTROLS = frozenset(
+    {
+        "MAKEFLAGS",
+        "MFLAGS",
+        "GNUMAKEFLAGS",
+        "MAKEOVERRIDES",
+        "MAKEFILES",
+        "MAKE",
+        "MAKELEVEL",
+    }
+)
+
+
+def compiler_environment() -> dict[str, str]:
+    environment = dict(os.environ)
+    if MAKE_CONTROLS.intersection(environment):
+        print("Inherited make controls replaced by the compiler job budget", file=sys.stderr)
+    return {name: value for name, value in environment.items() if name not in MAKE_CONTROLS}
+
 
 def main() -> None:
     if sys.version_info[:3] != (3, 14, 10) or sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
@@ -43,7 +64,7 @@ def main() -> None:
             )
             getconf.chmod(0o755)
             environment = dict(
-                os.environ,
+                compiler_environment(),
                 PATH=directory + os.pathsep + os.environ.get("PATH", os.defpath),
                 PYTHON_CONFIG=str(config),
                 CMAKE_BUILD_PARALLEL_LEVEL=jobs,

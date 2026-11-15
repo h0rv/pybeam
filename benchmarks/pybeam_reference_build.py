@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from tools.build_native import compiler_environment
+
 from benchmarks.contract import LoadedAsset, Source, StrictModel
 from benchmarks.provenance import source
 
@@ -98,7 +100,7 @@ def build(native: Path, python: Path) -> Path:
         ("erlc", "-o", str(ebin), *map(str, sorted((native / "src").glob("*.erl")))),
     )
     environment = dict(
-        os.environ,
+        compiler_environment(),
         ERL_FLAGS="+S 1:1 +A 1",
         PYTHON_CONFIG=str(python_config),
         CMAKE_BUILD_PARALLEL_LEVEL=jobs,
