@@ -67,7 +67,9 @@ async def main() -> None:
         )
         == "ok"
     )
-    print("COMPATIBILITY_PREFLIGHT_OK stale rejected, unchanged; matching and idempotent accepted")
+    print(
+        "COMPATIBILITY_PREFLIGHT_OK current-stale and old-only GenStage/logger rejected intact; matching and idempotent accepted"
+    )
     from pybeam.integrations.genstage.pipeline import stream
 
     async with stream(16, process) as events:

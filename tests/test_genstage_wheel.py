@@ -90,6 +90,14 @@ def test_installed_genstage_without_developer_environment(tmp_path: Path) -> Non
             assert hashlib.sha256(content).hexdigest() == item.sha256
         assert len([name for name in archive.namelist() if name.endswith("/bin/erlexec")]) == 1
         assert len([name for name in archive.namelist() if name.endswith("/priv/py_nif.so")]) == 1
+        helper = next(
+            name for name in archive.namelist() if name.endswith("/ebin/py_application.beam")
+        )
+        compiled = (
+            ROOT.parent
+            / "native-genstage/_build/default/lib/erlang_python/ebin/py_application.beam"
+        )
+        assert archive.read(helper) == compiled.read_bytes()
         assert not any("libpython" in name for name in archive.namelist())
         assert not any(name.endswith((".ex", ".erl")) for name in archive.namelist())
         core: object = json.loads(archive.read("pybeam/runtime/_assets/runtime.json"))
