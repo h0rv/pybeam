@@ -260,7 +260,7 @@ if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
     printf 'Set PYBEAM_TEST_WHEEL to the current private platform wheel.\n' >&2
     exit 2
 fi
-uv run --locked pytest tests/test_genstage_callbacks.py tests/test_genstage_integration.py tests/test_genstage_portability.py tests/test_genstage_wheel.py tests/test_packaging.py tests/test_optional_wheel_imports.py --run-runtime -q -s
+uv run --locked pytest tests/test_genstage_callbacks.py tests/test_genstage_integration.py tests/test_genstage_portability.py tests/test_genstage_promotion_guards.py tests/test_genstage_shutdown.py tests/test_genstage_wheel.py tests/test_packaging.py tests/test_optional_wheel_imports.py --run-runtime -q -s
 '''
 
 [tasks."experiment:genstage-probe"]
