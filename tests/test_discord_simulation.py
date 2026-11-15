@@ -50,7 +50,12 @@ def test_config__rejects_out_of_capacity(data: dict[str, object]) -> None:
 
 @pytest.mark.runtime
 @pytest.mark.parametrize(
-    "entry", ["examples/discord_simulation.py", "tests/native/discord_simulation.py"]
+    "entry",
+    [
+        "examples/discord_simulation.py",
+        "tests/native/discord_simulation.py",
+        "tests/native/discord_leave.py",
+    ],
 )
 def test_simulation__managed_native_proof(request: pytest.FixtureRequest, entry: str) -> None:
     if request.config.getoption("run_runtime") is not True:
@@ -79,7 +84,10 @@ def test_simulation__managed_native_proof(request: pytest.FixtureRequest, entry:
         assert proof.contexts_before.live == proof.contexts_after.live
         assert proof.count_overload_rejections == proof.byte_overload_rejections == 1
     else:
-        assert "discord-native-ok" in result.stdout
+        marker = (
+            "discord-leave-native-ok" if entry.endswith("discord_leave.py") else "discord-native-ok"
+        )
+        assert marker in result.stdout
 
 
 @pytest.mark.runtime

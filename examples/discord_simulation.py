@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,6 +11,9 @@ from pybeam.actors import ActorInfo, ContextCounts, context_counts
 type RoomCount = Annotated[int, Field(ge=1, le=16)]
 type MemberCount = Annotated[int, Field(ge=1, le=64)]
 type EventCount = Annotated[int, Field(ge=1, le=1000)]
+type RoomEpoch = Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
+type MembershipRevision = Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
+type MemberId = Annotated[str, Field(min_length=1, max_length=32)]
 
 
 class Config(BaseModel):
@@ -49,6 +52,23 @@ class Receipt:
     deliveries: tuple[Delivery, ...]
 
 
+class MembershipInput(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    member_id: MemberId
+    epoch: RoomEpoch
+    revision: MembershipRevision = 0
+
+
+@dataclass(frozen=True, slots=True)
+class Membership:
+    member_id: str
+    epoch: int
+    count: int
+    present: bool
+    revision: int = 0
+
+
 @dataclass(frozen=True, slots=True)
 class Snapshot:
     room_id: str
@@ -56,6 +76,7 @@ class Snapshot:
     members: tuple[Delivery, ...]
     event_ids: tuple[str, ...]
     history: tuple[Event, ...]
+    ledger: tuple[Membership, ...] = ()
 
 
 @pybeam.actor
@@ -65,28 +86,62 @@ class Room:
     max_events: int
     history_limit: int
     epoch: int = 0
-    members: dict[str, int] = field(default_factory=dict, init=False)
+    members: dict[str, Membership] = field(default_factory=dict, init=False)
     event_ids: list[str] = field(default_factory=list, init=False)
     history: list[Event] = field(default_factory=list, init=False)
 
     async def join(self, member_id: str, *, epoch: int) -> int:
-        if not member_id or len(member_id) > 32 or epoch < 0:
-            raise ValueError("Invalid membership")
-        if member_id in self.members:
-            raise ValueError("Duplicate membership")
-        if len(self.members) >= self.max_members:
-            raise ValueError("Room membership capacity reached")
-        if not self.members and not self.event_ids:
-            self.epoch = epoch
-        if epoch != self.epoch:
+        """Return presence count; keep epoch as the room's publish epoch.
+
+        The first member establishes the room epoch. A departed member rejoins
+        in that same epoch with an incremented authoritative membership revision.
+        Snapshot.ledger exposes that revision for subsequent leave forms.
+        Counts and departed-member tombstones last for this native generation.
+        max_members bounds distinct identities, including departed identities.
+        """
+        request = MembershipInput(member_id=member_id, epoch=epoch)
+        if self.members and request.epoch != self.epoch:
             raise ValueError("Wrong membership epoch")
-        self.members[member_id] = 0
-        return len(self.members)
+        previous = self.members.get(request.member_id)
+        if previous is not None:
+            if previous.present:
+                raise ValueError("Duplicate membership")
+            if previous.revision >= 9_223_372_036_854_775_807:
+                raise ValueError("Membership revision exhausted")
+            membership = replace(previous, revision=previous.revision + 1, present=True)
+        else:
+            if len(self.members) >= self.max_members:
+                raise ValueError("Room membership capacity reached")
+            membership = Membership(request.member_id, request.epoch, 0, True)
+        if not self.members:
+            self.epoch = request.epoch
+        self.members[request.member_id] = membership
+        return sum(member.present for member in self.members.values())
+
+    async def leave(self, member_id: str, *, epoch: int, revision: int = 0) -> int:
+        """Return remaining presence count without deleting receipts or history.
+
+        Epoch is the existing room epoch, not a membership lease. Revision defaults
+        to zero for first admission. Submit the revision captured in the leave form
+        from Snapshot.ledger, never the latest revision looked up at execution time.
+        Matching repeated leaves are idempotent. Unknown members or mismatched
+        epochs/revisions fail without mutation. Native references guard generation.
+        """
+        request = MembershipInput(member_id=member_id, epoch=epoch, revision=revision)
+        membership = self.members.get(request.member_id)
+        if membership is None:
+            raise ValueError("Unknown membership")
+        if request.epoch != self.epoch:
+            raise ValueError("Wrong membership epoch")
+        if request.revision != membership.revision:
+            raise ValueError("Wrong membership revision")
+        self.members[request.member_id] = replace(membership, present=False)
+        return sum(member.present for member in self.members.values())
 
     async def publish(self, event: Event) -> Receipt:
         if event.room_id != self.room_id or event.epoch != self.epoch:
             raise ValueError("Wrong room or epoch")
-        if not self.members:
+        if not any(member.present for member in self.members.values()):
             raise ValueError("Explicit membership is required")
         if event.event_id in self.event_ids:
             raise ValueError("Duplicate event ID")
@@ -95,22 +150,32 @@ class Room:
         self.event_ids.append(event.event_id)
         self.history.append(event)
         del self.history[: -self.history_limit]
-        for member in self.members:
-            self.members[member] += 1
+        for member_id, member in self.members.items():
+            if member.present:
+                self.members[member_id] = replace(member, count=member.count + 1)
         return Receipt(
             self.room_id,
             event.event_id,
             self.epoch,
-            tuple(Delivery(member, count) for member, count in self.members.items()),
+            tuple(
+                Delivery(member.member_id, member.count)
+                for member in self.members.values()
+                if member.present
+            ),
         )
 
     async def snapshot(self) -> Snapshot:
         return Snapshot(
             self.room_id,
             self.epoch,
-            tuple(Delivery(member, count) for member, count in self.members.items()),
+            tuple(
+                Delivery(member.member_id, member.count)
+                for member in self.members.values()
+                if member.present
+            ),
             tuple(self.event_ids),
             tuple(self.history),
+            tuple(self.members.values()),
         )
 
 
@@ -163,6 +228,13 @@ def check_snapshot(
         snapshot.members
         == tuple(Delivery("member-" + str(i), len(expected_ids)) for i in range(members)),
         "Authoritative fanout differs",
+    )
+    require(
+        snapshot.ledger
+        == tuple(
+            Membership("member-" + str(i), epoch, len(expected_ids), True) for i in range(members)
+        ),
+        "Authoritative historical ledger differs",
     )
     require(
         tuple(event.event_id for event in snapshot.history) == expected_ids[-history_limit:],
