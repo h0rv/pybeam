@@ -5,4 +5,7 @@ from pybeam.actors.codec import ActorCallError as ActorCallError
 from pybeam.actors.codec import ActorConstructionError as ActorConstructionError
 from pybeam.actors.codec import ActorPayloadError as ActorPayloadError
 from pybeam.actors.groups import ActorGroup as ActorGroup
+from pybeam.actors.groups import ActorInfo as ActorInfo
+from pybeam.actors.groups import ContextCounts as ContextCounts
+from pybeam.actors.groups import context_counts as context_counts
 from pybeam.actors.groups import spawn as spawn

@@ -45,6 +45,34 @@ async def open_group(*, max_children: int) -> DataGroup:
 
 
 @dataclass(frozen=True, slots=True)
+class ActorInfo:
+    """BEAM identity and admitted encoded requests, not Python heap or mailbox length."""
+
+    pid: str
+    generation: int
+    admitted_count: int
+    admitted_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCounts:
+    created: int
+    destroyed: int
+
+    @property
+    def live(self) -> int:
+        return self.created - self.destroyed
+
+
+async def context_counts() -> ContextCounts:
+    """Process-wide native context allocation/destruction counters, not PID counts."""
+    from erlang.actors import context_counts as native_counts
+
+    counts = await native_counts()
+    return ContextCounts(counts.created, counts.destroyed)
+
+
+@dataclass(frozen=True, slots=True)
 class Started[T]:
     reference: T
 
@@ -189,6 +217,30 @@ class ActorGroup:
         outcome = await asyncio.shield(self._stops[child_id])
         if isinstance(outcome, Failed):
             raise outcome.error
+
+    async def info(self, reference: object, /) -> ActorInfo:
+        """Inspect this generation only; stale references cannot inspect its replacement."""
+        from erlang.actors import DataActorRef
+
+        actor = self._require_member(reference).native
+        if not isinstance(actor, DataActorRef):
+            raise TypeError("Actor information requires a native data actor")
+        info = await actor.info()
+        return ActorInfo(info.pid, info.generation, info.admitted_count, info.admitted_bytes)
+
+    async def crash(self, reference: object, /) -> None:
+        """Diagnostic kill of this generation, with real native context/body drain.
+
+        OTP restarts permanent children with fresh state. No method is replayed;
+        callers must explicitly rejoin the new generation and restore membership.
+        Cancellation still waits for the native diagnostic to finish.
+        """
+        from erlang.actors import DataActorRef
+
+        actor = self._require_member(reference).native
+        if not isinstance(actor, DataActorRef):
+            raise TypeError("Actor diagnostics require a native data actor")
+        await actor.crash()
 
     async def rejoin[T](self, reference: T, /) -> T:
         """Explicitly acquire the current generation, without retrying any method."""

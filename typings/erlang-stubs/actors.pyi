@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Concatenate, Literal, Protocol, Self
 
 class DataDispatcher(Protocol):
@@ -6,6 +7,23 @@ class DataDispatcher(Protocol):
 
 class ActorOverloaded(RuntimeError): ...
 class ActorAdmissionClosed(RuntimeError): ...
+class ActorRestarting(RuntimeError): ...
+
+@dataclass(frozen=True, slots=True)
+class ActorInfo:
+    pid: str
+    generation: int
+    admitted_count: int
+    admitted_bytes: int
+
+@dataclass(frozen=True, slots=True)
+class ContextCounts:
+    created: int
+    destroyed: int
+    @property
+    def live(self) -> int: ...
+
+async def context_counts() -> ContextCounts: ...
 
 class ActorGenerationChanged(RuntimeError):
     expected: int
@@ -23,6 +41,8 @@ class DataActorRef:
     def reserve(self, payload: bytes, /) -> DataTicket: ...
     async def call(self, payload: bytes, /) -> bytes: ...
     async def rejoin(self) -> DataActorRef: ...
+    async def info(self) -> ActorInfo: ...
+    async def crash(self) -> None: ...
 
 class DataActorGroup:
     def __init__(self, *, max_children: int = 64) -> None: ...
