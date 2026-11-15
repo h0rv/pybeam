@@ -104,6 +104,7 @@ def launch(
                 "PYBEAM_NODE_ALIAS",
             ):
                 environment.pop(key, None)
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
         environment["PYBEAM_SHUTDOWN"] = str(shutdown)
         environment["PYBEAM_COMPLETION"] = str(completed)
         environment["PYBEAM_CLEANUP"] = str(cleanup)
