@@ -32,6 +32,7 @@ def test_genstage_commands__do_not_require_private_checkout_inputs() -> None:
     tasks = TypeAdapter(dict[str, Task]).validate_python(
         tomllib.loads((ROOT / "mise.toml").read_text())["tasks"]
     )
+    assert '--out-dir "${usage_output}/wheel"' in tasks["build:optional-genstage"].run
     for name, task in tasks.items():
         if "genstage" in name:
             command = task.run

@@ -280,7 +280,7 @@ arg "<output>" help="New asset generation directory"
 run = '''
 set -eu
 uv run --locked python -m tools.genstage_assets "${usage_wheel}" "${usage_output}"
-PYBEAM_BUILD_RUNTIME="${usage_output}/runtime" uv build --wheel --out-dir dist
+PYBEAM_BUILD_RUNTIME="${usage_output}/runtime" uv build --wheel --out-dir "${usage_output}/wheel"
 '''
 
 [tasks.serve]
