@@ -200,6 +200,20 @@ description = "Run the PyView counter at PYBEAM_BIND, without implicit build"
 quiet = true
 run = ["mise run example:prepare", "mise run serve -- examples.pyview.main:app"]
 
+[tasks."experiment:genstage"]
+description = "Run the private GenStage/Python interoperability prototype (not the MVP gate)"
+run = '''
+set -eu
+test "$(git -C .experiment/elixir rev-parse HEAD)" = 853b7cd719bce7df87be4271ee91c90acdf706e1
+test "$(git -C .experiment/gen_stage rev-parse HEAD)" = d1532fa56482bc92d90abc777439ff8be34b5b1a
+test "$(cd _checkouts/erlang_python && pwd -P)" = "$(cd ../native-genstage && pwd -P)"
+export PYTHONPATH="$PWD/examples:$PWD/src:$PWD/.experiment/venv/lib/python3.14/site-packages"
+erl -noshell -pa .experiment/elixir/lib/*/ebin \
+    -pa .experiment/gen_stage/_build/dev/lib/gen_stage/ebin \
+    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
+    -eval ' {ok, _} = application:ensure_all_started(elixir), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_pipeline.exs">>), halt().'
+'''
+
 [tasks.serve]
 wait_for = ["setup", "build"]
 quiet = true
