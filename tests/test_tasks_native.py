@@ -8,6 +8,12 @@ from tests.task_runtime import run_native
 pytestmark = pytest.mark.runtime
 
 
+@pytest.fixture(autouse=True)
+def require_runtime(request: pytest.FixtureRequest) -> None:
+    if request.config.getoption("run_runtime") is not True:
+        pytest.skip("Requires explicit --run-runtime and the paired Task-enabled runtime")
+
+
 def task_program(tmp_path: Path, source: str) -> None:
     body = "    from pybeam.tasks import TaskFunction, TaskLimits, TaskSupervisor\n"
     body += "    from erlang import async_call\n"
