@@ -5,7 +5,7 @@ from typing import Literal
 
 from examples.discord_simulation import Event, Room, Snapshot
 from pybeam.actors import ActorGroup, ActorInfo
-from pybeam.integrations.hornbeam.contracts import Services
+from pybeam.integrations.hornbeam.contracts import Services, Subscription
 
 ROOMS = ("general", "python", "beam", "random")
 type Action = Literal["join", "leave", "send", "crash"]
@@ -33,8 +33,19 @@ class Demo:
         self.leave = leave
         self.rooms: dict[str, RoomHandle] = {}
         self.streams = 0
+        self.subscriptions: set[Subscription] = set()
+        self.streams_drained = asyncio.Event()
+        self.streams_drained.set()
+        self.closing = False
         self.inflight = 0
         self.owner: str | None = None
+
+    async def close_streams(self) -> None:
+        self.closing = True
+        async with asyncio.timeout(3), asyncio.TaskGroup() as tasks:
+            for subscription in tuple(self.subscriptions):
+                tasks.create_task(subscription.aclose())
+            await self.streams_drained.wait()
 
     async def start(self) -> None:
         for room_id in ROOMS:

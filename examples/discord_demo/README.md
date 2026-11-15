@@ -8,7 +8,7 @@ uv run --extra fastapi --extra hornbeam python -m examples.discord_demo.main
 
 Open `http://127.0.0.1:8766` in two separate browser sessions. Use `--port` to choose another loopback port. Join a room before sending. The first browser owns the crash button. Crashing replaces that room's BEAM child with empty state. Everyone must explicitly join the new generation.
 
-This example needs a managed Python 3.14 runtime with native actor groups and Hornbeam's supervised services and registered service callback. The current managed launcher does not initialize those Hornbeam services. Startup therefore stops with a capability error. It does not start a second server or substitute polling or Python room state.
+This example needs locally staged Python 3.14 native assets with actor groups and opt-in Hornbeam services. The source installation alone does not provide those assets. The Hornbeam integration owns startup and shutdown of its existing supervised services and callback. It does not start Hornbeam's HTTP listener. Uvicorn serves FastAPI inside the managed native event loop. Missing runtime capabilities stop startup rather than substituting polling or Python room state.
 
 Leave is disabled until the room domain provides its native leave method. Disconnect releases the subscription, not membership. Changing rooms navigates to a new page and closes the old stream.
 

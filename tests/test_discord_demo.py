@@ -1,6 +1,6 @@
 import asyncio
+import os
 import secrets
-import socket
 import subprocess
 import sys
 from collections.abc import AsyncGenerator, Mapping
@@ -17,7 +17,9 @@ from examples.discord_demo.domain import Action, Demo, RoomHandle, View
 from examples.discord_simulation import Delivery, Event, Room, Snapshot
 from pybeam.actors import ActorGroup, ActorInfo
 from pybeam.actors.classes import Container, Route, definition
+from pybeam.integrations.hornbeam import runtime as managed
 from pybeam.integrations.hornbeam.contracts import ByteStore
+from pybeam.runtime.loader import Entry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -403,22 +405,48 @@ async def test_stream__admission_rejects_before_subscribing(demo: Demo) -> None:
     demo.streams = 0
 
 
+@pytest.mark.parametrize("previous", [None, "disabled"])
+@pytest.mark.parametrize("fails", [False, True])
+def test_managed_services__restores_launch_environment(
+    monkeypatch: pytest.MonkeyPatch, previous: str | None, fails: bool
+) -> None:
+    variable = "PYBEAM_HORNBEAM_SERVICES"
+    if previous is None:
+        monkeypatch.delenv(variable, raising=False)
+    else:
+        monkeypatch.setenv(variable, previous)
+
+    async def main() -> None:
+        pass
+
+    def invoke(entry: Entry) -> None:
+        assert entry is main
+        assert os.environ[variable] == "1"
+        if fails:
+            raise RuntimeError("launch failed")
+
+    monkeypatch.setattr(managed, "run_native", invoke)
+    if fails:
+        with pytest.raises(RuntimeError, match="launch failed"):
+            managed.run(main)
+    else:
+        managed.run(main)
+    assert os.environ.get(variable) == previous
+
+
+@pytest.mark.parametrize("enabled", [False, True])
 @pytest.mark.runtime
-async def test_native__miniapp_fails_clearly_without_managed_services_startup(
+async def test_native__services_are_opt_in_and_cleanup_is_acknowledged(
+    enabled: bool,
     request: pytest.FixtureRequest,
     tmp_path: Path,
 ) -> None:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and staged native assets")
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
     process = await asyncio.create_subprocess_exec(
         sys.executable,
-        "-m",
-        "examples.discord_demo.main",
-        "--port",
-        str(port),
+        "tests/native/discord_services.py",
+        *([] if enabled else ["--without-services"]),
         cwd=ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -432,8 +460,7 @@ async def test_native__miniapp_fails_clearly_without_managed_services_startup(
             await process.wait()
     text = output.decode()
     (tmp_path / "native-demo-startup.log").write_text(text)
-    assert process.returncode != 0, text
-    assert "supervised pubsub/services plus registered hornbeam_services callback" in text
-    assert "Function 'hornbeam_services' not registered" in text
+    assert process.returncode == 0, text
+    assert ("managed services drained" if enabled else "services remain opt-in") in text
     assert "PyBeam cleanup failed" not in text
     assert "cleanup was not acknowledged" not in text

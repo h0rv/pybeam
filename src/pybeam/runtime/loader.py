@@ -121,6 +121,18 @@ async def shutdown(timeout_ms: int) -> None:
     current = asyncio.current_task()
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout_ms / 1000
+    session = _state.session
+    if session is not None and session.task is not None and not session.task.done():
+        entry = session.task
+        if not entry.cancelling():
+            entry.cancel()
+        # The entrypoint owns framework lifespans, including tasks created by
+        # libraries without an asyncio awaited-by relationship.
+        done, _ = await asyncio.wait({entry}, timeout=max(0.0, deadline - loop.time()))
+        if not done:
+            raise BootstrapError("Managed entrypoint did not finish shutdown before the deadline")
+        if not entry.cancelled() and (error := entry.exception()) is not None:
+            raise error
     cancelled: set[asyncio.Task[object]] = set()
     while True:
         if loop.time() >= deadline:

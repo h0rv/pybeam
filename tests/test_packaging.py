@@ -26,6 +26,7 @@ from tools.build_runtime import (
     audit_binary,
     inspect_macho,
     native_binaries,
+    stage_hornbeam,
     stage_runtime,
     wheel_tag,
 )
@@ -230,6 +231,24 @@ def test_staging__resolves_inputs_before_systools_changes_directory(
     monkeypatch.setattr("tools.build_runtime.run", command)
     with pytest.raises(RuntimeError, match="captured absolute"):
         stage_runtime(Path("otp"), Path("native"), Path("LICENSE"), Path("LICENSE"), Path("output"))
+
+
+def test_staging__hornbeam_services_include_runtime_code_and_notices(tmp_path: Path) -> None:
+    source, output = tmp_path / "hornbeam", tmp_path / "runtime"
+    (source / "ebin").mkdir(parents=True)
+    (source / "priv/__pycache__").mkdir(parents=True)
+    (source / "ebin/hornbeam.app").write_text('{application,hornbeam,[{vsn,"1.4.1"}]}.')
+    (source / "ebin/hornbeam_services.beam").write_bytes(b"compiled-services")
+    (source / "priv/worker.py").write_text("pass\n")
+    (source / "priv/__pycache__/worker.pyc").write_bytes(b"cache")
+    notice = source / "LICENSE"
+    notice.write_text("third-party notice")
+    result = stage_hornbeam(source, notice, output)
+    assert result == Path("lib/hornbeam-1.4.1/ebin")
+    assert (output / result / "hornbeam_services.beam").read_bytes() == b"compiled-services"
+    assert (output / result.parent / "priv/worker.py").is_file()
+    assert not (output / result.parent / "priv/__pycache__").exists()
+    assert (output / "notices/hornbeam-LICENSE").read_text() == "third-party notice"
 
 
 def test_packaged_assets__rejects_incompatible_host_before_native_launch(

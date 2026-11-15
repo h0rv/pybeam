@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Literal, override
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
@@ -19,12 +19,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from uvicorn import Config, Server
 
-import pybeam
 from examples.discord_demo.domain import ROOMS, Action, Demo, View
 from pybeam.actors import ActorCallError, ActorGroup, ActorStoppedError, context_counts
 from pybeam.integrations.hornbeam.client import Beam
 from pybeam.integrations.hornbeam.contracts import Subscription
 from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
+from pybeam.integrations.hornbeam.runtime import run
 
 ROOT = Path(__file__).parent
 logger = logging.getLogger("discord_demo")
@@ -109,8 +109,15 @@ class LocalOnly:
             await PlainTextResponse(reason, status_code=status)(scope, receive, send)
             return
 
+        streaming = False
+
         async def secure_send(message: Message) -> None:
+            nonlocal streaming
             if message["type"] == "http.response.start":
+                streaming = any(
+                    name == b"content-type" and value.startswith(b"text/event-stream")
+                    for name, value in message["headers"]
+                )
                 message["headers"] = [
                     *message["headers"],
                     (b"x-content-type-options", b"nosniff"),
@@ -122,7 +129,15 @@ class LocalOnly:
                         b"frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
                     ),
                 ]
-            await send(message)
+            if streaming:
+                try:
+                    async with asyncio.timeout(5):
+                        await send(message)
+                except TimeoutError:
+                    logger.warning("Slow SSE peer exceeded the five-second send deadline")
+                    raise
+            else:
+                await send(message)
 
         await self.app(scope, receive, secure_send)
 
@@ -138,11 +153,12 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         baseline = await services.subscription_count()
         async with services.subscribe("discord:startup", max_bytes=4096):
             pass
+        if await services.subscription_count() != baseline:
+            raise RuntimeError("Startup subscription did not return to baseline")
     except Exception as error:
         raise RuntimeError(
-            "Discord demo requires native Hornbeam services in the managed VM: supervised "
-            "pubsub/services plus registered hornbeam_services callback, without another "
-            "HTTP listener. This runtime does not provide that startup capability. "
+            "Discord demo could not acquire native Hornbeam services in the managed VM. "
+            "Use a runtime with opt-in supervised services and callback registration. "
             "No polling or Python-state fallback is enabled. Native error: " + str(error)
         ) from error
     contexts_before = await context_counts()
@@ -266,7 +282,7 @@ async def action(
         raise HTTPException(422, "Write a message first")
     if command.action == "crash" and identity != demo.owner:
         raise HTTPException(403, "Crash diagnostic belongs to the first local browser")
-    if owner.tasks is None or demo.inflight >= 16:
+    if owner.tasks is None or demo.closing or demo.inflight >= 16:
         raise HTTPException(503, "Native operation admission is full")
 
     async def complete() -> str:
@@ -301,37 +317,32 @@ async def action(
     )
 
 
-class BoundedEvents(EventSourceResponse):
-    @override
-    async def stream_response(self, send: Send) -> None:
-        async def bounded_send(message: Message) -> None:
-            async with asyncio.timeout(5):
-                await send(message)
-
-        try:
-            await super().stream_response(bounded_send)
-        except TimeoutError:
-            logger.warning("Slow SSE peer exceeded the five-second send deadline")
-            raise
-
-
 async def stream_owner(
     room_id: RoomId, demo: Native, _identity: Member
 ) -> AsyncGenerator[Subscription]:
-    if demo.streams >= 32:
-        raise HTTPException(503, "Native stream admission is full")
+    if demo.closing or demo.streams >= 32:
+        raise HTTPException(503, "Native stream admission is closed or full")
     demo.streams += 1
+    demo.streams_drained.clear()
     try:
         async with demo.services.subscribe("discord:" + room_id, max_bytes=4096) as subscription:
-            yield subscription
+            if demo.closing:
+                raise HTTPException(503, "Native stream admission is closed")
+            demo.subscriptions.add(subscription)
+            try:
+                yield subscription
+            finally:
+                demo.subscriptions.remove(subscription)
     finally:
         demo.streams -= 1
+        if demo.streams == 0:
+            demo.streams_drained.set()
 
 
 type Push = Annotated[Subscription, Depends(stream_owner, scope="request")]
 
 
-@app.get("/rooms/{room_id}/events", response_class=BoundedEvents)
+@app.get("/rooms/{room_id}/events", response_class=EventSourceResponse)
 async def events(
     room_id: RoomId, demo: Native, identity: Member, subscription: Push
 ) -> AsyncGenerator[ServerSentEvent]:
@@ -359,13 +370,21 @@ async def main() -> None:
             loop="none",
             http="h11",
             limit_concurrency=64,
-            timeout_graceful_shutdown=8,
+            lifespan="on",
+            timeout_graceful_shutdown=1,
         )
     )
-    await server.serve()
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        if owner.demo is not None:
+            await owner.demo.close_streams()
+        if server.started:
+            await server.shutdown()
+        raise
     if not server.started:
         raise RuntimeError("Discord demo could not start; see the native capability error above")
 
 
 if __name__ == "__main__":
-    pybeam.run(main)
+    run(main)

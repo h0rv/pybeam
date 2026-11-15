@@ -445,6 +445,40 @@ async def test_shutdown__lets_taskgroup_owners_cancel_their_children_once() -> N
     assert all(child.cancelling() == 1 for child in children)
 
 
+async def test_shutdown__entrypoint_closes_detached_framework_lifespan_before_sweep(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    started, stop = asyncio.Event(), asyncio.Event()
+    cleaned: list[str] = []
+    framework_tasks: list[asyncio.Task[None]] = []
+
+    async def lifespan() -> None:
+        started.set()
+        await stop.wait()
+        cleaned.append("lifespan")
+
+    async def entry() -> None:
+        framework = asyncio.create_task(lifespan())
+        framework_tasks.append(framework)
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await asyncio.sleep(0.01)
+            stop.set()
+            await framework
+            cleaned.append("entry")
+
+    task = asyncio.create_task(entry())
+    session = loader._Session(ready=tmp_path / "ready", completed=tmp_path / "completed")
+    session.task = task
+    monkeypatch.setattr(loader, "_state", loader._Loader(session=session))
+    await started.wait()
+    await loader.shutdown(500)
+    assert cleaned == ["lifespan", "entry"]
+    assert task.cancelled()
+    assert all(task.done() and not task.cancelled() for task in framework_tasks)
+
+
 def _native_runtime(request: pytest.FixtureRequest) -> Path:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and a Python 3.14 native runtime")

@@ -144,9 +144,36 @@ def erlang_string(path: Path) -> str:
     return json.dumps(str(path))
 
 
+def stage_hornbeam(app: Path, license_file: Path, output: Path) -> Path:
+    specification = (app / "ebin" / "hornbeam.app").read_text()
+    version = re.search(r'\{vsn,\s*"([0-9.]+)"\}', specification)
+    if version is None:
+        raise ValueError("Cannot determine Hornbeam application version")
+    if not license_file.is_file():
+        raise ValueError("Required Hornbeam license missing")
+    code_path = Path("lib", "hornbeam-" + version.group(1), "ebin")
+    destination = output / code_path.parent
+    for directory in ("ebin", "priv"):
+        shutil.copytree(app / directory, destination / directory)
+    for cache in destination.rglob("__pycache__"):
+        shutil.rmtree(cache)
+    (output / "notices").mkdir(exist_ok=True)
+    shutil.copy2(license_file, output / "notices" / "hornbeam-LICENSE")
+    return code_path
+
+
 def stage_runtime(
-    otp: Path, native: Path, otp_license: Path, native_license: Path, output: Path
+    otp: Path,
+    native: Path,
+    otp_license: Path,
+    native_license: Path,
+    output: Path,
+    *,
+    hornbeam: Path | None = None,
+    hornbeam_license: Path | None = None,
 ) -> None:
+    if (hornbeam is None) != (hornbeam_license is None):
+        raise ValueError("--hornbeam-app and --hornbeam-license must be supplied together")
     otp = otp.resolve()
     native = native.resolve()
     otp_license = otp_license.resolve()
@@ -219,6 +246,9 @@ def stage_runtime(
                     item.unlink()
         for cache in staged.rglob("__pycache__"):
             shutil.rmtree(cache)
+        code_paths = [str(app.relative_to(staged) / "ebin")]
+        if hornbeam is not None and hornbeam_license is not None:
+            code_paths.append(str(stage_hornbeam(hornbeam, hornbeam_license, staged)))
         nif = priv / "py_nif.so"
         nif_info = audit_binary(nif, python_nif=True)
         for rpath in nif_info.rpaths:
@@ -231,7 +261,7 @@ def stage_runtime(
             for item in native_binaries(staged, required)
         )
         notices = staged / "notices"
-        notices.mkdir()
+        notices.mkdir(exist_ok=True)
         shutil.copy2(otp_license, notices / "OTP-LICENSE.txt")
         shutil.copy2(native_license, notices / "erlang-python-LICENSE")
         for source, destination in ((otp, notices / "otp"), (native, notices / "erlang-python")):
@@ -250,7 +280,7 @@ def stage_runtime(
             "executable": "erts-" + versions.erts + "/bin/erlexec",
             "root_dir": ".",
             "bindir": "erts-" + versions.erts + "/bin",
-            "code_paths": [str(app.relative_to(staged) / "ebin")],
+            "code_paths": code_paths,
             "erts_version": versions.erts,
             "python_library": "libpython3.14.dylib",
         }
@@ -269,9 +299,17 @@ def main() -> None:
     parser.add_argument("--otp-license", type=Path, required=True)
     parser.add_argument("--native-license", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("build/runtime"))
+    parser.add_argument("--hornbeam-app", type=Path)
+    parser.add_argument("--hornbeam-license", type=Path)
     args = parser.parse_args()
     stage_runtime(
-        args.otp_root, args.native_app, args.otp_license, args.native_license, args.output
+        args.otp_root,
+        args.native_app,
+        args.otp_license,
+        args.native_license,
+        args.output,
+        hornbeam=args.hornbeam_app,
+        hornbeam_license=args.hornbeam_license,
     )
 
 

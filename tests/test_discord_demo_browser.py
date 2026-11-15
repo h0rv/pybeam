@@ -22,6 +22,7 @@ pytestmark = [pytest.mark.runtime, pytest.mark.browser]
 class Miniapp:
     url: str
     log: Path
+    process: asyncio.subprocess.Process
 
 
 @pytest.fixture
@@ -62,7 +63,7 @@ async def miniapp(
                         continue
                     assert response.status_code == 200, log.read_text()
                     break
-            yield Miniapp(url, log)
+            yield Miniapp(url, log, process)
         finally:
             with suppress(ProcessLookupError):
                 process.terminate()
@@ -74,8 +75,101 @@ async def miniapp(
                 async with asyncio.timeout(5):
                     await process.wait()
                 pytest.fail("Managed miniapp shutdown timed out: " + log.read_text())
-    assert "PyBeam cleanup failed" not in log.read_text()
-    assert "cleanup was not acknowledged" not in log.read_text()
+    text = log.read_text()
+    assert process.returncode == 143, text
+    assert "Application shutdown complete" in text, text
+    assert "Application shutdown failed" not in text, text
+    assert "Traceback" not in text or "Slow SSE peer exceeded" in text, text
+    assert "PyBeam cleanup failed" not in text, text
+    assert "cleanup was not acknowledged" not in text, text
+
+
+async def test_miniapp__shutdown_drains_live_native_stream(miniapp: Miniapp) -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        try:
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(miniapp.url + "/rooms/general")
+            await expect(page.locator("#inspector")).to_be_visible()
+            counts = await resource_counts(page, miniapp.url)
+            assert counts.streams == counts.subscriptions == 1
+            miniapp.process.terminate()
+            async with asyncio.timeout(8):
+                await miniapp.process.wait()
+            assert miniapp.process.returncode == 143, miniapp.log.read_text()
+            await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_miniapp__nonreading_output_peer_releases_native_subscription(
+    miniapp: Miniapp,
+) -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        try:
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(miniapp.url + "/rooms/general")
+            await expect(page.locator("#inspector")).to_be_visible()
+            await join(page)
+            baseline = await resource_counts(page, miniapp.url)
+            cookie = next(
+                item["value"] for item in await context.cookies() if item["name"] == "discord"
+            )
+            csrf = await page.locator('input[name="csrf"][form="compose"]').input_value()
+            generation = await page.locator("#inspector").get_attribute("data-generation")
+            peer = socket.socket()
+            peer.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024)
+            peer.setblocking(False)
+            port = int(miniapp.url.rsplit(":", 1)[1])
+            await asyncio.get_running_loop().sock_connect(peer, ("127.0.0.1", port))
+            reader, writer = await asyncio.open_connection(sock=peer, limit=1024)
+            try:
+                request = (
+                    "GET /rooms/general/events HTTP/1.1\r\nHost: 127.0.0.1:"
+                    + str(port)
+                    + "\r\nCookie: discord="
+                    + cookie
+                    + "\r\n\r\n"
+                )
+                writer.write(request.encode("ascii"))
+                await writer.drain()
+                async with asyncio.timeout(5):
+                    assert b"200 OK" in await reader.readuntil(b"\r\n\r\n")
+                active = await resource_counts(page, miniapp.url)
+                assert active.subscriptions == baseline.subscriptions + 1
+                for _ in range(100):
+                    response = await page.request.post(
+                        miniapp.url + "/rooms/general/actions",
+                        form={
+                            "action": "send",
+                            "generation": generation or "0",
+                            "csrf": csrf,
+                            "text": "🦀" * 256,
+                        },
+                        headers={"origin": miniapp.url, "hx-request": "true"},
+                    )
+                    assert "Confirmed send" in await response.text()
+                async with asyncio.timeout(12):
+                    while True:
+                        final = await resource_counts(page, miniapp.url)
+                        if final.subscriptions == final.streams == 1:
+                            break
+                        await asyncio.sleep(0.05)
+                assert final.live_contexts == baseline.live_contexts
+                assert "Slow SSE peer exceeded" in miniapp.log.read_text()
+                async with asyncio.timeout(5):
+                    while await reader.read(65536):
+                        pass
+                print("Nonreading peer retired:", final.model_dump_json())
+            finally:
+                writer.close()
+                await writer.wait_closed()
+            await context.close()
+        finally:
+            await browser.close()
 
 
 async def join(page: Page) -> None:
@@ -98,6 +192,7 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
     miniapp: Miniapp,
 ) -> None:
     errors: list[str] = []
+    network_errors: list[str] = []
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
         first_context = await browser.new_context()
@@ -106,13 +201,33 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
         try:
             first = await first_context.new_page()
             second = await second_context.new_page()
+
+            async def delayed_extension(route: Route) -> None:
+                await asyncio.sleep(0.2)
+                await route.continue_()
+
+            await second.route("**/static/sse.js", delayed_extension)
             for page in (first, second):
                 page.on("pageerror", lambda error: errors.append(str(error)))
+                page.on("requestfailed", lambda request: network_errors.append(request.url))
             await first.goto(miniapp.url + "/rooms/general")
             await expect(first.locator("#inspector")).to_be_visible()
             await second.goto(miniapp.url + "/rooms/general")
             await expect(second.locator("#inspector")).to_be_visible()
             initial = await resource_counts(first, miniapp.url)
+            assert initial.streams == initial.subscriptions == 2
+            assert initial.operations == 0
+            await asyncio.sleep(2.2)
+            assert not errors
+            assert not network_errors
+            foreign_csrf = await second.locator('input[name="csrf"][form="compose"]').input_value()
+            foreign = await second.request.post(
+                miniapp.url + "/rooms/general/actions",
+                form={"action": "crash", "generation": "0", "csrf": foreign_csrf},
+                headers={"origin": miniapp.url, "hx-request": "true"},
+            )
+            assert foreign.status == 403
+            assert (await second.request.get(miniapp.url + "/resources")).status == 403
             async with asyncio.TaskGroup() as tasks:
                 tasks.create_task(join(first))
                 tasks.create_task(join(second))
@@ -185,6 +300,8 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
             await expect(second.locator("#messages")).not_to_contain_text("old room event")
             await asyncio.sleep(2.2)
             assert not errors
+            await first.reload()
+            await expect(first.locator("#messages")).to_contain_text("old room event")
             await other.close()
             await second.close()
             await first.goto("about:blank")
@@ -195,6 +312,15 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
                         break
                     await asyncio.sleep(0.05)
             assert final.live_contexts == initial.live_contexts
+            print(
+                "Native room replacement:",
+                old_pid,
+                fresh_pid,
+                "other room:",
+                other_pid,
+                "drained resources:",
+                final.model_dump_json(),
+            )
         finally:
             release_ack.set()
             await first_context.close()
