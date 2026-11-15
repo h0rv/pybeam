@@ -1,0 +1,33 @@
+-- The C compiler identification is AppleClang 21.0.0.21000401
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Using OTP lib: /opt/homebrew/Cellar/erlang/29.1.2/lib/erlang/lib
+-- Using erl_interface version: erl_interface-5.8.2
+-- Using erts version: erts-17.1.1
+-- Found Python3: /opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/bin/python3.14 (found version "3.14.10") found components: Interpreter Development Development.Module Development.Embed
+-- Python3 executable: /opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/bin/python3.14
+-- Python3 version: 3.14.10
+-- Python3 include dirs: /opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/include/python3.14
+-- Python3 libraries: /opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/lib/libpython3.14.dylib
+-- Python3 library: 
+-- Python 3.14.10 >= 3.12, checking subinterpreter API...
+-- Performing Test HAVE_SUBINTERPRETERS
+-- Performing Test HAVE_SUBINTERPRETERS - Success
+-- Subinterpreter API detected (PyInterpreterConfig_OWN_GIL available)
+-- Python 3.14.10 >= 3.14, OWN_GIL mode enabled
+-- Using Python library path for dlopen: /opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/lib/libpython3.14.dylib
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Build type: Release
+-- Output directory: /Users/robby/projects/worktrees/pybeam/native-benchmark-current/c_src/../priv
+-- Configuring done (2.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/cmake
+[ 50%] Building C object CMakeFiles/py_nif.dir/py_nif.c.o
+[100%] Linking C shared module /Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/py_nif.so
+[100%] Built target py_nif
+/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/pybeam-reference-build.json

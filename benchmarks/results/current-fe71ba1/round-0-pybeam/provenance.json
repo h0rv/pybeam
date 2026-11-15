@@ -1,0 +1,34 @@
+{
+  "sources": [
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/benchmark-current",
+      "sha": "fe71ba1f52d239871a97cb2e4b87bcdf2b6794aa",
+      "dirty": false,
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_sha256": "0240231de7f2f0184bcfe3b9c21bd3357ef7b9e1ea17cb41e3ffcb90ca4d5336"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current",
+      "sha": "a1ca04bfcaea817654ec7d1972f210c7a60075c4",
+      "dirty": false,
+      "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_tree_sha256": "145ae245e57a38d900bdecd73ddfd1d6c6221ac6191f307954e128daef6f3c16"
+    }
+  ],
+  "harness_python": "3.14.10 (main, Oct 25 2026, 17:12:00) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "harness_executable": "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/.venv/bin/python",
+  "harness_executable_sha256": "5504147b44ff4544bb4f1039d2b4a7bed66aac3cfa4534471e32ef559687f28d",
+  "pydantic": "2.14.3",
+  "psutil": "7.2.2",
+  "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "logical_cpus": 10,
+  "load_average": [
+    3.41455078125,
+    3.44482421875,
+    3.134765625
+  ],
+  "available_otp_executable": "/opt/homebrew/bin/erl",
+  "available_elixir_executable": null,
+  "environment_policy": "Allowlisted PATH/HOME/TMPDIR/LANG/LC_ALL only; values not logged. Fixed hash seed and single-thread math/OTP settings. No cookies or inherited PYTHONPATH."
+}

@@ -1,0 +1,10 @@
+{
+  "guardian_owned_vm": {
+    "pid": 67828,
+    "created": 1794727249.678386
+  },
+  "startup_ns": 381743666,
+  "shutdown_observation_ns": 66749435043083,
+  "vm_exited_before_cleanup_ack": true,
+  "launch_path": "guardian spawn_owned -> escript -> existing py_launch + runtime.loader"
+}

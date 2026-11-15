@@ -1,0 +1,41 @@
+{
+  "host_control": "uncontrolled_smoke",
+  "trials": [
+    {
+      "trial": 0,
+      "outcome": {
+        "status": "failed",
+        "reason": "ValueError: invalid adapter evidence or process observation",
+        "returncode": 0,
+        "cleanup_survivors": [],
+        "cleanup_state": "confirmed",
+        "cleanup_ns": 1277541,
+        "forced_cleanup_count": 0,
+        "enforcement": [
+          "Independent guardian checks harness PID and creation time.",
+          "RSS/process/thread/artifact budgets are sampled watchdog limits, not hard allocations.",
+          "RSS is summed resident memory, not PSS; shared pages may be counted more than once.",
+          "RLIMIT_CORE=0 and per-process RLIMIT_CPU inherited; no RLIMIT_RSS/AS guarantee.",
+          "Detached runtimes must use guardian spawn broker; unregistered escape is unsupported.",
+          "CPU affinity unavailable here; one core is requested, not enforced."
+        ]
+      },
+      "completed": null,
+      "throughput_per_second": null,
+      "latency_ns": null,
+      "phases": null,
+      "adapter_rss_peak_bytes": 43089920,
+      "descendants_rss_peak_bytes": 124600320,
+      "simultaneous_tree_rss_peak_bytes": 167395328,
+      "cpu_seconds_observed_by_pid": {
+        "68573@1794727275.567559": 0.129815456,
+        "68578@1794727275.727754": 0.34932948799999997,
+        "68579@1794727275.751014": 0.000709833,
+        "68596@1794727275.794951": 0.001619
+      }
+    }
+  ],
+  "throughput_repeat_statistics": null,
+  "latency_quantile_repeat_statistics": {},
+  "phase_repeat_statistics": {}
+}

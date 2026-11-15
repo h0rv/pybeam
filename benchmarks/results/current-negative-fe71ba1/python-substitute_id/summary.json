@@ -1,0 +1,38 @@
+{
+  "host_control": "uncontrolled_smoke",
+  "trials": [
+    {
+      "trial": 0,
+      "outcome": {
+        "status": "failed",
+        "reason": "Adapter exited unsuccessfully",
+        "returncode": 1,
+        "cleanup_survivors": [],
+        "cleanup_state": "confirmed",
+        "cleanup_ns": 506584,
+        "forced_cleanup_count": 0,
+        "enforcement": [
+          "Independent guardian checks harness PID and creation time.",
+          "RSS/process/thread/artifact budgets are sampled watchdog limits, not hard allocations.",
+          "RSS is summed resident memory, not PSS; shared pages may be counted more than once.",
+          "RLIMIT_CORE=0 and per-process RLIMIT_CPU inherited; no RLIMIT_RSS/AS guarantee.",
+          "Detached runtimes must use guardian spawn broker; unregistered escape is unsupported.",
+          "CPU affinity unavailable here; one core is requested, not enforced."
+        ]
+      },
+      "completed": null,
+      "throughput_per_second": null,
+      "latency_ns": null,
+      "phases": null,
+      "adapter_rss_peak_bytes": 41385984,
+      "descendants_rss_peak_bytes": 0,
+      "simultaneous_tree_rss_peak_bytes": 41385984,
+      "cpu_seconds_observed_by_pid": {
+        "68310@1794727268.651304": 0.08838520799999999
+      }
+    }
+  ],
+  "throughput_repeat_statistics": null,
+  "latency_quantile_repeat_statistics": {},
+  "phase_repeat_statistics": {}
+}

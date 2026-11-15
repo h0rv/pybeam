@@ -1,0 +1,164 @@
+{
+  "baseline": {
+    "otp": "29.1.2",
+    "erts": "Erlang/OTP 29 [erts-17.1.1] [source] [64-bit] [smp:1:1] [ds:1:1:1] [async-threads:1] [jit] [dtrace]\n",
+    "schedulers": 1,
+    "executable": "/opt/homebrew/Cellar/erlang/29.1.2/lib/erlang/erts-17.1.1/bin/beam.smp",
+    "contexts": [
+      "<0.93.0>"
+    ],
+    "actors": [],
+    "loaded_beams": [
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_app.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_group.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_callback.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_channel.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_embedded.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_init.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_router.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop_pool.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_import.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_launch.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_logger.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_nif.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_object_actor.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_preload.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_semaphore.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_shm.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_state.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_supervision.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_thread_handler.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_tracer.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_util.beam"
+    ]
+  },
+  "active": {
+    "otp": "29.1.2",
+    "erts": "Erlang/OTP 29 [erts-17.1.1] [source] [64-bit] [smp:1:1] [ds:1:1:1] [async-threads:1] [jit] [dtrace]\n",
+    "schedulers": 1,
+    "executable": "/opt/homebrew/Cellar/erlang/29.1.2/lib/erlang/erts-17.1.1/bin/beam.smp",
+    "contexts": [
+      "<0.93.0>",
+      "<0.107.0>",
+      "<0.111.0>"
+    ],
+    "actors": [
+      "<0.106.0>",
+      "<0.110.0>"
+    ],
+    "loaded_beams": [
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_app.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_group.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_callback.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_channel.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_embedded.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_init.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_router.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop_pool.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_import.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_launch.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_logger.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_nif.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_object_actor.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_preload.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_semaphore.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_shm.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_state.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_supervision.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_thread_handler.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_tracer.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_util.beam"
+    ]
+  },
+  "stopped": {
+    "otp": "29.1.2",
+    "erts": "Erlang/OTP 29 [erts-17.1.1] [source] [64-bit] [smp:1:1] [ds:1:1:1] [async-threads:1] [jit] [dtrace]\n",
+    "schedulers": 1,
+    "executable": "/opt/homebrew/Cellar/erlang/29.1.2/lib/erlang/erts-17.1.1/bin/beam.smp",
+    "contexts": [
+      "<0.93.0>"
+    ],
+    "actors": [],
+    "loaded_beams": [
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_app.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_group.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_callback.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_channel.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_embedded.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_init.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_router.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop_pool.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_registry.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_sup.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_import.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_launch.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_logger.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_nif.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_object_actor.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_preload.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_semaphore.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_shm.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_state.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_supervision.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_thread_handler.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_tracer.beam",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_util.beam"
+    ]
+  },
+  "warmup_counts": [
+    8,
+    9
+  ],
+  "reset_counts": [
+    0,
+    0
+  ],
+  "python": "3.14.10 (main, Oct 25 2026, 17:12:00) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "gil_enabled": true,
+  "interpreter_id": 0,
+  "interpreter_count": 1,
+  "context_threads_are_not_interpreters": true,
+  "actor_state_collected": true,
+  "nif_contexts": [
+    {
+      "created": 1,
+      "destroyed": 0,
+      "live": 1
+    },
+    {
+      "created": 3,
+      "destroyed": 0,
+      "live": 3
+    },
+    {
+      "created": 3,
+      "destroyed": 2,
+      "live": 1
+    }
+  ]
+}

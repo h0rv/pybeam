@@ -1,0 +1,136 @@
+{
+  "host_control": "uncontrolled_smoke",
+  "trials": [
+    {
+      "trial": 0,
+      "outcome": {
+        "status": "passed",
+        "reason": null,
+        "returncode": 0,
+        "cleanup_survivors": [],
+        "cleanup_state": "confirmed",
+        "cleanup_ns": 1007208,
+        "forced_cleanup_count": 0,
+        "enforcement": [
+          "Independent guardian checks harness PID and creation time.",
+          "RSS/process/thread/artifact budgets are sampled watchdog limits, not hard allocations.",
+          "RSS is summed resident memory, not PSS; shared pages may be counted more than once.",
+          "RLIMIT_CORE=0 and per-process RLIMIT_CPU inherited; no RLIMIT_RSS/AS guarantee.",
+          "Detached runtimes must use guardian spawn broker; unregistered escape is unsupported.",
+          "CPU affinity unavailable here; one core is requested, not enforced."
+        ]
+      },
+      "completed": 100,
+      "throughput_per_second": 11477.158503461167,
+      "latency_ns": {
+        "count": 100,
+        "mean": 422599.9,
+        "stdev": 132534.92304466225,
+        "minimum": 188750.0,
+        "maximum": 904208.0,
+        "p50": 397875.0,
+        "p95": 634833.0,
+        "p99": 853625.0
+      },
+      "phases": {
+        "creation_ns": 4017917,
+        "warmup_ns": 2949250,
+        "measurement_ns": 8712958,
+        "deletion_ns": 210963791
+      },
+      "adapter_rss_peak_bytes": 37289984,
+      "descendants_rss_peak_bytes": 123289600,
+      "simultaneous_tree_rss_peak_bytes": 160382976,
+      "cpu_seconds_observed_by_pid": {
+        "67820@1794727249.518091": 0.114193956,
+        "67828@1794727249.678386": 0.35740408,
+        "67830@1794727249.702443": 0.001023208,
+        "67848@1794727249.743984": 0.0022377910000000003
+      }
+    }
+  ],
+  "throughput_repeat_statistics": {
+    "count": 1,
+    "mean": 11477.158503461167,
+    "stdev": 0.0,
+    "minimum": 11477.158503461167,
+    "maximum": 11477.158503461167,
+    "p50": 11477.158503461167,
+    "p95": 11477.158503461167,
+    "p99": 11477.158503461167
+  },
+  "latency_quantile_repeat_statistics": {
+    "p50": {
+      "count": 1,
+      "mean": 397875.0,
+      "stdev": 0.0,
+      "minimum": 397875.0,
+      "maximum": 397875.0,
+      "p50": 397875.0,
+      "p95": 397875.0,
+      "p99": 397875.0
+    },
+    "p95": {
+      "count": 1,
+      "mean": 634833.0,
+      "stdev": 0.0,
+      "minimum": 634833.0,
+      "maximum": 634833.0,
+      "p50": 634833.0,
+      "p95": 634833.0,
+      "p99": 634833.0
+    },
+    "p99": {
+      "count": 1,
+      "mean": 853625.0,
+      "stdev": 0.0,
+      "minimum": 853625.0,
+      "maximum": 853625.0,
+      "p50": 853625.0,
+      "p95": 853625.0,
+      "p99": 853625.0
+    }
+  },
+  "phase_repeat_statistics": {
+    "creation_ns": {
+      "count": 1,
+      "mean": 4017917.0,
+      "stdev": 0.0,
+      "minimum": 4017917.0,
+      "maximum": 4017917.0,
+      "p50": 4017917.0,
+      "p95": 4017917.0,
+      "p99": 4017917.0
+    },
+    "warmup_ns": {
+      "count": 1,
+      "mean": 2949250.0,
+      "stdev": 0.0,
+      "minimum": 2949250.0,
+      "maximum": 2949250.0,
+      "p50": 2949250.0,
+      "p95": 2949250.0,
+      "p99": 2949250.0
+    },
+    "measurement_ns": {
+      "count": 1,
+      "mean": 8712958.0,
+      "stdev": 0.0,
+      "minimum": 8712958.0,
+      "maximum": 8712958.0,
+      "p50": 8712958.0,
+      "p95": 8712958.0,
+      "p99": 8712958.0
+    },
+    "deletion_ns": {
+      "count": 1,
+      "mean": 210963791.0,
+      "stdev": 0.0,
+      "minimum": 210963791.0,
+      "maximum": 210963791.0,
+      "p50": 210963791.0,
+      "p95": 210963791.0,
+      "p99": 210963791.0
+    }
+  }
+}

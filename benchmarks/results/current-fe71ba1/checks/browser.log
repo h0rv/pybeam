@@ -1,0 +1,7 @@
+Chrome actual Python completions: 100 events/s: 138153.4138399327
+Chrome cancellation: forced cleanup 2 survivors 0
+Chrome rendered actual Python and Erlang scalar results. Page and console errors: []
+Chrome guardian death: registered processes gone, cleanup confirmed, lock reusable
+Application shutdown: all captured owned identities gone
+.
+1 passed in 11.55s

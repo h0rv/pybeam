@@ -1,0 +1,313 @@
+{
+  "native": {
+    "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current",
+    "sha": "a1ca04bfcaea817654ec7d1972f210c7a60075c4",
+    "dirty": false,
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "working_tree_sha256": "145ae245e57a38d900bdecd73ddfd1d6c6221ac6191f307954e128daef6f3c16"
+  },
+  "runtime_directory": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python",
+  "python_executable": {
+    "path": "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "sha256": "5504147b44ff4544bb4f1039d2b4a7bed66aac3cfa4534471e32ef559687f28d"
+  },
+  "cmake_cache": {
+    "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/cmake/CMakeCache.txt",
+    "sha256": "61cbda69146a176cd6b83e7d5e7467e5cabeb1d1542d1996221edf8f78326301"
+  },
+  "assets": [
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/py_nif.so",
+      "sha256": "8a98acf2a0cdd74f03abf8c9abd53255ddeaf171734f87d1d5cdfdf5681c3b8f"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_app.beam",
+      "sha256": "ba5783903b2a4c6398a59d07dc1353b2df94b7db9565f9005c977ff73fc92883"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python_sup.beam",
+      "sha256": "b57e16500e1bfacabd8bf398c804a5013bd9f035df76fda8feae574a89e60ada"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py.beam",
+      "sha256": "cc0cef5169a361b7b1a2ea14851e956f89ef317aa3f160e4ad261a9f925aeac8"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_group.beam",
+      "sha256": "073619d3b298ce3940cdf8ad07d8df10cd24d7bffa0af8d67669105160da6120"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_actor_registry.beam",
+      "sha256": "9085a22e796fe861990a8400a51ed7170419c2d8137309ac7f9bc2f839dc1a4a"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_buffer.beam",
+      "sha256": "36691b4f9cf92fa456ebaf5410c16476cddeffe5795f0d53758bde6bcbe5c1b3"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_byte_channel.beam",
+      "sha256": "2778f1f813548607fa9f2bf5c965230a61dd0bc482b7a7bc51dd216a16e53371"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_callback.beam",
+      "sha256": "faa52352e0fb1eea1f8a91076fc7c64ce01ccd60d221b605ab55ad446d263a70"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_channel.beam",
+      "sha256": "3f6c55a38b4ca845f7864d6d4537f285120cddca2589f7fc6021a07518c01fac"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context.beam",
+      "sha256": "f41aef97046ac867e28aff0827ad8023a94b5bea4a2987e008a38150958618fb"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_embedded.beam",
+      "sha256": "86dc9a8269f8abc0d83ce2b874c6563e16ea1bd64699c7e94ea99adadbc25411"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_init.beam",
+      "sha256": "8a208baa0768704cb448aa26953d19d3db9d2cd28c393adad5193e1e0fe48661"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_router.beam",
+      "sha256": "e76d89269222401ef9e08f9a638758a42a93a4feaf676a81a93ccac82a050b72"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_context_sup.beam",
+      "sha256": "3e8bdde5360e49f34dcc72770ed40366ada6811f02cca7224683e4a163bfb136"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_data_actor.beam",
+      "sha256": "1132eadc1e16c127327db036339d9cd594da2298185f960dc6caf5dceb018deb"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop.beam",
+      "sha256": "7354b72cce5c0af6f4a3cc5570aae3f501abf2fb690d47f8ec2e9dbcbd978be7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_loop_pool.beam",
+      "sha256": "a892c03a533e86fbb74f382d4bb74a64710f3878903e66be63a29d0d5659011e"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker.beam",
+      "sha256": "430148d9ed22bef54f26a40ff0c841f3863f483c71dd0187b1dcf815883c218f"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_registry.beam",
+      "sha256": "e8285c56b0df88c1d581923e05994a171cb49d3f7ac2ea6338548fc9ef77e7b7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_event_worker_sup.beam",
+      "sha256": "f5d96e26905f8d492fd4e7c271be1a157279325873d453f0abd0e852b568d146"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_import.beam",
+      "sha256": "9097909cd79ea5e1fa2329da167de56fd29293f1f0a0b0fe20036016528447d5"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_isolated.beam",
+      "sha256": "d3d44c190f89173795d4daec337ea9b7ca29ae38b429505ed70fcb6d521b7fe8"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_launch.beam",
+      "sha256": "5d203fff314247430fe96ebdeabf616d0ce49f9abee3053be8c29b63ca9b1610"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_logger.beam",
+      "sha256": "31bad5d9cbd7e956519c1a2fa81c6447b0488f3cb1d3bcc3238d7b04f2a855c8"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_nif.beam",
+      "sha256": "fc4e22ae158779470030f5af3b00740c1e9242084313453e801540ec24e9f919"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_object_actor.beam",
+      "sha256": "c77f08a2a6e4f0bb6a3aaf5421b72f6fa8ea6d4a1c6b0ee72a8a98ab394691bd"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_preload.beam",
+      "sha256": "1671ef19922674992196941819693fcaa87968dd9deb0717798720445950081b"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_reactor_context.beam",
+      "sha256": "d1bc5de7105a1112a0ec2436ecfab90a8ad88f02fea31d59a8b2b56f5ecb71c4"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_semaphore.beam",
+      "sha256": "54d63b2826ac606285cf86e70885e835c8dc9ec9e721298e3fa1fb84b0854010"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_shared_dict.beam",
+      "sha256": "1ab01ceb4c35ee3e49be26036dc4c484c6f661b29472e3bdf75a12aef4e8de0c"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_shm.beam",
+      "sha256": "a6712370138fabbba5410ddd21f89c8bde78c5d2d2db2abe98b6b575cc2a105a"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_state.beam",
+      "sha256": "4ff4888c8b361c5df1f3cecfdc0b4d3eec1e2267c3f0beceaef5ddfb135c61aa"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_stream.beam",
+      "sha256": "08e6534bed49348227b55a8c1e715fe84b215741bba11649ab6e14604612a963"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_supervision.beam",
+      "sha256": "31ca5a277721d247909e0eeeccb54d2252aa324e34be5f9e2fd1a6e648ad8bfd"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_thread_handler.beam",
+      "sha256": "bc7b6dc313cb7857fa23ad745371c179da1ee0fdf10677382673b423a3064c1e"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_tracer.beam",
+      "sha256": "579728f7089051205e0db61d6250bd05f730c6be74e914871570272ab4800983"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_util.beam",
+      "sha256": "67798a8a621a033d8d78ddb37de7cac94b8160c9b1256cd3a05f4688cad43d6b"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/py_venv.beam",
+      "sha256": "148d3e9cfd0c0f59de2d53d6517147ba803cd1e853de825be221fa532f563ca7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin/erlang_python.app",
+      "sha256": "7523de363eb35723789ea291c74b2cab56dc0225768765c3af2cbc6d801d34eb"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/__init__.py",
+      "sha256": "7d4a04a9a648242fb4d44f84e9958546a7f0cede6da8b445f8832cf9ec919626"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_actor_common.py",
+      "sha256": "9964edade3b30908d3be5e56d0bd60c85a415238d00224d78d1fd3e2b8a2a448"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_actor_data.py",
+      "sha256": "9e51ca9e6161d4fe8b78353fee1c2fe58c24f044ee6b332ad46323bb2c41ad61"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_actors.py",
+      "sha256": "abf7e3ec1a16bcfd83439a5526719bacc41a55822a5649588125757b69607cb7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_byte_channel.py",
+      "sha256": "5dfaf8145efcb888166e68d70c54bb5f4a788bed59d9a146b0067a61a0a83517"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_channel.py",
+      "sha256": "23141c98b4290284ce63df3275c512b0ef3e1200ca3aa1706ad72b9800eaaacb"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_etf.py",
+      "sha256": "a1c6062fe09b65f7ac8ed0369b3a0875ab206c59ea55e893b38fb2df53e049d7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_isolated.py",
+      "sha256": "5517c279dcc55496968be604aa8be967417febd4592faf1bf9f52c1bf07f314e"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_loop.py",
+      "sha256": "9c195866ea050483989c4149bd2c1ef3e715395e35496547a6384f8c7407d488"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_mode.py",
+      "sha256": "740fc430768fa735ef44ef2fa4a4791af8b138e37e0fd72735cd9a1fcb45f3ba"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_policy.py",
+      "sha256": "f65118869fd6a02a4fca44a4c7b2f348a077787cb7344f784c37663a786f6be7"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_reactor.py",
+      "sha256": "da9c50089efb07ece4201ceeb400319c5bc33820188262e04ba7e3e217e9527a"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_sandbox.py",
+      "sha256": "3bfc13455a2560689cd10fa36e95e9756fbcb51432220014de2651d0c884559f"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_server.py",
+      "sha256": "52d1baef1a9448a31454c7e7b294d5f6096607e1035e40e14a15b7bdd1db9a43"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_shm.py",
+      "sha256": "29e44e44f96d51454e2a56b855d0daaa7127837472f49c60e85f4b088ae4634b"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_subprocess.py",
+      "sha256": "07143bb45baf8d5b20e15c8d124436e633aac8086be47fd38ff7b86239338e1f"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_supervision.py",
+      "sha256": "feb043f92c92a123134a2df699928c9520855e6383b7b6c2bcd3abd374cdf1f9"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/priv/_erlang_impl/_transport.py",
+      "sha256": "584fa4ec41d9724c904497166afa9b2f2f3d274a58cca8d565675386244c2e17"
+    }
+  ],
+  "commands": [
+    [
+      "cmake",
+      "-S",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/c_src",
+      "-B",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/cmake",
+      "-DPython3_EXECUTABLE=/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+      "-DCMAKE_BUILD_TYPE=Release"
+    ],
+    [
+      "cmake",
+      "--build",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/cmake",
+      "--parallel",
+      "2"
+    ],
+    [
+      "erlc",
+      "-o",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/_build/default/lib/erlang_python/ebin",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/erlang_python_app.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/erlang_python_sup.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_actor_group.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_actor_registry.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_buffer.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_byte_channel.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_callback.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_channel.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_context.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_context_embedded.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_context_init.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_context_router.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_context_sup.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_data_actor.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_event_loop.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_event_loop_pool.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_event_worker.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_event_worker_registry.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_event_worker_sup.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_import.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_isolated.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_launch.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_logger.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_nif.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_object_actor.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_preload.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_reactor_context.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_semaphore.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_shared_dict.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_shm.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_state.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_stream.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_supervision.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_thread_handler.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_tracer.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_util.erl",
+      "/Users/robby/projects/worktrees/pybeam/native-benchmark-current/src/py_venv.erl"
+    ]
+  ]
+}

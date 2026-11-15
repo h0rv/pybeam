@@ -1,0 +1,87 @@
+  + Exception Group Traceback (most recent call last):
+  |   File "<frozen runpy>", line 203, in _run_module_as_main
+  |   File "<frozen runpy>", line 88, in _run_code
+  |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 136, in <module>
+  |     main()
+  |     ~~~~^^
+  |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 128, in main
+  |     inject_python(directory, fault)
+  |     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 73, in inject_python
+  |     python_reference.main()
+  |     ~~~~~~~~~~~~~~~~~~~~~^^
+  |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 218, in main
+  |     output = asyncio.run(run(config))
+  |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 205, in run
+  |     return runner.run(main)
+  |            ~~~~~~~~~~^^^^^^
+  |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 128, in run
+  |     return self._loop.run_until_complete(task)
+  |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+  |     return future.result()
+  |            ~~~~~~~~~~~~~^^
+  |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 147, in run
+  |     async with asyncio.timeout(config.budget.wall_seconds), asyncio.TaskGroup() as group:
+  |                                                             ~~~~~~~~~~~~~~~~~^^
+  |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/taskgroups.py", line 72, in __aexit__
+  |     return await self._aexit(et, exc)
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/taskgroups.py", line 174, in _aexit
+  |     raise BaseExceptionGroup(
+  |     ...<2 lines>...
+  |     ) from None
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Exception Group Traceback (most recent call last):
+    |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 165, in run
+    |     observations = await dispatch(measured_sequence, queues, w.max_inflight, peaks)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 53, in rotated
+    |     return await original_dispatch(sequence, queues, window, peaks)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 82, in dispatch
+    |     async with asyncio.TaskGroup() as group:
+    |                ~~~~~~~~~~~~~~~~~^^
+    |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/taskgroups.py", line 72, in __aexit__
+    |     return await self._aexit(et, exc)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/opt/homebrew/Cellar/python@3.14/3.14.10/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/taskgroups.py", line 174, in _aexit
+    |     raise BaseExceptionGroup(
+    |     ...<2 lines>...
+    |     ) from None
+    | ExceptionGroup: unhandled errors in a TaskGroup (3 sub-exceptions)
+    +-+---------------- 1 ----------------
+      | Traceback (most recent call last):
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 68, in invoke
+      |     verify_applied(message, reply)
+      |     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 41, in recorded_verify
+      |     original_verify(message, reply)
+      |     ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/contract.py", line 111, in verify_applied
+      |     raise ValueError("Applied acknowledgment has wrong message or executing entity identity")
+      | ValueError: Applied acknowledgment has wrong message or executing entity identity
+      +---------------- 2 ----------------
+      | Traceback (most recent call last):
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 68, in invoke
+      |     verify_applied(message, reply)
+      |     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 41, in recorded_verify
+      |     original_verify(message, reply)
+      |     ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/contract.py", line 111, in verify_applied
+      |     raise ValueError("Applied acknowledgment has wrong message or executing entity identity")
+      | ValueError: Applied acknowledgment has wrong message or executing entity identity
+      +---------------- 3 ----------------
+      | Traceback (most recent call last):
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/python_reference.py", line 68, in invoke
+      |     verify_applied(message, reply)
+      |     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/tests/identity_fault.py", line 41, in recorded_verify
+      |     original_verify(message, reply)
+      |     ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+      |   File "/Users/robby/projects/worktrees/pybeam/benchmark-current/benchmarks/contract.py", line 111, in verify_applied
+      |     raise ValueError("Applied acknowledgment has wrong message or executing entity identity")
+      | ValueError: Applied acknowledgment has wrong message or executing entity identity
+      +------------------------------------
