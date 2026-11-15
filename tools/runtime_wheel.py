@@ -2,7 +2,12 @@ import json
 import re
 from pathlib import Path
 
+from pybeam.runtime.optional_manifest import verify_manifest
 from tools.build_runtime import ERTS_EXECUTABLES, audit_binary, native_binaries, wheel_tag
+
+
+def audit_optional(root: Path) -> None:
+    verify_manifest(root)
 
 
 def runtime_tag(assets: Path) -> str:
@@ -71,4 +76,5 @@ def runtime_tag(assets: Path) -> str:
             raise ValueError("Wheel tag understates the native macOS deployment target")
         if any(not item.startswith("@loader_path") for item in info.rpaths):
             raise ValueError("Runtime contains a nonrelocatable dylib search path")
+    audit_optional(assets / "optional/genstage")
     return tag

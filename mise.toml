@@ -225,6 +225,64 @@ description = "Run the PyView counter at PYBEAM_BIND, without implicit build"
 quiet = true
 run = ["mise run example:prepare", "mise run serve -- examples.pyview.main:app"]
 
+[tasks."experiment:genstage-assets"]
+description = "Extract the exact reviewed wheel into a new verified asset generation; no compilation"
+usage = '''
+arg "<wheel>" help="Exact reviewed platform wheel, SHA256 checked"
+arg "<output>" help="New asset generation directory; existing paths are refused"
+flag "--preserve-hornbeam-from <runtime>" help="Copy an explicit existing Hornbeam payload unchanged"
+'''
+run = '''
+set -eu
+set --
+if [ -n "${usage_preserve_hornbeam_from:-}" ]; then
+    set -- --preserve-hornbeam-from "${usage_preserve_hornbeam_from}"
+fi
+uv run --locked python -m tools.genstage_assets "${usage_wheel}" "${usage_output}" "$@"
+'''
+
+[tasks."example:genstage"]
+description = "Run the private Python GenStage example from an explicitly selected wheel"
+run = '''
+set -eu
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Set PYBEAM_TEST_WHEEL to the current private platform wheel.\n' >&2
+    exit 2
+fi
+uv run --no-project --with "$PYBEAM_TEST_WHEEL" examples/genstage.py
+'''
+
+[tasks."test:genstage"]
+description = "Private finite GenStage units and installed-wheel integration; no builds or measurements"
+run = '''
+set -eu
+if [ -z "${PYBEAM_TEST_WHEEL:-}" ] || [ ! -f "$PYBEAM_TEST_WHEEL" ]; then
+    printf 'Set PYBEAM_TEST_WHEEL to the current private platform wheel.\n' >&2
+    exit 2
+fi
+uv run --locked pytest tests/test_genstage_callbacks.py tests/test_genstage_integration.py tests/test_genstage_portability.py tests/test_genstage_wheel.py tests/test_packaging.py tests/test_optional_wheel_imports.py --run-runtime -q -s
+'''
+
+[tasks."experiment:genstage-probe"]
+description = "Compile tracked test fixtures into a new directory using verified wheel applications"
+usage = '''
+arg "<wheel>" help="Exact reviewed platform wheel, SHA256 checked"
+arg "<output>" help="New ephemeral test fixture directory"
+'''
+run = 'uv run --locked python -m tools.genstage_fixtures "${usage_wheel}" "${usage_output}"'
+
+[tasks."build:optional-genstage"]
+description = "Build this SDK wheel with exact reviewed prebuilt runtime assets; no native compilation"
+usage = '''
+arg "<wheel>" help="Exact reviewed input platform wheel, SHA256 checked"
+arg "<output>" help="New asset generation directory"
+'''
+run = '''
+set -eu
+uv run --locked python -m tools.genstage_assets "${usage_wheel}" "${usage_output}"
+PYBEAM_BUILD_RUNTIME="${usage_output}/runtime" uv build --wheel --out-dir "${usage_output}/wheel"
+'''
+
 [tasks.serve]
 wait_for = ["setup", "build"]
 quiet = true

@@ -10,6 +10,7 @@ dependencies = ["pydantic==2.14.3", "typing-extensions>=4.14.1,<5"]
 pybeam = "pybeam.runtime.cli:main"
 
 [project.optional-dependencies]
+genstage = []
 showcase = [
     "fastapi==0.163.0",
     "jinja2>=3.1.6,<4",
@@ -48,9 +49,9 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling>=1.27,<2", "pydantic==2.14.3", "typing-extensions>=4.14.1,<5"]
 build-backend = "hatchling.build"
-backend-path = ["."]
+backend-path = [".", "src"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -60,6 +61,7 @@ path = "tools/hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pybeam"]
+exclude = ["src/pybeam/integrations/genstage/*.erl", "src/pybeam/integrations/genstage/*.ex", "src/pybeam/integrations/genstage/*.app"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]

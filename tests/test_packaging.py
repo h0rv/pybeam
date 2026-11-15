@@ -332,13 +332,16 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         assert not any(
             name.startswith("hornbeam/") or "/lib/hornbeam-" in name for name in archive.namelist()
         )
-        native_priv = Path(__file__).resolve().parents[2] / "erlang-python/priv"
-        for directory in ("_erlang_impl", "erlang-stubs"):
-            for source in (native_priv / directory).rglob("*"):
-                if source.suffix in {".py", ".pyi"}:
-                    assert archive.read(str(source.relative_to(native_priv))) == source.read_bytes()
-        for name in ("erlang_services.py", "py_isolated_child.py"):
-            assert archive.read(name) == (native_priv / name).read_bytes()
+        native_priv = "pybeam/runtime/_assets/lib/erlang_python-5.0.1/priv/"
+        bindings = [
+            name
+            for name in archive.namelist()
+            if name.startswith(native_priv) and name.endswith((".py", ".pyi"))
+        ]
+        assert any("erlang-stubs/actors.pyi" in name for name in bindings)
+        assert any("_erlang_impl/_transport.py" in name for name in bindings)
+        for name in bindings:
+            assert archive.read(name.removeprefix(native_priv)) == archive.read(name)
         record = dist_info.removesuffix("WHEEL") + "RECORD"
         for name, digest, size in csv.reader(io.StringIO(archive.read(record).decode())):
             if name == record:

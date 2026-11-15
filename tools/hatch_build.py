@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import override
 
@@ -12,7 +13,9 @@ class RuntimeBuildHook(BuildHookInterface[BuilderConfig]):
     def initialize(self, version: str, build_data: dict[str, object]) -> None:
         if self.target_name != "wheel" or version == "editable":
             return
-        assets = Path(self.root) / "build" / "runtime"
+        assets = (
+            Path(self.root) / os.environ.get("PYBEAM_BUILD_RUNTIME", "build/runtime")
+        ).resolve()
         build_data["tag"] = runtime_tag(assets)
         build_data["pure_python"] = False
         priv = next(assets.glob("lib/erlang_python-*/priv"))
