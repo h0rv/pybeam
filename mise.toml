@@ -231,6 +231,7 @@ cp -R .experiment/gen_stage/_build/dev/lib/gen_stage/ebin .experiment/genstage-a
 cp .experiment/elixir/LICENSE .experiment/genstage-assets/elixir/
 cp -R .experiment/elixir/LICENSES .experiment/genstage-assets/elixir/
 cp .experiment/gen_stage/README.md .experiment/genstage-assets/gen_stage/NOTICE.md
+cp src/pybeam/integrations/genstage/pybeam_genstage.app .experiment/genstage-assets/plugin/ebin/
 erlc -o .experiment/genstage-assets/plugin/ebin src/pybeam/integrations/genstage/pybeam_genstage.erl
 PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
     -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
@@ -243,18 +244,49 @@ depends = ["experiment:genstage-assets"]
 description = "Verify real GenStage lifecycle and Python managed entrypoint"
 run = '''
 set -eu
-export PYTHONPATH="$PWD/tests/native:$PWD/src:$PWD:$PWD/.experiment/venv/lib/python3.14/site-packages"
-export PYBEAM_GENSTAGE_ASSETS="$PWD/.experiment/genstage-assets"
+export PYTHONPATH="$PWD/tests/native:$PWD/examples:$PWD/src:$PWD:$PWD/.experiment/venv/lib/python3.14/site-packages"
 erl +S 2:2 -noshell -pa .experiment/elixir/lib/ex_unit/ebin \
     .experiment/genstage-assets/*/ebin ../native-genstage/_build/default/lib/erlang_python/ebin \
-    -eval 'pybeam_genstage:bootstrap(), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_owned.exs">>), halt().'
-.experiment/venv/bin/python tests/native/genstage_entry.py
-.experiment/venv/bin/python examples/genstage.py
+    -eval 'application:load(erlang_python), application:set_env(erlang_python,num_contexts,1), {ok,_}=application:ensure_all_started(pybeam_genstage), '\''Elixir.Code'\'':require_file(<<"tests/native/genstage_owned.exs">>), halt().'
 '''
 
 [tasks."example:genstage"]
-description = "Run the Python entrypoint with already-staged private optional assets"
-run = 'PYBEAM_GENSTAGE_ASSETS="$PWD/.experiment/genstage-assets" PYTHONPATH="$PWD/src:$PWD" .experiment/venv/bin/python examples/genstage.py'
+description = "Run the Python example using the built wheel"
+run = 'uv run --no-project --with ./dist/python_beam-0.1.0a1-cp314-cp314-macosx_27_0_arm64.whl examples/genstage.py'
+
+[tasks."experiment:genstage-probe"]
+depends = ["experiment:genstage-assets"]
+description = "Compile the test-only installed-wheel ownership fixture"
+run = '''
+set -eu
+mkdir -p .experiment/genstage-probe/ebin
+cp tests/native/pybeam_genstage_probe.app .experiment/genstage-probe/ebin/
+erlc -o .experiment/genstage-probe/ebin tests/native/pybeam_genstage_probe.erl
+PATH="$PWD/.experiment/elixir/bin:$PATH" elixirc --erl '+S 2:2' \
+    -pa ../native-genstage/_build/default/lib/erlang_python/ebin \
+    -pa .experiment/genstage-assets/gen_stage/ebin -pa .experiment/genstage-assets/plugin/ebin \
+    -o .experiment/genstage-probe/ebin tests/native/genstage_probe.ex
+'''
+
+[tasks."experiment:genstage-wheel"]
+depends = ["experiment:genstage-assets"]
+description = "Stage one private runtime and its pinned optional application assets, then build the wheel"
+run = '''
+set -eu
+otp="$(mise where erlang@29.1.2)"
+if ! test -f .experiment/OTP-LICENSE.txt; then
+    curl --fail --location https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt --output .experiment/OTP-LICENSE.txt
+fi
+digest="$(shasum -a 256 .experiment/OTP-LICENSE.txt)"
+test "${digest%% *}" = 809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0
+.experiment/venv/bin/python -m tools.build_runtime --otp-root "$otp" \
+    --native-app ../native-genstage/_build/default/lib/erlang_python \
+    --otp-license .experiment/OTP-LICENSE.txt --native-license ../native-genstage/LICENSE --output build/runtime
+.experiment/venv/bin/python -m tools.build_genstage --otp "$otp" \
+    --elixir .experiment/elixir --genstage .experiment/gen_stage \
+    --bridge .experiment/genstage-assets/plugin/ebin --runtime build/runtime
+uv build --wheel --out-dir dist
+'''
 
 [tasks.serve]
 wait_for = ["setup", "build"]

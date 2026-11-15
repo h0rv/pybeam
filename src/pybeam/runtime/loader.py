@@ -40,6 +40,17 @@ def register(entry: Entry) -> bool:
     return True
 
 
+def require_managed_entry() -> None:
+    session = _state.session
+    if (
+        session is None
+        or session.task is None
+        or session.task.done()
+        or session.task.get_loop() is not asyncio.get_running_loop()
+    ):
+        raise BootstrapError("Optional applications require a running managed Python entry")
+
+
 def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         raise BootstrapError("Invalid managed bootstrap arguments")

@@ -187,6 +187,22 @@ defmodule PyBEAM.GenStage.Bridge do
     end
   end
 
+  def callback([<<"runtime">>]) do
+    file = :code.which(GenStage)
+    {:ok, {GenStage, digest}} = :beam_lib.md5(file)
+    ^digest = GenStage.module_info(:md5)
+    otp = Path.join([:code.root_dir(), "releases", "29", "OTP_VERSION"])
+
+    %{
+      "genstage" => Application.spec(:gen_stage, :vsn) |> to_string(),
+      "elixir" => System.version(),
+      "otp" => File.read!(otp) |> String.trim(),
+      "erts" => :erlang.system_info(:version) |> to_string(),
+      "module" => to_string(file),
+      "module_md5" => Base.encode16(digest, case: :lower)
+    }
+  end
+
   def callback([<<"contexts">>]) do
     counters = :py_nif.get_debug_counters()
     counters.ctx_created - counters.ctx_destroyed

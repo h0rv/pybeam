@@ -1,8 +1,7 @@
-import pybeam
-from examples.genstage_callbacks import Outcome, process
-from pybeam.integrations.genstage import enable, stream
+from genstage_callbacks import Outcome, process
 
-enable()
+import pybeam
+from pybeam.integrations.genstage.pipeline import stream
 
 
 async def main() -> None:

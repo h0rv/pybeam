@@ -1,6 +1,6 @@
 from time import sleep
 
-from examples.genstage_callbacks import process
+from genstage_callbacks import process
 
 
 def busy(payload: bytes) -> bytes:

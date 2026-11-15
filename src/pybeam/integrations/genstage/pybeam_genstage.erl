@@ -1,11 +1,14 @@
 -module(pybeam_genstage).
--export([bootstrap/0]).
+-behaviour(application).
+-behaviour(supervisor).
+-export([start/2, stop/1, init/1]).
 
-bootstrap() ->
-    application:load(erlang_python),
-    application:set_env(erlang_python, num_contexts, 1),
-    application:set_env(erlang_python, event_loop_pool_size, 1),
-    {ok, _} = application:ensure_all_started(erlang_python),
-    {ok, _} = application:ensure_all_started(elixir),
-    {ok, _} = application:ensure_all_started(gen_stage),
-    'Elixir.PyBEAM.GenStage.Bridge':install().
+start(_Type, _Args) ->
+    ok = 'Elixir.PyBEAM.GenStage.Bridge':install(),
+    supervisor:start_link(?MODULE, []).
+
+stop(_State) ->
+    py:unregister_function(pybeam_genstage).
+
+init([]) ->
+    {ok, {#{strategy => one_for_one, intensity => 0, period => 1}, []}}.

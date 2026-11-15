@@ -230,6 +230,10 @@ def stage_runtime(
         boot = staged / "releases" / "0.1.0" / "start.boot"
         shutil.copy2(boot, bin_dir / "start.boot")
         shutil.copy2(boot, bin_dir / "start_clean.boot")
+        for version_file in otp.glob("releases/*/OTP_VERSION"):
+            destination = staged / version_file.relative_to(otp)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(version_file, destination)
         app = staged / "lib" / ("erlang_python-" + native_version)
         priv = app / "priv"
         for item in priv.iterdir():

@@ -1,12 +1,11 @@
 import asyncio
 
+from genstage_callbacks import Outcome, process
 from genstage_owned import raises
 
 import pybeam
-from examples.genstage_callbacks import Outcome, process
-from pybeam.integrations.genstage import CallbackFailed, enable, stream
-
-enable()
+from pybeam.integrations.genstage.pipeline import CallbackFailed, stream
+from pybeam.runtime.optional import start_optional
 
 
 async def contexts() -> int:
@@ -18,6 +17,7 @@ async def contexts() -> int:
 
 
 async def main() -> None:
+    await start_optional("genstage")
     baseline = await contexts()
     for _ in range(8):
         async with stream(16, process) as events:
