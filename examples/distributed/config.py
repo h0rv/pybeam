@@ -12,7 +12,7 @@ def configuration() -> tuple[Config, Distribution]:
     runtime = Path(
         os.environ.get(
             "PYBEAM_DEVELOPMENT_RUNTIME",
-            str(ROOT.parent / "native-local-distribution" / "_build" / "default"),
+            str(ROOT.parent / "native-local-distribution-admission" / "_build" / "default"),
         )
     )
     return Config(development_runtime=runtime), Distribution(
