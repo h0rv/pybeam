@@ -1,6 +1,8 @@
-# Matching serial reference smoke
+# Historical serial reference smoke, superseded
 
-Nine fresh trials passed at clean source commit `4a2219c38ec461a9971bad7992ed1bd5ef247bc4`. Each backend completed three trials of 100 events. Every trial had exact receipt IDs and routes, terminal counts `[50, 50]`, two completed entity deletions, confirmed cleanup, zero forced cleanup, and zero surviving owned processes. Raw receipts were parsed as strict `Receipt` objects and matched the adapter results.
+These observations from `d3efc78` are provisional and superseded by `CORRECTED_COMPARISON.md`. Independent review `6a164` found a correctness proof blind spot. Python and LEGACY raw PyBEAM fabricated receipt identities from producer request labels. Balanced cyclic misrouting and duplicate delivered IDs could therefore pass despite terminal counts `[50, 50]`. The earlier exact-route claim was invalid. Do not use these records as corrected correctness acceptance or as evidence for the new `@actor` API.
+
+The original raw records under `results/serial-*-4a2219c` remain unchanged. Their measured rates and repeat statistics are actual historical observations; the defect was in the completion proof. Nine trials were originally accepted at source commit `4a2219c38ec461a9971bad7992ed1bd5ef247bc4`. Each completed 100 events with the reported terminal totals, entity deletion totals, confirmed process cleanup, zero forced cleanup, and zero surviving owned processes. Strict receipt parsing alone did not establish actual handler identity.
 
 These are uncontrolled smoke observations. Other builders were active in this work period. There was no reserved idle host. The very short measured intervals and fixed backend order also limit interpretation. There is no controlled performance winner and no production capacity claim.
 
@@ -74,4 +76,4 @@ Negative controls cover missing or duplicate acknowledgments, wrong terminal sta
 
 Fault, churn, bridge, execution-mode, distribution, other payload, and nonuniform families remain unsupported. No broader correctness or performance conclusion follows from these nine small trials.
 
-The source worktrees `bench-python`, `bench-beam`, and `bench-pybeam` are no longer dependencies of this integration. Their changes are committed here and the raw trials are retained here. This task does not delete them. Keep `benchmark-integration` and the private `native-bench-pybeam` assets for reruns. The completed trial records no longer require the original three adapter worktrees.
+The source worktrees `bench-python`, `bench-beam`, and `bench-pybeam` are no longer dependencies after the follow-up configuration portability fixes and evidence archive. Their changes are committed here and raw trials are retained here. This task does not delete them. Keep `benchmark-integration` and the private `native-bench-pybeam` assets for reruns. The completed trial records no longer require the original three adapter worktrees.

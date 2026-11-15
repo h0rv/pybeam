@@ -1,0 +1,42 @@
+{
+  "host_control": "uncontrolled_smoke",
+  "trials": [
+    {
+      "trial": 0,
+      "outcome": {
+        "status": "unsupported",
+        "reason": "v1 check_correctness requires native_source_sha and guardian equates it to the unused paired NIF checkout; pure OTP has no such loaded revision",
+        "returncode": 0,
+        "cleanup_survivors": [],
+        "cleanup_ns": 1199917,
+        "forced_cleanup_count": 0,
+        "enforcement": [
+          "Independent guardian checks harness PID and creation time.",
+          "RSS/process/thread/artifact budgets are sampled watchdog limits, not hard allocations.",
+          "RSS is summed resident memory, not PSS; shared pages may be counted more than once.",
+          "RLIMIT_CORE=0 and per-process RLIMIT_CPU inherited; no RLIMIT_RSS/AS guarantee.",
+          "Detached runtimes must use guardian spawn broker; unregistered escape is unsupported.",
+          "CPU affinity unavailable here; one core is requested, not enforced."
+        ]
+      },
+      "completed": null,
+      "throughput_per_second": null,
+      "latency_ns": null,
+      "phases": null,
+      "adapter_rss_peak_bytes": 82264064,
+      "descendants_rss_peak_bytes": 5128192,
+      "simultaneous_tree_rss_peak_bytes": 84000768,
+      "cpu_seconds_observed_by_pid": {
+        "84602@1794718132.819829": 0.305698952,
+        "84609@1794718132.981947": 0.000695541,
+        "84607@1794718132.98061": 0.0007625819999999999,
+        "84610@1794718132.98248": 0.000353582,
+        "84608@1794718132.981474": 0.000606124,
+        "84616@1794718133.03232": 0.0026
+      }
+    }
+  ],
+  "throughput_repeat_statistics": null,
+  "latency_quantile_repeat_statistics": {},
+  "phase_repeat_statistics": {}
+}

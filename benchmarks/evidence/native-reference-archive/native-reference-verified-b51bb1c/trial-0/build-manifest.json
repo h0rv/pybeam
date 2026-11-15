@@ -1,0 +1,30 @@
+{
+  "otp": "29.1.2",
+  "otp_source_tag": "https://github.com/erlang/otp/tree/OTP-29.1.2",
+  "compiler": {
+    "path": "/opt/homebrew/Cellar/erlang/29.1.2/lib/erlang/bin/erlc",
+    "sha256": "b75f8cb03b2f5ac0f4a52703ff57ac11fa08814716be155afa2bed669c8c944d"
+  },
+  "sources": [
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/bench-beam/benchmarks/native_reference/room.erl",
+      "sha256": "fc1c392d90c6c7db9c426d16d7ade25fc1bbb4f4e6799275b2e21931ccf079ee"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/bench-beam/benchmarks/native_reference/native_bench.erl",
+      "sha256": "23479b422b57c63f76eaf8fc2bb4aef64a9412f1ae7362e97f8176aed12e7c34"
+    }
+  ],
+  "assets": [
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/bench-beam/benchmarks/native_reference/_build/room.beam",
+      "sha256": "9d7e5de574dbc3da84d8046316c8a974c341ad331e9055964c9123b0af8a0be8"
+    },
+    {
+      "path": "/Users/robby/projects/worktrees/pybeam/bench-beam/benchmarks/native_reference/_build/native_bench.beam",
+      "sha256": "66bb5e3a84bc400804919a2f9b4f0c559baf66c5341be53b146d00bf999c0972"
+    }
+  ],
+  "pybeam_nif_loaded": false,
+  "paired_native_checkout_used": false
+}

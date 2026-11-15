@@ -2,8 +2,8 @@
   "schema_version": 1,
   "backend": "pybeam",
   "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.pybeam_reference"],
-  "python_source": "/Users/robby/projects/worktrees/pybeam/benchmark-integration",
-  "native_source": "/Users/robby/projects/worktrees/pybeam/native-bench-pybeam",
+  "python_source": ".",
+  "native_source": "../native-bench-pybeam",
   "repeats": 3,
   "host_control": "uncontrolled_smoke",
   "workload": {

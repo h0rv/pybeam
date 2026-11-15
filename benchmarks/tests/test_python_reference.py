@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from benchmarks import python_reference
 from benchmarks.contract import (
     AdapterResult,
+    Applied,
     Budget,
     Config,
     Payload,
@@ -243,7 +244,7 @@ def test_dispatch__sender_latency_includes_window_admission() -> None:
                 assert pending is not None
                 entered.set()
                 await release.wait()
-                pending.applied.set_result(None)
+                pending.applied.set_result(Applied(pending.message.id, 0, 1))
                 queue.task_done()
 
         async with asyncio.TaskGroup() as group:

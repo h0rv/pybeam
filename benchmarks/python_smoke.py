@@ -7,6 +7,7 @@ from pathlib import Path
 
 from benchmarks.contract import (
     AdapterResult,
+    Applied,
     Config,
     Message,
     Phases,
@@ -14,13 +15,14 @@ from benchmarks.contract import (
     Runtime,
     Unsupported,
     messages,
+    verify_applied,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class Pending:
     message: Message
-    done: asyncio.Future[None]
+    done: asyncio.Future[Applied]
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +72,7 @@ async def run(config: Config) -> AdapterResult | Unsupported:
                 if pending is None:
                     return
                 counts[entity] += pending.message.increment
-                pending.done.set_result(None)
+                pending.done.set_result(Applied(pending.message.id, entity, counts[entity]))
             finally:
                 queue.task_done()
 
@@ -79,11 +81,12 @@ async def run(config: Config) -> AdapterResult | Unsupported:
             future = asyncio.get_running_loop().create_future()
             await queues[message.entity].put(Pending(message, future))
             observed.queue_peak = max(observed.queue_peak, queues[message.entity].qsize())
-            await future
+            reply = await future
+            verify_applied(message, reply)
             receipts.append(
                 Observation(
-                    id=message.id,
-                    entity=message.entity,
+                    id=reply.id,
+                    entity=reply.entity,
                     sent_ns=sent,
                     completed_ns=time.monotonic_ns(),
                 )
@@ -151,7 +154,8 @@ async def run(config: Config) -> AdapterResult | Unsupported:
             Receipt(id=r.id, entity=r.entity, sent_ns=r.sent_ns, completed_ns=r.completed_ns)
             for r in observations
         ),
-        transport_encoding="in-process Python objects; no serialization",
+        transport_encoding="in-process Message envelope and Applied identity/count reply; "
+        "scalar payload 1; no serialization",
         transport_payload_bytes=None,
         terminal_counts=terminal,
         entities_created=len(worker_tasks),

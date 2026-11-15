@@ -11,6 +11,6 @@
     "queue_bound_scope": "client_admission_only"
   },
   "repeats": 1,
-  "python_source": "/Users/robby/projects/worktrees/pybeam/bench-beam",
-  "native_source": "/Users/robby/projects/worktrees/pybeam/native-benchmarks"
+  "python_source": ".",
+  "native_source": "../native-bench-pybeam"
 }

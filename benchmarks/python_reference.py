@@ -7,6 +7,7 @@ from pathlib import Path
 
 from benchmarks.contract import (
     AdapterResult,
+    Applied,
     Config,
     Message,
     Payload,
@@ -15,13 +16,14 @@ from benchmarks.contract import (
     Runtime,
     Unsupported,
     messages,
+    verify_applied,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class Pending:
     message: Message
-    applied: asyncio.Future[None]
+    applied: asyncio.Future[Applied]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +48,7 @@ async def worker(entity: int, queue: asyncio.Queue[Pending | None], counts: list
             if pending is None:
                 return
             counts[entity] += pending.message.increment
-            pending.applied.set_result(None)
+            pending.applied.set_result(Applied(pending.message.id, entity, counts[entity]))
         finally:
             queue.task_done()
 
@@ -62,8 +64,9 @@ async def invoke(
         applied = asyncio.get_running_loop().create_future()
         await queue.put(Pending(message, applied))
         peaks.queue = max(peaks.queue, queue.qsize())
-        await applied
-        observations.append(Observation(message.id, message.entity, sent_ns, time.monotonic_ns()))
+        reply = await applied
+        verify_applied(message, reply)
+        observations.append(Observation(reply.id, reply.entity, sent_ns, time.monotonic_ns()))
     finally:
         peaks.inflight -= 1
 
@@ -183,7 +186,9 @@ async def run(config: Config) -> AdapterResult | Unsupported:
             for r in observations
         ),
         transport_encoding=(
-            "in-process Python Message objects through asyncio.Queue; no serialization"
+            "in-process Message envelope (ID, requested entity) and Applied reply "
+            "(received ID, executing entity, count) through asyncio.Queue; scalar payload 1; "
+            "no serialization"
         ),
         transport_payload_bytes=None,
         terminal_counts=terminal_counts,

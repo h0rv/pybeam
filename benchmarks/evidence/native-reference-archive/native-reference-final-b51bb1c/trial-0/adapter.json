@@ -1,0 +1,1 @@
+{"reason":"v1 check_correctness requires native_source_sha and guardian equates it to the unused paired NIF checkout; pure OTP has no such loaded revision","features":["pure_otp_provenance_without_nif_identity"],"kind":"unsupported"}

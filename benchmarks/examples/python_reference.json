@@ -1,6 +1,6 @@
 {
   "python_source": ".",
-  "native_source": "../native-benchmarks",
+  "native_source": "../native-bench-pybeam",
   "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.python_reference"],
   "workload": {
     "queue_bound_scope": "client_admission_only"

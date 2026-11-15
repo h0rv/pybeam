@@ -1,4 +1,5 @@
 from collections import Counter
+from dataclasses import dataclass
 from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -92,6 +93,20 @@ def messages(workload: Workload, count: int) -> tuple[Message, ...]:
     return tuple(
         Message(id=i, entity=(i + workload.seed) % workload.entities) for i in range(count)
     )
+
+
+@dataclass(frozen=True, slots=True)
+class Applied:
+    """Handler reply after applying the effect, not a producer's request label."""
+
+    id: int
+    entity: int
+    count: int
+
+
+def verify_applied(message: Message, reply: Applied) -> None:
+    if (reply.id, reply.entity) != (message.id, message.entity):
+        raise ValueError("Applied acknowledgment has wrong message or executing entity identity")
 
 
 class Receipt(StrictModel):

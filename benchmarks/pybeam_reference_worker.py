@@ -13,6 +13,7 @@ from pybeam.actors import ActorRef, ActorSpec, OwnedActorRef, UnboundedMailbox, 
 
 from benchmarks.contract import (
     AdapterResult,
+    Applied,
     Config,
     Message,
     Phases,
@@ -20,6 +21,7 @@ from benchmarks.contract import (
     Runtime,
     StrictModel,
     messages,
+    verify_applied,
 )
 from benchmarks.pybeam_reference_build import BuildManifest, asset
 
@@ -52,13 +54,21 @@ class WorkerEvidence(StrictModel):
 class Room:
     instances: ClassVar[list[ReferenceType[Room]]] = []
     count: int = 0
+    entity: int | None = None
 
     def __post_init__(self) -> None:
         self.instances.append(ref(self))
 
-    async def add(self, increment: int) -> int:
+    async def bind(self, entity: int) -> None:
+        if self.entity is not None:
+            raise ValueError("Room identity is already bound")
+        self.entity = entity
+
+    async def add(self, message_id: int, increment: int) -> Applied:
+        if self.entity is None:
+            raise ValueError("Room identity must be bound before work")
         self.count += increment
-        return self.count
+        return Applied(message_id, self.entity, self.count)
 
     async def reset(self) -> None:
         self.count = 0
@@ -101,13 +111,14 @@ async def produce(
 
     async def invoke(message: Message, sent: int) -> None:
         try:
-            applied_count = await actors[message.entity].call(Room.add, message.increment)
-            if applied_count != message.id // len(actors) + 1:
+            reply = await actors[message.entity].call(Room.add, message.id, message.increment)
+            verify_applied(message, reply)
+            if reply.count != message.id // len(actors) + 1:
                 raise ValueError("Invalid applied acknowledgment")
             receipts.append(
                 Observation(
-                    message.id,
-                    message.entity,
+                    reply.id,
+                    reply.entity,
                     sent,
                     time.monotonic_ns(),
                 )
@@ -142,12 +153,14 @@ async def measure(directory: Path) -> AdapterResult:
     baseline = await inventory()
     if baseline.actors:
         raise RuntimeError("Unexpected existing actors in fresh VM")
-    spec = ActorSpec(Room, methods=(Room.add, Room.read, Room.reset))
+    spec = ActorSpec(Room, methods=(Room.add, Room.read, Room.reset, Room.bind))
     actors: list[OwnedActorRef[Room]] = []
     start = time.monotonic_ns()
     try:
-        for _ in range(w.entities):
-            actors.append(await spawn(spec, mailbox=UnboundedMailbox()))
+        for entity in range(w.entities):
+            actor = await spawn(spec, mailbox=UnboundedMailbox())
+            actors.append(actor)
+            await actor.call(Room.bind, entity)
         creation = time.monotonic_ns() - start
         active = await inventory()
         if (
@@ -239,7 +252,8 @@ async def measure(directory: Path) -> AdapterResult:
             )
             for r in observations
         ),
-        transport_encoding="retained_python_objects",
+        transport_encoding="retained Python scalar int payload 1; message ID in call envelope; "
+        "Applied reply contains received ID, executing room identity, applied count",
         transport_payload_bytes=None,
         terminal_counts=terminal,
         entities_created=len(actors),

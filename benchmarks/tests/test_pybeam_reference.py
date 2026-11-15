@@ -50,7 +50,10 @@ class LocalActorDouble:
 def test_produce__bounds_tasks_and_includes_admission_wait_in_latency() -> None:
     async def check() -> None:
         calls = Calls()
-        actors = [LocalActorDouble(calls), LocalActorDouble(calls)]
+        actors = [
+            LocalActorDouble(calls, room=Room(entity=0)),
+            LocalActorDouble(calls, room=Room(entity=1)),
+        ]
         workload = Workload(entities=2, events=30, seed=5)
         async with asyncio.timeout(2), asyncio.TaskGroup() as group:
             task = group.create_task(produce(actors, messages(workload, 30), 2))
@@ -92,7 +95,7 @@ def test_produce__rejects_bad_applied_acknowledgment() -> None:
     async def check() -> None:
         calls = Calls()
         calls.gate.set()
-        actors = [LocalActorDouble(calls, room=Room(count=9))]
+        actors = [LocalActorDouble(calls, room=Room(count=9, entity=0))]
         with pytest.raises(ExceptionGroup, match="TaskGroup"):
             await produce(actors, messages(Workload(entities=1), 1), 1)
         assert calls.active == 0
