@@ -8,8 +8,8 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 export const pages = [
   { source: "docs/guide/index.md", path: "", label: "Overview" },
   { source: "docs/guide/quickstart.md", path: "quickstart/", label: "Quickstart" },
-  { source: "docs/guide/actors.md", path: "actors/", label: "Actors and state" },
-  { source: "docs/guide/web.md", path: "web/", label: "Web examples" },
+  { source: "docs/guide/primitives.md", path: "primitives/", label: "Core primitives" },
+  { source: "docs/guide/web.md", path: "web/", label: "Web and integrations" },
   { source: "docs/guide/limits.md", path: "limits/", label: "Boundaries" },
 ];
 

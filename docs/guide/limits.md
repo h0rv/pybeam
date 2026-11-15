@@ -1,19 +1,19 @@
 # Boundaries
 
-## Execution
+## Execution and ownership
 
-Python runs in one BEAM VM with one main interpreter. The GIL still applies. Separate actor processes do not provide multicore Python execution or isolation from a C-extension crash.
+Python runs in one BEAM VM with one main interpreter. The GIL still applies. OTP processes do not provide multicore Python execution or isolation from a C-extension crash.
 
-An actor serializes its calls even while a method awaits. Use separate actors for independent state owners. Use ordinary async functions when you only need concurrent I/O and no actor state.
+Keep ownership of background work until its body and cleanup have ended. Cancelling a waiter is not the same as stopping its work. Cancellation is cooperative; a timeout is not proof of cleanup.
 
-## Effects and persistence
+## Effects and delivery
 
-Actor state and ETS counters are volatile. OTP can replace a failed child, but does not recover its previous Python state. Applications own persistence and authorization.
+A timeout or cancellation is not rollback. Work may already have changed state or performed an external write. There is no exactly-once execution guarantee. Choose retry policy explicitly.
 
-A timeout or cancellation is not rollback. The method may already have changed state. There is no exactly-once execution guarantee or automatic replay. Make retry policy explicit, especially for writes. Pub/sub is not a durable event log.
+OTP can replace a failed process, but replacement does not restore previous Python state or replay missed messages. Actor state and ETS values are volatile. Pub/sub is not a durable event log. Applications own persistence and authorization.
 
-## Data and memory
+## Data and bounds
 
-Actor calls transfer serialized request and result copies, not arbitrary Python objects. Resources belong to their actor and require explicit cleanup.
+Serialized messages are data copies, not remote Python objects. Actor arguments and results cross this boundary. The local background service API instead passes arguments directly within its worker loop.
 
-Admission limits count accepted work and encoded request bytes. They do not bound total process memory, serialization scratch space, or the work a method can perform. Bound the number of caller tasks as well as the actor's admitted work.
+Channel credits cover queued messages and return on dequeue. Actor admission credits cover queued plus running requests and remain held until work ends. Neither is a bound on RSS, temporary serialization allocations, or arbitrary work in application code. Bound caller concurrency as well.
