@@ -29,7 +29,7 @@ def run(main: Entry) -> None:
     try:
         status = run_file(Path(sys.argv[0]), sys.argv[1:])
     except BootstrapError as error:
-        print("PyBeam: " + str(error), file=sys.stderr)
+        print("PyBEAM: " + str(error), file=sys.stderr)
         raise SystemExit(error.exit_status) from error
     if status:
         raise SystemExit(status)
