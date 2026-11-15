@@ -133,6 +133,9 @@ async def run(config: Config) -> AdapterResult | Unsupported:
 
     warmup_sequence = messages(w, w.warmup_events)
     measured_sequence = messages(w, w.events)
+    expected_warmup = tuple(
+        sum(message.entity == entity for message in warmup_sequence) for entity in range(w.entities)
+    )
     peaks = Peaks()
     start = time.monotonic_ns()
     queues = [asyncio.Queue[Pending | None](maxsize=w.queue_capacity) for _ in range(w.entities)]
@@ -146,8 +149,13 @@ async def run(config: Config) -> AdapterResult | Unsupported:
 
         start = time.monotonic_ns()
         await dispatch(warmup_sequence, queues, w.max_inflight, peaks)
-        warmup_ns = time.monotonic_ns() - start
+        warmup_counts = tuple(counts)
+        if warmup_counts != expected_warmup:
+            raise ValueError("Warmup snapshot differs from applied messages")
         counts[:] = [0] * w.entities
+        if any(counts):
+            raise ValueError("Warmup reset left nonzero state")
+        warmup_ns = time.monotonic_ns() - start
         peaks = Peaks()
 
         start = time.monotonic_ns()

@@ -88,6 +88,18 @@ def test_produce__failure_leaves_no_inflight_calls_or_producer_tasks() -> None:
     asyncio.run(check())
 
 
+def test_produce__rejects_bad_applied_acknowledgment() -> None:
+    async def check() -> None:
+        calls = Calls()
+        calls.gate.set()
+        actors = [LocalActorDouble(calls, room=Room(count=9))]
+        with pytest.raises(ExceptionGroup, match="TaskGroup"):
+            await produce(actors, messages(Workload(entities=1), 1), 1)
+        assert calls.active == 0
+
+    asyncio.run(check())
+
+
 @pytest.mark.parametrize(
     "workload",
     [

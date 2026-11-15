@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "backend": "python",
+  "adapter_command": ["benchmarks/.venv/bin/python", "-m", "benchmarks.python_reference"],
+  "python_source": "/Users/robby/projects/worktrees/pybeam/benchmark-integration",
+  "native_source": "/Users/robby/projects/worktrees/pybeam/native-bench-pybeam",
+  "repeats": 3,
+  "host_control": "uncontrolled_smoke",
+  "workload": {
+    "entities": 2, "events": 100, "warmup_events": 17, "seed": 1,
+    "activity": "uniform", "max_inflight": 4, "queue_capacity": 4,
+    "queue_bound_scope": "client_admission_only"
+  }
+}

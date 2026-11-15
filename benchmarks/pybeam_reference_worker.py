@@ -38,6 +38,8 @@ class WorkerEvidence(StrictModel):
     baseline: Inventory
     active: Inventory
     stopped: Inventory
+    warmup_counts: tuple[int, ...]
+    reset_counts: tuple[int, ...]
     python: str
     gil_enabled: bool
     interpreter_id: int
@@ -99,7 +101,9 @@ async def produce(
 
     async def invoke(message: Message, sent: int) -> None:
         try:
-            await actors[message.entity].call(Room.add, message.increment)
+            applied_count = await actors[message.entity].call(Room.add, message.increment)
+            if applied_count != message.id // len(actors) + 1:
+                raise ValueError("Invalid applied acknowledgment")
             receipts.append(
                 Observation(
                     message.id,
@@ -132,6 +136,9 @@ async def measure(directory: Path) -> AdapterResult:
     w = config.workload
     warmup_sequence = messages(w, w.warmup_events)
     measured_sequence = messages(w, w.events)
+    expected_warmup = tuple(
+        sum(message.entity == entity for message in warmup_sequence) for entity in range(w.entities)
+    )
     baseline = await inventory()
     if baseline.actors:
         raise RuntimeError("Unexpected existing actors in fresh VM")
@@ -150,9 +157,15 @@ async def measure(directory: Path) -> AdapterResult:
             raise RuntimeError("Native actor PID/context inventory does not match entities")
         start = time.monotonic_ns()
         await produce(actors, warmup_sequence, w.max_inflight)
-        warmup = time.monotonic_ns() - start
+        warmup_counts = tuple([await actor.call(Room.read) for actor in actors])
+        if warmup_counts != expected_warmup:
+            raise ValueError("Warmup snapshot differs from applied messages")
         for actor in actors:
             await actor.call(Room.reset)
+        reset_counts = tuple([await actor.call(Room.read) for actor in actors])
+        if any(reset_counts):
+            raise ValueError("Warmup reset left nonzero state")
+        warmup = time.monotonic_ns() - start
         start = time.monotonic_ns()
         observations, peak = await produce(actors, measured_sequence, w.max_inflight)
         measurement = time.monotonic_ns() - start
@@ -174,6 +187,8 @@ async def measure(directory: Path) -> AdapterResult:
         baseline=baseline,
         active=active,
         stopped=stopped,
+        warmup_counts=warmup_counts,
+        reset_counts=reset_counts,
         python=sys.version,
         gil_enabled=sys._is_gil_enabled(),
         interpreter_id=_interpreters.get_current()[0],
