@@ -312,4 +312,4 @@ timeout 120 java -jar "$PYBEAM_ALLOY_JAR" exec -t none -o "$output/solutions" "$
 
 [tasks."test:distributed"]
 description = "Private finite distribution and ownership checks; never part of default VM-free tests"
-run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py tests/test_guardian_authorization.py tests/test_guardian_authorization_model.py --run-runtime -q"
+run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py tests/test_guardian_authorization.py tests/test_guardian_authorization_model.py tests/test_guardian_composition.py tests/test_guardian_composition_model.py tests/test_guardian_composition_native.py --run-runtime -q"

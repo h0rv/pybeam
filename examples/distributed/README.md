@@ -36,6 +36,13 @@ reports uncertainty. Restarting B creates empty state and a new incarnation.
 A must explicitly join again and submit a new request. There is no replay or
 durability. These limits do not bound network decoding or total process memory.
 
+A host can pass a `GuardianEndpoint` through `LocalCluster(..., guardian=endpoint)`
+when an existing outer guardian implements the registration acknowledgment
+contract. The cluster borrows that guardian and does not stop it. The inner
+guardian and every executable child must receive an outer acknowledgment after
+their birth identity is recorded. Cancellation or a missing acknowledgment
+blocks entry. The normal command does not require an outer guardian.
+
 ## Source development
 
 Use conventional CPython 3.14.10 and OTP 29.1.2. Build the paired native checkout
