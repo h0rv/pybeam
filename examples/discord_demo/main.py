@@ -8,14 +8,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from uvicorn import Config, Server
 
@@ -30,15 +30,30 @@ ROOT = Path(__file__).parent
 logger = logging.getLogger("discord_demo")
 templates = Jinja2Templates(directory=ROOT / "templates")
 type RoomId = Literal["general", "python", "beam", "random"]
+type EpochText = Annotated[str, Field(pattern=r"^(0|[1-9][0-9]{0,18})$")]
 
 
 class Command(BaseModel):
     model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
 
     action: Action
-    generation: Annotated[str, Field(pattern=r"^(0|[1-9][0-9]{0,19})$")]
+    generation: EpochText
+    revision: EpochText | None = None
     csrf: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     text: Annotated[str, Field(max_length=256)] = ""
+
+    @field_validator("generation", "revision")
+    @classmethod
+    def bounded_epoch(cls, value: str | None) -> str | None:
+        if value is not None and int(value) > 9_223_372_036_854_775_807:
+            raise ValueError("Epoch or revision exceeds the native integer limit")
+        return value
+
+    @model_validator(mode="after")
+    def captured_leave_revision(self) -> Self:
+        if self.action == "leave" and self.revision is None:
+            raise ValueError("Leave requires the membership revision captured in its form")
+        return self
 
     @field_validator("text")
     @classmethod
@@ -205,13 +220,17 @@ type Member = Annotated[str, Depends(member)]
 
 
 def panel(view: View, identity: str, demo: Demo) -> str:
+    membership = next(
+        (item for item in view.snapshot.ledger if item.member_id == identity and item.present),
+        None,
+    )
     return templates.get_template("room.html").render(
         view=view,
         member=identity,
         csrf=owner.csrf(identity),
         is_owner=identity == demo.owner,
-        can_leave=demo.leave is not None,
-        joined=any(item.member_id == identity for item in view.snapshot.members),
+        revision=membership.revision if membership is not None else None,
+        joined=membership is not None,
     )
 
 
@@ -294,6 +313,7 @@ async def action(
                 command.action,
                 command.text,
                 secrets.token_hex(16),
+                revision=int(command.revision) if command.revision is not None else None,
             )
             return "Confirmed " + command.action + ". The live stream reads native state."
         except (ValueError, ActorCallError, ActorStoppedError) as error:

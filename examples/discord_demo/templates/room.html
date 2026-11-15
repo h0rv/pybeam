@@ -16,24 +16,27 @@
     <h3>Members <small>{{ view.snapshot.members|length }} / 8</small></h3>
     <ul id="members">
       {% for item in view.snapshot.members %}
-      <li><code>{{ item.member_id[:8] }}</code>{% if item.member_id == member %} (you){% endif %}
+      <li data-member="{{ item.member_id }}" data-count="{{ item.count }}"><code>{{ item.member_id[:8] }}</code>{% if item.member_id == member %} (you){% endif %}
         <small>{{ item.count }} receipts</small></li>
       {% else %}
       <li>No native memberships.</li>
       {% endfor %}
     </ul>
     <p id="membership">{% if joined %}Joined this generation.{% else %}Not joined. Explicit join required.{% endif %}</p>
-    {% for action, title, disabled in [('join', 'Join / rejoin', joined), ('leave', 'Leave', not joined or not can_leave)] %}
+    {% for action, title, disabled in [('join', 'Join / rejoin', joined), ('leave', 'Leave', not joined)] %}
     <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
           hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
       <input type="hidden" name="action" value="{{ action }}">
+      {% if action == 'leave' and revision is not none %}
+      <input type="hidden" name="revision" value="{{ revision }}">
+      {% endif %}
       <input type="hidden" name="generation" value="{{ view.info.generation }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button type="submit" {% if disabled %}disabled{% endif %}>{{ title }}</button>
     </form>
     {% endfor %}
-    {% if not can_leave %}<p>Leave unavailable: this domain revision has no native Room.leave method.
-      Membership remains until the room restarts. Disconnect does not pretend to remove it.</p>{% endif %}
+    <p>Leave stops native message delivery receipts, not this read-only live view.
+      Disconnect closes the stream without changing membership.</p>
   </aside>
 </div>
 <details open>
@@ -42,10 +45,22 @@
     <dt>BEAM child PID</dt><dd><code>{{ view.info.pid }}</code></dd>
     <dt>Native generation</dt><dd>{{ view.info.generation }}</dd>
     <dt>Room epoch</dt><dd>{{ view.snapshot.epoch }}</dd>
+    <dt>Identity slots used this generation</dt><dd id="identity-slots">{{ view.snapshot.ledger|length }} / 8, including departed members</dd>
+    <dt>Your membership revision</dt><dd id="membership-revision">{{ revision if revision is not none else 'Not present' }}</dd>
     <dt>Admitted encoded calls / bytes</dt><dd>{{ view.info.admitted_count }} / {{ view.info.admitted_bytes }}</dd>
     <dt>State</dt><dd>{{ view.snapshot.members|length }} members, {{ view.snapshot.event_ids|length }} events,
       {{ view.snapshot.history|length }} retained messages</dd>
   </dl>
+  <h4>Native receipt ledger</h4>
+  <ul id="ledger">
+    {% for item in view.snapshot.ledger %}
+    <li data-member="{{ item.member_id }}" data-count="{{ item.count }}"
+        data-revision="{{ item.revision }}" data-present="{{ 'true' if item.present else 'false' }}">
+      <code>{{ item.member_id[:8] }}</code>: {{ item.count }} receipts,
+      revision {{ item.revision }}, {{ 'present' if item.present else 'departed' }}
+    </li>
+    {% else %}<li>No identities in this generation.</li>{% endfor %}
+  </ul>
   {% if is_owner %}
   <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
         hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">

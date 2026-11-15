@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from playwright.async_api import Page, Route, async_playwright, expect
+from playwright.async_api import Page, Request, Route, async_playwright, expect
 
 from examples.discord_demo.main import Resources
 
@@ -167,6 +167,142 @@ async def test_miniapp__nonreading_output_peer_releases_native_subscription(
                 await writer.wait_closed()
             await context.close()
         finally:
+            await browser.close()
+
+
+async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_receipts(
+    miniapp: Miniapp,
+) -> None:
+    errors: list[str] = []
+    navigating = False
+
+    def request_failed(request: Request) -> None:
+        if navigating and request.url.endswith("/events") and request.failure == "net::ERR_ABORTED":
+            return
+        errors.append(request.url + ": " + str(request.failure))
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(executable_path=str(CHROME), headless=True)
+        first_context = await browser.new_context()
+        second_context = await browser.new_context()
+        release_ack = asyncio.Event()
+        try:
+            first, second = await first_context.new_page(), await second_context.new_page()
+            for page in (first, second):
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.on("requestfailed", request_failed)
+                await page.goto(miniapp.url + "/rooms/general")
+                await expect(page.locator("#inspector")).to_be_visible()
+                await join(page)
+            baseline = await resource_counts(first, miniapp.url)
+            assert baseline.streams == baseline.subscriptions == 2
+            await send(first, "one: both native recipients")
+            for page in (first, second):
+                await expect(page.locator("#members li")).to_have_count(2)
+                await expect(page.locator('#members li[data-count="1"]')).to_have_count(2)
+            form = second.locator("form").filter(
+                has=second.get_by_role("button", name="Leave", exact=True)
+            )
+            captured: dict[str, str] = {}
+            for element in await form.locator("input[name]").all():
+                name = await element.get_attribute("name")
+                assert name is not None
+                captured[name] = await element.input_value()
+            assert captured["revision"] == "0"
+            second_cookie = next(
+                item["value"]
+                for item in await second_context.cookies()
+                if item["name"] == "discord"
+            )
+            second_id = second_cookie.split(".", 1)[0]
+            second_ledger = '#ledger li[data-member="' + second_id + '"]'
+            completed = asyncio.Event()
+
+            async def delay_leave_ack(route: Route) -> None:
+                response = await route.fetch()
+                completed.set()
+                await release_ack.wait()
+                await route.fulfill(response=response)
+
+            await second.route("**/actions", delay_leave_ack)
+            await second.get_by_role("button", name="Leave", exact=True).click()
+            async with asyncio.timeout(5):
+                await completed.wait()
+            for page in (first, second):
+                await expect(page.locator("#members li")).to_have_count(1)
+                await expect(page.locator(second_ledger)).to_have_attribute("data-present", "false")
+            await send(first, "two: only the remaining native recipient")
+            for page in (first, second):
+                await expect(page.locator("#messages")).to_contain_text("two: only")
+                await expect(page.locator('#members li[data-count="2"]')).to_have_count(1)
+                await expect(page.locator(second_ledger)).to_have_attribute("data-count", "1")
+            release_ack.set()
+            await expect(second.locator("#ack")).to_contain_text("Confirmed leave")
+            await expect(second.locator("#messages")).to_contain_text("two: only")
+            await expect(second.locator("#members li")).to_have_count(1)
+            await second.unroute("**/actions", delay_leave_ack)
+            await join(second)
+            for page in (first, second):
+                await expect(page.locator("#members li")).to_have_count(2)
+                await expect(page.locator(second_ledger)).to_have_attribute("data-revision", "1")
+                await expect(page.locator(second_ledger)).to_have_attribute("data-present", "true")
+                await expect(page.locator("#inspector")).to_have_attribute(
+                    "data-generation", captured["generation"]
+                )
+            response = await second.request.post(
+                miniapp.url + "/rooms/general/actions",
+                form={**captured},
+                headers={"origin": miniapp.url, "hx-request": "true"},
+            )
+            rejection = await response.text()
+            assert "Not confirmed" in rejection and "revision" in rejection
+            impersonation = await first.request.post(
+                miniapp.url + "/rooms/general/actions",
+                form={**captured, "revision": "1"},
+                headers={"origin": miniapp.url, "hx-request": "true"},
+            )
+            assert impersonation.status == 403
+            forged_member = await second.request.post(
+                miniapp.url + "/rooms/general/actions",
+                form={**captured, "revision": "1", "member_id": "another-session"},
+                headers={"origin": miniapp.url, "hx-request": "true"},
+            )
+            assert forged_member.status == 422
+            assert not errors
+            navigating = True
+            await second.reload()
+            await expect(second.locator(second_ledger)).to_have_attribute("data-revision", "1")
+            navigating = False
+            await expect(second.locator(second_ledger)).to_have_attribute("data-count", "1")
+            await expect(second.locator("#members li")).to_have_count(2)
+            await send(first, "three: both native recipients after rejoin")
+            for page in (first, second):
+                await expect(page.locator("#messages")).to_contain_text("three: both")
+                await expect(page.locator('#members li[data-count="3"]')).to_have_count(1)
+                await expect(page.locator(second_ledger)).to_have_attribute("data-count", "2")
+                await expect(page.locator("#identity-slots")).to_contain_text("2 / 8")
+            await asyncio.sleep(2.2)
+            assert not errors
+            await second.close()
+            await first.goto("about:blank")
+            async with asyncio.timeout(8):
+                while True:
+                    final = await resource_counts(first, miniapp.url)
+                    if final.streams == final.subscriptions == final.operations == 0:
+                        break
+                    await asyncio.sleep(0.05)
+            assert final.live_contexts == baseline.live_contexts
+            print(
+                "Native leave/rejoin verified: room generation",
+                captured["generation"],
+                "membership revision 0 -> 1; native receipts A=3 B=2; stale form rejected;",
+                "drained resources:",
+                final.model_dump_json(),
+            )
+        finally:
+            release_ack.set()
+            await first_context.close()
+            await second_context.close()
             await browser.close()
 
 

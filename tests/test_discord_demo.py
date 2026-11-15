@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from examples.discord_demo import main as web
 from examples.discord_demo.domain import Action, Demo, RoomHandle, View
-from examples.discord_simulation import Delivery, Event, Room, Snapshot
+from examples.discord_simulation import Delivery, Event, Membership, Room, Snapshot
 from pybeam.actors import ActorGroup, ActorInfo
 from pybeam.actors.classes import Container, Route, definition
 from pybeam.integrations.hornbeam import runtime as managed
@@ -95,7 +95,14 @@ async def demo(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Demo]:
 def view(identity: str, text: str = "hello") -> View:
     event = Event(room_id="general", event_id="one", epoch=7, text=text, tags=[identity])
     return View(
-        Snapshot("general", 7, (Delivery(identity, 1),), ("one",), (event,)),
+        Snapshot(
+            "general",
+            7,
+            (Delivery(identity, 1),),
+            ("one",),
+            (event,),
+            (Membership(identity, 7, 1, True, 3),),
+        ),
         ActorInfo("<0.123.0>", 7, 0, 0),
     )
 
@@ -130,6 +137,12 @@ def test_session__signature_is_bound_to_runtime_and_csrf_purpose() -> None:
         {"text": "x" * 257},
         {"csrf": "雪" * 64},
         {"pid": "<0.1.0>"},
+        {"member_id": "another-session"},
+        {"generation": "9223372036854775808"},
+        {"revision": "9223372036854775808"},
+        {"revision": "-1"},
+        {"revision": True},
+        {"action": "leave"},
     ],
 )
 def test_command__rejects_unsafe_form_boundary(payload: dict[str, object]) -> None:
@@ -151,7 +164,10 @@ async def test_render__escapes_messages_and_never_puts_chat_in_ack(demo: Demo) -
     assert "&lt;img" in rendered
     assert "<0.123.0>" not in rendered
     assert "&lt;0.123.0&gt;" in rendered
-    assert "Leave unavailable" in rendered
+    assert "Leave unavailable" not in rendered
+    assert 'name="revision" value="3"' in rendered
+    assert 'data-revision="3" data-present="true"' in rendered
+    assert "including departed members" in rendered
     ack = web.templates.get_template("ack.html").render(message="Confirmed send")
     assert "messages" not in ack
     assert "generation" not in ack
@@ -204,6 +220,8 @@ async def test_post__ack_cannot_replace_chat_and_csrf_rejects_without_call(
         action: Action,
         text: str,
         event_id: str,
+        *,
+        revision: int | None = None,
     ) -> None:
         calls.append(action)
 
@@ -337,9 +355,22 @@ async def test_domain__native_snapshot_authorizes_members_and_rejects_stale_cont
         await demo.change("general", identity, 6, "crash", "", "crash")
     with pytest.raises(ValueError, match="Join this room"):
         await demo.change("general", "foreign", 7, "send", "forged", "forged")
-    with pytest.raises(ValueError, match=r"Room\.leave is not available"):
+    with pytest.raises(ValueError, match="membership revision captured"):
         await demo.change("general", identity, 7, "leave", "", "leave")
     assert await reference.snapshot() == snapshot
+    await demo.change("general", identity, 7, "leave", "", "leave", revision=0)
+    departed = await reference.snapshot()
+    assert departed.members == ()
+    assert departed.ledger == (Membership(identity, 7, 1, False, 0),)
+    assert departed.history == snapshot.history
+    await demo.change("general", identity, 7, "join", "", "rejoin")
+    fresh = await reference.snapshot()
+    assert fresh.ledger == (Membership(identity, 7, 1, True, 1),)
+    with pytest.raises(web.ActorCallError, match="revision"):
+        await demo.change("general", identity, 7, "leave", "", "old-leave", revision=0)
+    assert await reference.snapshot() == fresh
+    await demo.change("general", identity, 7, "leave", "", "fresh-leave", revision=1)
+    assert (await reference.snapshot()).members == ()
 
 
 async def test_post__cancelled_wait_does_not_cancel_or_retry_admitted_effect(
@@ -357,6 +388,8 @@ async def test_post__cancelled_wait_does_not_cancel_or_retry_admitted_effect(
         action: Action,
         text: str,
         event_id: str,
+        *,
+        revision: int | None = None,
     ) -> None:
         admitted.set()
         await release.wait()
@@ -403,6 +436,58 @@ async def test_stream__admission_rejects_before_subscribing(demo: Demo) -> None:
     assert error.value.status_code == 503
     assert demo.streams == 32
     demo.streams = 0
+
+
+async def test_leave_http__binds_session_and_preserves_captured_revision(
+    demo: Demo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reference = local_room()
+    demo.rooms["general"] = RoomHandle(reference)
+    first, second = secrets.token_hex(16), secrets.token_hex(16)
+
+    async def info(_reference: object) -> ActorInfo:
+        return ActorInfo("<unit-only>", 7, 0, 0)
+
+    monkeypatch.setattr(demo.group, "info", info)
+    for identity in (first, second):
+        await demo.change("general", identity, 7, "join", "", "join")
+    await demo.change("general", first, 7, "send", "first", "first-event")
+    before = await reference.snapshot()
+    captured = {
+        "action": "leave",
+        "generation": "7",
+        "revision": "0",
+        "csrf": web.owner.csrf(second),
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(second)},
+        headers={"origin": web.owner.origin, "hx-request": "true"},
+    ) as client:
+        for forged in (
+            {**captured, "member_id": first},
+            {**captured, "csrf": web.owner.csrf(first)},
+            {**captured, "generation": "6"},
+        ):
+            response = await client.post("/rooms/general/actions", data=forged)
+            assert response.status_code in (403, 422) or "Not confirmed" in response.text
+            assert await reference.snapshot() == before
+        response = await client.post("/rooms/general/actions", data=captured)
+        assert "Confirmed leave" in response.text
+        assert "id=" not in response.text
+        assert (await reference.snapshot()).members == (Delivery(first, 1),)
+        await demo.change("general", first, 7, "send", "second", "second-event")
+        assert (await reference.snapshot()).ledger == (
+            Membership(first, 7, 2, True),
+            Membership(second, 7, 1, False),
+        )
+        await demo.change("general", second, 7, "join", "", "rejoin")
+        fresh = await reference.snapshot()
+        response = await client.post("/rooms/general/actions", data=captured)
+        assert "Not confirmed" in response.text and "revision" in response.text
+        assert await reference.snapshot() == fresh
+        assert demo.inflight == 0
 
 
 @pytest.mark.parametrize("previous", [None, "disabled"])

@@ -22,7 +22,7 @@
     </nav>
     <p>You: <code>{{ member[:8] }}</code></p>
     <p>Anonymous local sessions. Not Discord authentication.</p>
-    <p>Changing pages does not change native membership. Leave explicitly when available.</p>
+    <p>Changing pages does not change native membership. Use Leave explicitly.</p>
   </aside>
   <main>
     <header>
@@ -45,7 +45,9 @@
     <p id="ack" role="status">Messages are not retried. A cancelled request can still have effects.</p>
     <footer>
       <p>Four real BEAM worker processes, not four Python coroutines. No CPU or GIL isolation claim.</p>
-      <p>8 members per room. 100 events per generation. Latest 32 messages retained.
+      <p>8 distinct identities per room generation, including departed members.
+         Leave does not free an identity slot; the same identity can rejoin.
+         100 events per generation. Latest 32 messages retained.
          32 streams, 16 admitted web operations, native request limits and 4096-byte subscription queues.
          Slow writes disconnect after 5 seconds. No persistence or replay.</p>
       <p>The stream alone writes chat and presence. POST responses only confirm operations.
