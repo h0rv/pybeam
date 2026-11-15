@@ -1,7 +1,9 @@
 import asyncio
 import sys
 from pathlib import Path
+from typing import override
 
+import pytest
 import uvicorn
 from pydantic import BaseModel, ConfigDict
 
@@ -67,32 +69,37 @@ def serve(port: int, audit: Path) -> None:
                 ).model_dump_json(),
             )
 
+        @override
         def update(self, job: Job) -> None:
             super().update(job)
             self.record()
 
+        @override
         def subscribe(self) -> asyncio.Queue[int]:
             result = super().subscribe()
             self.record()
             return result
 
+        @override
         def unsubscribe(self, queue: asyncio.Queue[int]) -> None:
             super().unsubscribe(queue)
             self.record()
 
+        @override
         async def close(self) -> None:
             self.close_calls += 1
             await super().close()
             self.record()
 
-    showcase.Jobs = ObservedJobs
-    uvicorn.run(
-        create_app(Settings(port=port)),
-        host="127.0.0.1",
-        port=port,
-        access_log=False,
-        timeout_graceful_shutdown=2,
-    )
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(showcase, "Jobs", ObservedJobs)
+        uvicorn.run(
+            create_app(Settings(port=port)),
+            host="127.0.0.1",
+            port=port,
+            access_log=False,
+            timeout_graceful_shutdown=2,
+        )
 
 
 if __name__ == "__main__":
