@@ -39,7 +39,15 @@ def main() -> None:
         trusted_hornbeam_root=args.trusted_hornbeam_root,
         trusted_native_root=args.trusted_native_root,
     )
-    uvicorn.run(create_app(settings), host="127.0.0.1", port=settings.port, access_log=False)
+    # Uvicorn drains HTTP before lifespan shutdown. Bound the SSE drain so lifespan
+    # can request owned cleanup, then let its TaskGroup await the guardian ACKs.
+    uvicorn.run(
+        create_app(settings),
+        host="127.0.0.1",
+        port=settings.port,
+        access_log=False,
+        timeout_graceful_shutdown=2,
+    )
 
 
 if __name__ == "__main__":
