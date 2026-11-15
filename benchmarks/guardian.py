@@ -22,7 +22,7 @@ from benchmarks.contract import (
     Unsupported,
     check_correctness,
 )
-from benchmarks.ownership import SpawnReply, SpawnRequest, identity, resolve
+from benchmarks.ownership import Control, SpawnReply, SpawnRequest, identity, resolve
 from benchmarks.provenance import git
 
 
@@ -81,7 +81,7 @@ def append_sample(stream: TextIO, sample: ResourceSample) -> None:
     stream.flush()
 
 
-def supervise(directory: Path, parent: Identity) -> Outcome:
+def supervise(directory: Path, parent: Identity, control: Control | None = None) -> Outcome:
     config = Config.model_validate_json((directory / "config.json").read_text())
     budget = config.budget
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -190,7 +190,11 @@ def supervise(directory: Path, parent: Identity) -> Outcome:
                         processes=observed,
                     ),
                 )
-                if harness is None:
+                if control is not None and Path(control.stop_file).exists():
+                    reason = "Stop requested; side effects are not rolled back"
+                elif control is not None and resolve(control.owner) is None:
+                    reason = "Control owner exited"
+                elif harness is None:
                     reason = "Harness owner exited"
                 elif time.monotonic_ns() - start > budget.wall_seconds * 1e9:
                     reason = "Wall-time budget exceeded"
@@ -268,7 +272,8 @@ def supervise(directory: Path, parent: Identity) -> Outcome:
 def main() -> None:
     directory = Path(sys.argv[1])
     parent = Identity.model_validate_json(sys.argv[2])
-    outcome = supervise(directory, parent)
+    control = Control.model_validate_json(sys.argv[3]) if len(sys.argv) > 3 else None
+    outcome = supervise(directory, parent, control)
     (directory / "outcome.json").write_text(outcome.model_dump_json() + "\n")
 
 

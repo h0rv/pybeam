@@ -1,0 +1,60 @@
+<section id="jobs" hx-get="/jobs" hx-trigger="every 1s" hx-target="#jobs" hx-swap="outerHTML">
+  <h2>Jobs and results</h2>
+  <p>{{ jobs|selectattr('active')|list|length }} queued/running. <a href="/">Refresh page</a></p>
+  <p>Backend support: Python smoke only. PyBeam, Erlang and Elixir comparisons are unsupported.
+     Rates below describe actual completed events on an uncontrolled host. They are not cross-backend speedups.</p>
+  {% if measurements %}
+  <table>
+    <caption>Python smoke runs side by side · same fixed workload, uncontrolled host</caption>
+    <thead><tr><th>Job</th><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th></tr></thead>
+    <tbody>{% for sample in measurements %}<tr>
+      <td><a href="#job-{{ sample.job_id }}">{{ sample.job_id[:8] }}</a></td>
+      <td>{{ sample.trial.trial }}</td><td>{{ sample.trial.outcome.status }}</td>
+      <td>{{ sample.trial.completed }}</td><td>{{ sample.trial.throughput_per_second }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+  {% for job in jobs %}
+  <article class="box" id="job-{{ job.id }}" data-status="{{ job.status }}" data-key="{{ job.card.key }}">
+    <h3>{{ job.card.title }}: <span role="status">{{ job.status }}</span></h3>
+    {% if job.active %}
+    <form action="/cancel/{{ job.id }}" method="post"><button>Cancel {{ job.card.title }}</button></form>
+    {% if job.card.port and job.status == 'running' %}<a href="http://127.0.0.1:{{ job.card.port }}" target="_blank" rel="noopener">Open private demo (may still be starting)</a>{% endif %}
+    {% endif %}
+    {% if job.status in ['stopped', 'stopping'] %}<p>Stop requested. No rollback guarantee. Inspect cleanup survivors below.</p>{% endif %}
+    {% if job.error %}<p>{{ job.error }}</p>{% endif %}
+    <pre>{{ job.logs() }}</pre>
+    {% if job.trials %}
+    <a href="/artifact/{{ job.id }}">Download actual trials.jsonl</a>
+    <table>
+      <caption>Actual typed runner evidence · Python smoke, not a full comparison</caption>
+      <thead><tr><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th><th>Latency p95 ns</th><th>Tree RSS bytes</th><th>Cleanup survivors</th></tr></thead>
+      <tbody>
+      {% for trial in job.trials %}
+      <tr><td>{{ trial.trial }}</td><td>{{ trial.outcome.status }} {{ trial.outcome.reason or '' }}</td>
+        <td>{{ trial.completed if trial.completed is not none else 'unsupported' }}</td>
+        <td>{{ '%.2f'|format(trial.throughput_per_second) if trial.throughput_per_second is not none else 'unsupported' }}</td>
+        <td>{{ trial.latency_ns.p95 if trial.latency_ns else 'unsupported' }}</td>
+        <td>{{ trial.simultaneous_tree_rss_peak_bytes }}</td><td>{{ trial.outcome.cleanup_survivors|length }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <figure>
+      <figcaption>Measured throughput per trial, events/s. Zero-based axis scaled to this job's maximum.</figcaption>
+      {% set rates = job.trials|map(attribute='throughput_per_second')|reject('none')|list %}
+      {% if rates %}
+      <svg viewBox="0 0 600 {{ 40 * job.trials|length + 30 }}" role="img" aria-label="Actual events per second by trial">
+        <line x1="100" y1="0" x2="100" y2="{{ 40 * job.trials|length }}" stroke="currentColor"/>
+        {% for trial in job.trials %}{% if trial.throughput_per_second is not none %}
+        <text x="0" y="{{ loop.index0 * 40 + 20 }}" fill="currentColor">Trial {{ trial.trial }}</text>
+        <rect x="100" y="{{ loop.index0 * 40 }}" width="{{ 400 * trial.throughput_per_second / (rates|max) }}" height="25" fill="steelblue"><title>{{ trial.throughput_per_second }} events/s</title></rect>
+        {% endif %}{% endfor %}
+        <text x="100" y="{{ 40 * job.trials|length + 20 }}" fill="currentColor">0</text>
+        <text x="400" y="{{ 40 * job.trials|length + 20 }}" fill="currentColor">{{ '%.2f'|format(rates|max) }} events/s</text>
+      </svg>
+      {% else %}<p>No throughput evidence. No chart values invented.</p>{% endif %}
+    </figure>
+    {% endif %}
+  </article>
+  {% else %}<p>No jobs yet. Start the small Python smoke above.</p>{% endfor %}
+</section>

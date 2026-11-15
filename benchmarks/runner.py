@@ -26,7 +26,7 @@ from benchmarks.contract import (
     check_correctness,
 )
 from benchmarks.metrics import describe
-from benchmarks.ownership import identity
+from benchmarks.ownership import Control, identity, resolve
 from benchmarks.provenance import capture
 
 type Quantile = Literal["p50", "p95", "p99"]
@@ -69,13 +69,20 @@ def measurement_lock() -> Generator[int]:
         os.close(descriptor)
 
 
-def trial(config: Config, directory: Path, lock_fd: int) -> Outcome:
+def trial(config: Config, directory: Path, lock_fd: int, control: Control | None = None) -> Outcome:
     directory.mkdir(parents=True)
     (directory / "config.json").write_text(config.model_dump_json(indent=2) + "\n")
     parent = identity(psutil.Process())
     with (directory / "guardian.log").open("wb") as log:
         guardian = subprocess.Popen(  # noqa: S603
-            [sys.executable, "-m", "benchmarks.guardian", str(directory), parent.model_dump_json()],
+            [
+                sys.executable,
+                "-m",
+                "benchmarks.guardian",
+                str(directory),
+                parent.model_dump_json(),
+                *([] if control is None else [control.model_dump_json()]),
+            ],
             start_new_session=True,
             pass_fds=(lock_fd,),
             stdout=log,
@@ -145,7 +152,7 @@ def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> 
     )
 
 
-def run(config: Config, output: Path) -> Summary:
+def run(config: Config, output: Path, control: Control | None = None) -> Summary:
     with measurement_lock() as descriptor:
         output.mkdir(parents=True, exist_ok=False)
         provenance = capture(config.python_source, config.native_source)
@@ -153,8 +160,12 @@ def run(config: Config, output: Path) -> Summary:
         summaries: list[TrialSummary] = []
         with (output / "trials.jsonl").open("w") as raw:
             for index in range(config.repeats):
+                if control is not None and (
+                    Path(control.stop_file).exists() or resolve(control.owner) is None
+                ):
+                    break
                 directory = output / ("trial-" + str(index))
-                outcome = trial(config, directory, descriptor)
+                outcome = trial(config, directory, descriptor, control)
                 summary = summarize(index, directory, config, outcome)
                 summaries.append(summary)
                 raw.write(summary.model_dump_json() + "\n")
@@ -223,6 +234,7 @@ def main() -> None:
     parser.add_argument("command", choices=("run", "schema"))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--control", help="Local owner identity and stop-file JSON, not HTTP input")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     if args.command == "schema":
@@ -249,6 +261,7 @@ def main() -> None:
         Path("/tmp").resolve()  # noqa: S108  User-authorized artifact location.
     ):
         parser.error("Artifacts must be under this experiment's benchmarks/results or /tmp")
-    result = run(config, output)
+    control = None if args.control is None else Control.model_validate_json(args.control)
+    result = run(config, output, control)
     if any(t.outcome.status == "failed" for t in result.trials):
         raise SystemExit(1)

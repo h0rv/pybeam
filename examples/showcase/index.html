@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
+  <title>PyBeam local control plane</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/missing.min.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <p>Local development tool · fixed source catalog</p>
+    <h1>PyBeam control plane</h1>
+    <p>This server runs on CPython with FastAPI, not on native BEAM. Only the counter examples use BEAM state.</p>
+    <p>One job at a time, at most four queued/running and 16 retained per session.
+       Benchmark comparisons always use the shared runner load lock. Logs show at most 16 KiB.
+       Each running workload has a 30-second guardian budget. Limits are sampled watchdog checks.
+       Stop requests are not rollback. Side effects may remain uncertain.</p>
+    <form action="/run-all" method="post"><button>Run all available demos</button></form>
+    <p>The cancellation probe is excluded from run all. Missing runtime assets disable native cards.
+       Only this checkout's fixed commands are trusted. No other worktree heads are executed.</p>
+  </header>
+  <section aria-labelledby="catalog-heading">
+    <h2 id="catalog-heading">Example catalog</h2>
+    {% for card in cards %}
+    <article class="box" id="card-{{ card.key }}">
+      <h3>{{ card.title }} <small>[{{ card.status }}]</small></h3>
+      <p>{{ card.explanation }}</p>
+      {% if card.source %}<p><a href="/source/{{ card.key }}">View example code</a> · <code>{{ card.source }}</code></p>{% endif %}
+      {% if card.disabled %}<p>Unavailable: {{ card.disabled }}</p>{% endif %}
+      <form action="/start/{{ card.key }}" method="post">
+        <button {% if card.disabled %}disabled{% endif %}>Start {{ card.title }}</button>
+      </form>
+    </article>
+    {% endfor %}
+  </section>
+  {% include 'jobs.html' %}
+</main>
+</body>
+</html>

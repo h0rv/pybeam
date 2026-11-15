@@ -8,6 +8,11 @@ from pydantic import Field
 from benchmarks.contract import Identity, StrictModel
 
 
+class Control(StrictModel):
+    owner: Identity
+    stop_file: str
+
+
 class SpawnRequest(StrictModel):
     argv: tuple[str, ...] = Field(min_length=1)
 
