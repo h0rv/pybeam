@@ -1,9 +1,11 @@
+import ast
 import base64
 import csv
 import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -379,12 +381,16 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "from erlang import ErlangEventLoop\n"
         "from erlang.actors import OwnedActor\n"
         "from erlang.supervision import ChildState\n"
-        "from pybeam.actors import ActorRef\n"
+        "from pybeam import actor\n"
+        "@actor\n"
+        "class Counter:\n"
+        "    async def echo(self, value: int, *, label: str) -> str:\n"
+        "        return label * value\n"
         "async def method(state: object, value: int, *, label: str) -> str:\n"
         "    return label * value\n"
-        "async def verify(actor: OwnedActor, ref: ActorRef[object], child: ChildState) -> None:\n"
+        "async def verify(actor: OwnedActor, ref: Counter, child: ChildState) -> None:\n"
         "    assert_type(await actor.call(0, method, 2, label='ok'), str)\n"
-        "    assert_type(await ref.call(method, 2, label='ok'), str)\n"
+        "    assert_type(await ref.echo(2, label='ok'), str)\n"
         "    assert_type(child, ChildState)\n"
         "loop: ErlangEventLoop\n"
     )
@@ -434,6 +440,53 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     )
     assert rejected.returncode != 0
     assert rejected.stdout.count("error[invalid-argument-type]") == 2, rejected.stdout
+    source_tests = Path(__file__).resolve().parent
+    isolated_tests = tmp_path / "tests"
+    (isolated_tests / "fixtures").mkdir(parents=True)
+    for name in ("__init__.py", "fixtures/__init__.py"):
+        (isolated_tests / name).touch()
+    for name in ("pythonic_actors_positive.py", "fixtures/actor_inheritance.py"):
+        shutil.copyfile(source_tests / name, isolated_tests / name)
+    negative_source = (source_tests / "pythonic_actors_negative.txt").read_text()
+    negative = isolated_tests / "negative.py"
+    negative.write_text(negative_source)
+    for target, expected in ((isolated_tests / "pythonic_actors_positive.py", 0), (negative, 1)):
+        checked_types = subprocess.run(
+            [
+                ty,
+                "check",
+                "--project",
+                str(tmp_path),
+                "--python",
+                str(moved),
+                "--error-on-warning",
+                "--config",
+                "rules.all='error'",
+                "--output-format",
+                "concise",
+                str(target),
+            ],
+            cwd=tmp_path,
+            env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        output = checked_types.stdout + checked_types.stderr
+        assert checked_types.returncode == expected, output
+        if expected == 1:
+            assert "unresolved-import" not in output, output
+            lines = [int(match[1]) for match in re.finditer(r":(\d+):\d+: error\[", output)]
+            functions = [
+                node
+                for node in ast.parse(negative_source).body
+                if isinstance(node, ast.AsyncFunctionDef)
+            ]
+            assert len(functions) == 18
+            for function in functions:
+                assert function.end_lineno is not None
+                assert any(function.lineno <= line <= function.end_lineno for line in lines), output
     application = tmp_path / "application-original"
     application.mkdir()
     entry = application / "main.py"
@@ -442,14 +495,22 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "from pathlib import Path\n"
         "import pybeam, pydantic\n"
         "from pybeam.actors import ActorGroup, actor, spawn\n"
-        "from pybeam.mailbox import UnboundedMailbox\n"
-        "class Echo:\n"
+        "@actor\n"
+        "class Base:\n"
+        "    value: int = 0\n"
+        "    async def add(self, n: int) -> int:\n"
+        "        self.value += n\n"
+        "        return self.value\n"
+        "@actor\n"
+        "class Echo(Base):\n"
         "    async def echo(self, value: int) -> int:\n"
         "        return value\n"
         "async def main():\n"
         "    import erlang, ctypes\n"
-        "    async with await spawn(ActorSpec(Echo, (Echo.echo,)), mailbox=UnboundedMailbox()) as actor:\n"
-        "        assert await actor.call(Echo.echo, 42) == 42\n"
+        "    async with spawn(Echo, value=1) as reference:\n"
+        "        assert await reference.echo(42) == 42\n"
+        "        assert await reference.add(1) == 2\n"
+        "        assert await Base.add(reference, 2) == 4\n"
         "    dyld = ctypes.CDLL(None)\n"
         "    dyld._dyld_image_count.restype = ctypes.c_uint\n"
         "    dyld._dyld_get_image_name.restype = ctypes.c_char_p\n"
@@ -518,6 +579,25 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     )
     cli_state = NativeState.model_validate_json(cli_state_line.removeprefix("NATIVE_STATE "))
     assert cli_state.libraries == (host / "lib/libpython3.14.dylib",)
+    root = Path(__file__).resolve().parents[1]
+    for source, marker in (
+        (root / "examples/actors/main.py", "[1, 1, 1, 1, 1]"),
+        (root / "tests/fixtures/actor_inheritance.py", "pythonic-inheritance-ok"),
+    ):
+        relocated_probe = application / (source.stem + "_probe.py")
+        shutil.copyfile(source, relocated_probe)
+        checked = subprocess.run(
+            [str(moved / "bin/python"), str(relocated_probe)],
+            cwd=application,
+            env=clean,
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        assert checked.returncode == 0, checked.stdout + checked.stderr
+        assert marker in checked.stdout
+        assert "/Users/robby/projects" not in checked.stdout + checked.stderr
     with pytest.raises(ProcessLookupError):
         os.killpg(cli_state.pid, 0)
     manifest = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/runtime.json"

@@ -14,16 +14,17 @@ from benchmarks.runner import TrialSummary, measurement_lock
 from examples.showcase.catalog import ROOT
 
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
-BASE = "http://127.0.0.1:38921"
 
 
 @pytest.mark.skipif(not CHROME.is_file(), reason="Local Google Chrome unavailable")
 def test_showcase__actual_chrome_controls_and_evidence(tmp_path: Path) -> None:
     with socket.socket() as reservation:
-        reservation.bind(("127.0.0.1", 38921))
+        reservation.bind(("127.0.0.1", 0))
+        port = reservation.getsockname()[1]
+    BASE = "http://127.0.0.1:" + str(port)
     with (tmp_path / "server.log").open("wb") as log:
         server = subprocess.Popen(
-            [sys.executable, "-m", "examples.showcase"],
+            [sys.executable, "-m", "examples.showcase", "--port", str(port)],
             cwd=ROOT,
             stdout=log,
             stderr=log,
