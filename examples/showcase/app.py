@@ -42,13 +42,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        with session_directory() as directory:
+        temporary = session_directory()
+        with temporary as directory:
             async with asyncio.TaskGroup() as group:
                 session.jobs = Jobs(group, Path(directory))
                 try:
                     yield
                 finally:
                     await session.jobs.close()
+            if not any(job.status == "uncertain" for job in session.jobs.items.values()):
+                temporary.cleanup()
+            else:
+                print("Ownership uncertain; retained local journals: " + directory, flush=True)
             session.jobs = None
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)

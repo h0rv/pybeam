@@ -250,6 +250,7 @@ class Outcome(StrictModel):
     reason: str | None
     returncode: int | None
     cleanup_survivors: tuple[Identity, ...]
+    cleanup_state: Literal["confirmed", "uncertain"] = "confirmed"
     cleanup_ns: Natural
     forced_cleanup_count: Natural
     enforcement: tuple[str, ...]

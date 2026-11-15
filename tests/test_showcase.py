@@ -7,6 +7,7 @@ import psutil
 import pytest
 from fastapi.testclient import TestClient
 
+from benchmarks import runner
 from benchmarks.contract import Budget, Config, Identity, Outcome
 from benchmarks.ownership import Control, identity, resolve
 from benchmarks.runner import measurement_lock, trial
@@ -105,7 +106,10 @@ async def test_showcase__queue_is_bounded(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("mode", ["stop", "owner_exit"])
-def test_guardian__control_reaps_owned_child(tmp_path: Path, mode: str) -> None:
+def test_guardian__control_reaps_owned_child(
+    tmp_path: Path, mode: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runner, "LOAD_LOCK", tmp_path / "load.lock")
     config = Config(
         python_source=str(ROOT),
         native_source=str(ROOT),
@@ -118,8 +122,8 @@ def test_guardian__control_reaps_owned_child(tmp_path: Path, mode: str) -> None:
     control = Control(owner=identity(psutil.Process(owner.pid)), stop_file=str(stop))
 
     async def perform() -> Outcome:
-        async with asyncio.TaskGroup() as group:
-            with measurement_lock() as descriptor:
+        with measurement_lock() as descriptor:
+            async with asyncio.TaskGroup() as group:
                 task = group.create_task(
                     asyncio.to_thread(trial, config, tmp_path / "trial", descriptor, control)
                 )

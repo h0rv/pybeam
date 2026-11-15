@@ -68,6 +68,15 @@
           "title": "Cleanup Survivors",
           "type": "array"
         },
+        "cleanup_state": {
+          "default": "confirmed",
+          "enum": [
+            "confirmed",
+            "uncertain"
+          ],
+          "title": "Cleanup State",
+          "type": "string"
+        },
         "cleanup_ns": {
           "$ref": "#/$defs/Natural"
         },

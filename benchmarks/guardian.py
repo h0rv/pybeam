@@ -22,7 +22,19 @@ from benchmarks.contract import (
     Unsupported,
     check_correctness,
 )
-from benchmarks.ownership import Control, SpawnReply, SpawnRequest, identity, resolve
+from benchmarks.ownership import (
+    Control,
+    Registry,
+    SpawnReply,
+    SpawnRequest,
+    cleanup,
+    discover,
+    durable_write,
+    identity,
+    record,
+    resolve,
+    write_lease,
+)
 from benchmarks.provenance import git
 
 
@@ -41,35 +53,6 @@ def snapshot(value: Identity, role: str) -> ProcessSample | None:
         )
     except psutil.NoSuchProcess:
         return None
-
-
-def discover(owned: set[Identity]) -> None:
-    for value in tuple(owned):
-        process = resolve(value)
-        if process is None:
-            continue
-        with contextlib.suppress(psutil.NoSuchProcess):
-            owned.update(identity(child) for child in process.children(recursive=True))
-
-
-def cleanup(owned: set[Identity]) -> tuple[Identity, ...]:
-    discover(owned)
-    for value in owned:
-        process = resolve(value)
-        if process is not None:
-            with contextlib.suppress(psutil.NoSuchProcess):
-                process.suspend()
-    discover(owned)
-    for value in owned:
-        process = resolve(value)
-        if process is not None:
-            with contextlib.suppress(psutil.NoSuchProcess):
-                process.kill()
-    deadline = time.monotonic() + 1.0
-    while any(resolve(value) is not None for value in owned) and time.monotonic() < deadline:
-        time.sleep(0.01)
-    # Popen must reap its own children, or its recorded return code can be lost.
-    return tuple(value for value in owned if resolve(value) is not None)
 
 
 def artifact_size(directory: Path) -> int:
@@ -119,6 +102,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
         (directory / "resources.jsonl").open("w") as samples,
         contextlib.ExitStack() as stack,
     ):
+        record(directory, owned, "spawning")
         process = subprocess.Popen(  # noqa: S603
             [*command, str(directory)],
             env=environment,
@@ -129,6 +113,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
         children.append(process)
         adapter = identity(psutil.Process(process.pid))
         owned.add(adapter)
+        record(directory, owned, "tracking")
         try:
             if sys.platform == "linux":
                 target = psutil.Process(process.pid)
@@ -140,7 +125,10 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     "CPU affinity unavailable here; one core is requested, not enforced."
                 )
             while True:
+                previous = frozenset(owned)
                 discover(owned)
+                if owned != previous:
+                    record(directory, owned, "tracking")
                 request_path = directory / "spawn.request.json"
                 if request_path.exists():
                     request = SpawnRequest.model_validate_json(request_path.read_text())
@@ -151,6 +139,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     child_err = stack.enter_context(
                         (directory / (str(index) + ".stderr.log")).open("wb")
                     )
+                    record(directory, owned, "spawning")
                     child = subprocess.Popen(  # noqa: S603
                         request.argv,
                         env=environment,
@@ -161,6 +150,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     children.append(child)
                     child_identity = identity(psutil.Process(child.pid))
                     owned.add(child_identity)
+                    record(directory, owned, "tracking")
                     if sys.platform == "linux":
                         target = psutil.Process(child.pid)
                         target.cpu_affinity(cpus[:1])
@@ -248,12 +238,16 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
             cleanup_start = time.monotonic_ns()
             forced = sum(resolve(value) is not None for value in owned)
             survivors = cleanup(owned)
+            registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+            record(directory, owned, registry.phase)
             cleanup_duration = time.monotonic_ns() - cleanup_start
             for child in children:
                 with contextlib.suppress(subprocess.TimeoutExpired):
                     child.wait(timeout=1.0)
-    if survivors:
-        status, reason = "failed", "Owned processes survived cleanup"
+    registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+    uncertain = bool(survivors) or registry.phase == "spawning"
+    if uncertain:
+        status, reason = "failed", "Ownership uncertain; pending spawn or surviving owned process"
     return Outcome(
         status="passed"
         if status == "passed"
@@ -263,6 +257,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
         reason=reason,
         returncode=process.returncode,
         cleanup_survivors=survivors,
+        cleanup_state="uncertain" if uncertain else "confirmed",
         cleanup_ns=cleanup_duration,
         forced_cleanup_count=forced,
         enforcement=tuple(enforcement),
@@ -272,9 +267,15 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
 def main() -> None:
     directory = Path(sys.argv[1])
     parent = Identity.model_validate_json(sys.argv[2])
-    control = Control.model_validate_json(sys.argv[3]) if len(sys.argv) > 3 else None
+    control = (
+        Control.model_validate_json(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
+    )
     outcome = supervise(directory, parent, control)
-    (directory / "outcome.json").write_text(outcome.model_dump_json() + "\n")
+    registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+    record(directory, set(registry.owned), outcome.cleanup_state)
+    if outcome.cleanup_state == "confirmed" and len(sys.argv) > 4:
+        write_lease(int(sys.argv[4]), None)
+    durable_write(directory / "outcome.json", outcome.model_dump_json() + "\n")
 
 
 if __name__ == "__main__":

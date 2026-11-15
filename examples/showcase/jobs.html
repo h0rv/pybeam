@@ -22,20 +22,21 @@
     {% if job.card.port and job.status == 'running' %}<a href="http://127.0.0.1:{{ job.card.port }}" target="_blank" rel="noopener">Open private demo (may still be starting)</a>{% endif %}
     {% endif %}
     {% if job.status in ['stopped', 'stopping'] %}<p>Stop requested. No rollback guarantee. Inspect cleanup survivors below.</p>{% endif %}
+    {% if job.status == 'uncertain' %}<p>Ownership or cleanup is uncertain. New measurements are blocked by the shared load lease. Do not remove the lock or journal until ownership is resolved.</p>{% endif %}
     {% if job.error %}<p>{{ job.error }}</p>{% endif %}
     <pre>{{ job.logs() }}</pre>
     {% if job.trials %}
     <a href="/artifact/{{ job.id }}">Download actual trials.jsonl</a>
     <table>
       <caption>Actual typed runner evidence · Python smoke, not a full comparison</caption>
-      <thead><tr><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th><th>Latency p95 ns</th><th>Tree RSS bytes</th><th>Cleanup survivors</th></tr></thead>
+      <thead><tr><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th><th>Latency p95 ns</th><th>Tree RSS bytes</th><th>Cleanup evidence</th></tr></thead>
       <tbody>
       {% for trial in job.trials %}
       <tr><td>{{ trial.trial }}</td><td>{{ trial.outcome.status }} {{ trial.outcome.reason or '' }}</td>
         <td>{{ trial.completed if trial.completed is not none else 'unsupported' }}</td>
         <td>{{ '%.2f'|format(trial.throughput_per_second) if trial.throughput_per_second is not none else 'unsupported' }}</td>
         <td>{{ trial.latency_ns.p95 if trial.latency_ns else 'unsupported' }}</td>
-        <td>{{ trial.simultaneous_tree_rss_peak_bytes }}</td><td>{{ trial.outcome.cleanup_survivors|length }}</td></tr>
+        <td>{{ trial.simultaneous_tree_rss_peak_bytes }}</td><td>{{ trial.outcome.cleanup_state }}; {{ trial.outcome.cleanup_survivors|length }} known survivors</td></tr>
       {% endfor %}
       </tbody>
     </table>

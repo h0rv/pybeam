@@ -1,11 +1,56 @@
+import contextlib
 import os
 import time
 from pathlib import Path
+from typing import Literal
 
 import psutil
 from pydantic import Field
 
 from benchmarks.contract import Identity, StrictModel
+
+
+class Lease(StrictModel):
+    trial_directory: str
+
+
+def write_lease(descriptor: int, lease: Lease | None) -> None:
+    payload = b"" if lease is None else lease.model_dump_json().encode()
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    written = os.write(descriptor, payload)
+    if written != len(payload):
+        raise OSError("Incomplete load lease write; ownership must be inspected")
+    os.ftruncate(descriptor, len(payload))
+    os.fsync(descriptor)
+
+
+class Registry(StrictModel):
+    phase: Literal["tracking", "spawning", "confirmed", "uncertain"]
+    owned: tuple[Identity, ...]
+
+
+def durable_write(path: Path, text: str) -> None:
+    temporary = path.with_suffix(path.suffix + ".pending")
+    with temporary.open("w") as stream:
+        stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    descriptor = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def record(
+    directory: Path,
+    owned: set[Identity],
+    phase: Literal["tracking", "spawning", "confirmed", "uncertain"],
+) -> None:
+    durable_write(
+        directory / "ownership.json", Registry(phase=phase, owned=tuple(owned)).model_dump_json()
+    )
 
 
 class Control(StrictModel):
@@ -33,6 +78,34 @@ def resolve(value: Identity) -> psutil.Process | None:
     except psutil.NoSuchProcess:
         return None
     return None
+
+
+def discover(owned: set[Identity]) -> None:
+    for value in tuple(owned):
+        process = resolve(value)
+        if process is None:
+            continue
+        with contextlib.suppress(psutil.NoSuchProcess):
+            owned.update(identity(child) for child in process.children(recursive=True))
+
+
+def cleanup(owned: set[Identity]) -> tuple[Identity, ...]:
+    discover(owned)
+    for value in owned:
+        process = resolve(value)
+        if process is not None:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                process.suspend()
+    discover(owned)
+    for value in owned:
+        process = resolve(value)
+        if process is not None:
+            with contextlib.suppress(psutil.NoSuchProcess):
+                process.kill()
+    deadline = time.monotonic() + 1.0
+    while any(resolve(value) is not None for value in owned) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return tuple(value for value in owned if resolve(value) is not None)
 
 
 def spawn_owned(directory: Path, argv: tuple[str, ...], *, timeout: float = 5.0) -> Identity:

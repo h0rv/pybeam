@@ -12,12 +12,13 @@ from pathlib import Path
 from typing import Literal
 
 import psutil
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from benchmarks.contract import (
     AdapterOutput,
     AdapterResult,
     Config,
+    Identity,
     Outcome,
     Phases,
     ResourceSample,
@@ -26,7 +27,17 @@ from benchmarks.contract import (
     check_correctness,
 )
 from benchmarks.metrics import describe
-from benchmarks.ownership import Control, identity, resolve
+from benchmarks.ownership import (
+    Control,
+    Lease,
+    Registry,
+    cleanup,
+    durable_write,
+    identity,
+    record,
+    resolve,
+    write_lease,
+)
 from benchmarks.provenance import capture
 
 type Quantile = Literal["p50", "p95", "p99"]
@@ -54,16 +65,47 @@ class Summary(StrictModel):
     phase_repeat_statistics: dict[Phase, Statistics]
 
 
+LOAD_LOCK = Path("/tmp") / ("pybeam-benchmark-load-" + str(os.getuid()) + ".lock")  # noqa: S108
+
+
+class ContaminatedLoad(RuntimeError):
+    pass
+
+
+def check_lease(descriptor: int) -> None:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    payload = os.read(descriptor, 65536)
+    if not payload:
+        return
+    try:
+        lease = Lease.model_validate_json(payload)
+        registry = Registry.model_validate_json(
+            (Path(lease.trial_directory) / "ownership.json").read_text()
+        )
+        if registry.phase == "confirmed" and all(
+            resolve(value) is None for value in registry.owned
+        ):
+            write_lease(descriptor, None)
+            return
+    except OSError, ValueError, psutil.Error:
+        pass
+    raise ContaminatedLoad(
+        "Measurement contaminated: ownership/cleanup uncertain. New load blocked. "
+        "Inspect the ownership journal referenced by "
+        + str(LOAD_LOCK)
+        + ". No automatic reset; do not remove the lock or journal until ownership is resolved."
+    )
+
+
 @contextlib.contextmanager
 def measurement_lock() -> Generator[int]:
-    # Shared path is deliberate; O_NOFOLLOW prevents following an attacker symlink.
-    path = Path("/tmp") / ("pybeam-benchmark-load-" + str(os.getuid()) + ".lock")  # noqa: S108
-    descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    descriptor = os.open(LOAD_LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise RuntimeError("Another benchmark owns the shared load lock") from error
+        check_lease(descriptor)
         yield descriptor
     finally:
         os.close(descriptor)
@@ -72,6 +114,8 @@ def measurement_lock() -> Generator[int]:
 def trial(config: Config, directory: Path, lock_fd: int, control: Control | None = None) -> Outcome:
     directory.mkdir(parents=True)
     (directory / "config.json").write_text(config.model_dump_json(indent=2) + "\n")
+    record(directory, set(), "tracking")
+    write_lease(lock_fd, Lease(trial_directory=str(directory.resolve())))
     parent = identity(psutil.Process())
     with (directory / "guardian.log").open("wb") as log:
         guardian = subprocess.Popen(  # noqa: S603
@@ -81,7 +125,8 @@ def trial(config: Config, directory: Path, lock_fd: int, control: Control | None
                 "benchmarks.guardian",
                 str(directory),
                 parent.model_dump_json(),
-                *([] if control is None else [control.model_dump_json()]),
+                "" if control is None else control.model_dump_json(),
+                str(lock_fd),
             ],
             start_new_session=True,
             pass_fds=(lock_fd,),
@@ -97,15 +142,62 @@ def trial(config: Config, directory: Path, lock_fd: int, control: Control | None
             ) from error
     path = directory / "outcome.json"
     if guardian.returncode != 0 or not path.exists():
-        raise RuntimeError("Guardian failed; inspect " + str(directory / "guardian.log"))
-    return Outcome.model_validate_json(path.read_text())
+        outcome = recover_guardian(directory, guardian.returncode)
+    else:
+        outcome = Outcome.model_validate_json(path.read_text())
+    if outcome.cleanup_state == "confirmed" and not outcome.cleanup_survivors:
+        write_lease(lock_fd, None)
+    return outcome
+
+
+def recover_guardian(directory: Path, returncode: int | None) -> Outcome:
+    start = time.monotonic_ns()
+    owned = set[Identity]()
+    phase = "uncertain"
+    try:
+        registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+        owned.update(registry.owned)
+        phase = registry.phase
+    except OSError, ValueError:
+        pass
+    forced = sum(resolve(value) is not None for value in owned)
+    survivors = cleanup(owned)
+    uncertain = phase in {"spawning", "uncertain"} or bool(survivors)
+    state = "uncertain" if uncertain else "confirmed"
+    record(directory, owned, state)
+    outcome = Outcome(
+        status="failed",
+        reason=(
+            "Guardian failed; ownership uncertain, new measurements blocked"
+            if uncertain
+            else "Guardian failed; registered ownership cleanup confirmed"
+        ),
+        returncode=returncode,
+        cleanup_survivors=survivors,
+        cleanup_state=state,
+        cleanup_ns=time.monotonic_ns() - start,
+        forced_cleanup_count=forced,
+        enforcement=(
+            "Runner fallback retained the measurement lock during registered identity cleanup.",
+            "Fallback confirms registered identities only; unregistered escape is unsupported.",
+            "A pending spawn, unreadable journal or survivor contaminates future measurements.",
+        ),
+    )
+    durable_write(directory / "outcome.json", outcome.model_dump_json() + "\n")
+    return outcome
 
 
 def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> TrialSummary:
-    samples = tuple(
-        ResourceSample.model_validate_json(line)
-        for line in (directory / "resources.jsonl").read_text().splitlines()
-    )
+    samples: list[ResourceSample] = []
+    path = directory / "resources.jsonl"
+    if path.exists():
+        for line in path.read_text().splitlines():
+            try:
+                samples.append(ResourceSample.model_validate_json(line))
+            except ValidationError:
+                if outcome.status == "passed":
+                    raise
+                break
     completed: int | None = None
     throughput: float | None = None
     latency: Statistics | None = None
@@ -262,6 +354,10 @@ def main() -> None:
     ):
         parser.error("Artifacts must be under this experiment's benchmarks/results or /tmp")
     control = None if args.control is None else Control.model_validate_json(args.control)
-    result = run(config, output, control)
+    try:
+        result = run(config, output, control)
+    except ContaminatedLoad as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(3) from error
     if any(t.outcome.status == "failed" for t in result.trials):
         raise SystemExit(1)

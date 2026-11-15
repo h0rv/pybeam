@@ -5,10 +5,12 @@ import time
 from pathlib import Path
 
 import httpx
+import psutil
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
-from benchmarks.runner import TrialSummary
+from benchmarks.ownership import identity, resolve
+from benchmarks.runner import TrialSummary, measurement_lock
 from examples.showcase.catalog import ROOT
 
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -133,7 +135,54 @@ def test_showcase__actual_chrome_controls_and_evidence(tmp_path: Path) -> None:
                     "Chrome compared two actual smoke JSONL results. Page and console errors:",
                     errors,
                 )
+                page.get_by_role(
+                    "button", name="Start Owned cancellation probe", exact=True
+                ).click()
+                failed_hold = page.locator('[data-key="hold"]').first
+                expect(failed_hold.locator("pre")).to_contain_text(
+                    "Guardian owns child PID", timeout=15000
+                )
+                descendants = psutil.Process(server.pid).children(recursive=True)
+                captured = tuple(identity(child) for child in descendants)
+                guardian = next(
+                    identity(child)
+                    for child in descendants
+                    if "benchmarks.guardian" in child.cmdline()
+                )
+                target = resolve(guardian)
+                assert target is not None
+                target.kill()
+                failed_hold.locator('[role="status"]').filter(has_text="failed").wait_for(
+                    timeout=15000
+                )
+                href = failed_hold.get_by_role(
+                    "link", name="Download actual trials.jsonl"
+                ).get_attribute("href")
+                assert href is not None
+                failure = TrialSummary.model_validate_json(
+                    page.request.get(BASE + href).text().strip()
+                )
+                assert failure.outcome.cleanup_state == "confirmed"
+                assert not failure.outcome.cleanup_survivors
+                assert all(resolve(value) is None for value in captured)
+                with measurement_lock():
+                    pass
+                print(
+                    "Chrome guardian death: registered processes gone, cleanup confirmed, lock reusable"
+                )
+                page.get_by_role(
+                    "button", name="Start Owned cancellation probe", exact=True
+                ).click()
+                page.locator('[data-key="hold"]').first.locator("pre").filter(
+                    has_text="Guardian owns child PID"
+                ).wait_for(timeout=15000)
+                shutdown_owned = tuple(
+                    identity(child) for child in psutil.Process(server.pid).children(recursive=True)
+                )
+                assert errors == []
                 browser.close()
         finally:
             server.terminate()
             server.wait(timeout=40)
+        assert all(resolve(value) is None for value in shutdown_owned)
+        print("Application shutdown: all captured owned identities gone")

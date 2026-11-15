@@ -9,7 +9,7 @@ from typing import Literal
 import psutil
 
 from benchmarks.contract import Budget, Config, Workload
-from benchmarks.ownership import Control, identity
+from benchmarks.ownership import Control, Registry, identity
 from benchmarks.runner import TrialSummary
 from examples.showcase.catalog import ROOT, Card
 
@@ -19,7 +19,9 @@ class Job:
     id: str
     card: Card
     directory: Path
-    status: Literal["queued", "running", "finished", "failed", "stopping", "stopped"] = "queued"
+    status: Literal[
+        "queued", "running", "finished", "failed", "stopping", "stopped", "uncertain"
+    ] = "queued"
     error: str = ""
     trials: tuple[TrialSummary, ...] = ()
 
@@ -127,15 +129,26 @@ class Jobs:
                         TrialSummary.model_validate_json(line)
                         for line in path.read_text().splitlines()
                     )
+                registry_path = job.directory / "result/trial-0/ownership.json"
+                uncertain = (
+                    registry_path.exists()
+                    and Registry.model_validate_json(registry_path.read_text()).phase != "confirmed"
+                )
                 job.status = (
-                    "stopped"
-                    if (job.directory / "stop.request").exists()
-                    else ("finished" if process.returncode == 0 else "failed")
+                    "uncertain"
+                    if uncertain
+                    or process.returncode == 3
+                    or any(trial.outcome.cleanup_state == "uncertain" for trial in job.trials)
+                    else (
+                        "stopped"
+                        if (job.directory / "stop.request").exists()
+                        else ("finished" if process.returncode == 0 else "failed")
+                    )
                 )
             except (OSError, ValueError) as error:
                 job.error = str(error)
-                job.status = "failed"
+                job.status = "uncertain" if (job.directory / "result").exists() else "failed"
 
 
 def session_directory() -> tempfile.TemporaryDirectory[str]:
-    return tempfile.TemporaryDirectory(prefix="pybeam-ui-", dir="/tmp")
+    return tempfile.TemporaryDirectory(prefix="pybeam-ui-", dir="/tmp", delete=False)

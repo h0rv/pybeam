@@ -12,7 +12,8 @@ def main() -> None:
         "uv run --extra showcase python -m examples.showcase. "
         "Open http://127.0.0.1:38921. Fixed local commands only; no public bind option. "
         "One serial job, four queued/running, 30-second guardian budget, 16 retained jobs. "
-        "Ctrl+C requests owned cleanup. Artifacts are temporary and removed on exit. "
+        "Ctrl+C requests owned cleanup. Clean artifacts are removed on exit. "
+        "Uncertain ownership journals are retained and block new measurements, even after restart. "
         "Python smoke only, not comparative benchmark evidence."
     )
     parser.add_argument(
