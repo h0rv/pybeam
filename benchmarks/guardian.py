@@ -71,13 +71,16 @@ def verify_runtime_assets(config: Config, runtime: Runtime) -> None:
     These checks are not independent proof of a VM's memory mappings.
     """
     if runtime.native_source_sha is not None and (
-        runtime.native_source_sha
+        config.native_source is None
+        or runtime.native_source_sha
         != git(Path(config.native_source), "rev-parse", "HEAD").decode().strip()
     ):
         raise ValueError("Adapter loaded a different native source revision")
-    asset_root = Path(
-        config.native_source if config.backend == "pybeam" else config.python_source
-    ).resolve()
+    asset_root = Path(config.python_source).resolve()
+    if config.backend == "pybeam":
+        if config.native_source is None:
+            raise ValueError("PyBEAM native source checkout is required")
+        asset_root = Path(config.native_source).resolve()
     if config.backend != "python" and any(
         not Path(asset.path).resolve().is_relative_to(asset_root) for asset in runtime.loaded_assets
     ):

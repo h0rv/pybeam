@@ -31,6 +31,11 @@ def git(root: Path, *args: str) -> bytes:
 
 
 def source(root: Path) -> Source:
+    if not (root / ".git").exists():
+        raise ValueError(
+            "Benchmark provenance requires Git metadata in the declared source checkout; "
+            "source archives without .git are not supported."
+        )
     files = git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
     digest = hashlib.sha256()
     for name in sorted(set(files.split(b"\0")) - {b""}):
@@ -49,9 +54,12 @@ def source(root: Path) -> Source:
     )
 
 
-def capture(python_source: str, native_source: str) -> Provenance:
+def capture(python_source: str, native_source: str | None) -> Provenance:
+    sources = (source(Path(python_source)),)
+    if native_source is not None:
+        sources += (source(Path(native_source)),)
     return Provenance(
-        sources=(source(Path(python_source)), source(Path(native_source))),
+        sources=sources,
         harness_python=sys.version,
         harness_executable=sys.executable,
         harness_executable_sha256=hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest(),

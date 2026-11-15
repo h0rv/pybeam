@@ -68,11 +68,13 @@ class Config(StrictModel):
     unsafe_native_crash: bool = False
     host_control: Literal["uncontrolled_smoke"] = "uncontrolled_smoke"
     python_source: str
-    native_source: str
+    native_source: str | None = None
 
     @model_validator(mode="after")
     def safe_smoke(self) -> Self:
         w = self.workload
+        if self.backend == "pybeam" and self.native_source is None:
+            raise ValueError("PyBEAM requires an explicitly configured native source checkout")
         if self.scale == "smoke" and (w.entities > 20 or w.events > 1000):
             raise ValueError("Larger workloads require explicit_progressive")
         if self.backend != "python" and not self.adapter_command:

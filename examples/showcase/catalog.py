@@ -48,7 +48,7 @@ def catalog(trusted_hornbeam_root: Path | None = None) -> tuple[Card, ...]:
             "Run 100 events on four Python queues. Typed completion evidence, not a three-backend "
             "comparison. Uncontrolled host; no comparative performance claims.",
             "benchmarks/python_smoke.py",
-            None,
+            None if (ROOT / ".git").exists() else "Source archive lacks required Git provenance.",
         ),
         Card(
             "hold",

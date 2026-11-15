@@ -1,3 +1,4 @@
+import re
 import socket
 import subprocess
 import sys
@@ -7,7 +8,7 @@ from pathlib import Path
 import httpx
 import psutil
 import pytest
-from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import Locator, expect, sync_playwright
 
 from benchmarks.ownership import identity, resolve
 from benchmarks.runner import TrialSummary, measurement_lock
@@ -16,8 +17,20 @@ from examples.showcase.catalog import ROOT
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
 
+def finished(job: Locator) -> None:
+    expect(job).not_to_have_attribute(
+        "data-status", re.compile("queued|running|stopping"), timeout=20000
+    )
+    assert job.get_attribute("data-status") == "finished", job.inner_text()
+
+
+@pytest.mark.browser
 @pytest.mark.skipif(not CHROME.is_file(), reason="Local Google Chrome unavailable")
-def test_showcase__actual_chrome_controls_and_evidence(tmp_path: Path) -> None:
+def test_showcase__actual_chrome_controls_and_evidence(
+    tmp_path: Path, request: pytest.FixtureRequest
+) -> None:
+    if request.config.getoption("run_browser") is not True:
+        pytest.skip("Requires explicit --run-browser; this local UI test needs no native server")
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -62,7 +75,7 @@ def test_showcase__actual_chrome_controls_and_evidence(tmp_path: Path) -> None:
                 page.goto(BASE)
                 page.get_by_role("button", name="Start Python benchmark smoke", exact=True).click()
                 smoke = page.locator('[data-key="smoke"]')
-                smoke.locator('[role="status"]').filter(has_text="finished").wait_for(timeout=20000)
+                finished(smoke)
                 assert "100" in smoke.locator("table").inner_text()
                 assert smoke.locator("svg rect").count() == 1
                 href = smoke.get_by_role("link", name="Download actual trials.jsonl").get_attribute(

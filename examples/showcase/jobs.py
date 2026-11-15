@@ -83,7 +83,7 @@ class Jobs:
             job.status = "running"
             config = Config(
                 python_source=str(ROOT),
-                native_source=str(ROOT),
+                native_source=None,
                 repeats=1,
                 workload=Workload(entities=4, events=100, warmup_events=10),
                 budget=Budget(wall_seconds=30.0, artifact_bytes=2_097_152),
