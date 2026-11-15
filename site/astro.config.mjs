@@ -8,7 +8,7 @@ import { pybeamLight, pybeamDark } from "./src/pybeam-themes.mjs";
 import { codeBlocks } from "./src/code-blocks.mjs";
 
 export default defineConfig({
-  site: "https://horv.co",
+  site: process.env.DOCS_SITE || "https://h0rv.github.io",
   base: process.env.DOCS_BASE || "/",
   trailingSlash: "always",
   devToolbar: { enabled: false },

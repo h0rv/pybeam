@@ -11,7 +11,9 @@ mise run docs:serve --port 4321
 
 Open http://127.0.0.1:4321/. These tasks use Node 24.21.0 only for documentation. Node is not a core Python dependency. With Node 24 or later already available, you can also run `npm ci`, `npm test`, `npm run build`, and `npm run dev` from `site/`.
 
-The build writes static HTML to `site/dist`. Test another hosting prefix with `DOCS_BASE=/pybeam/ mise run docs:build`. Use the same variable with `docs:serve` to preview that prefix. There is no deployment workflow.
+The build writes static HTML to `site/dist`. Test another hosting prefix with `DOCS_BASE=/pybeam/ mise run docs:build`. Use the same variable with `docs:serve` to preview that prefix. `DOCS_SITE` sets the site origin and defaults to `https://h0rv.github.io`.
+
+`.github/workflows/docs-pages.yml` runs these same npm commands with Node only. Pull requests check both `/` and `/pybeam/` without accessing Pages or deploying. Main pushes and manual runs on main also build with the existing Pages origin and path, then deploy `site/dist`. A repository admin must first enable Pages with GitHub Actions as its source. The workflow does not enable Pages or change its domain. Other manual branches only run checks.
 
 Edit the five Markdown pages in `docs/guide/`. `src/links.mjs` is the explicit publication and navigation list. No research documents or repository artifacts are published. Relative links to other repository files point to GitHub. The quickstart code is checked against `examples/actors/main.py` to keep the snippet current. Site checks do not execute native examples or establish wheel compatibility.
 
