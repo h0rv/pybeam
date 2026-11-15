@@ -1,0 +1,26 @@
+from pybeam.actors import ActorSpec, OwnedActorRef, spawn
+from tests.native.actor_public import Broken, Counter
+
+
+async def wrong_argument(actor: OwnedActorRef[Counter]) -> None:
+    await actor.call(Counter.add, "wrong", label="typed")  # rejected
+
+
+async def missing_keyword(actor: OwnedActorRef[Counter]) -> None:
+    await actor.call(Counter.add, 1)  # rejected
+
+
+async def wrong_result(actor: OwnedActorRef[Counter]) -> str:
+    return await actor.call(Counter.read)  # rejected
+
+
+async def wrong_actor(actor: OwnedActorRef[Counter]) -> None:
+    await actor.call(Broken.read)  # rejected
+
+
+async def unsupported_policy() -> None:
+    await spawn(ActorSpec(Counter, methods=(Counter.read,)), mailbox=1)  # rejected
+
+
+async def missing_policy() -> None:
+    await spawn(ActorSpec(Counter, methods=(Counter.read,)))  # rejected

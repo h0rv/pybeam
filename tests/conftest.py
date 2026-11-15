@@ -1,0 +1,126 @@
+import os
+import signal
+import site
+import socket
+import subprocess
+import time
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, contextmanager, suppress
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TypeIs
+
+import httpx
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_RUNTIME = ROOT / "_build" / "hornbeam"
+RUNTIME_LAUNCHER = ROOT.parent / "hornbeam" / "examples" / "run_asgi.escript"
+
+
+@dataclass(frozen=True)
+class RunningServer:
+    base_url: str
+    port: int
+    log_path: Path
+    process: subprocess.Popen[bytes]
+
+
+type ServerFactory = Callable[[str], AbstractContextManager[RunningServer]]
+
+
+def is_address(value: object) -> TypeIs[tuple[object, object]]:
+    return isinstance(value, tuple) and len(value) == 2
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-runtime", action="store_true", help="Run tests on the real BEAM runtime"
+    )
+    parser.addoption(
+        "--hornbeam-runtime", default=str(DEFAULT_RUNTIME), help="Built rebar3 profile directory"
+    )
+    parser.addoption(
+        "--run-browser",
+        action="store_true",
+        help="Run Chromium example tests (requires --run-runtime)",
+    )
+
+
+@pytest.fixture(scope="session")
+def runtime_server_factory(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> ServerFactory:
+    enabled: object = request.config.getoption("run_runtime")
+    if enabled is not True:
+        pytest.skip("Requires --run-runtime and a built Hornbeam fork")
+    runtime_option: object = request.config.getoption("hornbeam_runtime")
+    if not isinstance(runtime_option, str):
+        raise TypeError("runtime path must be text")
+    runtime = Path(runtime_option).resolve()
+    logs = tmp_path_factory.mktemp("hornbeam")
+
+    @contextmanager
+    def start(app: str) -> Generator[RunningServer]:
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            address: object = listener.getsockname()
+            if not is_address(address):
+                raise TypeError("Expected an IPv4 socket address")
+            port = address[1]
+            if not isinstance(port, int) or isinstance(port, bool):
+                raise TypeError("Expected an integer TCP port")
+        log_path = logs / "server-{}-{}.log".format(app.replace(":", "-"), port)
+        argv = [
+            "escript",
+            str(RUNTIME_LAUNCHER),
+            str(runtime),
+            app,
+            "127.0.0.1:" + str(port),
+            "on",
+            str(ROOT),
+            str(ROOT / "src"),
+            *site.getsitepackages(),
+        ]
+        base_url = "http://127.0.0.1:{}".format(port)
+        with log_path.open("wb") as output:
+            process = subprocess.Popen(
+                argv,
+                cwd=ROOT,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            try:
+                deadline = time.monotonic() + 30
+                with httpx.Client(timeout=0.5) as client:
+                    while time.monotonic() < deadline:
+                        if process.poll() is not None:
+                            raise RuntimeError("Server exited during startup: {}".format(log_path))
+                        try:
+                            if client.get(base_url + "/health").status_code == 200:
+                                break
+                        except httpx.TransportError:
+                            pass
+                        time.sleep(0.05)
+                    else:
+                        raise TimeoutError("Server did not become ready: {}".format(log_path))
+                yield RunningServer(base_url, port, log_path, process)
+            finally:
+                if process.poll() is None:
+                    with suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    with suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=5)
+
+    return start
+
+
+@pytest.fixture(scope="module")
+def service_server(runtime_server_factory: ServerFactory) -> Generator[RunningServer]:
+    with runtime_server_factory("tests.fixtures.service_app:app") as server:
+        yield server

@@ -1,0 +1,6 @@
+# Copyright (c) 2026 Anatomy Financial.
+
+class InstrumentationProvider: ...
+
+class NoOpInstrumentation(InstrumentationProvider):
+    def __init__(self) -> None: ...

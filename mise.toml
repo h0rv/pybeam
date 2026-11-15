@@ -1,0 +1,78 @@
+[tools]
+python = "3.14.10"
+erlang = "29.1.2"
+rebar = "3.28.0"
+uv = "0.13.8"
+cmake = "4.5.0"
+
+[tasks.setup]
+run = [
+    "mkdir -p _checkouts",
+    "ln -sfn ../../hornbeam _checkouts/hornbeam",
+    "ln -sfn ../../erlang-python _checkouts/erlang_python",
+    "ln -sfn ../../erlang-ws _checkouts/ws",
+    "ln -sfn ../../erlang-h1 _checkouts/h1",
+    "uv sync --all-extras",
+    "mise run build",
+]
+
+[tasks.build]
+run = 'PYTHON_CONFIG="$(dirname "$(command -v python)")/python3.14-config" rebar3 as hornbeam compile'
+
+[tasks.check]
+run = ["uv run --all-extras ruff check .", "uv run --all-extras ruff format --check .", "uv run --all-extras ty check --error-on-warning"]
+
+[tasks.test]
+run = "uv run --all-extras pytest -c pyproject.toml -q tests ../hornbeam/test/python/test_services.py"
+
+[tasks.integration]
+run = "uv run --all-extras pytest --run-runtime -m runtime -q"
+
+[tasks.browser]
+description = "Test real two-tab counters on a built runtime. First: uv run playwright install chromium; or set PLAYWRIGHT_CHROMIUM_EXECUTABLE."
+run = "uv run --all-extras pytest --run-runtime --run-browser -m browser -q"
+
+[tasks."example:prepare"]
+hide = true
+quiet = true
+run = '''
+printf 'Preparing the example runtime...\n'
+log=$(mktemp "${TMPDIR:-/tmp}/pybeam-example.XXXXXX")
+if ! mise run setup > "$log" 2>&1; then
+    printf '\nSetup failed. Full build log: %s\n\n' "$log"
+    tail -n 80 "$log"
+    exit 1
+fi
+rm "$log"
+printf '\nOpen the URL below in two browser tabs.\nIncrement either counter. Both tabs should update without reloading.\nThe counter is shared in BEAM; pub/sub tells each tab to read fresh state.\nApplication logs follow. Press Ctrl+C to stop.\n'
+'''
+
+[tasks."example:fastapi"]
+alias = "example"
+description = "Run the FastAPI counter at http://127.0.0.1:8642"
+quiet = true
+depends = ["example:prepare"]
+run = [{ task = "serve", args = ["examples.fastapi.main:app"] }]
+
+[tasks."example:litestar"]
+description = "Run the Litestar counter at http://127.0.0.1:8642"
+quiet = true
+depends = ["example:prepare"]
+run = [{ task = "serve", args = ["examples.litestar.main:app"] }]
+
+[tasks."example:pyview"]
+description = "Run the PyView counter at http://127.0.0.1:8642"
+quiet = true
+depends = ["example:prepare"]
+run = [{ task = "serve", args = ["examples.pyview.main:app"] }]
+
+[tasks.serve]
+quiet = true
+output = "interleave"
+usage = 'arg "<app>" default="examples.fastapi.main:app"'
+run = '''
+escript ../hornbeam/examples/run_asgi.escript "$PWD/_build/hornbeam" "${usage_app}" "${PYBEAM_BIND:-127.0.0.1:8642}" on "$PWD" "$PWD/src" "$(uv run --quiet python -c 'import site; print(site.getsitepackages()[0])')" &
+pid=$!
+trap 'trap - INT TERM; printf "\nStopping the example...\n"; kill -TERM "$pid" 2>/dev/null || true; wait "$pid"; exit 130' INT TERM
+wait "$pid"
+'''

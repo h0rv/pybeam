@@ -1,0 +1,96 @@
+[project]
+name = "python-beam"
+version = "0.1.0a1"
+description = "Python-first tools for BEAM services"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = ["pydantic==2.14.3"]
+
+[project.scripts]
+pybeam = "pybeam.runtime.cli:main"
+
+[project.optional-dependencies]
+hornbeam = ["hornbeam"]
+fastapi = [
+    "fastapi==0.163.0",
+    "jinja2>=3.1.6,<4",
+    "python-multipart>=0.0.20,<1",
+]
+litestar = [
+    "litestar[jinja]==2.25.0",
+    "pydantic==2.14.3",
+]
+pyview = [
+    "python-multipart>=0.0.20,<1",
+    "pyview-web @ git+https://github.com/ogrodnek/pyview.git@d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9,<10",
+  "pytest-asyncio>=1,<2",
+  "hypothesis>=6,<7",
+  "ruff>=0.14,<1",
+  "httpx>=0.28,<1",
+  "websockets>=15,<17",
+  "pydantic==2.14.3",
+  "ty>=0.0.104",
+  "playwright>=1.58,<2",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+backend-path = ["."]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.hooks.custom]
+path = "tools/hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pybeam"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]
+
+[tool.uv.sources]
+hornbeam = { path = "../hornbeam", editable = true }
+
+[tool.ty.environment]
+python-version = "3.14"
+extra-paths = ["typings", ".", "../erlang-python/priv"]
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.src]
+include = ["src", "tests", "examples"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+  "E4", "E7", "E9", "F", "I", "B", "ASYNC", "UP", "C4", "DTZ",
+  "TID", "PLE", "PLW", "RUF", "SIM", "ANN", "S",
+]
+ignore = ["UP031", "UP032"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607"]
+"tests/test_runtime_native.py" = ["S101", "ASYNC110"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+    "runtime: requires a built BEAM runtime",
+    "browser: requires --run-browser, --run-runtime, and installed Chromium",
+]

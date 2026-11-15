@@ -1,0 +1,278 @@
+import argparse
+import json
+import platform
+import re
+import shutil
+import subprocess
+import tarfile
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True, slots=True)
+class OTPVersions:
+    erts: str
+    kernel: str
+    stdlib: str
+
+
+@dataclass(frozen=True, slots=True)
+class MachO:
+    dependencies: tuple[str, ...]
+    rpaths: tuple[str, ...]
+    minimum: tuple[int, int]
+
+
+def run(arguments: list[str], *, cwd: Path | None = None) -> str:
+    return subprocess.check_output(arguments, cwd=cwd, text=True)  # noqa: S603
+
+
+MACHO_MAGICS = frozenset(
+    bytes.fromhex(value)
+    for value in (
+        "feedface",
+        "cefaedfe",
+        "feedfacf",
+        "cffaedfe",
+        "cafebabe",
+        "bebafeca",
+        "cafebabf",
+        "bfbafeca",
+    )
+)
+FAT_MAGICS = frozenset(
+    bytes.fromhex(value) for value in ("cafebabe", "bebafeca", "cafebabf", "bfbafeca")
+)
+ERTS_EXECUTABLES = ("beam.smp", "erlexec", "erl_child_setup", "inet_gethost")
+
+
+def macho_magic(path: Path) -> bytes:
+    with path.open("rb") as stream:
+        return stream.read(4)
+
+
+def native_binaries(root: Path, required: tuple[Path, ...]) -> tuple[Path, ...]:
+    discovered = tuple(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path not in required and macho_magic(path) in MACHO_MAGICS
+    )
+    return (*required, *discovered)
+
+
+def inspect_macho(path: Path) -> MachO:
+    magic = macho_magic(path)
+    if magic in FAT_MAGICS:
+        raise ValueError(
+            "Universal Mach-O containers are unsupported; require thin arm64: " + str(path)
+        )
+    if magic not in MACHO_MAGICS:
+        raise ValueError("Required native artifact is not Mach-O: " + str(path))
+    architecture = run(["/usr/bin/lipo", "-archs", str(path)]).strip()
+    if architecture != "arm64":
+        raise ValueError("Only thin arm64 artifacts are supported: " + str(path))
+    dependencies = tuple(
+        line.strip().split(" (", 1)[0]
+        for line in run(["/usr/bin/otool", "-L", str(path)]).splitlines()[1:]
+    )
+    commands = run(["/usr/bin/otool", "-l", str(path)])
+    builds = re.findall(
+        r"cmd LC_BUILD_VERSION\s+cmdsize \d+\s+platform (\S+)\s+minos (\d+)\.(\d+)", commands
+    )
+    if any(apple_platform != "1" for apple_platform, _, _ in builds) or re.search(
+        r"cmd LC_VERSION_MIN_(?!MACOSX\b)", commands
+    ):
+        raise ValueError("Native artifacts must target PLATFORM_MACOS (1): " + str(path))
+    versions = [(major, minor) for _, major, minor in builds]
+    versions.extend(
+        re.findall(r"cmd LC_VERSION_MIN_MACOSX\s+cmdsize \d+\s+version (\d+)\.(\d+)", commands)
+    )
+    if not versions:
+        raise ValueError("Missing macOS deployment target: " + str(path))
+    minimum = max((int(major), int(minor)) for major, minor in versions)
+    rpaths = tuple(re.findall(r"cmd LC_RPATH\s+cmdsize \d+\s+path (.*?) \(offset", commands))
+    return MachO(dependencies, rpaths, minimum)
+
+
+def wheel_tag(minimum: tuple[int, int]) -> str:
+    if minimum[0] >= 11 and minimum[1] != 0:
+        raise ValueError(
+            "macOS wheel installers use major.0 compatibility tags; rebuild native artifacts "
+            "with MACOSX_DEPLOYMENT_TARGET set to a supported major.0 floor"
+        )
+    return "cp314-cp314-macosx_{}_{}_arm64".format(*minimum)
+
+
+def system_library(path: str) -> bool:
+    return path.startswith(("/usr/lib/", "/System/Library/"))
+
+
+def audit_binary(path: Path, *, python_nif: bool = False) -> MachO:
+    info = inspect_macho(path)
+    if python_nif and info.dependencies.count("@rpath/libpython3.14.dylib") != 1:
+        raise ValueError("Native runtime must link conventional CPython 3.14 exactly once")
+    for dependency in info.dependencies:
+        if system_library(dependency):
+            continue
+        if python_nif and dependency == "@rpath/libpython3.14.dylib":
+            continue
+        raise ValueError("Unbundled shared library: " + dependency + " in " + str(path))
+    return info
+
+
+def otp_information(erl: Path) -> OTPVersions:
+    expression = (
+        "io:put_chars(json:encode(#{erts => list_to_binary(erlang:system_info(version)), "
+        "kernel => list_to_binary(element(2, application:get_key(kernel, vsn))), "
+        "stdlib => list_to_binary(element(2, application:get_key(stdlib, vsn)))})), halt()."
+    )
+    raw: object = json.loads(run([str(erl), "+S", "1:1", "-noshell", "-eval", expression]))
+    if not isinstance(raw, dict):
+        raise ValueError("Invalid OTP build information")
+
+    def version(key: str) -> str:
+        value: object = raw.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9.]+", value):
+            raise ValueError("Invalid OTP version: " + key)
+        return value
+
+    return OTPVersions(version("erts"), version("kernel"), version("stdlib"))
+
+
+def erlang_string(path: Path) -> str:
+    return json.dumps(str(path))
+
+
+def stage_runtime(
+    otp: Path, native: Path, otp_license: Path, native_license: Path, output: Path
+) -> None:
+    otp = otp.resolve()
+    native = native.resolve()
+    otp_license = otp_license.resolve()
+    native_license = native_license.resolve()
+    output = output.resolve()
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        raise ValueError("Runtime staging currently supports macOS arm64 only")
+    for license_file in (otp_license, native_license):
+        if not license_file.is_file():
+            raise ValueError("Required third-party license missing: " + str(license_file))
+    erl = otp / "bin" / "erl"
+    versions = otp_information(erl)
+    app_text = (native / "ebin" / "erlang_python.app").read_text()
+    version_match = re.search(r'\{vsn,\s*"([0-9.]+)"\}', app_text)
+    if version_match is None:
+        raise ValueError("Cannot determine erlang_python application version")
+    native_version = version_match[1]
+    if not (native / "ebin" / "py_launch.beam").is_file():
+        raise ValueError("Canonical native runtime needs a rebuilt py_launch.beam")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="runtime-", dir=output.parent) as temporary:
+        work = Path(temporary)
+        release = work / "pybeam"
+        release.with_suffix(".rel").write_text(
+            '{{release,{{"pybeam","0.1.0"}},{{erts,"{}"}},'
+            '[{{kernel,"{}"}},{{stdlib,"{}"}},{{erlang_python,"{}",load}}]}}.\n'.format(
+                versions.erts, versions.kernel, versions.stdlib, native_version
+            )
+        )
+        expression = (
+            "ok = systools:make_script({release}, [{{path,[{ebin}]}},no_warn_sasl]), "
+            "ok = systools:make_tar({release}, [{{path,[{ebin}]}},"
+            "{{erts,{otp}}},no_warn_sasl]), halt()."
+        ).format(
+            release=erlang_string(release),
+            ebin=erlang_string(native / "ebin"),
+            otp=erlang_string(otp),
+        )
+        run([str(erl), "+S", "1:1", "-noshell", "-eval", expression], cwd=work)
+        staged = work / "staged"
+        staged.mkdir()
+        with tarfile.open(release.with_suffix(".tar.gz")) as archive:
+            archive.extractall(staged, filter="data")
+        erts_bin = staged / ("erts-" + versions.erts) / "bin"
+        keep = set(ERTS_EXECUTABLES)
+        for item in erts_bin.iterdir():
+            if item.name not in keep:
+                item.unlink()
+        bin_dir = staged / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        template = (otp / ("erts-" + versions.erts) / "bin" / "erl.src").read_text()
+        (bin_dir / "erl").write_text(template.replace("%FINAL_ROOTDIR%", "/"))
+        (bin_dir / "erl").chmod(0o755)
+        boot = staged / "releases" / "0.1.0" / "start.boot"
+        shutil.copy2(boot, bin_dir / "start.boot")
+        shutil.copy2(boot, bin_dir / "start_clean.boot")
+        app = staged / "lib" / ("erlang_python-" + native_version)
+        priv = app / "priv"
+        for item in priv.iterdir():
+            if item.name not in {
+                "py_nif.so",
+                "_erlang_impl",
+                "erlang_services.py",
+                "py_isolated_child.py",
+            }:
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+        for cache in staged.rglob("__pycache__"):
+            shutil.rmtree(cache)
+        nif = priv / "py_nif.so"
+        nif_info = audit_binary(nif, python_nif=True)
+        for rpath in nif_info.rpaths:
+            run(["/usr/bin/install_name_tool", "-delete_rpath", rpath, str(nif)])
+        run(["/usr/bin/install_name_tool", "-add_rpath", "@loader_path", str(nif)])
+        run(["/usr/bin/codesign", "--force", "--sign", "-", str(nif)])
+        required = (nif, *(erts_bin / name for name in ERTS_EXECUTABLES))
+        minimum = max(
+            audit_binary(item, python_nif=item == nif).minimum
+            for item in native_binaries(staged, required)
+        )
+        notices = staged / "notices"
+        notices.mkdir()
+        shutil.copy2(otp_license, notices / "OTP-LICENSE.txt")
+        shutil.copy2(native_license, notices / "erlang-python-LICENSE")
+        for source, destination in ((otp, notices / "otp"), (native, notices / "erlang-python")):
+            for name in ("COPYRIGHT", "NOTICE", "NOTICE.txt", "LICENSE", "LICENSE.txt"):
+                candidate = source / name
+                if candidate.is_file():
+                    destination.mkdir(exist_ok=True)
+                    shutil.copy2(candidate, destination / name)
+        manifest = {
+            "python_version": "3.14",
+            "implementation": "cpython",
+            "architecture": "arm64",
+            "system": "Darwin",
+            "minimum_macos": list(minimum),
+            "wheel_tag": wheel_tag(minimum),
+            "executable": "erts-" + versions.erts + "/bin/erlexec",
+            "root_dir": ".",
+            "bindir": "erts-" + versions.erts + "/bin",
+            "code_paths": [str(app.relative_to(staged) / "ebin")],
+            "erts_version": versions.erts,
+            "python_library": "libpython3.14.dylib",
+        }
+        (staged / "runtime.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        if output.exists():
+            shutil.rmtree(output)
+        shutil.move(str(staged), output)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Stage an already-built native runtime for a wheel"
+    )
+    parser.add_argument("--otp-root", type=Path, required=True)
+    parser.add_argument("--native-app", type=Path, required=True)
+    parser.add_argument("--otp-license", type=Path, required=True)
+    parser.add_argument("--native-license", type=Path, required=True)
+    parser.add_argument("--output", type=Path, default=Path("build/runtime"))
+    args = parser.parse_args()
+    stage_runtime(
+        args.otp_root, args.native_app, args.otp_license, args.native_license, args.output
+    )
+
+
+if __name__ == "__main__":
+    main()

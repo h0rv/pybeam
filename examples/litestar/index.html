@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shared BEAM counter · Litestar</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/missing.min.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/sse.js" defer></script>
+</head>
+<body>
+<main>
+  <h1>{{ title }}</h1>
+  <p>Open two tabs. Increment in one. Both update without a reload.</p>
+  <div id="counter-region" hx-sse:connect="/events" hx-swap="innerHTML" aria-live="polite">
+    {% include 'counter.html' %}
+  </div>
+  <form action="/increment" method="post" hx-post="/increment" hx-target="#confirmation" hx-swap="innerHTML">
+    <label>Amount <input name="amount" type="number" min="1" max="10" value="1" required></label>
+    <button type="submit">Increment</button>
+  </form>
+  <p id="confirmation" role="status"></p>
+  <p>Litestar stores the counter in BEAM ETS. Notifications trigger fresh reads.
+     Watch the terminal for increments, publications, and subscription activity.</p>
+  <p>Everyone shares this node-local counter. It is not persistent and has no authentication.</p>
+  <p><a href="/">Reload current state</a></p>
+</main>
+</body>
+</html>
