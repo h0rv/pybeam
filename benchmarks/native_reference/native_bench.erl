@@ -32,18 +32,16 @@ main() ->
             schedulers => erlang:system_info(schedulers_online),
             executable => unicode:characters_to_binary(Executable),
             executable_sha256 => hash_file(Executable), native_source_sha => null,
-            loaded_assets => Assets},
+            loaded_assets => Assets ++ maps:get(<<"sources">>, Manifest)},
         ok = file:write_file(filename:join(Directory, "build-manifest.json"), ManifestBytes),
         Result = run(Directory, Workload, Runtime, Mode),
         write_json(Directory, "native-result.json", Result),
         Receipts = maps:get(receipts, Result),
         ok = file:write_file(filename:join(Directory, "native-receipts.jsonl"),
             [[json:encode(Receipt), $\n] || Receipt <- Receipts]),
-        %% v1 requires an unrelated native checkout identity for every Erlang result.
-        %% Preserve true evidence, but do not score it under a forged identity.
-        write_json(Directory, "adapter.json", #{kind => unsupported,
-            reason => <<"v1 check_correctness requires native_source_sha and guardian equates it to the unused paired NIF checkout; pure OTP has no such loaded revision">>,
-            features => [<<"pure_otp_provenance_without_nif_identity">>]}),
+        %% Publish actual OTP executable, adapter BEAM and source hash evidence.
+        %% No paired PyBEAM NIF revision is invented for this pure OTP runtime.
+        write_json(Directory, "adapter.json", Result),
         halt(0)
     catch Class:Reason:Stack ->
         write_json(Directory, "failure.json", #{class => atom_to_binary(Class),

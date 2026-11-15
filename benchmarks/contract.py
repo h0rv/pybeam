@@ -184,10 +184,33 @@ def check_correctness(config: Config, result: AdapterResult) -> None:
         runtime.otp is None
         or runtime.erts is None
         or runtime.schedulers is None
-        or runtime.native_source_sha is None
         or not runtime.loaded_assets
     ):
         raise ValueError("Native runtime metadata is incomplete")
+    if result.backend == "python" and (
+        runtime.otp is not None
+        or runtime.erts is not None
+        or runtime.native_source_sha is not None
+        or runtime.loaded_assets
+    ):
+        raise ValueError("Python-only backend cannot claim native runtime assets")
+    asset_paths = tuple(asset.path for asset in runtime.loaded_assets)
+    nif_assets = tuple(path for path in asset_paths if path.endswith(("py_nif.so", "py_nif.dylib")))
+    if result.backend == "pybeam" and (
+        runtime.native_source_sha is None
+        or not nif_assets
+        or not any(path.endswith(".beam") for path in asset_paths)
+    ):
+        raise ValueError("PyBEAM requires paired native revision, NIF and BEAM assets")
+    if result.backend in {"erlang", "elixir"}:
+        if runtime.python is not None or nif_assets or runtime.native_source_sha is not None:
+            raise ValueError("Pure OTP backend cannot claim Python or paired PyBEAM NIF identity")
+        if not any(path.endswith(".beam") for path in asset_paths) or not any(
+            path.endswith((".erl", ".ex", ".exs")) for path in asset_paths
+        ):
+            raise ValueError("Pure OTP requires adapter BEAM and source hashes")
+        if runtime.executable.rsplit("/", 1)[-1] not in {"beam.smp", "beam"}:
+            raise ValueError("Pure OTP requires the actual ERTS executable")
     if result.backend == "elixir" and runtime.elixir is None:
         raise ValueError("Elixir runtime metadata is incomplete")
     if result.backend == "pybeam" and w.queue_bound_scope == "destination_queue":
@@ -203,7 +226,11 @@ def check_correctness(config: Config, result: AdapterResult) -> None:
         raise ValueError("Entity lifecycle count differs from request")
     if result.failures or result.lost or not result.cleanup_acknowledged:
         raise ValueError("Unexpected failure, loss, or missing cleanup acknowledgment")
-    if result.inflight_peak is not None and result.inflight_peak > w.max_inflight:
+    if result.inflight_peak is None:
+        raise ValueError("Missing observed client admission bound")
+    if w.queue_bound_scope == "destination_queue" and result.queue_peak is None:
+        raise ValueError("Missing observed destination queue bound")
+    if result.inflight_peak > w.max_inflight:
         raise ValueError("Observed inflight work exceeds admission budget")
     if result.queue_peak is not None and result.queue_peak > w.queue_capacity:
         raise ValueError("Observed destination queue exceeds requested capacity")

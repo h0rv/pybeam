@@ -13,7 +13,6 @@ from benchmarks.contract import (
     Outcome,
     Receipt,
     StrictModel,
-    Unsupported,
     Workload,
     check_correctness,
     messages,
@@ -50,7 +49,7 @@ def config(*, failure: bool = False, warmup: int = 17) -> Config:
         backend="erlang",
         adapter_command=command,
         python_source=str(ROOT),
-        native_source=str(ROOT.parent / "native-benchmarks"),
+        native_source=str(ROOT.parent / "native-bench-pybeam"),
         workload=Workload(
             entities=2,
             events=100,
@@ -126,7 +125,7 @@ def test_native_completion__strict_receipts_reset_snapshot_deletion(
             Receipt.model_validate_json('{"id":0,"entity":0,"sent_ns":2,"completed_ns":1}')
 
 
-def test_native_runtime__honest_provenance_and_schema_blocker(
+def test_native_runtime__honest_provenance_accepted_without_unused_nif(
     native_trials: tuple[Path, Path, Path],
 ) -> None:
     directory = native_trials[0]
@@ -142,16 +141,15 @@ def test_native_runtime__honest_provenance_and_schema_blocker(
         == runtime.executable_sha256
     )
     manifest = BuildManifest.model_validate_json((directory / "build-manifest.json").read_text())
-    assert manifest.assets == runtime.loaded_assets
+    assert manifest.assets + manifest.sources == runtime.loaded_assets
     assert not manifest.pybeam_nif_loaded and not manifest.paired_native_checkout_used
     for item in manifest.assets + manifest.sources:
         assert hashlib.sha256(Path(item.path).read_bytes()).hexdigest() == item.sha256
-    with pytest.raises(ValueError, match="Native runtime metadata is incomplete"):
-        check_correctness(config(), result)
+    check_correctness(config(), result)
     output = TypeAdapter(AdapterOutput).validate_json((directory / "adapter.json").read_text())
-    assert isinstance(output, Unsupported)
+    assert output == result
     outcome = Outcome.model_validate_json((directory / "test-outcome.json").read_text())
-    assert outcome.status == "unsupported"
+    assert outcome.status == "passed"
     assert outcome.forced_cleanup_count == 0 and not outcome.cleanup_survivors
 
 

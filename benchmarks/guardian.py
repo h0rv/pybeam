@@ -19,6 +19,7 @@ from benchmarks.contract import (
     Outcome,
     ProcessSample,
     ResourceSample,
+    Runtime,
     Unsupported,
     check_correctness,
 )
@@ -62,6 +63,31 @@ def artifact_size(directory: Path) -> int:
 def append_sample(stream: TextIO, sample: ResourceSample) -> None:
     stream.write(sample.model_dump_json() + "\n")
     stream.flush()
+
+
+def verify_runtime_assets(config: Config, runtime: Runtime) -> None:
+    """Check adapter attestations against checkout identities and actual file bytes.
+
+    These checks are not independent proof of a VM's memory mappings.
+    """
+    if runtime.native_source_sha is not None and (
+        runtime.native_source_sha
+        != git(Path(config.native_source), "rev-parse", "HEAD").decode().strip()
+    ):
+        raise ValueError("Adapter loaded a different native source revision")
+    asset_root = Path(
+        config.native_source if config.backend == "pybeam" else config.python_source
+    ).resolve()
+    if config.backend != "python" and any(
+        not Path(asset.path).resolve().is_relative_to(asset_root) for asset in runtime.loaded_assets
+    ):
+        raise ValueError("Adapter asset is outside its declared source checkout")
+    for path, digest in (
+        (runtime.executable, runtime.executable_sha256),
+        *((asset.path, asset.sha256) for asset in runtime.loaded_assets),
+    ):
+        if hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest:
+            raise ValueError("Runtime executable or loaded asset hash differs")
 
 
 def supervise(directory: Path, parent: Identity, control: Control | None = None) -> Outcome:
@@ -209,17 +235,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                         status, reason = "unsupported", output.reason
                     else:
                         check_correctness(config, output)
-                        if output.runtime.native_source_sha is not None and (
-                            output.runtime.native_source_sha
-                            != git(Path(config.native_source), "rev-parse", "HEAD").decode().strip()
-                        ):
-                            raise ValueError("Adapter loaded a different native source revision")
-                        for path, digest in (
-                            (output.runtime.executable, output.runtime.executable_sha256),
-                            *((asset.path, asset.sha256) for asset in output.runtime.loaded_assets),
-                        ):
-                            if hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest:
-                                raise ValueError("Runtime executable or loaded asset hash differs")
+                        verify_runtime_assets(config, output.runtime)
                         with (directory / "receipts.jsonl").open("w") as raw:
                             for receipt in output.receipts:
                                 raw.write(receipt.model_dump_json() + "\n")
