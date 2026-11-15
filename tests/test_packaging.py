@@ -15,6 +15,7 @@ from zipfile import ZipFile
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+from examples.discord_simulation import Proof as DiscordProof
 from pybeam.runtime.assets import _host_python_library, discover_assets, packaged_assets
 from pybeam.runtime.config import BootstrapError, Config
 from tools.build_runtime import (
@@ -379,9 +380,10 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     probe.write_text(
         "from typing import assert_type\n"
         "from erlang import ErlangEventLoop\n"
-        "from erlang.actors import OwnedActor\n"
+        "from erlang.actors import OwnedActor, DataActorRef, ActorInfo as NativeInfo\n"
         "from erlang.supervision import ChildState\n"
         "from pybeam import actor\n"
+        "from pybeam.actors import ActorGroup, ActorInfo, ContextCounts, context_counts\n"
         "@actor\n"
         "class Counter:\n"
         "    async def echo(self, value: int, *, label: str) -> str:\n"
@@ -392,6 +394,12 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "    assert_type(await actor.call(0, method, 2, label='ok'), str)\n"
         "    assert_type(await ref.echo(2, label='ok'), str)\n"
         "    assert_type(child, ChildState)\n"
+        "async def controls(group: ActorGroup, ref: Counter, native: DataActorRef) -> None:\n"
+        "    assert_type(await group.info(ref), ActorInfo)\n"
+        "    assert_type(await group.crash(ref), None)\n"
+        "    assert_type(await context_counts(), ContextCounts)\n"
+        "    assert_type(await native.info(), NativeInfo)\n"
+        "    assert_type(await native.crash(), None)\n"
         "loop: ErlangEventLoop\n"
     )
     ty = shutil.which("ty")
@@ -583,6 +591,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     for source, marker in (
         (root / "examples/actors/main.py", "[1, 1, 1, 1, 1]"),
         (root / "tests/fixtures/actor_inheritance.py", "pythonic-inheritance-ok"),
+        (root / "examples/discord_simulation.py", '"fanout_receipts_before_fault":800'),
     ):
         relocated_probe = application / (source.stem + "_probe.py")
         shutil.copyfile(source, relocated_probe)
@@ -598,6 +607,18 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         assert checked.returncode == 0, checked.stdout + checked.stderr
         assert marker in checked.stdout
         assert "/Users/robby/projects" not in checked.stdout + checked.stderr
+        if source.name == "discord_simulation.py":
+            proof = next(
+                DiscordProof.model_validate_json(line)
+                for line in checked.stdout.splitlines()
+                if line.startswith("{")
+            )
+            assert len({info.pid for info in proof.room_identities}) == 4
+            assert proof.fanout_receipts_before_fault == 800
+            assert proof.before.pid != proof.after.pid
+            assert proof.before.generation != proof.after.generation
+            assert proof.fresh.members == () and proof.fresh.event_ids == ()
+            assert proof.contexts_before.live == proof.contexts_after.live
     with pytest.raises(ProcessLookupError):
         os.killpg(cli_state.pid, 0)
     manifest = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/runtime.json"

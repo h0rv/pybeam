@@ -85,9 +85,9 @@ def catalog(trusted_hornbeam_root: Path | None = None) -> tuple[Card, ...]:
         ),
         Card(
             "actors",
-            "Native actors (legacy ActorSpec)",
-            "experimental",
-            "Existing native actor prototype, not the proposed decorator API.",
+            "Native actor classes",
+            "verified",
+            "Typed actor classes with scoped native ownership and bounded encoded admission.",
             "examples/actors/main.py",
             "Managed actor launcher is not integrated with guardian spawn ownership.",
         ),
@@ -119,10 +119,11 @@ def catalog(trusted_hornbeam_root: Path | None = None) -> tuple[Card, ...]:
         Card(
             "discord",
             "Discord simulation",
-            "blocked",
-            "Not implemented.",
-            None,
-            "Requires owned supervision and reference rebinding.",
+            "verified",
+            "Standalone native room simulation with checked fanout, fresh-state restart, and "
+            "explicit membership rejoin. No durability or interactive web app is provided here.",
+            "examples/discord_simulation.py",
+            "Managed simulation launcher is not integrated with guardian spawn ownership.",
         ),
         Card(
             "ai",

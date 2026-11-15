@@ -54,7 +54,7 @@ def test_config__rejects_out_of_capacity(data: dict[str, object]) -> None:
 )
 def test_simulation__managed_native_proof(request: pytest.FixtureRequest, entry: str) -> None:
     if request.config.getoption("run_runtime") is not True:
-        pytest.skip("Requires --run-runtime and privately staged runtime assets")
+        pytest.skip("Requires --run-runtime and staged canonical runtime assets")
     discover_assets(RuntimeConfig())
     command = [sys.executable, "-m", entry.removesuffix(".py").replace("/", ".")]
     if entry.startswith("examples/"):
@@ -91,7 +91,7 @@ def test_simulation__installed_wheel_without_source_or_developer_tools(
         pytest.skip("Requires --run-runtime")
     wheel = os.environ.get("PYBEAM_TEST_WHEEL")
     if wheel is None:
-        pytest.skip("Set PYBEAM_TEST_WHEEL to the privately built platform wheel")
+        pytest.skip("Set PYBEAM_TEST_WHEEL to the built platform wheel")
     uv = shutil.which("uv")
     assert uv is not None
     venv = tmp_path / "venv"
@@ -110,10 +110,7 @@ def test_simulation__installed_wheel_without_source_or_developer_tools(
     )
     app = tmp_path / "discord_simulation.py"
     app.write_text((ROOT / "examples/discord_simulation.py").read_text())
-    environment = os.environ.copy()
-    for name in ("PYTHONPATH", "PYTHONHOME", "PYBEAM_BOOTSTRAP", "DYLD_LIBRARY_PATH"):
-        environment.pop(name, None)
-    environment["PATH"] = os.defpath
+    environment = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
     result = subprocess.run(
         [str(python), str(app), "--config", '{"rooms":2,"members":2,"events":4}'],
         cwd=tmp_path,
