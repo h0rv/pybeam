@@ -1,0 +1,5 @@
+The optional 16-room, 1000-event default-size health check was blocked before any trial started.
+measurement_lock() raised RuntimeError: Another benchmark owns the shared load lock.
+No workload was started, no retry was attempted, and no default-size score is available.
+The completed corrected comparison is the separate nine-trial 2-room, 100-event run.
+Parent scheduling is required before another default-size attempt.
