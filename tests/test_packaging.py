@@ -11,9 +11,10 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
-from pybeam.runtime.assets import packaged_assets
-from pybeam.runtime.config import BootstrapError
+from pybeam.runtime.assets import _host_python_library, discover_assets, packaged_assets
+from pybeam.runtime.config import BootstrapError, Config
 from tools.build_runtime import (
     ERTS_EXECUTABLES,
     MACHO_MAGICS,
@@ -26,6 +27,15 @@ from tools.build_runtime import (
     wheel_tag,
 )
 from tools.runtime_wheel import runtime_tag
+
+
+class NativeState(BaseModel):
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+    pid: int
+    package: Path
+    pydantic: Path
+    libraries: tuple[Path, ...]
 
 
 def test_runtime_tag__requires_explicit_staged_assets(tmp_path: Path) -> None:
@@ -151,6 +161,16 @@ def test_wheel_audit__rejects_universal_required_executables(
     (app / "priv").mkdir()
     (app / "ebin/py_launch.beam").touch()
     (app / "priv/py_nif.so").write_bytes(bytes.fromhex("cffaedfe"))
+    for name in (
+        "_erlang_impl/__init__.py",
+        "_erlang_impl/_actors.py",
+        "_erlang_impl/_actors.pyi",
+        "erlang_services.py",
+        "py_isolated_child.py",
+    ):
+        path = app / "priv" / name
+        path.parent.mkdir(exist_ok=True)
+        path.touch()
     for name in ("notices/OTP-LICENSE.txt", "notices/erlang-python-LICENSE", "bin/start.boot"):
         path = assets / name
         path.parent.mkdir(exist_ok=True)
@@ -210,16 +230,54 @@ def test_packaged_assets__rejects_incompatible_host_before_native_launch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     manifest = {
-        "python_version": "3.14", "implementation": "cpython", "architecture": "arm64",
-        "system": "Darwin", "minimum_macos": [15, 0],
-        "wheel_tag": "cp314-cp314-macosx_15_0_arm64", "erts_version": "17.1.1",
-        "executable": "erts-17.1.1/bin/erlexec", "bindir": "erts-17.1.1/bin", "root_dir": ".",
-        "code_paths": ["lib/erlang_python-5.0.1/ebin"], "python_library": "libpython3.14.dylib",
+        "python_version": "3.14",
+        "implementation": "cpython",
+        "architecture": "arm64",
+        "system": "Darwin",
+        "minimum_macos": [15, 0],
+        "wheel_tag": "cp314-cp314-macosx_15_0_arm64",
+        "erts_version": "17.1.1",
+        "executable": "erts-17.1.1/bin/erlexec",
+        "bindir": "erts-17.1.1/bin",
+        "root_dir": ".",
+        "code_paths": ["lib/erlang_python-5.0.1/ebin"],
+        "python_library": "libpython3.14.dylib",
     }
     (tmp_path / "runtime.json").write_text(json.dumps(manifest))
     monkeypatch.setattr("pybeam.runtime.assets.platform.machine", lambda: "x86_64")
     with pytest.raises(BootstrapError, match="not compatible"):
         packaged_assets(tmp_path)
+
+
+def test_host_library__does_not_reuse_an_unrelated_compiled_prefix(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home = tmp_path / "relocated-python"
+    old_libdir = tmp_path / "old-python/lib"
+    old_libdir.mkdir(parents=True)
+    (old_libdir / "libpython3.14.dylib").touch()
+    monkeypatch.setattr("pybeam.runtime.assets.sys.base_prefix", str(home))
+    monkeypatch.setattr(
+        "pybeam.runtime.assets.sysconfig.get_config_var", lambda _name: str(old_libdir)
+    )
+    with pytest.raises(BootstrapError, match="matching shared library"):
+        _host_python_library("libpython3.14.dylib")
+    (home / "lib").mkdir(parents=True)
+    expected = home / "lib/libpython3.14.dylib"
+    expected.touch()
+    assert _host_python_library("libpython3.14.dylib") == expected
+
+
+def test_discovery__does_not_fall_back_to_an_unconfigured_checkout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "src/pybeam/runtime/assets.py"
+    source.parent.mkdir(parents=True)
+    (tmp_path / "rebar.config").touch()
+    (tmp_path / "_build/hornbeam").mkdir(parents=True)
+    monkeypatch.setattr("pybeam.runtime.assets.__file__", str(source))
+    with pytest.raises(BootstrapError, match="No supported managed runtime"):
+        discover_assets(Config())
 
 
 @pytest.mark.runtime
@@ -257,6 +315,22 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     )
     moved = tmp_path / "moved"
     original.rename(moved)
+    imports = subprocess.run(
+        [
+            str(moved / "bin/python"),
+            "-c",
+            "import sys; from pybeam.services.background import ServiceSlot; assert 'erlang' not in sys.modules; print(ServiceSlot.__module__)",
+        ],
+        cwd=tmp_path,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=15,
+    )
+    assert imports.returncode == 0, imports.stdout + imports.stderr
+    assert "erlang_services" in imports.stdout
+    assert (moved / "lib/python3.14/site-packages/_erlang_impl/_actors.pyi").is_file()
     application = tmp_path / "application-original"
     application.mkdir()
     entry = application / "main.py"
@@ -287,6 +361,8 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     application = relocated
     entry = application / "main.py"
     clean = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    for command in ("erl", "escript", "rebar3", "mise"):
+        assert shutil.which(command, path=clean["PATH"]) is None
     result = subprocess.run(
         [str(moved / "bin/python"), str(entry)],
         cwd=application,
@@ -306,14 +382,21 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     state_line = next(
         line for line in result.stdout.splitlines() if line.startswith("NATIVE_STATE ")
     )
-    state: object = json.loads(state_line.removeprefix("NATIVE_STATE "))
-    assert isinstance(state, dict)
-    pid: object = state["pid"]
-    assert isinstance(pid, int)
+    state = NativeState.model_validate_json(state_line.removeprefix("NATIVE_STATE "))
+    assert state.libraries == (host / "lib/libpython3.14.dylib",)
+    assert state.package == moved / "lib/python3.14/site-packages/pybeam/__init__.py"
+    assert state.pydantic == moved / "lib/python3.14/site-packages/pydantic/__init__.py"
     with pytest.raises(ProcessLookupError):
-        os.kill(pid, 0)
+        os.kill(state.pid, 0)
+    with pytest.raises(ProcessLookupError):
+        os.killpg(state.pid, 0)
+    console = tmp_path / "console"
+    subprocess.run([uv, "venv", "--python", interpreter, str(console)], check=True)
+    subprocess.run(
+        [uv, "pip", "install", "--python", str(console / "bin/python"), str(wheel)], check=True
+    )
     cli = subprocess.run(
-        [str(moved / "bin/python"), str(moved / "bin/pybeam"), "run", str(entry)],
+        [str(console / "bin/pybeam"), "run", str(entry)],
         cwd=application,
         env=clean,
         capture_output=True,
@@ -323,7 +406,17 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     )
     assert cli.returncode == 0, cli.stdout + cli.stderr
     assert cli.stdout.count("NATIVE_OK") == 1
+    assert str(console / "lib/python3.14/site-packages/pybeam/__init__.py") in cli.stdout
     assert str(host / "lib/libpython3.14.dylib") in cli.stdout
+    assert "/Users/robby/projects" not in cli.stdout + cli.stderr
+    assert "/mise/" not in cli.stdout + cli.stderr
+    cli_state_line = next(
+        line for line in cli.stdout.splitlines() if line.startswith("NATIVE_STATE ")
+    )
+    cli_state = NativeState.model_validate_json(cli_state_line.removeprefix("NATIVE_STATE "))
+    assert cli_state.libraries == (host / "lib/libpython3.14.dylib",)
+    with pytest.raises(ProcessLookupError):
+        os.killpg(cli_state.pid, 0)
     manifest = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/runtime.json"
     saved = manifest.read_text()
     payload: object = json.loads(saved)
@@ -348,7 +441,12 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     nif.rename(hidden_nif)
     missing_nif = subprocess.run(
         [str(moved / "bin/python"), str(entry)],
-        cwd=application, env=clean, capture_output=True, check=False, text=True, timeout=15,
+        cwd=application,
+        env=clean,
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=15,
     )
     assert missing_nif.returncode != 0
     assert "incomplete" in missing_nif.stderr

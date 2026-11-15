@@ -46,7 +46,7 @@ type AssetPath = Annotated[Path, AfterValidator(_relative)]
 
 
 class RuntimeManifest(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     python_version: Literal["3.14"]
     implementation: Literal["cpython"]

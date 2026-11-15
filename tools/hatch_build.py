@@ -15,4 +15,10 @@ class RuntimeBuildHook(BuildHookInterface[BuilderConfig]):
         assets = Path(self.root) / "build" / "runtime"
         build_data["tag"] = runtime_tag(assets)
         build_data["pure_python"] = False
-        build_data["force_include"] = {str(assets): "pybeam/runtime/_assets"}
+        priv = next(assets.glob("lib/erlang_python-*/priv"))
+        build_data["force_include"] = {
+            str(assets): "pybeam/runtime/_assets",
+            str(priv / "_erlang_impl"): "_erlang_impl",
+            str(priv / "erlang_services.py"): "erlang_services.py",
+            str(priv / "py_isolated_child.py"): "py_isolated_child.py",
+        }

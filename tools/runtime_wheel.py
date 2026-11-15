@@ -44,6 +44,16 @@ def runtime_tag(assets: Path) -> str:
     for required in ("notices/OTP-LICENSE.txt", "notices/erlang-python-LICENSE", "bin/start.boot"):
         if not (assets / required).is_file():
             raise ValueError("Missing runtime asset: " + required)
+    priv = natives[0].parent
+    for name in (
+        "_erlang_impl/__init__.py",
+        "_erlang_impl/_actors.py",
+        "_erlang_impl/_actors.pyi",
+        "erlang_services.py",
+        "py_isolated_child.py",
+    ):
+        if not (priv / name).is_file():
+            raise ValueError("Missing native Python binding: " + name)
     pieces = tag.split("macosx_", 1)[1].split("_")
     target = (int(pieces[0]), int(pieces[1]))
     if wheel_tag(target) != tag:
