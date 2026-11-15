@@ -306,8 +306,11 @@ defmodule PyBEAM.GenStageTest do
       {:release, {~c"genstage_probe", ~c"0.1.0"}, {:erts, :erlang.system_info(:version)},
        versions}
 
-    directory = Path.expand(".experiment/genstage-release")
-    File.mkdir_p!(directory)
+    directory =
+      Path.join(System.tmp_dir!(), "genstage-release-" <> Integer.to_string(System.unique_integer([:positive])))
+
+    File.mkdir!(directory)
+    on_exit(fn -> File.rm_rf!(directory) end)
     base = Path.join(directory, "genstage_probe")
     File.write!(base <> ".rel", :io_lib.format(~c"~tp.~n", [release]))
     # Local paths deliberately prove a development host boot, not relocation.

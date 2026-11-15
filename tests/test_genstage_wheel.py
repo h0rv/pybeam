@@ -14,6 +14,8 @@ import pytest
 
 from pybeam.runtime.config import BootstrapError
 from pybeam.runtime.optional import OptionalManifest, read_manifest
+from tools.genstage_assets import HELPER_SHA256, digest, stage
+from tools.genstage_fixtures import prepare
 from tools.runtime_wheel import audit_optional
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,11 +102,7 @@ def test_installed_genstage_without_developer_environment(
         helper = next(
             name for name in archive.namelist() if name.endswith("/ebin/py_application.beam")
         )
-        compiled = (
-            ROOT.parent
-            / "native-genstage-current/_build/default/lib/erlang_python/ebin/py_application.beam"
-        )
-        assert archive.read(helper) == compiled.read_bytes()
+        assert hashlib.sha256(archive.read(helper)).hexdigest() == HELPER_SHA256
         assert not any("libpython" in name for name in archive.namelist())
         assert not any(name.endswith((".ex", ".erl")) for name in archive.namelist())
         core: object = json.loads(archive.read("pybeam/runtime/_assets/runtime.json"))
@@ -159,13 +157,15 @@ def test_installed_genstage_without_developer_environment(
         ROOT / "tests/native/genstage_wheel.py",
     ):
         shutil.copyfile(source, application / source.name)
-    probe = ROOT / ".experiment/genstage-probe/ebin"
-    assert probe.is_dir(), "Compile the test-only fixture with mise run experiment:genstage-probe"
-    shutil.copytree(probe, application / "probe/ebin")
-    compat = ROOT / ".experiment/application-probe"
-    shutil.copytree(compat / "ebin", application / "compat/ebin")
-    (application / "compat/priv").mkdir()
-    shutil.copyfile(compat / "stale/Elixir.GenStage.beam", application / "compat/priv/stale.beam")
+    fixtures = tmp_path / "fixtures"
+    prepare(wheel, fixtures)
+    staged_nif = fixtures / "assets/runtime/lib/erlang_python-5.0.1/priv/py_nif.so"
+    identity, checksum = staged_nif.stat().st_ino, digest(staged_nif)
+    with pytest.raises(FileExistsError, match="new output directory"):
+        stage(wheel, fixtures / "assets")
+    assert (staged_nif.stat().st_ino, digest(staged_nif)) == (identity, checksum)
+    shutil.copytree(fixtures / "probe", application / "probe")
+    shutil.copytree(fixtures / "compat", application / "compat")
     imports = subprocess.run(
         [
             str(python),
