@@ -6,6 +6,8 @@ from itertools import count
 from types import TracebackType
 from typing import Protocol, Self, TypeIs, overload
 
+from pydantic import BaseModel, ConfigDict, PositiveInt
+
 from pybeam.actors.classes import (
     ActorStoppedError,
     Container,
@@ -56,6 +58,14 @@ def is_actor_class[T](value: Callable[..., T]) -> TypeIs[type[T]]:
     return isinstance(value, type)
 
 
+class _ActorGroupConfig(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    max_children: PositiveInt
+    max_pending: PositiveInt
+    max_bytes: PositiveInt
+
+
 class ActorGroup:
     """Own native OTP actors within one VM.
 
@@ -67,9 +77,9 @@ class ActorGroup:
     def __init__(
         self, *, max_children: int = 128, max_pending: int = 64, max_bytes: int = 1_048_576
     ) -> None:
-        if min(max_children, max_pending, max_bytes) <= 0:
-            raise ValueError("Actor limits must be positive")
-        self._limits = (max_children, max_pending, max_bytes)
+        self._limits = _ActorGroupConfig(
+            max_children=max_children, max_pending=max_pending, max_bytes=max_bytes
+        )
         self._stack = AsyncExitStack()
         self._starts: asyncio.TaskGroup | None = None
         self._native: DataGroup | None = None
@@ -84,8 +94,7 @@ class ActorGroup:
         if self._entered or self._closing:
             raise RuntimeError("ActorGroup cannot be entered twice or after closing")
         self._entered = True
-        children, _, _ = self._limits
-        native = await open_group(max_children=children)
+        native = await open_group(max_children=self._limits.max_children)
         self._native = native
         self._stack.push_async_callback(native.close)
         try:
@@ -106,7 +115,8 @@ class ActorGroup:
         try:
             spec = definition(cls)
             payload = spec.constructor.encode(args, kwargs)
-            _, capacity, size = self._limits
+            capacity = self._limits.max_pending
+            size = self._limits.max_bytes
             if len(payload) > size:
                 raise ActorPayloadError("Encoded actor constructor exceeds max_bytes")
             actor = await native.spawn(
