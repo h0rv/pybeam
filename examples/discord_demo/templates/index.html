@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>#{{ room_id }} · Native rooms</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/missing.min.css">
+  <link rel="stylesheet" href="/assets/demo.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/sse.js" defer></script>
+  <script src="/assets/demo.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <h1>Native rooms</h1>
+    <p>A small Discord-style demo</p>
+    <nav aria-label="Rooms">
+      {% for room in rooms %}
+      <a href="/rooms/{{ room }}" {% if room == room_id %}aria-current="page"{% endif %}># {{ room }}</a>
+      {% endfor %}
+    </nav>
+    <p>You: <code>{{ member[:8] }}</code></p>
+    <p>Anonymous local sessions. Not Discord authentication.</p>
+    <p>Changing pages does not change native membership. Leave explicitly when available.</p>
+  </aside>
+  <main>
+    <header>
+      <h2># {{ room_id }}</h2>
+      <p id="connection" role="status">Connecting to native push…</p>
+    </header>
+    <section id="room-stream" hx-sse:connect="/rooms/{{ room_id }}/events" hx-swap="innerHTML"
+             aria-live="polite" aria-label="Live native room">
+      <p>Waiting for a subscribed, fresh native snapshot.</p>
+    </section>
+    <form id="compose" action="/rooms/{{ room_id }}/actions" method="post"
+          hx-post="/rooms/{{ room_id }}/actions" hx-target="#ack" hx-swap="innerHTML"
+          hx-sync="this:drop">
+      <input type="hidden" name="action" value="send">
+      <label for="message">Message</label>
+      <textarea id="message" name="text" maxlength="256" rows="2" required
+                placeholder="Join this generation first. Maximum 256 characters."></textarea>
+      <button type="submit">Send message</button>
+    </form>
+    <p id="ack" role="status">Messages are not retried. A cancelled request can still have effects.</p>
+    <footer>
+      <p>Four real BEAM worker processes, not four Python coroutines. No CPU or GIL isolation claim.</p>
+      <p>8 members per room. 100 events per generation. Latest 32 messages retained.
+         32 streams, 16 admitted web operations, native request limits and 4096-byte subscription queues.
+         Slow writes disconnect after 5 seconds. No persistence or replay.</p>
+      <p>The stream alone writes chat and presence. POST responses only confirm operations.
+         Reload reconnects and reads current native state. Drafts stay local and are not cleared by acknowledgements.</p>
+    </footer>
+  </main>
+</body>
+</html>

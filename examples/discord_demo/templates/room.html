@@ -1,0 +1,60 @@
+<input type="hidden" name="generation" value="{{ view.info.generation }}" form="compose">
+<input type="hidden" name="csrf" value="{{ csrf }}" form="compose">
+<div class="room-layout">
+  <section aria-label="Messages">
+    <h3>Messages <small>{{ view.snapshot.event_ids|length }} / 100</small></h3>
+    <ol id="messages">
+      {% for event in view.snapshot.history %}
+      <li data-event="{{ event.event_id }}"><strong>{{ event.tags[0][:8] }}</strong>
+        <p class="message">{{ event.text }}</p></li>
+      {% else %}
+      <li>No messages. Restarted rooms begin empty.</li>
+      {% endfor %}
+    </ol>
+  </section>
+  <aside aria-label="Members">
+    <h3>Members <small>{{ view.snapshot.members|length }} / 8</small></h3>
+    <ul id="members">
+      {% for item in view.snapshot.members %}
+      <li><code>{{ item.member_id[:8] }}</code>{% if item.member_id == member %} (you){% endif %}
+        <small>{{ item.count }} receipts</small></li>
+      {% else %}
+      <li>No native memberships.</li>
+      {% endfor %}
+    </ul>
+    <p id="membership">{% if joined %}Joined this generation.{% else %}Not joined. Explicit join required.{% endif %}</p>
+    {% for action, title, disabled in [('join', 'Join / rejoin', joined), ('leave', 'Leave', not joined or not can_leave)] %}
+    <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
+          hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
+      <input type="hidden" name="action" value="{{ action }}">
+      <input type="hidden" name="generation" value="{{ view.info.generation }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" {% if disabled %}disabled{% endif %}>{{ title }}</button>
+    </form>
+    {% endfor %}
+    {% if not can_leave %}<p>Leave unavailable: this domain revision has no native Room.leave method.
+      Membership remains until the room restarts. Disconnect does not pretend to remove it.</p>{% endif %}
+  </aside>
+</div>
+<details open>
+  <summary>Native room inspector</summary>
+  <dl id="inspector" data-pid="{{ view.info.pid }}" data-generation="{{ view.info.generation }}">
+    <dt>BEAM child PID</dt><dd><code>{{ view.info.pid }}</code></dd>
+    <dt>Native generation</dt><dd>{{ view.info.generation }}</dd>
+    <dt>Room epoch</dt><dd>{{ view.snapshot.epoch }}</dd>
+    <dt>Admitted encoded calls / bytes</dt><dd>{{ view.info.admitted_count }} / {{ view.info.admitted_bytes }}</dd>
+    <dt>State</dt><dd>{{ view.snapshot.members|length }} members, {{ view.snapshot.event_ids|length }} events,
+      {{ view.snapshot.history|length }} retained messages</dd>
+  </dl>
+  {% if is_owner %}
+  <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
+        hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
+    <input type="hidden" name="action" value="crash">
+    <input type="hidden" name="generation" value="{{ view.info.generation }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="danger">Crash this native room</button>
+  </form>
+  <p>You own local diagnostics. Crash replaces only this child. Old forms cannot kill its replacement.
+    The new PID starts with empty state. Everyone must explicitly rejoin.</p>
+  {% else %}<p>The first local browser owns crash diagnostics.</p>{% endif %}
+</details>
