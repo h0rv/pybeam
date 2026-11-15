@@ -63,8 +63,8 @@ async def serve() -> None:
 
     spec = TaskFunction(double, TypeAdapter(JobRequest), TypeAdapter(JobResult))
     active: dict[str, TaskRef[JobResult]] = {}
-    limits = TaskLimits(capacity=snapshot.capacity, max_bytes=snapshot.max_bytes, shutdown_ms=1000)
-    async with TaskSupervisor(limits) as supervisor:
+    limits = TaskLimits(capacity=1, max_bytes=snapshot.max_bytes, shutdown_ms=1000)
+    async with asyncio.TaskGroup():
         registered = await local(Request(op="register", definition="double"))
         if registered.status != "ok":
             raise RuntimeError("Recipient definition registration failed")
@@ -81,34 +81,47 @@ async def serve() -> None:
                 except ValidationError:
                     await local(Request(op="reject", incarnation=handler.incarnation, token=token))
                     return
-                if len(spec.encode(request)) > len(payload.encode()):
+                encoded = spec.encode(request)
+                if len(encoded) > len(payload.encode()):
                     await local(Request(op="reject", incarnation=handler.incarnation, token=token))
                     return
-                ref = await supervisor.start(spec, request)
-                started: object = await async_call(
-                    "pybeam_dist_started", handler.incarnation.encode(), token.encode(), ref.pid
-                )
-                if (
-                    not isinstance(started, str | bytes)
-                    or Reply.model_validate_json(started).status != "ok"
-                ):
-                    raise RuntimeError("Cannot prove live local Task PID")
-                active[token] = ref
-                try:
-                    result = (await ref).model_dump_json()
-                except asyncio.CancelledError:
-                    current = asyncio.current_task()
-                    if current is None or current.cancelling():
+                async with TaskSupervisor(limits) as supervisor:
+                    bound: object = await async_call(
+                        "pybeam_dist_bind",
+                        handler.incarnation.encode(),
+                        token.encode(),
+                        supervisor._group,
+                    )
+                    if (
+                        not isinstance(bound, str | bytes)
+                        or Reply.model_validate_json(bound).status != "ok"
+                    ):
+                        raise RuntimeError("Cannot bind request to an empty local Task scope")
+                    ref = await supervisor.start(spec, request)
+                    started: object = await async_call(
+                        "pybeam_dist_started", handler.incarnation.encode(), token.encode(), ref.pid
+                    )
+                    if (
+                        not isinstance(started, str | bytes)
+                        or Reply.model_validate_json(started).status != "ok"
+                    ):
+                        raise RuntimeError("Cannot prove request-owned local Task PID")
+                    active[token] = ref
+                    try:
+                        result = (await ref).model_dump_json()
+                    except asyncio.CancelledError:
+                        current = asyncio.current_task()
+                        if current is None or current.cancelling():
+                            raise
+                        result = CancellationResult(
+                            cancelled=True, effects=effects, cleanups=cleanups
+                        ).model_dump_json()
+                    except UncertainInflight:
                         raise
-                    result = CancellationResult(
-                        cancelled=True, effects=effects, cleanups=cleanups
-                    ).model_dump_json()
-                except UncertainInflight:
-                    raise
-                except Exception:
-                    result = '{"error":"recipient_failure"}'
-                finally:
-                    active.pop(token, None)
+                    except Exception:
+                        result = '{"error":"recipient_failure"}'
+                    finally:
+                        active.pop(token, None)
                 completed = await local(
                     Request(
                         op="complete", incarnation=handler.incarnation, token=token, result=result

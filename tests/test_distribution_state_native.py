@@ -40,11 +40,11 @@ def test_distribution__recipient_admission_expiry_and_stale_state_controls(
         "-noshell",
         "-noinput",
         "-pa",
-        str(tmp_path),
         *(str(path) for path in assets.code_paths),
+        str(tmp_path),
         "-eval",
         "R=eunit:test(py_distribution_tests,[verbose]),case R of ok->halt(0);_->halt(1) end.",
     ]
     status, stdout, stderr = run_owned(argv)
     assert status == 0, stdout + stderr
-    assert b"All 4 tests passed" in stdout
+    assert b"All 8 tests passed" in stdout
