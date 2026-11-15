@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.native.runtime import NATIVE, ROOT, require_runtime
+from tests.native.runtime import NATIVE, ROOT, host_python_paths, require_runtime
 
 pytestmark = pytest.mark.runtime
 
@@ -52,10 +52,16 @@ def test_otp_restart_and_shutdown_contracts(native_tests: Path, native_runtime: 
 
 
 def test_python_api_and_process_bound_state_reset(native_tests: Path, native_runtime: Path) -> None:
-    source = str(ROOT / "src")
-    tests = str(ROOT / "tests/supervision")
+    source = ROOT / "src"
+    tests = ROOT / "tests" / "supervision"
+    paths = host_python_paths(source, tests)
     run_native(
         native_tests,
         native_runtime,
-        'ok = py_supervision_tests:runtime("{}", "{}"), halt().'.format(source, tests),
+        "{ok, _} = application:ensure_all_started(erlang_python), "
+        "ok = py_import:add_paths(PATHS), "
+        'ok = py:exec(<<"import supervision_probe">>), '
+        'ok = py_supervision_tests:runtime("SOURCE", "TESTS"), halt().'.replace("PATHS", paths)
+        .replace("SOURCE", str(source))
+        .replace("TESTS", str(tests)),
     )

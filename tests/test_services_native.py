@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.native.runtime import ROOT, require_runtime
+from tests.native.runtime import ROOT, host_python_paths, require_runtime
 
 
 @pytest.mark.runtime
@@ -19,8 +19,10 @@ def test_services__native_worker_without_web_server(
         application:set_env(erlang_python, num_contexts, 1),
         application:set_env(erlang_python, event_loop_pool_size, 1),
         {ok, _} = application:ensure_all_started(erlang_python),
+        ok = py_import:add_paths(HOST_PATHS),
         {ok, W} = py_context:new(#{mode => worker}),
         ok = py_context:exec(W, <<"import sys; sys.path[:0] = PATHS">>),
+        ok = py_context:exec(W, <<"import services_worker">>),
         ok = py_context:start_loop(W),
         {ok, Task} = py_context:submit(W, services_worker, verify, []),
         Owner = self(),
@@ -45,7 +47,7 @@ def test_services__native_worker_without_web_server(
         ok = application:stop(erlang_python),
         io:format("services-native-ok~n"),
         halt(0).
-    """.replace("PATHS", path_code)
+    """.replace("HOST_PATHS", host_python_paths()).replace("PATHS", path_code)
     environment = os.environ.copy()
     environment["ERL_CRASH_DUMP"] = str(tmp_path / "erl_crash.dump")
     result = subprocess.run(

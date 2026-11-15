@@ -1,17 +1,18 @@
 #!/usr/bin/env escript
 %%! +S 2:2
 
-main([Root, Runtime]) ->
+main([Root, Runtime, "--python-path" | PythonPaths]) ->
     true = code:add_patha(filename:join(Runtime, "ebin")),
     ok = application:load(erlang_python),
     ok = application:set_env(erlang_python, num_contexts, 1),
     ok = application:set_env(erlang_python, event_loop_pool_size, 1),
-    ok = application:set_env(erlang_python, paths, [Root, filename:join(Root, "src")]),
     {ok, _} = application:ensure_all_started(erlang_python),
+    ok = py_import:add_paths(PythonPaths),
     {ok, Worker} = py_context:new(#{mode => worker}),
     try
         ok = py_context:exec(Worker, iolist_to_binary(io_lib:format(
             "import sys; sys.path[:0] = [~p, ~p]", [Root, filename:join(Root, "src")]))),
+        ok = py_context:exec(Worker, <<"import tests.native.service_objects">>),
         ok = py_context:start_loop(Worker),
         io:format("Native submit has no mailbox policy; ServiceSlot bounds local tasks only.~n"),
         case py_context:submit_await(Worker, 'tests.native.service_objects', run, [], #{}, 10000) of

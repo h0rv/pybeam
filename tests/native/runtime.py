@@ -1,4 +1,6 @@
+import json
 import os
+import site
 import subprocess
 from pathlib import Path
 
@@ -21,13 +23,25 @@ def require_runtime(request: pytest.FixtureRequest) -> Path:
     return runtime
 
 
+def host_python_paths(*paths: Path) -> str:
+    return json.dumps([*(str(path) for path in paths), *site.getsitepackages()])
+
+
 def run_launcher(
     runtime: Path, launcher: str, tmp_path: Path, *args: str
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment["ERL_CRASH_DUMP"] = str(tmp_path / "erl_crash.dump")
     return subprocess.run(
-        ["escript", str(ROOT / "tests" / "native" / launcher), str(ROOT), str(runtime), *args],
+        [
+            "escript",
+            str(ROOT / "tests" / "native" / launcher),
+            str(ROOT),
+            str(runtime),
+            *args,
+            "--python-path",
+            *site.getsitepackages(),
+        ],
         cwd=tmp_path,
         env=environment,
         capture_output=True,

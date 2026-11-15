@@ -2,11 +2,12 @@
 %%! +S 2:2
 -mode(compile).
 
-main([Root, Runtime]) ->
+main([Root, Runtime, "--python-path" | PythonPaths]) ->
     true = code:add_patha(filename:join(Runtime, "ebin")),
     io:format("Internal native actor regression fixture.~n"),
     io:format("Mailbox policy: explicit unbounded. No mailbox bounds.~n"),
     {ok, _} = application:ensure_all_started(erlang_python),
+    ok = py_import:add_paths(PythonPaths),
     {ok, Ctx} = py_context:new(#{mode => worker}),
     Mon = erlang:monitor(process, Ctx),
     try run(Ctx, Root)
