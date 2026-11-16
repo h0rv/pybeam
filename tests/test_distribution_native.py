@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -36,7 +37,7 @@ def clean(cluster: LocalCluster) -> None:
 def test_distribution__actual_nodes_handlers_tasks_loss_and_fresh_restart() -> None:
     proof = demonstration()
     for key in ("first", "second"):
-        result = Reply.model_validate(proof[key])
+        result = Reply.model_validate_json(json.dumps(proof[key]))
         assert result.worker_kind == "temporary_otp_task"
         assert result.worker_dead is True
         assert result.worker is not None and result.worker.startswith("<0.")
@@ -45,10 +46,10 @@ def test_distribution__actual_nodes_handlers_tasks_loss_and_fresh_restart() -> N
         assert result.otp_version == "29.1.2"
         assert result.erts_version == "17.1.1"
         assert result.private_home is True
-    assert Reply.model_validate(proof["inflight_loss"]).status == "uncertain"
-    assert Reply.model_validate(proof["controls"]).count == 2
-    assert Reply.model_validate(proof["stale_ack"]).status == "stale"
-    journal = Registry.model_validate(proof["cleanup"])
+    assert Reply.model_validate_json(json.dumps(proof["inflight_loss"])).status == "uncertain"
+    assert Reply.model_validate_json(json.dumps(proof["controls"])).count == 2
+    assert Reply.model_validate_json(json.dumps(proof["stale_ack"])).status == "stale"
+    journal = Registry.model_validate_json(json.dumps(proof["cleanup"]))
     assert journal.phase == "confirmed"
     assert all(resolve(value) is None for value in journal.owned)
 

@@ -22,26 +22,12 @@ jobs:
         working-directory: pybeam
         shell: bash
     env:
-      ERLANG_PYTHON_REV: d227c0de29fa3f748610352bf8a808a235bcd5c3
-      HORNBEAM_REV: f062aa7d5634856aa1b8180933fdf41f32228bc4
       CMAKE_BUILD_PARALLEL_LEVEL: '2'
       ERL_FLAGS: '+S 2:2 +A 2'
     steps:
       - uses: actions/checkout@v4
         with:
           path: pybeam
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: h0rv/erlang-python
-          ref: ${{ env.ERLANG_PYTHON_REV }}
-          path: erlang-python
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: h0rv/hornbeam
-          ref: ${{ env.HORNBEAM_REV }}
-          path: hornbeam
           persist-credentials: false
       - name: Verify host and configure toolchain
         id: host
@@ -55,6 +41,38 @@ jobs:
       - uses: jdx/mise-action@v3
         with:
           working_directory: pybeam
+      - name: Resolve locked runtime pins
+        id: pins
+        run: |
+          native_ref=$(erl -noshell -eval '
+            {ok, [Locks]} = file:consult("rebar.lock"),
+            {_, {git, _, {ref, Ref}}, _} = lists:keyfind(<<"erlang_python">>, 1, Locks),
+            io:put_chars(Ref), halt().')
+          hornbeam_ref=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          lock = tomllib.loads(Path("uv.lock").read_text())
+          package = next(item for item in lock["package"] if item["name"] == "hornbeam")
+          print(package["source"]["git"].rsplit("#", 1)[1])
+          PY
+          )
+          [[ "$native_ref" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$hornbeam_ref" =~ ^[0-9a-f]{40}$ ]]
+          echo "erlang_python=$native_ref" >> "$GITHUB_OUTPUT"
+          echo "hornbeam=$hornbeam_ref" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: h0rv/erlang-python
+          ref: ${{ steps.pins.outputs.erlang_python }}
+          path: erlang-python
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: h0rv/hornbeam
+          ref: ${{ steps.pins.outputs.hornbeam }}
+          path: hornbeam
+          persist-credentials: false
       - name: Install locked Python dependencies
         run: uv sync --locked --all-extras --python "$(mise which python)"
       - name: Link pinned sibling sources
@@ -71,7 +89,7 @@ jobs:
             erlang-python/ebin
             erlang-python/priv/py_nif.so
             hornbeam/ebin
-          key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.host.outputs.image }}-${{ env.ERLANG_PYTHON_REV }}-${{ env.HORNBEAM_REV }}-${{ hashFiles('pybeam/mise.toml', 'pybeam/rebar.config', 'pybeam/rebar.lock', 'pybeam/tools/build_native.py', 'pybeam/.github/workflows/native.yml') }}
+          key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.host.outputs.image }}-${{ steps.pins.outputs.erlang_python }}-${{ steps.pins.outputs.hornbeam }}-${{ hashFiles('pybeam/mise.toml', 'pybeam/rebar.config', 'pybeam/rebar.lock', 'pybeam/tools/build_native.py', 'pybeam/.github/workflows/native.yml') }}
       - name: Build pinned native runtime
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: uv run --locked --all-extras python tools/build_native.py
