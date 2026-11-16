@@ -30,7 +30,7 @@ def test_distribution__recipient_admission_expiry_and_stale_state_controls(
     source = root.parent / "erlang-python/test/py_distribution_tests.erl"
     status, stdout, stderr = run_owned(["erlc", "-o", str(tmp_path), str(source)])
     assert status == 0, stdout + stderr
-    assets = development_assets(root / "_build/default")
+    assets = development_assets(root / "_build/hornbeam")
     argv = [
         str(assets.executable),
         "+S",
