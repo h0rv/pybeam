@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
 Save this as `main.py` and run `python main.py`. It prints `Hello from Python`.
 
-[Actors](actors.md) · [Supervision](supervision.md) · [Shared state](state.md) · [Messaging](messaging.md) · [Background services](background.md) · [Web integration](web.md)
+[Why PyBEAM](why.md) · [Actors](actors.md) · [Supervision](supervision.md) · [Shared state](state.md) · [Messaging](messaging.md) · [Background services](background.md) · [Web integration](web.md)
 
 Pass the function to `pybeam.run`, not the coroutine `main()`. PyBEAM starts and stops the runtime. Ordinary asyncio tasks work inside `main`; they are not OTP processes.
 
