@@ -46,6 +46,7 @@ dev = [
   "types-psutil>=7,<8",
   "playwright>=1.58,<2",
   "hatchling>=1.27,<2",
+  "patchelf==0.19.3.0 ; sys_platform == 'linux'",
 ]
 
 [build-system]
@@ -67,7 +68,7 @@ exclude = ["src/pybeam/integrations/genstage/*.erl", "src/pybeam/integrations/ge
 include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]
 
 [tool.uv.sources]
-hornbeam = { git = "https://github.com/h0rv/hornbeam.git", rev = "f062aa7d5634856aa1b8180933fdf41f32228bc4" }
+hornbeam = { git = "https://github.com/h0rv/hornbeam.git", branch = "main" }
 
 [tool.ty.environment]
 python-version = "3.14"

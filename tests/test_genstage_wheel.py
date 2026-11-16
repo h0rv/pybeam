@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import platform
 import selectors
 import shutil
 import signal
@@ -19,6 +20,25 @@ from tools.genstage_fixtures import prepare
 from tools.runtime_wheel import audit_optional
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def linux_without_genstage(wheel: Path, root: Path) -> None:
+    with ZipFile(wheel) as archive:
+        assert not any("/optional/genstage/" in name for name in archive.namelist())
+    uv = shutil.which("uv")
+    assert uv is not None
+    environment = root / "installed"
+    subprocess.run([uv, "venv", "--python", sys.executable, str(environment)], check=True)
+    python = environment / "bin/python"
+    subprocess.run([uv, "pip", "install", "--python", str(python), str(wheel)], check=True)
+    entry = root / "main.py"
+    entry.write_text(
+        "import pybeam\nfrom pybeam.runtime.optional import start_optional\n"
+        "async def main():\n    await start_optional('genstage')\npybeam.run(main)\n"
+    )
+    result = run(python, entry, {"PATH": "/usr/bin:/bin", "HOME": str(root)})
+    assert result.returncode != 0
+    assert "GenStage payload is not bundled on Linux" in result.stdout + result.stderr
 
 
 def run(python: Path, entry: Path, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
@@ -106,6 +126,9 @@ def test_installed_genstage_without_developer_environment(
     value = os.environ.get("PYBEAM_TEST_WHEEL")
     assert value is not None, "Set PYBEAM_TEST_WHEEL to the current private platform wheel"
     wheel = Path(value).resolve(strict=True)
+    if platform.system() == "Linux":
+        linux_without_genstage(wheel, tmp_path)
+        return
     with ZipFile(wheel) as archive:
         manifest_path = "pybeam/runtime/_assets/optional/genstage/manifest.json"
         manifest = OptionalManifest.model_validate_json(archive.read(manifest_path))

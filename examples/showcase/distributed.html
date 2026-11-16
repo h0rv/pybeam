@@ -1,89 +1,65 @@
-{% set nodes = job.observations|selectattr('kind', 'equalto', 'node')|list %}
-{% set exchanges = job.observations|selectattr('kind', 'equalto', 'exchange')|list %}
-{% set states = job.observations|selectattr('kind', 'equalto', 'state')|map(attribute='state')|list %}
-{% set cleanup = job.observations|selectattr('kind', 'equalto', 'cleanup')|list %}
-<section aria-label="Walkthrough progress and result">
-  {% if job.proof and job.status == 'finished' %}
-  <p class="result" role="status">B returned {{ exchanges[0].result.value }} before restart and {{ exchanges[-1].result.value }} after restart. Both nodes stopped cleanly.</p>
-  <a href="/artifact/{{ job.id }}">Download walkthrough proof</a>
-  {% elif job.status == 'queued' %}
-  <p class="result">Queued. Waiting for the current job to finish.</p>
-  {% elif job.status == 'stopping' %}
-  <p class="result">Stopping. Waiting for owned cleanup.</p>
-  {% elif not job.active %}
-  <p class="result">{{ 'Stopped.' if job.status == 'stopped' else 'Run did not finish successfully.' }} No complete walkthrough result was confirmed.</p>
-  {% else %}<p class="result">Running. Waiting for the next observation below.</p>{% endif %}
-  {% if job.observations and not job.proof %}
-  {% set last = job.observations[-1] %}
-  <p class="last-confirmed">Last confirmed:
-    {% if last.kind == 'node' %}Node {{ last.alias|upper }} {{ last.status }}.
-    {% elif last.kind == 'exchange' %}B returned {{ last.result.value }} with {{ last.result.side_effect_count }} effect. The temporary Task exited.
-    {% elif last.kind == 'cleanup' %}Owned cleanup {{ last.state }}.
-    {% elif last.state == 'task_pending' %}A temporary Task was pending on B.
-    {% elif last.state == 'nodedown_uncertain' %}B went down. The interrupted request's outcome is unknown.
-    {% elif last.state == 'fresh_empty' %}Restarted B had empty state.
-    {% elif last.state == 'stale_ack_rejected' %}B rejected the old acknowledgement.
-    {% endif %}
-  </p>
-  {% endif %}
-  {% set progress = namespace(waiting=false) %}
-  <ol class="steps" aria-label="Observed steps">
-    {% for label, confirmed in [
-      ('Start two nodes', nodes|length >= 2),
-      ('B returned ' ~ exchanges[0].result.value if exchanges else 'Send work to B', exchanges|length >= 1),
-      ('Stop B. Interrupted request outcome unknown' if 'nodedown_uncertain' in states else 'Stop B. Check interrupted request', 'nodedown_uncertain' in states),
-      ('Restart B with empty state', 'fresh_empty' in states),
-      ('Submit again. B returned ' ~ exchanges[-1].result.value if exchanges|length >= 2 else 'Submit again to fresh B', exchanges|length >= 2),
-      ('Finish owned cleanup', cleanup and cleanup[-1].state == 'confirmed')
-    ] %}
-    {% set current = job.status == 'running' and not confirmed and not progress.waiting %}
-    <li data-step="{{ 'confirmed' if confirmed else 'current' if current else 'unconfirmed' }}" {% if current %}aria-current="step"{% endif %}>
-      <span class="step-mark" aria-hidden="true">{{ '✓' if confirmed else '→' if current else '·' }}</span>
-      {{ label }} <small>{{ 'Confirmed' if confirmed else 'Waiting for observation' if current else 'Not observed' }}</small>
-    </li>
-    {% if current %}{% set progress.waiting = true %}{% endif %}
-    {% endfor %}
-  </ol>
-  <details>
-    <summary>Node identities and observations</summary>
-    <p>These are recorded observations, not live node controls. No automatic replay was made after interruption.</p>
-    {% for alias in ['a', 'b'] %}
-    {% set views = job.nodes|selectattr('observation.alias', 'equalto', alias)|list %}
-    <article data-node="{{ alias }}">
-      <h4>Node {{ alias|upper }}</h4>
-      {% if views %}{% set view = views[0] %}{% set node = view.observation %}
-      <dl>
-        <dt>Last observed status</dt><dd>{{ view.status }}</dd>
-        <dt>OS PID and birth identity</dt><dd>{{ node.birth.pid }} @ {{ node.birth.created }}</dd>
-        <dt>Node name</dt><dd>{{ node.handler.node }}</dd>
-        <dt>Handler PID</dt><dd>{{ node.handler.pid }}</dd>
-        <dt>Incarnation</dt><dd>{{ node.handler.incarnation }}</dd>
-      </dl>
-      {% else %}<p>No birth receipt observed.</p>{% endif %}
-    </article>
-    {% endfor %}
-    <ol aria-label="Observed exchanges and lifecycle">
-    {% for event in job.observations %}
-      <li data-observation="{{ event.kind }}">
+{% macro flow_frame(key, index, stage, motion=false, visible=false) %}
+<figure class="flow-frame" data-frame="{{ index }}" data-motion="{{ 'exchange' if motion else 'still' }}" {% if not visible %}hidden{% endif %}>
+  <div class="flow-graph" role="group" aria-label="Recorded architecture at this step">
+    <section class="flow-node" data-tone="{{ stage.atone }}"><span class="flow-node-symbol" aria-hidden="true">A</span><h4>Controller A</h4><p class="flow-node-state">{{ stage.a }}</p></section>
+    <div class="flow-wires" data-tone="{{ stage.btone }}">
+      <div class="flow-lane"><p>{{ stage.request }}</p><svg viewBox="0 0 220 26" role="img" aria-labelledby="flow-out-{{ key }}-{{ index }}"><title id="flow-out-{{ key }}-{{ index }}">Request from Controller A to Worker B</title><desc>A recorded step, not an ongoing health check.</desc><path d="M8 13 H208 M199 5 L208 13 L199 21"/><circle class="flow-dot flow-dot-out" cx="12" cy="13" r="4"/></svg></div>
+      <p class="flow-work">{{ stage.work }}</p>
+      <div class="flow-lane flow-return"><svg viewBox="0 0 220 26" role="img" aria-labelledby="flow-back-{{ key }}-{{ index }}"><title id="flow-back-{{ key }}-{{ index }}">Result from Worker B to Controller A</title><path d="M212 13 H12 M21 5 L12 13 L21 21"/><circle class="flow-dot flow-dot-back" cx="208" cy="13" r="4"/></svg><p>{{ stage.response }}</p></div>
+    </div>
+    <section class="flow-node" data-tone="{{ stage.btone }}"><span class="flow-node-symbol" aria-hidden="true">B</span><h4>Worker B {% if stage.fresh %}<span class="flow-new">NEW</span>{% endif %}</h4><p class="flow-node-state">{{ stage.b }}</p></section>
+  </div>
+  <figcaption>{{ stage.caption }}</figcaption>
+</figure>
+{% endmacro %}
+
+{% macro architecture(run=none) %}
+{% set key = run.id if run else 'ready' %}
+{% set events = run.observations if run else [] %}
+{% set complete = run and run.status == 'finished' and run.proof %}
+{% set cleaned = events|selectattr('kind', 'equalto', 'cleanup')|selectattr('state', 'equalto', 'confirmed')|list %}
+<section class="flow-player" data-flow-job="{{ key }}" data-flow-active="{{ 'true' if run and run.active else 'false' }}" data-flow-complete="{{ 'true' if complete else 'false' }}" data-flow-count="{{ events|length }}" aria-label="Two-node architecture and recorded step player">
+  <div class="flow-heading"><span class="flow-mode" data-flow-mode>{% if not run %}Ready{% elif run.active %}Live observations{% else %}Recorded replay{% endif %}</span><p class="flow-disclaimer">{% if not run %}Run the script to record these steps.{% elif run.status == 'queued' %}Queued.{% elif run.status == 'stopping' %}Stopping. Cleanup not yet confirmed.{% elif run.active %}Showing recorded node states.{% elif cleaned %}Run finished. Showing its recorded events.{% else %}Run ended. Cleanup not confirmed.{% endif %}</p></div>
+  <div class="flow-frames" aria-live="off">
+  {% set stage = namespace(a='Not started', b='Not started', atone='idle', btone='idle', request='A → B · Input 21', response='B → A · Expected 42', work='Python · 21 × 2', caption='The script sends 21 to Python on B, then stops and restarts B during another request.', fresh=false, exchanges=0) %}
+  {% if not events %}{{ flow_frame(key, 0, stage, visible=true) }}
+  {% else %}
+    {% set stage.request = 'No request yet' %}{% set stage.response = 'No result yet' %}
+    {% for event in events %}
       {% if event.kind == 'node' %}
-        Observed Node {{ event.alias|upper }} {{ event.status }}. OS birth {{ event.birth.pid }} @ {{ event.birth.created }}.
+        {% if event.alias == 'a' %}{% set stage.a = 'Recorded online' %}{% set stage.atone = 'good' %}{% set stage.caption = 'Controller A started; B has not yet been observed.' %}
+        {% elif event.status == 'fresh' %}{% set stage.b = 'New process' %}{% set stage.btone = 'good' %}{% set stage.fresh = true %}{% set stage.work = 'New worker identity' %}{% set stage.request = 'No new request yet' %}{% set stage.response = 'No new result yet' %}{% set stage.caption = 'B restarted as a new process; the earlier interrupted request still has an unknown outcome.' %}
+        {% else %}{% set stage.b = 'Recorded online' %}{% set stage.btone = 'good' %}{% set stage.work = 'Ready for work' %}{% set stage.caption = 'Both nodes were recorded online and ready for the first request.' %}{% endif %}
       {% elif event.kind == 'exchange' %}
-        <p>Task result {{ event.result.value }}. Effect count {{ event.result.side_effect_count }}. Python {{ event.result.python_version }}.</p>
-        <p>Recipient {{ event.recipient.pid }} on {{ event.recipient.node }}, incarnation {{ event.recipient.incarnation }}. Temporary Task {{ event.worker }} exited.</p>
-        <p>Message {{ event.receipt.message_id }} and reverse ACK {{ event.reverse_ack.message_id }}.</p>
+        {% set stage.exchanges = stage.exchanges + 1 %}{% set stage.btone = 'good' %}{% set stage.b = event.result.side_effect_count ~ ' completed job' ~ ('' if event.result.side_effect_count == 1 else 's') %}
+        {% set stage.request = 'A → B · ' ~ ('New request · ' if stage.exchanges > 1 else '') ~ '21' %}{% set stage.response = 'B → A · ' ~ event.result.value %}{% set stage.work = 'Python · 21 × 2 = ' ~ event.result.value %}
+        {% set stage.caption = 'A explicitly resubmitted 21; new B returned ' ~ event.result.value ~ ', without replaying the interrupted request.' if stage.exchanges > 1 else 'A sent 21; Python on B doubled it to ' ~ event.result.value ~ ' and the temporary Task exited.' %}
       {% elif event.kind == 'state' %}
-        {% if event.state == 'task_pending' %}Observed pending temporary Task {{ event.worker }}.
-        {% elif event.state == 'nodedown_uncertain' %}A observed NodeDOWN. The interrupted result and absent delivery are uncertain. No automatic replay.
-        {% elif event.state == 'fresh_empty' %}Explicit rejoin observed empty state on fresh B.
-        {% elif event.state == 'stale_ack_rejected' %}B rejected the stale ACK from its previous incarnation.
-        {% endif %}
+        {% if event.state == 'task_pending' %}{% set stage.btone = 'pending' %}{% set stage.b = 'Work in progress' %}{% set stage.request = 'A → B · Another request' %}{% set stage.response = 'No result yet' %}{% set stage.work = 'Work in progress' %}{% set stage.caption = 'After the first result, another request was observed running on B.' %}
+        {% elif event.state == 'nodedown_uncertain' %}{% set stage.btone = 'down' %}{% set stage.b = 'Down observed by A' %}{% set stage.request = 'A → B · Connection lost' %}{% set stage.response = 'No confirmed result' %}{% set stage.work = 'Outcome unknown' %}{% set stage.caption = 'B stopped during another request; its outcome is unknown, and any effects are not rolled back.' %}
+        {% elif event.state == 'fresh_empty' %}{% set stage.b = '0 completed jobs' %}{% set stage.work = 'Fresh, empty state' %}{% set stage.caption = 'New B rejoined with empty state, not restored work; the earlier request remains uncertain.' %}
+        {% elif event.state == 'stale_ack_rejected' %}{% set stage.request = 'Old acknowledgement ignored' %}{% set stage.work = 'Old identity rejected' %}{% set stage.caption = 'New B rejected an acknowledgement from its previous identity.' %}{% endif %}
       {% elif event.kind == 'cleanup' %}
-        Owned cleanup {{ event.state }}.
-        <ul>{% for birth in event.owned %}<li>{{ birth.pid }} @ {{ birth.created }}</li>{% endfor %}</ul>
+        {% set stage.atone = 'idle' if event.state == 'confirmed' else 'pending' %}{% set stage.btone = stage.atone %}{% set stage.a = 'Stopped' if event.state == 'confirmed' else 'Stop not confirmed' %}{% set stage.b = stage.a %}{% set stage.request = 'No active connection' %}{% set stage.response = 'Recording complete' if event.state == 'confirmed' else 'Cleanup uncertain' %}{% set stage.work = 'Stopped' if event.state == 'confirmed' else 'Cleanup uncertain' %}{% set stage.caption = 'Both nodes stopped; the earlier interrupted request still has an unknown outcome.' if event.state == 'confirmed' else 'Cleanup could not be confirmed; do not assume the nodes stopped.' %}
       {% endif %}
-      </li>
-    {% else %}<li>No native observations received.</li>{% endfor %}
-    </ol>
-    {% for trial in job.trials %}<p>Runner cleanup {{ trial.outcome.cleanup_state }}. {{ trial.outcome.cleanup_survivors|length }} known survivors. {{ trial.outcome.forced_cleanup_count }} forced stops.</p>{% endfor %}
-  </details>
+      {{ flow_frame(key, loop.index0, stage, event.kind == 'exchange', loop.last) }}
+    {% endfor %}
+  {% endif %}
+  </div>
+  <div class="flow-controls" role="group" aria-label="Recorded step controls">
+    <button type="button" id="flow-{{ key }}-previous" data-flow-action="previous" disabled>Previous</button>
+    <button type="button" id="flow-{{ key }}-pause" data-flow-action="pause" disabled>Pause</button>
+    <button type="button" id="flow-{{ key }}-next" data-flow-action="next" disabled>Next</button>
+    <button type="button" id="flow-{{ key }}-replay" data-flow-action="replay" title="Replay the recording without running work" disabled>Replay</button>
+    <button type="button" id="flow-{{ key }}-latest" data-flow-action="latest" disabled>Latest</button>
+    <span data-flow-position>Step {{ events|length if events else 0 }} of {{ events|length }}</span>
+  </div>
+  <p class="flow-announcement" data-flow-announcement role="status" aria-live="polite" aria-atomic="true"></p>
+  <noscript><p>Enable JavaScript to step through this recording.</p></noscript>
 </section>
+{% endmacro %}
+
+{% if job is defined %}
+{{ architecture(job) }}
+{% if job.proof and job.status == 'finished' %}<footer class="recording-footer"><a href="/artifact/{{ job.id }}">JSON recording</a></footer>{% endif %}
+{% endif %}

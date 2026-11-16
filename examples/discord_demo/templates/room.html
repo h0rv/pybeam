@@ -1,5 +1,41 @@
 <input type="hidden" name="generation" value="{{ view.info.generation }}" form="compose">
 <input type="hidden" name="csrf" value="{{ csrf }}" form="compose">
+<section class="tree" aria-label="Supervision tree">
+  <div class="tier">
+    <div class="box server" id="webserver">
+      <b>FastAPI web server</b>
+      <small>OS process <code class="pid">{{ server_pid }}</code></small>
+      <small>Observed when this page rendered</small>
+    </div>
+  </div>
+  <div class="link-down" aria-hidden="true"></div>
+  <div class="tier">
+    <div class="box supervisor" id="supervisor">
+      <b>OTP supervisor</b>
+      <small>restart: permanent &middot; 4 children</small>
+    </div>
+  </div>
+  <div class="fan" aria-hidden="true">
+    {% for node in nodes %}
+    <span class="leg {{ 'hot' if restart and node.room_id == view.snapshot.room_id else '' }}"></span>
+    {% endfor %}
+  </div>
+  <nav class="children" aria-label="Rooms">
+    {% for node in nodes %}
+    <a class="box child{{ ' current' if node.room_id == view.snapshot.room_id else '' }}"
+       href="/rooms/{{ node.room_id }}" data-room="{{ node.room_id }}"
+       aria-label="{{ node.room_id }} room"
+       data-node-pid="{{ node.pid }}" data-node-generation="{{ node.generation }}"
+       {% if node.room_id == view.snapshot.room_id %}aria-current="page"{% endif %}>
+      <b># {{ node.room_id }}</b>
+      <code class="pid">{{ node.pid }}</code>
+      <small>{{ node.members }} members &middot; {{ node.messages }} messages</small>
+      <small class="gen">generation {{ node.generation }}</small>
+    </a>
+    {% endfor %}
+  </nav>
+  <p class="caption">Supervisor owns restarts. Room actor owns members and messages.</p>
+</section>
 <div class="room-toolbar">
   <p id="membership" data-joined="{{ 'true' if joined else 'false' }}">{{ 'Joined' if joined else 'View only. Join to send.' }}</p>
   {% if joined %}
@@ -26,12 +62,20 @@
     <input type="hidden" name="action" value="crash">
     <input type="hidden" name="generation" value="{{ view.info.generation }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button id="restart-room" type="submit" class="danger">Restart room (clears messages)</button>
+    <button id="restart-room" type="submit" class="danger">Kill #{{ view.snapshot.room_id }} actor</button>
   </form>
   {% endif %}
 </div>
+{% if restart %}
+<p class="restart-notice" id="restart-evidence" role="status"
+   data-old-pid="{{ restart.old_pid }}" data-new-pid="{{ restart.new_pid }}">
+  Killed <code class="dead">{{ restart.old_pid }}</code> (generation {{ restart.old_generation }}).
+  Supervisor started <code class="live">{{ restart.new_pid }}</code> (generation {{ restart.new_generation }}).
+  Messages and membership in this room were lost.
+</p>
+{% endif %}
 {% if view.info.generation > 1 and not joined %}
-<p class="restart-notice" role="status">Room restarted. Earlier messages were cleared. Join again to send.</p>
+<p class="restart-notice" role="status">Join again to send in this generation.</p>
 {% endif %}
 <div class="room-layout">
   <section aria-label="Messages">
@@ -53,8 +97,7 @@
     </ul>
   </aside>
 </div>
-<details class="inspector">
-  <summary>Room details</summary>
+<div class="diagnostics" hidden>
   <dl id="inspector" data-pid="{{ view.info.pid }}" data-generation="{{ view.info.generation }}">
     <dt>BEAM child PID</dt><dd><code>{{ view.info.pid }}</code></dd>
     <dt>Generation</dt><dd>{{ view.info.generation }}</dd>
@@ -73,5 +116,4 @@
     </li>
     {% else %}<li>No identities in this generation.</li>{% endfor %}
   </ul>
-  <p>Restart replaces only this room's actor, not the VM. Everyone must join again. Only the first browser session can restart rooms.</p>
-</details>
+</div>

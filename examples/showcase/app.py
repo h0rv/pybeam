@@ -120,8 +120,14 @@ def create_app(settings: Settings | None = None) -> Starlette:
     async def favicon(request: Request) -> Response:
         return Response(status_code=204)
 
-    async def index(request: Request) -> HTMLResponse:
+    async def index(request: Request) -> Response:
+        if "scenario" not in request.query_params:
+            # The supervised chat is the primary story; the scripted walkthrough is secondary.
+            return RedirectResponse("/chat", status_code=303)
         return render(request)
+
+    async def chat(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(request=request, name="chat.html")
 
     async def job_panel(request: Request) -> HTMLResponse:
         return render(request, partial=True)
@@ -208,6 +214,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
         routes=[
             Route("/favicon.ico", favicon),
             Route("/", index),
+            Route("/chat", chat, methods=["GET"]),
             Route("/jobs", job_panel),
             Route("/events", events),
             Route("/start/{key}", start, methods=["POST"]),
@@ -243,6 +250,14 @@ def create_app(settings: Settings | None = None) -> Starlette:
             "default-src 'self'; script-src 'self'; style-src 'self'; "
             "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
         )
+        if request.url.path == "/chat":
+            # Only this page can frame the separately launched local chat.
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; script-src 'self'; style-src 'self' "
+                "'sha256-i/5yytnSVuElZsMlotX8mpio4Fpgs88VEXd1xgxRHbI='; "
+                "frame-src http://127.0.0.1:8766; "
+                "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+            )
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Cache-Control"] = "no-store"
         return response

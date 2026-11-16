@@ -22,6 +22,28 @@ class View:
     info: ActorInfo
 
 
+@dataclass(frozen=True, slots=True)
+class Node:
+    """One observed supervisor child, read from the native actor at render time."""
+
+    room_id: str
+    pid: str
+    generation: int
+    members: int
+    messages: int
+
+
+@dataclass(frozen=True, slots=True)
+class Restart:
+    """A confirmed native replacement: both identities were read, not assumed."""
+
+    room_id: str
+    old_pid: str
+    old_generation: int
+    new_pid: str
+    new_generation: int
+
+
 class Demo:
     def __init__(self, group: ActorGroup, services: Services) -> None:
         self.group = group
@@ -34,6 +56,7 @@ class Demo:
         self.closing = False
         self.inflight = 0
         self.owner: str | None = None
+        self.restarts: dict[str, Restart] = {}
 
     async def close_streams(self) -> None:
         self.closing = True
@@ -56,6 +79,24 @@ class Demo:
 
     async def _view(self, handle: RoomHandle) -> View:
         return View(await handle.reference.snapshot(), await self.group.info(handle.reference))
+
+    async def tree(self) -> tuple[Node, ...]:
+        """Read the four supervised children once. Bounded: no manager, no polling loop."""
+        nodes: list[Node] = []
+        for room_id in ROOMS:
+            handle = self.rooms[room_id]
+            async with handle.lock:
+                view = await self._view(handle)
+            nodes.append(
+                Node(
+                    room_id=room_id,
+                    pid=view.info.pid,
+                    generation=view.info.generation,
+                    members=len(view.snapshot.members),
+                    messages=len(view.snapshot.history),
+                )
+            )
+        return tuple(nodes)
 
     async def change(
         self,
@@ -112,6 +153,13 @@ class Demo:
                         raise RuntimeError("Native restart did not return empty state")
                     if fresh.info.pid == view.info.pid:
                         raise RuntimeError("Native child PID did not change")
+                    self.restarts[room_id] = Restart(
+                        room_id=room_id,
+                        old_pid=view.info.pid,
+                        old_generation=view.info.generation,
+                        new_pid=fresh.info.pid,
+                        new_generation=fresh.info.generation,
+                    )
                 case _:
                     raise ValueError("Unsupported room action")
             await self.services.publish("discord:" + room_id, b"changed")

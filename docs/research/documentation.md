@@ -1,6 +1,6 @@
 # Documentation plan
 
-Use this navigation order: Quickstart → runtime model → primitives → BEAM inspection → advanced configuration. Link [gallery](gallery.md), [runtime gaps](runtime-gaps.md), [API research](api-design.md), and [observability](observability.md) as research, not released contracts.
+Use this navigation order: Quickstart → runtime model → primitives → BEAM inspection → advanced configuration. Link [gallery](gallery.md), [execution model](execution-model.md), [runtime gaps](runtime-gaps.md), [API research](api-design.md), and [observability](observability.md) as research, not released contracts.
 
 ## Quickstart
 

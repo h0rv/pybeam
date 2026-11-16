@@ -41,7 +41,8 @@ def test_gate__does_not_accept_unreviewed_native_root(
     assert card.disabled is not None
     assert "prepared distribution profile" in card.disabled
     with TestClient(create_app(), base_url=BASE) as client:
-        page = client.get("/").text
+        assert client.get("/", follow_redirects=False).headers["location"] == "/chat"
+        page = client.get("/?scenario=distributed").text
         assert "Scripted two-node walkthrough" in page
         assert 'hx-sse:connect="/events"' in page
         assert "every 1s" not in page

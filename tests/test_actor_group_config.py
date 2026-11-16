@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 import pybeam
-from pybeam.actors import groups
+from pybeam.actors import ExecutionLimits, groups
 
 
 def construct_group(
@@ -59,3 +59,23 @@ def test_actor_group_limits__preserve_defaults_and_positive_integer_kwargs() -> 
     )
     configured = pybeam.ActorGroup(max_children=1, max_pending=2, max_bytes=3)._limits
     assert (configured.max_children, configured.max_pending, configured.max_bytes) == (1, 2, 3)
+
+
+@pytest.mark.parametrize("limit", ["workers", "capacity", "max_bytes"])
+@pytest.mark.parametrize("invalid", [True, False, 0, -1, "1", 1.0, float("inf"), float("nan")])
+def test_execution_limits__reject_invalid_values(limit: str, invalid: object) -> None:
+    options: dict[str, object] = {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
+    options[limit] = invalid
+    with pytest.raises(ValidationError) as raised:
+        ExecutionLimits.model_validate(options)
+    assert raised.value.errors()[0]["loc"] == (limit,)
+
+
+def test_execution_limits__immutable_strict_value_and_public_exports() -> None:
+    limits = pybeam.ExecutionLimits(workers=4, capacity=32, max_bytes=1_048_576)
+    assert type(limits) is ExecutionLimits
+    assert limits.model_dump() == {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
+    with pytest.raises(ValidationError, match="frozen"):
+        limits.__setattr__("workers", 8)
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        ExecutionLimits.model_validate({**limits.model_dump(), "unexpected": 1})

@@ -101,7 +101,7 @@ def stage_genstage(otp: Path, elixir: Path, genstage: Path, bridge: Path, runtim
         shutil.copytree(elixir / "LICENSES", notices / "Elixir-LICENSES")
         shutil.copyfile(genstage / "README.md", notices / "GenStage-NOTICE.md")
         shutil.copyfile(runtime / "notices/OTP-LICENSE.txt", notices / "OTP-LICENSE.txt")
-        core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes())
+        core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes()).root
         manifest = build_manifest(root, otp, core.erts_version, approved.sources)
         if manifest != approved:
             raise ValueError("Built optional assets differ from the approved pinned specification")
