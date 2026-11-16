@@ -67,11 +67,11 @@ exclude = ["src/pybeam/integrations/genstage/*.erl", "src/pybeam/integrations/ge
 include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]
 
 [tool.uv.sources]
-hornbeam = { path = "../hornbeam", editable = true }
+hornbeam = { git = "https://github.com/h0rv/hornbeam.git", rev = "f062aa7d5634856aa1b8180933fdf41f32228bc4" }
 
 [tool.ty.environment]
 python-version = "3.14"
-extra-paths = ["typings", ".", "../erlang-python/priv"]
+extra-paths = ["typings", ".", "examples/docs"]
 
 [tool.ty.rules]
 all = "error"

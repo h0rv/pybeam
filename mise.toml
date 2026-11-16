@@ -38,6 +38,7 @@ run = [
     "ln -sfn ../../erlang-python _checkouts/erlang_python",
     "ln -sfn ../../erlang-ws _checkouts/ws",
     "ln -sfn ../../erlang-h1 _checkouts/h1",
+    "uv add --optional hornbeam --editable ../hornbeam",
     "uv sync --locked --all-extras",
     "mise run build",
 ]
@@ -53,7 +54,7 @@ run = [
     "uv run --locked --all-extras ruff check .",
     "uv run --locked --all-extras ruff format --check .",
     "uv run --locked --all-extras ty check --error-on-warning",
-    "uv run --locked --project benchmarks ty check --project benchmarks --extra-search-path . --extra-search-path src --extra-search-path typings --extra-search-path ../erlang-python/priv --error-on-warning",
+    "uv run --locked --project benchmarks ty check --project benchmarks --extra-search-path . --extra-search-path src --extra-search-path typings --error-on-warning",
 ]
 
 [tasks.test]
