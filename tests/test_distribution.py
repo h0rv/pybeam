@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from pybeam.distribution import Reply, Request, RequestTooLarge, remote, reservation
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import Config, Distribution, PythonNode, parse_config
+from tests.typechecking import TYPECHECK_CONFIG
 
 
 def test_configuration__strict_opt_in_and_round_trip(tmp_path: Path) -> None:
@@ -140,7 +141,7 @@ def test_distribution__negative_public_types(tmp_path: Path) -> None:
     )
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [str(root / ".venv/bin/ty"), "check", "--error-on-warning", str(source)],
+        [str(root / ".venv/bin/ty"), "check", *TYPECHECK_CONFIG, "--error-on-warning", str(source)],
         cwd=root,
         capture_output=True,
         text=True,

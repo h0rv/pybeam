@@ -2,7 +2,41 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.skipif(
+    not (ROOT.parent / "erlang-python/priv/erlang_services.py").is_file(),
+    reason="requires sibling erlang-python Python service implementation",
+)
+
+
+def test_services__missing_native_module_has_clear_error() -> None:
+    code = """
+import sys
+sys.path.insert(0, SOURCE)
+sys.modules['erlang_services'] = None
+import pybeam
+import pybeam.services
+
+try:
+    import pybeam.services.background
+except RuntimeError as error:
+    assert str(error) == 'Native background services are required; no Python fallback'
+    assert isinstance(error.__cause__, ModuleNotFoundError)
+    assert error.__cause__.name == 'erlang_services'
+else:
+    raise AssertionError('missing native services must be rejected')
+""".replace("SOURCE", repr(str(ROOT / "src")))
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", code],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=15,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_services__imports_before_starting_the_vm() -> None:
