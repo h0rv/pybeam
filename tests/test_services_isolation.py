@@ -2,7 +2,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.skipif(
+    not (ROOT.parent / "erlang-python/priv/erlang_services.py").is_file(),
+    reason="requires sibling erlang-python Python service implementation",
+)
 
 
 def test_services__missing_native_module_has_clear_error() -> None:

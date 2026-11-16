@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from tests.typechecking import TYPECHECK_CONFIG
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -16,7 +18,7 @@ def checker() -> str:
 
 def test_actor_types__preserve_arguments_and_awaited_return() -> None:
     result = subprocess.run(
-        [checker(), "check", "--error-on-warning", "tests/actors_positive.py"],
+        [checker(), "check", *TYPECHECK_CONFIG, "--error-on-warning", "tests/actors_positive.py"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -34,6 +36,7 @@ def test_actor_types__reject_every_negative_case(tmp_path: Path) -> None:
         [
             checker(),
             "check",
+            *TYPECHECK_CONFIG,
             "--project",
             str(ROOT),
             "--extra-search-path",

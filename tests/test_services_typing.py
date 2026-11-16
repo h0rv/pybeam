@@ -1,8 +1,14 @@
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 NATIVE = ROOT.parent / "erlang-python" / "priv"
+pytestmark = pytest.mark.skipif(
+    not (NATIVE / "erlang_services.py").is_file(),
+    reason="requires sibling erlang-python Python service types",
+)
 
 
 def check(source: Path) -> subprocess.CompletedProcess[str]:

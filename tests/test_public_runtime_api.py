@@ -19,6 +19,10 @@ if TYPE_CHECKING:
         assert_type(await actor.call(0, method, 2, label="ok"), str)
 
 
+@pytest.mark.skipif(
+    not (NATIVE / "priv/erlang_services.py").is_file(),
+    reason="requires sibling erlang-python Python service implementation",
+)
 def test_public_runtime_api__ordinary_interpreter_requires_native_loop(tmp_path: Path) -> None:
     code = """
 import asyncio
