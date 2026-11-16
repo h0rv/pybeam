@@ -8,7 +8,7 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 export const pages = [
   { source: "docs/guide/index.md", path: "", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
-  { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
+  { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py", "examples/docs/actors_pooled.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
   { source: "docs/guide/state.md", path: "state/", label: "Shared state", examples: ["examples/docs/state.py"] },
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },

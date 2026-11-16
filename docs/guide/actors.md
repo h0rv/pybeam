@@ -41,6 +41,9 @@ Dedicated execution is the default (`execution=None`). To request pooled executi
 from a native runtime that supports it, pass an immutable `ExecutionLimits` value.
 
 ```python
+from actors import Counter
+
+import pybeam
 from pybeam import ActorGroup, ExecutionLimits
 
 
@@ -53,6 +56,10 @@ async def pooled() -> None:
     ) as actors:
         counter = await actors.spawn(Counter)
         await counter.add(1)
+
+
+if __name__ == "__main__":
+    pybeam.run(pooled)
 ```
 
 `workers` bounds physical Python execution contexts, not the number of actors.
