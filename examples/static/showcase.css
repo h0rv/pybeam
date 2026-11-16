@@ -5,6 +5,11 @@ body { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 1
 .scenario-nav nav { display: grid; gap: .25rem; }
 .scenario-nav a { display: block; padding: .55rem; text-decoration: none; border-radius: .3rem; }
 .scenario-nav a[aria-current] { background: #234f7b; color: white; }
+.scenario-nav details { margin: .75rem 0 0; padding: 0; background: transparent; border: 0; }
+.scenario-nav details > summary { margin: 0; padding: .4rem 0; font-weight: normal; }
+.scenario-nav .advanced-nav { display: grid; max-height: 22rem; overflow-y: auto; }
+.advanced-nav a[aria-current] { order: -1; }
+.advanced-nav small { display: block; }
 main { width: auto; max-width: 60rem; min-width: 0; margin: 0; padding: 1.5rem 2rem; }
 #jobs > header { padding: 0; margin: 0; border: 0; }
 header h2 { margin: 0; font-size: 1.5rem; }
@@ -40,6 +45,8 @@ dd { margin: 0; }
   .scenario-nav nav { display: flex; overflow-x: auto; gap: .35rem; }
   .scenario-nav a { white-space: nowrap; padding: .45rem; font-size: .85rem; }
   .scenario-nav a[aria-current] { order: -1; }
+  .scenario-nav .advanced-nav { max-height: 10rem; }
+  .advanced-nav a { white-space: normal; }
   main { padding: 1rem; }
   header h2 { font-size: 1.3rem; }
   .steps li { grid-template-columns: 1.25rem 1fr; padding: .3rem 0; }

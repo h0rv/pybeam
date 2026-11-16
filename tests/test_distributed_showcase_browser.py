@@ -152,6 +152,12 @@ def test_controlled_browser__scenario_navigation_progress_result_and_keyboard(
             context = browser.new_context(viewport={"width": width, "height": height})
             page = context.new_page()
             page.goto(controlled_server)
+            advanced = page.locator("#advanced-examples")
+            assert not advanced.evaluate("element => element.open")
+            ready = page.get_by_role("navigation", name="Ready demos")
+            expect(ready.get_by_role("link")).to_contain_text("Scripted two-node walkthrough")
+            expect(page.locator('a[href="/?scenario=discord"]')).not_to_be_visible()
+            page.screenshot(path=str(tmp_path / ("initial-" + str(width) + ".png")))
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             run = page.get_by_role("button", name="Run Controlled boundary:")
             expect(run).to_be_in_viewport()
@@ -173,18 +179,41 @@ def test_controlled_browser__scenario_navigation_progress_result_and_keyboard(
             page.screenshot(path=str(tmp_path / ("controlled-progress-" + str(width) + ".png")))
             with httpx.Client(base_url=controlled_server) as client:
                 assert client.get("/__test__/finish").status_code == 204
-            expect(page.locator("#current-run .result")).to_contain_text("Finished. B returned 42")
+            expect(page.locator("#current-run .result")).to_have_text(
+                "B returned 42 before restart and 42 after restart. Both nodes stopped cleanly."
+            )
             expect(page.locator("#current-run .result")).to_be_in_viewport()
             expect(page.get_by_role("link", name="Download walkthrough proof")).to_be_in_viewport()
             assert page.evaluate("window.scrollY") == 0
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             page.screenshot(path=str(tmp_path / ("controlled-finished-" + str(width) + ".png")))
+            summary = advanced.locator("summary")
+            summary.focus()
+            page.keyboard.press("Enter")
+            expect(summary).to_be_focused()
             page.get_by_role("link", name="Python benchmark smoke", exact=True).click()
             expect(page).to_have_url(controlled_server + "/?scenario=smoke")
             expect(page.locator("#jobs h2")).to_have_text("Python benchmark smoke")
             expect(page.locator("#current-run")).to_contain_text("Ready.")
+            expect(page.locator("#advanced-examples")).to_have_attribute("open", "")
+            expect(page.locator('#advanced-examples a[aria-current="page"]')).to_have_text(
+                "Python benchmark smoke"
+            )
             page.go_back()
-            expect(page.locator("#current-run .result")).to_contain_text("Finished.")
+            expect(page.locator("#current-run .result")).to_contain_text(
+                "Both nodes stopped cleanly."
+            )
+            page.goto(controlled_server + "/?scenario=discord")
+            expect(page.locator("#advanced-examples")).to_have_attribute("open", "")
+            selected = page.locator('#advanced-examples a[aria-current="page"]')
+            expect(selected).to_contain_text("Discord simulation")
+            expect(selected).to_contain_text("Unavailable")
+            expect(selected).to_be_in_viewport()
+            expect(page.locator("#card-discord")).to_contain_text(
+                "Managed simulation launcher is not integrated"
+            )
+            expect(page.locator("#run-discord")).to_be_disabled()
+            page.screenshot(path=str(tmp_path / ("advanced-" + str(width) + ".png")))
             context.close()
             plain = browser.new_context(java_script_enabled=False)
             page = plain.new_page()
@@ -195,7 +224,19 @@ def test_controlled_browser__scenario_navigation_progress_result_and_keyboard(
             with httpx.Client(base_url=controlled_server) as client:
                 client.get("/__test__/finish")
             page.reload()
-            expect(page.locator("#current-run .result")).to_contain_text("Finished.")
+            expect(page.locator("#current-run .result")).to_contain_text(
+                "Both nodes stopped cleanly."
+            )
+            page.goto(controlled_server + "/?scenario=discord")
+            expect(page.locator("#advanced-examples")).to_have_attribute("open", "")
+            expect(page.locator('#advanced-examples a[aria-current="page"]')).to_contain_text(
+                "Unavailable"
+            )
+            page.get_by_role("navigation", name="Ready demos").get_by_role("link").click()
+            expect(page.locator("#current-run .result")).to_contain_text(
+                "Both nodes stopped cleanly."
+            )
+            assert not page.locator("#advanced-examples").evaluate("element => element.open")
             plain.close()
         finally:
             browser.close()

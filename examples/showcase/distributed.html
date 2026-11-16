@@ -4,7 +4,7 @@
 {% set cleanup = job.observations|selectattr('kind', 'equalto', 'cleanup')|list %}
 <section aria-label="Walkthrough progress and result">
   {% if job.proof and job.status == 'finished' %}
-  <p class="result" role="status">Finished. B returned {{ exchanges[-1].result.value }} with {{ exchanges[-1].result.side_effect_count }} effect on each completed submission. B restarted empty. Owned shutdown is confirmed.</p>
+  <p class="result" role="status">B returned {{ exchanges[0].result.value }} before restart and {{ exchanges[-1].result.value }} after restart. Both nodes stopped cleanly.</p>
   <a href="/artifact/{{ job.id }}">Download walkthrough proof</a>
   {% elif job.status == 'queued' %}
   <p class="result">Queued. Waiting for the current job to finish.</p>

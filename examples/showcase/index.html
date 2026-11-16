@@ -14,11 +14,19 @@
 <body>
 <aside class="scenario-nav">
   <h1>PyBeam showcase</h1>
-  <nav aria-label="Scenarios">
-    {% for item in cards %}
+  <nav aria-label="Ready demos">
+    {% for item in cards if item.disabled is none and (item.key == 'distributed' or item.port is not none) %}
     <a href="/?scenario={{ item.key }}" {% if item.key == card.key %}aria-current="page"{% endif %}>{{ item.title }}</a>
     {% endfor %}
   </nav>
+  <details id="advanced-examples" {% if card.disabled is not none or (card.key != 'distributed' and card.port is none) %}open{% endif %}>
+    <summary>Advanced examples</summary>
+    <nav class="advanced-nav" aria-label="Advanced examples">
+      {% for item in cards if item.disabled is not none or (item.key != 'distributed' and item.port is none) %}
+      <a href="/?scenario={{ item.key }}" {% if item.key == card.key %}aria-current="page"{% endif %}>{{ item.title }}{% if item.disabled %} <small>Unavailable</small>{% endif %}</a>
+      {% endfor %}
+    </nav>
+  </details>
 </aside>
 <main>
   <section id="updates" hx-sse:connect="/events" hx-config='{"sse":{"pauseOnBackground":false}}'>
