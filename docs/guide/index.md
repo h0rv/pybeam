@@ -21,7 +21,7 @@ Save this as `main.py` and run `python main.py`. It prints `Hello from Python`.
 Use conventional CPython 3.14. `pybeam.run` needs a managed runtime:
 
 - A `python-beam` wheel with bundled runtime assets. These wheels currently
-  support macOS arm64 only; `python-beam` is not published to PyPI yet.
+  support macOS arm64 and Linux x86_64; `python-beam` is not published to PyPI yet.
 - An already-built compatible development runtime, selected with
   `development_runtime` under `[tool.pybeam]` in `pyproject.toml`. Set it to the
   build profile directory (for example, `_build/hornbeam`, relative to
