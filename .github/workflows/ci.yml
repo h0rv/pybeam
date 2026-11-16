@@ -1,0 +1,38 @@
+name: Code CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.8'
+          python-version: '3.14.10'
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Lint
+        run: uv run --locked --all-extras ruff check .
+      - name: Check formatting
+        run: uv run --locked --all-extras ruff format --check .
+      - name: Check types
+        run: uv run --locked --all-extras ty check --error-on-warning
+      - name: Check benchmark types
+        run: uv run --locked --project benchmarks ty check --project benchmarks --extra-search-path . --extra-search-path src --extra-search-path typings --error-on-warning
+      - name: Unit tests
+        run: uv run --locked --isolated pytest -c pyproject.toml -q -m 'not runtime and not browser'
