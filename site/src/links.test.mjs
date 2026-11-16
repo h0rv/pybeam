@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "actors/", "supervision/", "state/", "messaging/", "background/", "web/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "messaging/", "background/", "web/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -29,18 +29,38 @@ test("relative guide links, anchors and queries respect deployment base", () => 
   assert.equal(rewriteLink("actors.md?view=plain#actors", "docs/guide/index.md", "/pybeam/"),
     "/pybeam/actors/?view=plain#actors");
   assert.equal(rewriteLink("index.md", "docs/guide/actors.md", "/pybeam/"), "/pybeam/");
+  assert.equal(rewriteLink("why.md", "docs/guide/index.md", "/pybeam/"), "/pybeam/why/");
   assert.equal(rewriteLink("../../examples/actors/main.py", "docs/guide/index.md"),
     "https://github.com/h0rv/pybeam/blob/main/examples/actors/main.py");
   for (const href of ["https://example.com/docs", "//example.com", "#memory", "mailto:help@example.com"])
     assert.equal(rewriteLink(href, "docs/guide/index.md", "/pybeam/"), href);
 });
 
-test("public guides explain API use without contributor or installation workflows", () => {
-  const processContent = /work from source|install a provided wheel|\b(?:mise|uv) (?:run|add|init|sync)\b|sibling (?:runtime |repositories|checkouts)|development_runtime|(?:platform|local) wheel|build artifacts|native (?:assets|build)|libpython|\b(?:PyPI|macOS|toolchain|worktree|roadmap)\b|\b(?:Python|CPython) \d+\.\d+|not yet merged|private branch|release gates/gi;
+test("the showcase shares accessible repository-local SVGs with the README", () => {
+  const guide = readFileSync(join(repositoryRoot, "docs/guide/why.md"), "utf8");
+  const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
+  assert.match(readme, /\(docs\/guide\/why\.md\)/);
+  assert.match(readme, /\(docs\/guide\/assets\/architecture\.svg\)/);
+  for (const name of ["architecture", "shared-state"]) {
+    assert.ok(guide.includes(`(assets/${name}.svg)`));
+    const svg = readFileSync(join(repositoryRoot, `docs/guide/assets/${name}.svg`), "utf8");
+    assert.match(svg, /role="img" aria-labelledby="title desc"/);
+    assert.match(svg, /<title id="title">[^<]+<\/title>/);
+    assert.match(svg, /<desc id="desc">[^<]+<\/desc>/);
+    assert.match(svg, /@media \(prefers-color-scheme: dark\)/);
+    assert.match(svg, /font-family: system-ui, sans-serif/);
+    assert.match(svg, /rect, path \{ fill: none;/);
+    assert.doesNotMatch(svg, /<linearGradient|<radialGradient|<filter|THE STACK/);
+    assert.doesNotMatch(svg, /<script|<foreignObject|(?:href|src)="https?:/i);
+  }
+});
+
+test("public guides explain API use and installation without internal process text", () => {
+  const processContent = /\b(?:worktree|roadmap)\b|not yet merged|private branch|release gates/gi;
   for (const source of ["README.md", ...pages.map(({ source }) => source)]) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     assert.doesNotMatch(markdown, processContent, source);
-    assert.doesNotMatch(markdown, /^#{1,6} .*\b(?:install|setup|contributors?|development|build|packaging)\b/im, source);
+    assert.doesNotMatch(markdown, /^#{1,6} .*\bcontributors?\b/im, source);
   }
 });
 
@@ -90,7 +110,7 @@ test("state and supervision teach distinct operations without another introducti
 
 test("distinct concept tasks replace grouped capability navigation", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Get started", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Web integration",
+    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Web integration",
   ]);
   assert.ok(navigation.every((page) => !("group" in page)));
   assert.ok(!navigation.some(({ path }) => path === "genstage/"));

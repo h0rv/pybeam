@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="550" viewBox="0 0 640 550" role="img" aria-labelledby="title desc">
+  <title id="title">Python ergonomics, BEAM foundations</title>
+  <desc id="desc">A Python application calls PyBEAM typed wrappers. The wrappers reuse erlang-python for execution and message passing and Hornbeam for optional web and shared services. BEAM/OTP provides supervisors, ETS shared state, pub/sub and mailboxes. Today's build runs Python in one main interpreter with its GIL.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; text-anchor: middle; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 19px; }
+    .heading { font-size: 23px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 18px; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 7 4 1 7"/></marker>
+  </defs>
+  <rect x="24" y="16" width="592" height="76"/>
+  <text x="320" y="47" class="heading">Your Python app</text>
+  <text x="320" y="75" class="note">async functions · existing web framework</text>
+  <path d="M320 93V125" marker-end="url(#arrow)"/>
+  <rect x="24" y="137" width="592" height="76"/>
+  <text x="320" y="168" class="heading">PyBEAM typed wrappers</text>
+  <text x="320" y="196" class="note">Python APIs · ownership · lifecycle</text>
+  <path d="M320 214V232H166V246" marker-end="url(#arrow)"/>
+  <path d="M320 232H474V246" marker-end="url(#arrow)"/>
+  <rect x="24" y="258" width="284" height="104"/>
+  <rect x="332" y="258" width="284" height="104"/>
+  <text x="166" y="291" class="heading">erlang-python</text>
+  <text x="166" y="319" class="note">Execution · contexts</text>
+  <text x="166" y="344" class="note">Message passing</text>
+  <text x="474" y="291" class="heading">Hornbeam</text>
+  <text x="474" y="319" class="note">Optional web serving</text>
+  <text x="474" y="344" class="note">Shared services</text>
+  <path d="M166 363V395" marker-end="url(#arrow)"/>
+  <path d="M474 363V395" marker-end="url(#arrow)"/>
+  <rect x="24" y="407" width="592" height="82"/>
+  <text x="320" y="440" class="heading">BEAM / OTP</text>
+  <text x="320" y="470">Supervisors · ETS shared state · pub/sub · mailboxes</text>
+  <text x="320" y="527" class="note">Today: one main interpreter and GIL.</text>
+</svg>

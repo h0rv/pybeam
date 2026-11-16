@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="690" viewBox="0 0 640 690" role="img" aria-labelledby="title desc">
+  <title id="title">One shared count, explicit actor recovery</title>
+  <desc id="desc">Two WebSocket clients use Python handlers. Step one increments one shared BEAM counter atomically. Step two publishes an invalidation separately. Step three reads the latest value for both clients. In a separate actor lifecycle, a supervisor replaces a crashed actor with a new actor starting at zero; the app must rejoin it.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; text-anchor: middle; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 19px; }
+    .heading { font-size: 23px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 18px; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 7 4 1 7"/></marker>
+  </defs>
+  <rect x="24" y="16" width="284" height="72"/>
+  <rect x="332" y="16" width="284" height="72"/>
+  <text x="166" y="47" class="heading">Client A</text>
+  <text x="474" y="47" class="heading">Client B</text>
+  <text x="166" y="73" class="note">WebSocket connection</text>
+  <text x="474" y="73" class="note">WebSocket connection</text>
+  <path d="M166 89V120" marker-end="url(#arrow)"/>
+  <path d="M474 89V120" marker-end="url(#arrow)"/>
+  <rect x="24" y="132" width="592" height="72"/>
+  <text x="320" y="163" class="heading">Your async Python handlers</text>
+  <text x="320" y="189" class="note">PyBEAM → Hornbeam services</text>
+  <path d="M44 205V268" marker-end="url(#arrow)"/>
+  <path d="M596 205V268" marker-end="url(#arrow)"/>
+  <text x="175" y="243" class="note">1. Atomic increment</text>
+  <text x="465" y="243" class="note">2. Publish changed key</text>
+  <rect x="24" y="280" width="284" height="76"/>
+  <rect x="332" y="280" width="284" height="76"/>
+  <text x="166" y="312" class="heading">Shared counter</text>
+  <text x="166" y="339" class="note">One count on BEAM</text>
+  <text x="474" y="312" class="heading">Pub/sub</text>
+  <text x="474" y="339" class="note">Invalidation, not state</text>
+  <path d="M474 357V388H166V357" marker-end="url(#arrow)"/>
+  <text x="320" y="421">3. Subscribers read fresh → send to both clients</text>
+  <path d="M24 448H616" stroke-dasharray="3 5"/>
+  <text x="320" y="477" class="note">Separate actor lifecycle</text>
+  <rect x="160" y="497" width="320" height="48"/>
+  <text x="320" y="528" class="heading">OTP supervisor</text>
+  <path d="M240 546V568H166V586" marker-end="url(#arrow)"/>
+  <path d="M400 546V568H474V586" marker-end="url(#arrow)"/>
+  <rect x="24" y="598" width="284" height="44"/>
+  <rect x="332" y="598" width="284" height="44"/>
+  <text x="166" y="626">Actor crashed · value 5</text>
+  <text x="474" y="626">Replacement · value 0</text>
+  <text x="320" y="675" class="note">Fresh constructor state. App must rejoin. No replay.</text>
+</svg>

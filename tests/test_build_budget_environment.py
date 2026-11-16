@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -47,6 +48,12 @@ def test_build_entry_environment__bounds_real_recursive_make_without_changing_pa
     config.touch()
     monkeypatch.setattr(sys, "base_prefix", str(home))
     monkeypatch.setattr(build_native, "ROOT", native)
+    original_which = shutil.which
+    monkeypatch.setattr(
+        build_native.shutil,
+        "which",
+        lambda name: "/mock/rebar3" if name == "rebar3" else original_which(name),
+    )
     monkeypatch.setenv("CMAKE_BUILD_PARALLEL_LEVEL", budget)
     monkeypatch.setenv("IOMMAP_BUILDOPTS", "-j10")
     monkeypatch.setenv("CFLAGS", "preserved-toolchain-sentinel")

@@ -10,7 +10,7 @@ from tools.genstage_fixtures import FIXTURES, SOURCES
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_typing__retains_the_public_sibling_contract() -> None:
+def test_typing__uses_checkout_local_contracts() -> None:
     paths = TypeAdapter(list[str]).validate_python(
         tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["ty"]["environment"][
             "extra-paths"
@@ -19,9 +19,12 @@ def test_typing__retains_the_public_sibling_contract() -> None:
     assert paths == [
         "typings",
         ".",
-        "../erlang-python/priv",
+        "examples/docs",
     ]
+    assert all((ROOT / path).is_dir() for path in paths)
     assert (ROOT / "typings/erlang-stubs/actors.pyi").is_file()
+    assert (ROOT / "typings/erlang_services.pyi").is_file()
+    assert (ROOT / "typings/_erlang_impl/_supervision.pyi").is_file()
 
 
 class Task(BaseModel):

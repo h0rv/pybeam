@@ -375,6 +375,8 @@ def test_staging__resolves_inputs_before_systools_changes_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("tools.build_runtime.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("tools.build_runtime.platform.machine", lambda: "arm64")
     native = tmp_path / "native"
     (native / "ebin").mkdir(parents=True)
     (native / "ebin/py_launch.beam").touch()

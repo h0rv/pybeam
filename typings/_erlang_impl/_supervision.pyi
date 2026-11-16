@@ -1,0 +1,3 @@
+def _require_available(
+    capacity: int | None, max_bytes: int | None, max_children: int | None
+) -> None: ...

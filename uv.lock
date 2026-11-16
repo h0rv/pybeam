@@ -177,7 +177,7 @@ wheels = [
 [[package]]
 name = "hornbeam"
 version = "0.0.0"
-source = { editable = "../hornbeam" }
+source = { git = "https://github.com/h0rv/hornbeam.git?rev=f062aa7d5634856aa1b8180933fdf41f32228bc4#f062aa7d5634856aa1b8180933fdf41f32228bc4" }
 
 [[package]]
 name = "httpcore"
@@ -885,7 +885,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "==0.163.0" },
     { name = "fastapi", marker = "extra == 'showcase'", specifier = "==0.163.0" },
-    { name = "hornbeam", marker = "extra == 'hornbeam'", editable = "../hornbeam" },
+    { name = "hornbeam", marker = "extra == 'hornbeam'", git = "https://github.com/h0rv/hornbeam.git?rev=f062aa7d5634856aa1b8180933fdf41f32228bc4" },
     { name = "jinja2", marker = "extra == 'fastapi'", specifier = ">=3.1.6,<4" },
     { name = "jinja2", marker = "extra == 'showcase'", specifier = ">=3.1.6,<4" },
     { name = "litestar", extras = ["jinja"], marker = "extra == 'litestar'", specifier = "==2.25.0" },

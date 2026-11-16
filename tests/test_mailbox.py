@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from pybeam.mailbox import BoundedMailbox, MailboxOverloaded, UnboundedMailbox
+from tests.typechecking import TYPECHECK_CONFIG
 
 ROOT = Path(__file__).resolve().parents[1]
 IMPORTS = "\n".join(
@@ -94,6 +95,7 @@ def check_types(tmp_path: Path, code: str) -> tuple[int, str]:
         [
             str(Path(executable).parent / "ty"),
             "check",
+            *TYPECHECK_CONFIG,
             "--project",
             str(ROOT),
             "--error-on-warning",
