@@ -41,7 +41,7 @@ repository. Native builds use
 CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0 as pinned in
 `mise.toml`. With these tools available, build with `mise run setup`.
 
-[Actors](actors.md) · [Supervision](supervision.md) · [Shared state](state.md) · [Messaging](messaging.md) · [Background services](background.md) · [Web integration](web.md)
+[Why PyBEAM](why.md) · [Actors](actors.md) · [Supervision](supervision.md) · [Shared state](state.md) · [Messaging](messaging.md) · [Background services](background.md) · [Web integration](web.md)
 
 ## Choose a primitive
 
