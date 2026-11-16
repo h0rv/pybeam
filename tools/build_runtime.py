@@ -46,6 +46,56 @@ FAT_MAGICS = frozenset(
     bytes.fromhex(value) for value in ("cafebabe", "bebafeca", "cafebabf", "bfbafeca")
 )
 ERTS_EXECUTABLES = ("beam.smp", "erlexec", "erl_child_setup", "inet_gethost", "epmd")
+ELF_MAGIC = b"\x7fELF"
+LINUX_LIBRARIES = frozenset(
+    {
+        "libc.so.6",
+        "libm.so.6",
+        "libstdc++.so.6",
+        "libgcc_s.so.1",
+        "libtinfo.so.6",
+        "libz.so.1",
+        "libcrypto.so.3",
+        "ld-linux-x86-64.so.2",
+        "libpthread.so.0",
+        "libdl.so.2",
+        "librt.so.1",
+        "libutil.so.1",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ELF:
+    dependencies: tuple[str, ...]
+    rpaths: tuple[str, ...]
+
+
+def audit_elf(path: Path, *, python_nif: bool = False) -> ELF:
+    if macho_magic(path) != ELF_MAGIC:
+        raise ValueError("Required native artifact is not ELF: " + str(path))
+    header = run(["readelf", "-h", str(path)])
+    if not re.search(r"Machine:\s+Advanced Micro Devices X86-64\s*$", header, re.MULTILINE):
+        raise ValueError("Only x86-64 ELF artifacts are supported: " + str(path))
+    dynamic = run(["readelf", "-d", str(path)])
+    dependencies = tuple(re.findall(r"\(NEEDED\).*?\[(.*?)\]", dynamic))
+    rpaths = tuple(
+        entry
+        for value in re.findall(r"\((?:RUNPATH|RPATH)\).*?\[(.*?)\]", dynamic)
+        for entry in value.split(":")
+    )
+    if any(
+        (entry != "$ORIGIN" and not entry.startswith("$ORIGIN/")) or ".." in Path(entry).parts
+        for entry in rpaths
+    ):
+        raise ValueError("Runtime contains a nonrelocatable ELF search path: " + str(path))
+    if python_nif and dependencies.count("libpython3.14.so.1.0") != 1:
+        raise ValueError("Native runtime must link conventional CPython 3.14 exactly once")
+    allowed = LINUX_LIBRARIES | ({"libpython3.14.so.1.0"} if python_nif else set())
+    for dependency in dependencies:
+        if dependency not in allowed:
+            raise ValueError("Unbundled shared library: " + dependency + " in " + str(path))
+    return ELF(dependencies, rpaths)
 
 
 def macho_magic(path: Path) -> bytes:
@@ -57,7 +107,9 @@ def native_binaries(root: Path, required: tuple[Path, ...]) -> tuple[Path, ...]:
     discovered = tuple(
         path
         for path in root.rglob("*")
-        if path.is_file() and path not in required and macho_magic(path) in MACHO_MAGICS
+        if path.is_file()
+        and path not in required
+        and macho_magic(path) in MACHO_MAGICS | {ELF_MAGIC}
     )
     return (*required, *discovered)
 
@@ -182,8 +234,9 @@ def stage_runtime(
     otp_license = otp_license.resolve()
     native_license = native_license.resolve()
     output = output.resolve()
-    if platform.system() != "Darwin" or platform.machine() != "arm64":
-        raise ValueError("Runtime staging currently supports macOS arm64 only")
+    linux = platform.system() == "Linux" and platform.machine() == "x86_64"
+    if not linux and (platform.system() != "Darwin" or platform.machine() != "arm64"):
+        raise ValueError("Runtime staging supports macOS arm64 and Linux x86_64 only")
     for license_file in (otp_license, native_license):
         if not license_file.is_file():
             raise ValueError("Required third-party license missing: " + str(license_file))
@@ -260,16 +313,22 @@ def stage_runtime(
         if hornbeam is not None and hornbeam_license is not None:
             code_paths.append(str(stage_hornbeam(hornbeam, hornbeam_license, staged)))
         nif = priv / "py_nif.so"
-        nif_info = audit_binary(nif, python_nif=True)
-        for rpath in nif_info.rpaths:
-            run(["/usr/bin/install_name_tool", "-delete_rpath", rpath, str(nif)])
-        run(["/usr/bin/install_name_tool", "-add_rpath", "@loader_path", str(nif)])
-        run(["/usr/bin/codesign", "--force", "--sign", "-", str(nif)])
         required = (nif, *(erts_bin / name for name in ERTS_EXECUTABLES))
-        minimum = max(
-            audit_binary(item, python_nif=item == nif).minimum
-            for item in native_binaries(staged, required)
-        )
+        minimum = (0, 0)
+        if linux:
+            for item in native_binaries(staged, required):
+                run(["patchelf", "--remove-rpath", str(item)])
+                audit_elf(item, python_nif=item == nif)
+        else:
+            nif_info = audit_binary(nif, python_nif=True)
+            for rpath in nif_info.rpaths:
+                run(["/usr/bin/install_name_tool", "-delete_rpath", rpath, str(nif)])
+            run(["/usr/bin/install_name_tool", "-add_rpath", "@loader_path", str(nif)])
+            run(["/usr/bin/codesign", "--force", "--sign", "-", str(nif)])
+            minimum = max(
+                audit_binary(item, python_nif=item == nif).minimum
+                for item in native_binaries(staged, required)
+            )
         notices = staged / "notices"
         notices.mkdir(exist_ok=True)
         shutil.copy2(otp_license, notices / "OTP-LICENSE.txt")
@@ -294,6 +353,14 @@ def stage_runtime(
             "erts_version": versions.erts,
             "python_library": "libpython3.14.dylib",
         }
+        if linux:
+            manifest.update(
+                architecture="x86_64",
+                system="Linux",
+                wheel_tag="cp314-cp314-linux_x86_64",
+                python_library="libpython3.14.so.1.0",
+            )
+            del manifest["minimum_macos"]
         (staged / "runtime.json").write_text(json.dumps(manifest, indent=2) + "\n")
         if output.exists():
             shutil.rmtree(output)

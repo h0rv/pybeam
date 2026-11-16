@@ -113,6 +113,28 @@ def test_approved_release_is_the_pinned_build() -> None:
         assert actual == expected
 
 
+def test_optional_specs_are_platform_specific(monkeypatch: pytest.MonkeyPatch) -> None:
+    darwin = approved_manifest("genstage", system="Darwin", architecture="arm64")
+    linux = approved_manifest("genstage", system="Linux", architecture="x86_64")
+    assert linux.sources == darwin.sources
+    assert linux != darwin
+    monkeypatch.setattr(optional_manifest.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(optional_manifest.platform, "machine", lambda: "x86_64")
+    assert approved_manifest("genstage") == linux
+    with pytest.raises(ValueError, match="Unsupported optional runtime platform"):
+        approved_manifest("genstage", system="Linux", architecture="arm64")
+
+
+def test_optional_spec_rejects_other_platform(tmp_path: Path) -> None:
+    other = approved_manifest("genstage", system="Darwin", architecture="arm64")
+    local = approved_manifest("genstage")
+    if local == other:
+        other = approved_manifest("genstage", system="Linux", architecture="x86_64")
+    write_manifest(tmp_path, other)
+    with pytest.raises(ValueError, match="approved pinned specification"):
+        optional_manifest.verify_manifest(tmp_path)
+
+
 def test_manifest_verifies_all_files(artifact: Artifact) -> None:
     assert read_manifest(artifact.root) == artifact.approved
     audit_optional(artifact.root)

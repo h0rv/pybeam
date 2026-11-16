@@ -37,7 +37,7 @@ def digest(path: Path) -> str:
 
 
 def preserve_hornbeam(source: Path, runtime: Path) -> dict[str, str]:
-    manifest = RuntimeManifest.model_validate_json((source / "runtime.json").read_bytes())
+    manifest = RuntimeManifest.model_validate_json((source / "runtime.json").read_bytes()).root
     code_path = Path("lib/hornbeam-1.4.1/ebin")
     if code_path not in manifest.code_paths:
         raise ValueError("The explicitly selected runtime must contain Hornbeam 1.4.1")
@@ -52,7 +52,7 @@ def preserve_hornbeam(source: Path, runtime: Path) -> dict[str, str]:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, destination)
             hashes[str(relative)] = digest(destination)
-    core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes())
+    core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes()).root
     merged = core.model_copy(update={"code_paths": (*core.code_paths, code_path)})
     (runtime / "runtime.json").write_text(merged.model_dump_json(indent=2) + "\n")
     return hashes

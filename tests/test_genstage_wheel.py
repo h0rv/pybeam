@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import platform
 import selectors
 import shutil
 import signal
@@ -110,7 +111,11 @@ def test_installed_genstage_without_developer_environment(
         manifest_path = "pybeam/runtime/_assets/optional/genstage/manifest.json"
         manifest = OptionalManifest.model_validate_json(archive.read(manifest_path))
         approved = OptionalManifest.model_validate_json(
-            archive.read("pybeam/runtime/optional_specs/genstage.json")
+            archive.read(
+                "pybeam/runtime/optional_specs/genstage"
+                + ("-linux_x86_64" if platform.system() == "Linux" else "")
+                + ".json"
+            )
         )
         assert manifest == approved
         assert manifest.otp_version == "29.1.2"
@@ -129,7 +134,11 @@ def test_installed_genstage_without_developer_environment(
         helper = next(
             name for name in archive.namelist() if name.endswith("/ebin/py_application.beam")
         )
-        assert hashlib.sha256(archive.read(helper)).hexdigest() == HELPER_SHA256
+        helper_hash = {
+            ("Darwin", "arm64"): HELPER_SHA256,
+            ("Linux", "x86_64"): "9d67c0de43b418e645a8cb44d3ae7c2788de5b996b51617217c8d148b713375b",
+        }[(platform.system(), platform.machine())]
+        assert hashlib.sha256(archive.read(helper)).hexdigest() == helper_hash
         assert not any("libpython" in name for name in archive.namelist())
         assert not any(name.endswith((".ex", ".erl")) for name in archive.namelist())
         core: object = json.loads(archive.read("pybeam/runtime/_assets/runtime.json"))
