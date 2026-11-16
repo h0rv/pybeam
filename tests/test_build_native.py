@@ -101,6 +101,7 @@ def test_build__free_threaded_requires_matching_config(
 
 
 @pytest.mark.parametrize("selected", [False, True])
+@pytest.mark.skipif(shutil.which("erl") is None, reason="requires erl to evaluate rebar.config")
 def test_build__configure_hook_passes_selected_interpreter_and_abi(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, selected: bool
 ) -> None:
