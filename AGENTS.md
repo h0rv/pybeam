@@ -2,13 +2,17 @@
 
 This is a personal MVP. Do not add company references, project licenses, copyright notices, publishing machinery, or generated reports. Preserve vendored third-party notices. GitHub forks and committed branch pushes under the user's personal `h0rv` account are authorized. Do not force-push, push to upstream repositories, or publish to PyPI without separate permission. Keep README content focused on using the examples, not naming discussions, agent activity, audit history, test counts, or branch bookkeeping.
 
+Bring BEAM capabilities to Python developers, including users of Django, FastAPI, Redis, Celery, and SQLAlchemy; do not require an Elixir or LiveView mental model. Map the useful semantics to concise, first-class Python and asyncio APIs and familiar framework integrations. Users should not need BEAM knowledge or infrastructure plumbing for ordinary use; expose advanced operations separately. Simplicity must not imply free durability or conceal deployment and failure boundaries.
+
 Keep PyBeam thin. Before implementing a capability or adding an abstraction, check OTP, erlang-python, Hornbeam, and established BEAM libraries for an existing implementation. Prefer binding and reusing their semantics over recreating them in Python. Hide operational plumbing, not ownership, overload, cancellation, durability, or restart guarantees.
 
 Concentrate complexity in integration boundaries, not application code. Keep the existing ASGI frameworks. Do not introduce a web framework, browser protocol, ORM, task queue, or workflow engine. Storage and authorization policy belong to applications.
 
 ## Current MVP
 
-Python 3.14 conventional worker mode on one BEAM node is the baseline. Other Python versions and execution modes are separate experiments.
+Python 3.14 conventional worker mode on one BEAM node is the reproducible baseline, not an architectural ceiling. Evaluate free-threaded Python, own-GIL subinterpreters, and newer Python releases (including 3.15+) against actual runtime and dependency contracts. Do not dismiss parallel Python because of the GIL or present these alternatives as already working throughout PyBeam.
+
+Read the [execution model](docs/research/execution-model.md) before changing concurrency claims or execution APIs. Distinguish BEAM identity, execution context, native thread, interpreter, event loop, OS process, node, and persistent storage. Python version is not live GIL state; one free-threaded asyncio loop is not multicore or distributed; subinterpreters are not native-crash isolation. Supervision, mailboxes, shared memory, and pub/sub do not provide durable jobs or state. Keep acceptance, cancellation, retry, recovery, and uncertain outcomes explicit, and recheck source-linked constraints when dependencies change.
 
 The verification gate is two independent real WebSocket clients sharing BEAM state, atomic concurrent increments, pub/sub invalidations followed by fresh reads, and dependable disconnect, cancellation, shutdown, and slow-consumer cleanup. Unit tests and adapter counts do not establish runtime compatibility. Surface runtime blockers rather than concealing them with workarounds.
 
