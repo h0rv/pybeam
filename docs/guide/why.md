@@ -10,7 +10,7 @@ Keep your async functions and [web framework](web.md). Use [actors](actors.md) f
 
 PyBEAM is a thin Python-facing layer, not a new scheduler or web framework. erlang-python owns execution, contexts and message passing. Hornbeam supplies the current counter, store and pub/sub services; these services do not require replacing your ASGI server. OTP supplies supervision underneath the actor API.
 
-Ordinary asyncio tasks remain asyncio tasks, not OTP processes. Python runs in one main interpreter with its GIL: this is not multicore Python, and OTP processes do not isolate C-extension crashes.
+Ordinary asyncio tasks remain asyncio tasks, not OTP processes. Today's build runs Python in one main interpreter with its GIL, so Python code does not run on multiple cores yet. In the current build, OTP processes do not isolate C-extension crashes.
 
 ## Shared state, explicit recovery
 
