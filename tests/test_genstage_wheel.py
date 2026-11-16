@@ -15,7 +15,7 @@ import pytest
 from pybeam.runtime.config import BootstrapError
 from pybeam.runtime.optional import OptionalManifest, read_manifest
 from tests.readiness import ProcessOutput, wait_ready
-from tools.genstage_assets import HELPER_SHA256, digest, stage
+from tools.genstage_assets import approved_artifact, digest, stage
 from tools.genstage_fixtures import prepare
 from tools.runtime_wheel import audit_optional
 
@@ -134,11 +134,7 @@ def test_installed_genstage_without_developer_environment(
         helper = next(
             name for name in archive.namelist() if name.endswith("/ebin/py_application.beam")
         )
-        helper_hash = {
-            ("Darwin", "arm64"): HELPER_SHA256,
-            ("Linux", "x86_64"): "9d67c0de43b418e645a8cb44d3ae7c2788de5b996b51617217c8d148b713375b",
-        }[(platform.system(), platform.machine())]
-        assert hashlib.sha256(archive.read(helper)).hexdigest() == helper_hash
+        assert hashlib.sha256(archive.read(helper)).hexdigest() == approved_artifact().helper
         assert not any("libpython" in name for name in archive.namelist())
         assert not any(name.endswith((".ex", ".erl")) for name in archive.namelist())
         core: object = json.loads(archive.read("pybeam/runtime/_assets/runtime.json"))

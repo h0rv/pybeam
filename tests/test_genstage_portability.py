@@ -4,10 +4,26 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
-from tools.genstage_assets import stage
+from tools.genstage_assets import APPROVED_WHEEL, HELPER_SHA256, approved_artifact, stage
 from tools.genstage_fixtures import FIXTURES, SOURCES
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_reviewed_wheels_keep_separate_platform_pins(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("tools.genstage_assets.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("tools.genstage_assets.platform.machine", lambda: "arm64")
+    darwin = approved_artifact()
+    assert (darwin.wheel, darwin.helper) == (APPROVED_WHEEL, HELPER_SHA256)
+    monkeypatch.setattr("tools.genstage_assets.platform.system", lambda: "Linux")
+    monkeypatch.setattr("tools.genstage_assets.platform.machine", lambda: "x86_64")
+    linux = approved_artifact()
+    assert linux.wheel != darwin.wheel
+    assert linux.helper != darwin.helper
+    assert linux.nif != darwin.nif
+    monkeypatch.setattr("tools.genstage_assets.platform.machine", lambda: "arm64")
+    with pytest.raises(ValueError, match="Unsupported optional wheel platform"):
+        approved_artifact()
 
 
 def test_typing__retains_the_public_sibling_contract() -> None:

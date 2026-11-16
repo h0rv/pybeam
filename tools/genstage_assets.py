@@ -1,9 +1,11 @@
 import argparse
 import hashlib
 import json
+import platform
 import shutil
 import stat
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
@@ -19,6 +21,33 @@ NATIVE_REVISION = "3234b697c4fcec478858aac99a320583439f40a3"
 HELPER_SHA256 = "0db382fb5590a404d19d1734372d8d91df93abf599a5f996bc73461b24e71671"
 NIF_SHA256 = "4a106fb8c6cf562cef7bfd884b0656fcbb5aba338014d0fcafab1e7d1033381a"
 PREFIX = "pybeam/runtime/_assets/"
+
+
+@dataclass(frozen=True, slots=True)
+class Artifact:
+    wheel: str
+    sdk: str
+    native: str
+    helper: str
+    nif: str
+
+
+def approved_artifact() -> Artifact:
+    match platform.system(), platform.machine():
+        case "Darwin", "arm64":
+            return Artifact(
+                APPROVED_WHEEL, SDK_REVISION, NATIVE_REVISION, HELPER_SHA256, NIF_SHA256
+            )
+        case "Linux", "x86_64":
+            return Artifact(
+                "9f5e66c34afc3a5c3ed6dc811b7131fc5df82737df82e1f2cbd2f28add0675ca",
+                "c1772ae382ee374a645e3bc47b9e5cd2f30aa988",
+                "a81a1687561daf47e9da4ac941eae7a1726237b3",
+                "9d67c0de43b418e645a8cb44d3ae7c2788de5b996b51617217c8d148b713375b",
+                "128fc2cd31192e50878cfbe365416a8be5cf514dae5e82a60a693725264f8430",
+            )
+        case _:
+            raise ValueError("Unsupported optional wheel platform")
 
 
 class Provenance(BaseModel):
@@ -66,8 +95,9 @@ def stage(wheel: Path, output: Path, *, hornbeam_runtime: Path | None = None) ->
     Nothing is compiled, downloaded, installed, or written through an existing inode.
     """
     wheel = wheel.resolve(strict=True)
-    if digest(wheel) != APPROVED_WHEEL:
-        raise ValueError("Expected the exact reviewed GenStage wheel SHA256: " + APPROVED_WHEEL)
+    approved = approved_artifact()
+    if digest(wheel) != approved.wheel:
+        raise ValueError("Expected the exact reviewed GenStage wheel SHA256: " + approved.wheel)
     output = output.absolute()
     if output.exists() or output.is_symlink():
         raise FileExistsError("Asset preparation requires a new output directory: " + str(output))
@@ -101,9 +131,9 @@ def stage(wheel: Path, output: Path, *, hornbeam_runtime: Path | None = None) ->
                     destination.write_bytes(data)
                     destination.chmod((item.external_attr >> 16) & 0o777)
         native = runtime / "lib/erlang_python-5.0.1"
-        if digest(native / "ebin/py_application.beam") != HELPER_SHA256:
+        if digest(native / "ebin/py_application.beam") != approved.helper:
             raise ValueError("Reviewed native application helper is missing or changed")
-        if digest(native / "priv/py_nif.so") != NIF_SHA256:
+        if digest(native / "priv/py_nif.so") != approved.nif:
             raise ValueError("Reviewed core NIF is missing or changed")
         preserved = (
             {}
@@ -112,9 +142,9 @@ def stage(wheel: Path, output: Path, *, hornbeam_runtime: Path | None = None) ->
         )
         runtime_tag(runtime)
         provenance = Provenance(
-            artifact_sdk_revision=SDK_REVISION,
-            artifact_native_revision=NATIVE_REVISION,
-            wheel_sha256=APPROVED_WHEEL,
+            artifact_sdk_revision=approved.sdk,
+            artifact_native_revision=approved.native,
+            wheel_sha256=approved.wheel,
             payloads=payloads,
             runtime_payloads={
                 str(path.relative_to(runtime)): digest(path)
@@ -145,7 +175,7 @@ def main() -> None:
     parser.add_argument("--preserve-hornbeam-from", type=Path)
     args = parser.parse_args(namespace=Arguments())
     runtime = stage(args.wheel, args.output, hornbeam_runtime=args.preserve_hornbeam_from)
-    print(json.dumps({"runtime": str(runtime), "approved_wheel_sha256": APPROVED_WHEEL}))
+    print(json.dumps({"runtime": str(runtime), "approved_wheel_sha256": approved_artifact().wheel}))
 
 
 if __name__ == "__main__":
