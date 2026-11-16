@@ -1,6 +1,7 @@
 <article class="run" id="job-{{ job.id }}" data-status="{{ job.status }}" data-key="{{ job.card.key }}">
+  {% if job.card.key != 'distributed' %}
   <div class="run-status">
-    <h3>{{ 'Current run' if job == jobs[0] else 'Run ' + job.id[:8] }} <span role="status">{{ job.status }}</span></h3>
+    <h3>{{ 'Current run' if job == jobs[0] else 'Run ' + job.id[:8] }} <span role="status">{{ {'queued': 'Queued', 'running': 'Running', 'finished': 'Finished', 'failed': 'Failed', 'stopping': 'Stopping', 'stopped': 'Stopped', 'uncertain': 'Cleanup uncertain'}[job.status] }}</span></h3>
     {% if job.active %}
     <form action="/cancel/{{ job.id }}" method="post" hx-post="/cancel/{{ job.id }}" hx-swap="none">
       <button id="cancel-{{ job.id }}" {% if job.status == 'stopping' %}disabled{% endif %}>{{ 'Stopping…' if job.status == 'stopping' else 'Cancel ' + job.card.title }}</button>
@@ -10,8 +11,12 @@
   </div>
   {% if job.status in ['stopped', 'stopping'] %}<p>Stop requested. Effects are not rolled back.</p>{% endif %}
   {% if job.status == 'uncertain' %}<p>Cleanup is uncertain. New measurements are blocked until ownership is resolved. Do not remove the lock or journal.</p>{% endif %}
-  {% if job.error %}<p>{{ job.error }}</p>{% endif %}
+  {% endif %}
+  {% if job.error %}<p class="error-message" role="alert">Run failed. {{ job.error }}</p>{% endif %}
   {% if job.card.key == 'distributed' %}
+  {% if job.status in ['failed', 'uncertain'] and not job.error %}
+  <p class="error-message" role="alert">{% for trial in job.trials %}Run {{ trial.outcome.status }}. {{ trial.outcome.reason or 'No complete result was confirmed.' }} {% else %}Run ended without a complete result or a recorded failure reason.{% endfor %}</p>
+  {% endif %}
   {% include 'distributed.html' %}
   {% else %}
     {% if job.trials %}
@@ -45,7 +50,8 @@
       </svg>
       {% else %}<p>No throughput evidence.</p>{% endif %}
     </figure>
-    {% elif job.active %}<p>Waiting for runner evidence.</p>{% endif %}
+    {% elif job.active %}<p>Waiting for runner evidence. No result has been confirmed.</p>
+    {% else %}<p class="result">This run ended without a recorded result. {% if not job.error %}The runner did not provide a completed trial. Open the logs below for any available diagnostic output.{% endif %}</p>{% endif %}
     <details><summary>Logs and runtime details</summary>
       <pre>{{ job.logs() }}</pre>
       {% if job.provenance %}

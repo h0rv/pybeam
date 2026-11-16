@@ -1,31 +1,40 @@
 <section id="jobs" data-revision="{{ revision }}">
   {% if card is defined %}
-  <header id="card-{{ card.key }}">
-    <h2>{{ card.title }}</h2>
-    {% if card.key == 'distributed' %}
-    <p>Run a fixed exchange between two BEAM nodes, then restart B and submit again.</p>
-    {% elif card.key == 'smoke' %}<p>Run 100 events on four Python queues.</p>
+  <header id="card-{{ card.key }}" {% if card.key == 'distributed' %}class="walkthrough-heading"{% endif %}>
+    {% if card.key == 'distributed' %}<h1>Watch a worker fail and restart</h1>{% else %}<h2>{{ card.title }}</h2>{% endif %}
+    {% if card.key == 'smoke' %}<p>Run 100 events on four Python queues.</p>
     {% elif card.benchmark %}<p>Run this scalar reference and inspect its measured result.</p>
     {% elif card.key == 'hold' %}<p>Start an owned process, then cancel it to check cleanup.</p>
     {% elif card.port %}<p>Open a shared counter in two browser sessions.</p>
     {% endif %}
-    {% if card.disabled %}<p>Unavailable. {{ card.disabled }}</p>{% endif %}
-    <form action="/start/{{ card.key }}" method="post" hx-post="/start/{{ card.key }}" hx-swap="none">
-      <button id="run-{{ card.key }}" {% if card.disabled or jobs|selectattr('active')|list %}disabled{% endif %}>{{ 'Run' if card.key == 'distributed' else 'Start' }} {{ card.title }}</button>
-    </form>
+    <div class="run-actions">
+      <form action="/start/{{ card.key }}" method="post" hx-post="/start/{{ card.key }}" hx-swap="none">
+        <button id="run-{{ card.key }}" {% if card.disabled or jobs|selectattr('active')|list %}disabled{% endif %}>{{ 'Run' if card.key == 'distributed' else 'Start ' ~ card.title }}</button>
+      </form>
+      {% if card.key == 'distributed' and jobs and jobs[0].active %}
+      <form action="/cancel/{{ jobs[0].id }}" method="post" hx-post="/cancel/{{ jobs[0].id }}" hx-swap="none"><button id="cancel-{{ jobs[0].id }}" {% if jobs[0].status == 'stopping' %}disabled{% endif %}>{{ 'Stopping' if jobs[0].status == 'stopping' else 'Cancel' }}</button></form>
+      {% endif %}
+    </div>
+    {% if card.disabled %}<p class="unavailable">Unavailable. {{ card.disabled }}</p>{% endif %}
   </header>
   {% endif %}
   <div id="current-run" aria-label="Current run">
     {% if jobs %}
     {% set job = jobs[0] %}{% include 'job.html' %}
-    {% else %}<p>Ready. Your progress and result will appear here.</p>{% endif %}
+    {% else %}
+    {% if card is defined and card.key == 'distributed' %}
+    {% from 'distributed.html' import architecture %}
+    {{ architecture() }}
+    {% else %}<p class="ready-note">Ready. Your progress and result will appear here.</p>{% endif %}
+    {% endif %}
   </div>
-  {% if jobs|length > 1 %}
+  {% if jobs|length > 1 and (card is not defined or card.key != 'distributed') %}
   <details id="history">
     <summary>Earlier runs ({{ jobs|length - 1 }})</summary>
     {% for job in jobs[1:] %}{% include 'job.html' %}{% endfor %}
   </details>
   {% endif %}
+  {% if card is not defined or card.key != 'distributed' %}
   <details id="scenario-details">
     <summary>Scenario details</summary>
     {% if card is defined %}
@@ -34,15 +43,18 @@
     {% if card.key == 'distributed' %}<p>This is a scripted walkthrough, not an interactive cluster console. Cancel requests cleanup, not rollback. An interrupted request can have effects.</p>{% endif %}
     {% endif %}
     <p>The web UI runs on CPython. Jobs run serially. There are at most four active jobs and 16 retained jobs per session. Ordinary jobs have a 30-second budget. The walkthrough has a 120-second budget.</p>
-    {% if measurements %}
+    {% if measurements and card is defined and card.key != 'distributed' %}
     <table>
       <caption>Actual scalar results. Uncontrolled host, not a comparison.</caption>
       <thead><tr><th>Profile</th><th>Outcome</th><th>Completions</th><th>Events/s</th></tr></thead>
       <tbody>{% for sample in measurements %}<tr><td>{{ sample.backend }}</td><td>{{ sample.trial.outcome.status }}</td><td>{{ sample.trial.completed }}</td><td>{{ sample.trial.throughput_per_second }}</td></tr>{% endfor %}</tbody>
     </table>
     {% endif %}
+    {% if card is defined and card.key != 'distributed' %}
     <form action="/run-all" method="post" hx-post="/run-all" hx-swap="none"><button>Run all available benchmarks</button></form>
     <p>Scalar references are not a test of the actor safe data default. Rates do not establish speedups. RSS is a sampled lower bound, not PSS.</p>
+    {% endif %}
   </details>
+  {% endif %}
   <noscript><p><a href="/?scenario={{ card.key if card is defined else 'distributed' }}">Refresh this scenario</a> to see its current result.</p></noscript>
 </section>

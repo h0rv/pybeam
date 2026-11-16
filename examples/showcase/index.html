@@ -4,30 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
-  <title>PyBeam showcase</title>
+  <title>PyBeam | Scripted two-node walkthrough</title>
   <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/missing.min.css">
-  <link rel="stylesheet" href="/static/showcase.css">
+  <link rel="stylesheet" href="/static/showcase-walkthrough.css">
   <script src="/static/htmx.min.js" defer></script>
   <script src="/static/sse.js" defer></script>
+  <script src="/static/showcase-flow.js" defer></script>
 </head>
 <body>
-<aside class="scenario-nav">
-  <h1>PyBeam showcase</h1>
-  <nav aria-label="Ready demos">
-    {% for item in cards if item.disabled is none and (item.key == 'distributed' or item.port is not none) %}
-    <a href="/?scenario={{ item.key }}" {% if item.key == card.key %}aria-current="page"{% endif %}>{{ item.title }}</a>
-    {% endfor %}
-  </nav>
-  <details id="advanced-examples" {% if card.disabled is not none or (card.key != 'distributed' and card.port is none) %}open{% endif %}>
-    <summary>Advanced examples</summary>
-    <nav class="advanced-nav" aria-label="Advanced examples">
-      {% for item in cards if item.disabled is not none or (item.key != 'distributed' and item.port is none) %}
-      <a href="/?scenario={{ item.key }}" {% if item.key == card.key %}aria-current="page"{% endif %}>{{ item.title }}{% if item.disabled %} <small>Unavailable</small>{% endif %}</a>
-      {% endfor %}
-    </nav>
-  </details>
-</aside>
+<header class="scenario-nav">
+  <a class="brand" href="/?scenario=distributed">PyBeam</a>
+  <nav aria-label="Showcase"><a href="/chat">Chat</a></nav>
+</header>
 <main>
   <section id="updates" hx-sse:connect="/events" hx-config='{"sse":{"pauseOnBackground":false}}'>
     <div id="job-refresh" hx-get="/jobs?scenario={{ card.key }}" hx-trigger="jobs-changed from:#updates" hx-target="#jobs" hx-swap="outerHTML" hx-sync="this:queue last"></div>

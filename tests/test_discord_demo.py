@@ -1,4 +1,7 @@
+import argparse
 import asyncio
+import base64
+import hashlib
 import os
 import secrets
 import subprocess
@@ -6,14 +9,14 @@ import sys
 from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
 from types import TracebackType
-from typing import Self
+from typing import Self, override
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
 from examples.discord_demo import main as web
-from examples.discord_demo.domain import Action, Demo, RoomHandle, View
+from examples.discord_demo.domain import ROOMS, Action, Demo, Node, RoomHandle, View
 from examples.discord_simulation import Delivery, Event, Membership, Room, Snapshot
 from pybeam.actors import ActorGroup, ActorInfo
 from pybeam.actors.classes import Container, Route, definition
@@ -82,9 +85,18 @@ class FakeServices:
         return int(not self.subscription.closed)
 
 
+class RenderingDemo(Demo):
+    @override
+    async def tree(self) -> tuple[Node, ...]:
+        return tuple(
+            Node(room_id, "<0." + str(index + 100) + ".0>", 7, 0, 0)
+            for index, room_id in enumerate(ROOMS)
+        )
+
+
 @pytest.fixture
 async def demo(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[Demo]:
-    instance = Demo(ActorGroup(), FakeServices())
+    instance = RenderingDemo(ActorGroup(), FakeServices())
     monkeypatch.setattr(web, "owner", web.Owner(demo=instance))
     async with asyncio.TaskGroup() as tasks:
         web.owner.tasks = tasks
@@ -159,7 +171,7 @@ def test_command__rejects_unsafe_form_boundary(payload: dict[str, object]) -> No
 
 async def test_render__escapes_messages_and_never_puts_chat_in_ack(demo: Demo) -> None:
     identity = secrets.token_hex(16)
-    rendered = web.panel(view(identity, '<img src=x onerror="alert(1)">\n雪'), identity, demo)
+    rendered = await web.panel(view(identity, '<img src=x onerror="alert(1)">\n雪'), identity, demo)
     assert "<img" not in rendered
     assert "&lt;img" in rendered
     assert "<0.123.0>" not in rendered
@@ -208,10 +220,14 @@ async def test_http__rejects_host_origin_and_body_before_native_access(
     assert response.status_code == status
 
 
+@pytest.mark.parametrize("embedded", [False, True])
 async def test_post__ack_cannot_replace_chat_and_csrf_rejects_without_call(
     demo: Demo,
     monkeypatch: pytest.MonkeyPatch,
+    embedded: bool,
 ) -> None:
+    if embedded:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
     calls: list[Action] = []
     identity = secrets.token_hex(16)
 
@@ -232,7 +248,13 @@ async def test_post__ack_cannot_replace_chat_and_csrf_rejects_without_call(
         transport=httpx.ASGITransport(app=web.app),
         base_url=web.owner.origin,
         cookies={"discord": cookie(identity)},
-        headers={"origin": web.owner.origin, "hx-request": "true"},
+        headers={
+            "origin": web.owner.origin,
+            "hx-request": "true",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+        },
     ) as client:
         data = {"action": "send", "generation": "7", "csrf": "0" * 64, "text": "hello"}
         assert (await client.post("/rooms/general/actions", data=data)).status_code == 403
@@ -372,12 +394,12 @@ class LocalActor:
         return self
 
 
-def local_room() -> Room:
+def local_room(room_id: str = "general") -> Room:
     spec = definition(Room)
     payload = spec.constructor.encode(
         (),
         {
-            "room_id": "general",
+            "room_id": room_id,
             "max_members": 8,
             "max_events": 100,
             "history_limit": 32,
@@ -385,6 +407,31 @@ def local_room() -> Room:
     )
     transport = LocalActor(spec.factory(payload)())
     return spec.reference(Room, Route(transport, spec.methods, Room))
+
+
+async def test_tree__returns_four_observed_children(monkeypatch: pytest.MonkeyPatch) -> None:
+    instance = Demo(ActorGroup(), FakeServices())
+    references = tuple(local_room(room_id) for room_id in ROOMS)
+    instance.rooms.update(
+        (room_id, RoomHandle(reference))
+        for room_id, reference in zip(ROOMS, references, strict=True)
+    )
+    observed: list[object] = []
+
+    async def info(reference: object) -> ActorInfo:
+        observed.append(reference)
+        for index, expected in enumerate(references):
+            if reference is expected:
+                return ActorInfo("<0." + str(index + 100) + ".0>", 7, 0, 0)
+        raise AssertionError("Unknown test reference")
+
+    monkeypatch.setattr(instance.group, "info", info)
+    nodes = await instance.tree()
+    assert tuple(observed) == references
+    assert nodes == tuple(
+        Node(room_id, "<0." + str(index + 100) + ".0>", 7, 0, 0)
+        for index, room_id in enumerate(ROOMS)
+    )
 
 
 async def test_domain__native_snapshot_authorizes_members_and_rejects_stale_controls(
@@ -542,6 +589,314 @@ async def test_leave_http__binds_session_and_preserves_captured_revision(
         assert "Not confirmed" in response.text and "revision" in response.text
         assert await reference.snapshot() == fresh
         assert demo.inflight == 0
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://localhost:38921",
+        "https://127.0.0.1:38921",
+        "http://127.0.0.2:38921",
+        "http://0.0.0.0:38921",
+        "http://[::1]:38921",
+        "http://attacker.invalid:38921",
+        "http://127.0.0.1",
+        "http://127.0.0.1:0",
+        "http://127.0.0.1:65536",
+        "http://127.0.0.1:-1",
+        "http://127.0.0.1:abc",
+        "http://127.0.0.1:038921",
+        "http://user@127.0.0.1:38921",
+        "http://user:pass@127.0.0.1:38921",
+        "http://127.0.0.1:38921/",
+        "http://127.0.0.1:38921/chat",
+        "http://127.0.0.1:38921?",
+        "http://127.0.0.1:38921?x=1",
+        "http://127.0.0.1:38921#",
+        "http://127.0.0.1:38921#x",
+        "*",
+        "null",
+        " http://127.0.0.1:38921",
+        "http://127.0.0.1:38921\n",
+        "http://127.0.0.1.attacker.invalid:38921",
+    ],
+)
+def test_embed_origin__should_reject_noncanonical_or_nonlocal_input(value: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError):
+        web.LocalEmbedOrigin.parse(value)
+
+
+@pytest.mark.parametrize("port", [1, 38921, 65535])
+def test_embed_origin__should_parse_explicit_loopback_port(port: int) -> None:
+    url = "http://127.0.0.1:" + str(port)
+    assert web.LocalEmbedOrigin.parse(url).url == url
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("site", ["same-site", "same-origin"])
+async def test_iframe__should_require_opt_in_and_emit_exact_ancestor(
+    demo: Demo, monkeypatch: pytest.MonkeyPatch, enabled: bool, site: str
+) -> None:
+    if enabled:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
+    identity = secrets.token_hex(16)
+
+    async def snapshot(room_id: str) -> View:
+        return view(identity)
+
+    monkeypatch.setattr(demo, "view", snapshot)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        headers={"sec-fetch-site": site, "sec-fetch-mode": "navigate", "sec-fetch-dest": "iframe"},
+        follow_redirects=True,
+    ) as client:
+        response = await client.get("/")
+        assert response.status_code == (200 if enabled else 403)
+        if enabled:
+            assert 'id="compose"' in response.text
+            assert client.cookies.get("discord") is not None
+            assert "SameSite=strict" in response.headers["set-cookie"]
+            assert (
+                "frame-ancestors http://127.0.0.1:38921;"
+                in response.headers["content-security-policy"]
+            )
+            assert response.headers["referrer-policy"] == "same-origin"
+            assert "access-control-allow-origin" not in response.headers
+        else:
+            assert demo.owner is None
+            assert not client.cookies
+        top = await client.get(
+            "/rooms/general", headers={"sec-fetch-site": "none", "sec-fetch-dest": "document"}
+        )
+        assert top.status_code == 200
+        if not enabled:
+            assert "frame-ancestors 'none'" in top.headers["content-security-policy"]
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("path", ["/", "/rooms/general"])
+async def test_direct_document__same_site_get_should_require_opt_in_without_joining(
+    demo: Demo, monkeypatch: pytest.MonkeyPatch, enabled: bool, path: str
+) -> None:
+    if enabled:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
+    reference = local_room()
+    demo.rooms["general"] = RoomHandle(reference)
+    identity = secrets.token_hex(16)
+    demo.owner = identity
+    before = await reference.snapshot()
+
+    async def info(_reference: object) -> ActorInfo:
+        return ActorInfo("<unit-only>", 7, 0, 0)
+
+    monkeypatch.setattr(demo.group, "info", info)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(identity)},
+        headers={
+            "sec-fetch-site": "same-site",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-dest": "document",
+        },
+        follow_redirects=True,
+    ) as client:
+        response = await client.get(path)
+    assert response.status_code == (200 if enabled else 403)
+    if enabled:
+        assert 'id="compose"' in response.text
+        assert 'data-joined="false"' in response.text
+        assert response.url.path == "/rooms/general"
+        assert len(response.history) == (1 if path == "/" else 0)
+    assert await reference.snapshot() == before
+    assert demo.owner == identity
+    assert demo.inflight == demo.streams == 0
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize(
+    "method,path,changes",
+    [
+        ("GET", "/", {"sec-fetch-site": "cross-site"}),
+        ("GET", "/rooms/general", {"origin": "http://127.0.0.1:38921"}),
+        ("GET", "/rooms/general", {"origin": "null"}),
+        ("GET", "/rooms/general", {"host": "127.0.0.1:38921"}),
+        ("GET", "/rooms/general/events", {}),
+        ("GET", "/resources", {}),
+        ("POST", "/rooms/general/actions", {"origin": "http://127.0.0.1:8766"}),
+    ],
+)
+async def test_direct_document__unsafe_requests_should_reject_before_state_or_admission(
+    demo: Demo, enabled: bool, method: str, path: str, changes: dict[str, str]
+) -> None:
+    if enabled:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
+    identity = secrets.token_hex(16)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(identity)},
+    ) as client:
+        response = await client.request(
+            method,
+            path,
+            headers={
+                "sec-fetch-site": "same-site",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-dest": "document",
+                **changes,
+            },
+            data={"action": "join", "generation": "7", "csrf": web.owner.csrf(identity)},
+        )
+    assert response.status_code == 403
+    assert demo.owner is None
+    assert not demo.rooms
+    assert demo.inflight == demo.streams == 0
+    assert not response.cookies
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize(
+    "method,path,headers",
+    [
+        ("GET", "/rooms/general", {"sec-fetch-mode": "cors"}),
+        ("GET", "/rooms/general", {"sec-fetch-dest": "object"}),
+        ("GET", "/rooms/general", {"sec-fetch-dest": "empty"}),
+        ("GET", "/rooms/general", {"sec-fetch-site": "cross-site"}),
+        ("GET", "/rooms/general", {"sec-fetch-mode": "no-cors"}),
+        ("GET", "/rooms/general", {"host": "localhost:8766"}),
+        ("GET", "/rooms/general", {"host": "127.0.0.1:38921"}),
+        ("GET", "/rooms/general", {"origin": "null"}),
+        ("GET", "/rooms/general", {"origin": "http://127.0.0.1:38921"}),
+        ("GET", "/rooms/general", {"origin": "http://attacker.invalid:38921"}),
+        ("GET", "/rooms/general/events", {}),
+        ("GET", "/resources", {}),
+        ("HEAD", "/rooms/general", {}),
+        ("POST", "/rooms/general/actions", {"origin": "http://127.0.0.1:8766"}),
+        ("POST", "/rooms/general/actions", {"origin": "http://127.0.0.1:38921"}),
+        (
+            "POST",
+            "/rooms/general/actions",
+            {"sec-fetch-dest": "empty", "origin": "http://127.0.0.1:8766"},
+        ),
+    ],
+)
+async def test_embedding__invalid_metadata_should_reject_before_state_or_admission(
+    demo: Demo, enabled: bool, method: str, path: str, headers: dict[str, str]
+) -> None:
+    if enabled:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
+    identity = secrets.token_hex(16)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(identity)},
+    ) as client:
+        response = await client.request(
+            method,
+            path,
+            headers={
+                "sec-fetch-site": "same-site",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-dest": "iframe",
+                **headers,
+            },
+            data={
+                "action": "send",
+                "generation": "7",
+                "csrf": web.owner.csrf(identity),
+                "text": "must not be sent",
+            },
+        )
+    assert response.status_code == 403
+    assert demo.owner is None
+    assert not demo.rooms
+    assert demo.inflight == demo.streams == 0
+    assert not response.cookies
+
+
+async def test_showcase_chat__should_render_live_frame_under_strict_csp() -> None:
+    from examples.showcase.app import create_app
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app()), base_url="http://127.0.0.1:38921"
+    ) as client:
+        response = await client.get("/chat")
+        assert response.status_code == 200
+        assert "Live FastAPI chat" in response.text
+        assert 'src="http://127.0.0.1:8766/rooms/general"' in response.text
+        assert 'href="http://127.0.0.1:8766/rooms/general"' in response.text
+        css = response.text.split("<style>")[1].split("</style>")[0]
+        digest = base64.b64encode(hashlib.sha256(css.encode()).digest()).decode()
+        policy = response.headers["content-security-policy"]
+        assert "'sha256-" + digest + "'" in policy
+        assert "frame-src http://127.0.0.1:8766;" in policy
+        assert "frame-ancestors 'none'" in policy
+        assert "'unsafe-inline'" not in policy
+        assert (await client.get("/chat", headers={"host": "attacker.invalid"})).status_code == 403
+        assert (await client.get("/chat", headers={"origin": "null"})).status_code == 403
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+async def test_iframe_form__should_join_only_with_explicit_embedding_and_valid_security(
+    demo: Demo, monkeypatch: pytest.MonkeyPatch, enabled: bool
+) -> None:
+    if enabled:
+        web.owner.embed_origin = web.LocalEmbedOrigin.parse("http://127.0.0.1:38921")
+    reference = local_room()
+    demo.rooms["general"] = RoomHandle(reference)
+    identity = secrets.token_hex(16)
+
+    async def info(_reference: object) -> ActorInfo:
+        return ActorInfo("<unit-only>", 7, 0, 0)
+
+    monkeypatch.setattr(demo.group, "info", info)
+    before = await reference.snapshot()
+    form = {"action": "join", "generation": "7", "csrf": web.owner.csrf(identity)}
+    headers = {
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-dest": "iframe",
+        "origin": web.owner.origin,
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(identity)},
+    ) as client:
+        for changes in (
+            {"host": "attacker.invalid"},
+            {"origin": "null"},
+            {"origin": "http://127.0.0.1:38921"},
+            {"sec-fetch-site": "same-site"},
+            {"sec-fetch-site": "cross-site"},
+            {"sec-fetch-mode": "cors"},
+            {"content-length": "5000"},
+            {"content-length": "invalid"},
+            {"transfer-encoding": "chunked"},
+        ):
+            denied = await client.post(
+                "/rooms/general/actions", data=form, headers={**headers, **changes}
+            )
+            assert denied.status_code in (403, 411, 413)
+            assert await reference.snapshot() == before
+            assert demo.inflight == demo.streams == 0
+        without_origin = {key: value for key, value in headers.items() if key != "origin"}
+        denied = await client.post("/rooms/general/actions", data=form, headers=without_origin)
+        assert denied.status_code == 403
+        denied = await client.post(
+            "/rooms/general/actions", data={**form, "csrf": "0" * 64}, headers=headers
+        )
+        assert denied.status_code == 403
+        assert await reference.snapshot() == before
+        accepted = await client.post("/rooms/general/actions", data=form, headers=headers)
+    assert accepted.status_code == (303 if enabled else 403)
+    if enabled:
+        assert (await reference.snapshot()).members == (Delivery(identity, 0),)
+    else:
+        assert await reference.snapshot() == before
+    assert demo.inflight == demo.streams == 0
 
 
 @pytest.mark.parametrize("previous", [None, "disabled"])

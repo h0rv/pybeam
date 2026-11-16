@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import psutil
@@ -120,19 +121,18 @@ async def test_miniapp__clear_first_screen_origin_forms_and_shared_restart(
             for page, label in ((first, "desktop"), (second, "phone")):
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 await page.goto(miniapp.url)
-                await expect(page.get_by_role("button", name="Join #general")).to_be_in_viewport()
+                await expect(page.locator("#membership")).to_have_text("Joined")
                 await expect(page.get_by_label("Message", exact=True)).to_be_in_viewport()
                 await expect(page.locator("#inspector")).not_to_be_visible()
                 await page.screenshot(path=str(tmp_path / ("chat-ready-" + label + ".png")))
                 print(
                     "Chat viewport",
                     label,
-                    "join",
-                    await page.locator("#join-room").bounding_box(),
+                    "membership",
+                    await page.locator("#membership").bounding_box(),
                     "composer",
                     await page.locator("#message").bounding_box(),
                 )
-                await join(page)
                 await expect(page.get_by_role("button", name="Send message")).to_be_enabled()
             assert (await desktop.cookies())[0]["value"] != (await phone.cookies())[0]["value"]
             await send(second, "Hello from a private session")
@@ -258,7 +258,7 @@ async def test_miniapp__nonreading_output_peer_releases_native_subscription(
             page = await context.new_page()
             await page.goto(miniapp.url + "/rooms/general")
             await expect(page.locator("#inspector")).to_be_attached()
-            await join(page)
+            await expect(page.locator("#membership")).to_have_text("Joined")
             baseline = await resource_counts(page, miniapp.url)
             cookie = next(
                 item["value"] for item in await context.cookies() if item["name"] == "discord"
@@ -342,7 +342,7 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
                 page.on("requestfailed", request_failed)
                 await page.goto(miniapp.url + "/rooms/general")
                 await expect(page.locator("#inspector")).to_be_attached()
-                await join(page)
+                await expect(page.locator("#membership")).to_have_text("Joined")
             baseline = await resource_counts(first, miniapp.url)
             assert baseline.streams == baseline.subscriptions == 2
             await send(first, "one: both native recipients")
@@ -455,6 +455,114 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
             await browser.close()
 
 
+@pytest.mark.parametrize("outcome", ["joined", "rejected", "already"])
+async def test_client_initial_join__one_attempt_per_document_without_swap_retries(
+    outcome: Literal["joined", "rejected", "already"],
+) -> None:
+    posts: list[str] = []
+    errors: list[str] = []
+    joined = outcome == "already"
+
+    async def serve(route: Route) -> None:
+        nonlocal joined
+        path = route.request.url.split("8766", 1)[1]
+        if path in ("/static/htmx.min.js", "/assets/demo.js"):
+            file = (
+                ROOT
+                / "examples"
+                / (
+                    "static/htmx.min.js"
+                    if path.startswith("/static")
+                    else "discord_demo/assets/demo.js"
+                )
+            )
+            await route.fulfill(content_type="text/javascript", body=file.read_bytes())
+        elif route.request.method == "POST":
+            assert route.request.headers.get("hx-request") == "true"
+            posts.append(route.request.post_data or "")
+            assert "action=join" in posts[-1]
+            assert "generation=7" in posts[-1]
+            assert "csrf=protected" in posts[-1]
+            joined = outcome != "rejected"
+            await route.fulfill(
+                status=200 if joined else 403,
+                content_type="text/html",
+                body="Confirmed join." if joined else "Request rejected. Nothing was retried.",
+            )
+        else:
+            membership = "true" if joined else "false"
+            await route.fulfill(
+                content_type="text/html",
+                body=(
+                    '<!doctype html><script src="/static/htmx.min.js"></script>'
+                    '<script src="/assets/demo.js" defer></script>'
+                    '<p id="connection"></p><p id="membership" data-joined="'
+                    + membership
+                    + '">'
+                    + ("Joined" if joined else "View only")
+                    + "</p>"
+                    '<form action="/rooms/general/actions" method="post" '
+                    'hx-post="/rooms/general/actions" hx-target="#ack">'
+                    '<input name="action" value="join" type="hidden">'
+                    '<input name="generation" value="7" type="hidden">'
+                    '<input name="csrf" value="protected" type="hidden">'
+                    '<button id="join-room">Join</button></form>'
+                    '<button id="send-message">Send</button><p id="ack"></p>'
+                    '<a href="/rooms/python">Python room</a>'
+                ),
+            )
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
+        try:
+            page = await browser.new_page()
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            await page.route("http://127.0.0.1:8766/**", serve)
+            await page.goto("http://127.0.0.1:8766/rooms/general")
+            if outcome != "already":
+                await expect(page.locator("#ack")).to_contain_text(
+                    "Confirmed join" if outcome == "joined" else "Request rejected"
+                )
+            assert len(posts) == (0 if outcome == "already" else 1)
+            await page.evaluate(
+                """() => {
+                  document.getElementById('membership').dataset.joined = 'true';
+                  document.dispatchEvent(new CustomEvent('htmx:after:swap'));
+                }"""
+            )
+            await expect(page.locator("#send-message")).to_be_enabled()
+            # Leave and restarted snapshots must not trigger another Join.
+            for _ in range(2):
+                await page.evaluate(
+                    """() => {
+                      document.getElementById('membership').dataset.joined = 'false';
+                      document.dispatchEvent(new CustomEvent('htmx:after:swap'));
+                      document.dispatchEvent(new CustomEvent('htmx:sse:after:connection'));
+                    }"""
+                )
+                await expect(page.locator("#send-message")).to_be_disabled()
+            await page.wait_for_timeout(100)
+            assert len(posts) == (0 if outcome == "already" else 1)
+            await expect(page.locator("#join-room")).to_be_enabled()
+            await page.reload()
+            if outcome == "rejected":
+                await expect(page.locator("#ack")).to_contain_text("Request rejected")
+                assert len(posts) == 2
+            else:
+                assert len(posts) == (0 if outcome == "already" else 1)
+            joined = False
+            await page.get_by_role("link", name="Python room").click()
+            await expect(page.locator("#ack")).to_contain_text(
+                "Request rejected" if outcome == "rejected" else "Confirmed join"
+            )
+            assert len(posts) == {"already": 1, "joined": 2, "rejected": 3}[outcome]
+            assert not errors
+        finally:
+            await browser.close()
+
+
 async def join(page: Page) -> None:
     await page.get_by_role("button", name="Join #").click()
     await expect(page.locator("#membership")).to_have_text("Joined")
@@ -499,6 +607,8 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
             await expect(first.locator("#inspector")).to_be_attached()
             await second.goto(miniapp.url + "/rooms/general")
             await expect(second.locator("#inspector")).to_be_attached()
+            for page in (first, second):
+                await expect(page.locator("#membership")).to_have_text("Joined")
             initial = await resource_counts(first, miniapp.url)
             assert initial.streams == initial.subscriptions == 2
             assert initial.operations == 0
@@ -513,9 +623,8 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
             )
             assert foreign.status == 403
             assert (await second.request.get(miniapp.url + "/resources")).status == 403
-            async with asyncio.TaskGroup() as tasks:
-                tasks.create_task(join(first))
-                tasks.create_task(join(second))
+            for page in (first, second):
+                await expect(page.locator("#membership")).to_have_text("Joined")
             for page in (first, second):
                 await expect(page.locator("#members li")).to_have_count(2)
             async with asyncio.TaskGroup() as tasks:
@@ -549,7 +658,7 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
             csrf = await first.locator('input[name="csrf"][form="compose"]').input_value()
             other = await second_context.new_page()
             await other.goto(miniapp.url + "/rooms/python")
-            await join(other)
+            await expect(other.locator("#membership")).to_have_text("Joined")
             other_pid = await other.locator("#inspector").get_attribute("data-pid")
             await first.get_by_role("button", name="Restart room (clears messages)").click()
             await expect(first.locator("#inspector")).not_to_have_attribute(

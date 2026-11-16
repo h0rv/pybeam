@@ -3,12 +3,14 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Literal, Self
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
@@ -69,9 +71,36 @@ class ActionResult:
     message: str
 
 
+class LocalEmbedOrigin(BaseModel):
+    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
+
+    port: Annotated[int, Field(ge=1, le=65535)]
+
+    @property
+    def url(self) -> str:
+        return "http://127.0.0.1:" + str(self.port)
+
+    @classmethod
+    def parse(cls, value: str) -> Self:
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+            if port is None:
+                raise ValueError("Explicit port required")
+            origin = cls(port=port)
+            if value != origin.url:
+                raise ValueError("Only an exact HTTP 127.0.0.1 origin is supported")
+            return origin
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(
+                "Expected http://127.0.0.1:PORT with port 1 to 65535 and no path"
+            ) from error
+
+
 @dataclass(slots=True)
 class Owner:
     origin: str = "http://127.0.0.1:8766"
+    embed_origin: LocalEmbedOrigin | None = None
     secret: bytes = field(default_factory=lambda: secrets.token_bytes(32))
     demo: Demo | None = None
     tasks: asyncio.TaskGroup | None = None
@@ -110,9 +139,33 @@ class LocalOnly:
         headers = request.headers
         reason: str | None = None
         status = 403
+        embedded_navigation = (
+            owner.embed_origin is not None
+            and headers.get("sec-fetch-dest") in ("iframe", "document")
+            and headers.get("sec-fetch-mode") == "navigate"
+            and (
+                (
+                    request.method == "GET"
+                    and headers.get("sec-fetch-site") in ("same-site", "same-origin")
+                    and request.url.path in ("/", *("/rooms/" + room for room in ROOMS))
+                )
+                or (
+                    request.method == "POST"
+                    and headers.get("sec-fetch-dest") == "iframe"
+                    and headers.get("sec-fetch-site") == "same-origin"
+                    and headers.get("origin") == owner.origin
+                    and request.url.path in ("/rooms/" + room + "/actions" for room in ROOMS)
+                )
+            )
+        )
         if headers.get("host") != owner.origin.removeprefix("http://"):
             reason = "Unexpected Host"
-        elif headers.get("sec-fetch-site") not in (None, "none", "same-origin"):
+        elif headers.get("sec-fetch-dest") == "iframe" and not embedded_navigation:
+            reason = "Frame navigation rejected"
+        elif (
+            headers.get("sec-fetch-site") not in (None, "none", "same-origin")
+            and not embedded_navigation
+        ):
             reason = "Cross-site request rejected"
         elif headers.get("origin") not in (None, owner.origin):
             reason = "Unexpected Origin"
@@ -148,7 +201,13 @@ class LocalOnly:
                         b"content-security-policy",
                         b"default-src 'self'; script-src 'self'; "
                         b"style-src 'self'; img-src 'self' data:; object-src 'none'; "
-                        b"frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+                        + b"frame-ancestors "
+                        + (
+                            owner.embed_origin.url.encode("ascii")
+                            if owner.embed_origin is not None
+                            else b"'none'"
+                        )
+                        + b"; base-uri 'none'; form-action 'self'",
                     ),
                 ]
             if streaming:
@@ -226,7 +285,7 @@ async def member(request: Request) -> str:
 type Member = Annotated[str, Depends(member)]
 
 
-def panel(view: View, identity: str, demo: Demo) -> str:
+async def panel(view: View, identity: str, demo: Demo) -> str:
     membership = next(
         (item for item in view.snapshot.ledger if item.member_id == identity and item.present),
         None,
@@ -238,6 +297,9 @@ def panel(view: View, identity: str, demo: Demo) -> str:
         is_owner=identity == demo.owner,
         revision=membership.revision if membership is not None else None,
         joined=membership is not None,
+        nodes=await demo.tree(),
+        restart=demo.restarts.get(view.snapshot.room_id),
+        server_pid=os.getpid(),
     )
 
 
@@ -290,7 +352,7 @@ async def room_page(
             "rooms": ROOMS,
             "room_id": room_id,
             "member": identity,
-            "room_html": panel(await demo.view(room_id), identity, demo),
+            "room_html": await panel(await demo.view(room_id), identity, demo),
             "notice": notice,
         },
         headers={"Cache-Control": "no-store"},
@@ -390,9 +452,9 @@ async def events(
     room_id: RoomId, demo: Native, identity: Member, subscription: Push
 ) -> AsyncGenerator[ServerSentEvent]:
     try:
-        yield ServerSentEvent(raw_data=panel(await demo.view(room_id), identity, demo))
+        yield ServerSentEvent(raw_data=await panel(await demo.view(room_id), identity, demo))
         async for _notification in subscription:
-            yield ServerSentEvent(raw_data=panel(await demo.view(room_id), identity, demo))
+            yield ServerSentEvent(raw_data=await panel(await demo.view(room_id), identity, demo))
     except (SubscriptionClosed, SubscriptionOverflow) as error:
         logger.warning("Native stream closed: %s", error)
         html = templates.get_template("stream_error.html").render(message=str(error))
@@ -402,8 +464,15 @@ async def events(
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Local native Discord room miniapp")
     parser.add_argument("--port", type=int, default=8766, choices=range(1024, 65536))
+    parser.add_argument(
+        "--embed-origin",
+        type=LocalEmbedOrigin.parse,
+        default=None,
+        help="Allow framing by one exact local origin, e.g. http://127.0.0.1:38921",
+    )
     args = parser.parse_args()
     owner.origin = "http://127.0.0.1:" + str(args.port)
+    owner.embed_origin = args.embed_origin
     logging.basicConfig(level=logging.INFO)
     server = Server(
         Config(
