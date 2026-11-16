@@ -85,6 +85,8 @@ jobs:
             --native-app _build/hornbeam/checkouts/erlang_python \
             --otp-license "$RUNNER_TEMP/OTP-LICENSE.txt" \
             --native-license ../erlang-python/LICENSE \
+            --hornbeam-app _build/hornbeam/checkouts/hornbeam \
+            --hornbeam-license ../hornbeam/LICENSE \
             --output src/pybeam/runtime/_assets
       - name: Native regression suites
         # Browser acceptance needs Chromium; benchmark loads need an exclusive window.
