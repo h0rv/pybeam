@@ -93,7 +93,8 @@ jobs:
         run: >-
           uv run --locked --all-extras pytest
           --run-frameworks --run-runtime -m 'runtime and not browser'
-          -q -rs --basetemp="$RUNNER_TEMP/native-tests"
+          -vv -x -rs -o faulthandler_timeout=120
+          --basetemp="$RUNNER_TEMP/native-tests"
       - name: Upload regression diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
