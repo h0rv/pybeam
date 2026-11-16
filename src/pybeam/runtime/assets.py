@@ -1,3 +1,4 @@
+import os
 import platform
 import re
 import shutil
@@ -7,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, RootModel, ValidationError
 
 from pybeam.runtime.config import BootstrapError, Config
 
@@ -32,7 +33,11 @@ class RuntimeAssets:
         if self.python_home is not None:
             result["PYTHONHOME"] = str(self.python_home)
         if self.python_library is not None:
-            result["DYLD_LIBRARY_PATH"] = str(self.python_library.parent)
+            name = "LD_LIBRARY_PATH" if platform.system() == "Linux" else "DYLD_LIBRARY_PATH"
+            existing = os.environ.get(name)
+            result[name] = str(self.python_library.parent) + (
+                os.pathsep + existing if existing is not None else ""
+            )
         return result
 
 
@@ -45,21 +50,37 @@ def _relative(path: Path) -> Path:
 type AssetPath = Annotated[Path, AfterValidator(_relative)]
 
 
-class RuntimeManifest(BaseModel):
+class ManifestBase(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
     python_version: Literal["3.14"]
     implementation: Literal["cpython"]
-    architecture: Literal["arm64"]
-    system: Literal["Darwin"]
-    minimum_macos: tuple[Annotated[int, Field(ge=0)], Annotated[int, Field(ge=0)]]
-    wheel_tag: Annotated[str, Field(pattern=r"^cp314-cp314-macosx_\d+_\d+_arm64$")]
     executable: AssetPath
     root_dir: Literal["."]
     bindir: AssetPath
     code_paths: Annotated[tuple[AssetPath, ...], Field(min_length=1)]
     erts_version: Annotated[str, Field(pattern=r"^[0-9.]+$")]
+
+
+class DarwinManifest(ManifestBase):
+    architecture: Literal["arm64"]
+    system: Literal["Darwin"]
+    minimum_macos: tuple[Annotated[int, Field(ge=0)], Annotated[int, Field(ge=0)]]
+    wheel_tag: Annotated[str, Field(pattern=r"^cp314-cp314-macosx_\d+_\d+_arm64$")]
     python_library: Literal["libpython3.14.dylib"]
+
+
+class LinuxManifest(ManifestBase):
+    architecture: Literal["x86_64"]
+    system: Literal["Linux"]
+    wheel_tag: Literal["cp314-cp314-linux_x86_64"]
+    python_library: Literal["libpython3.14.so.1.0"]
+
+
+class RuntimeManifest(
+    RootModel[Annotated[DarwinManifest | LinuxManifest, Field(discriminator="system")]]
+):
+    model_config = ConfigDict(frozen=True)
 
 
 def _version() -> str:
@@ -90,7 +111,7 @@ def _host_python_library(name: str) -> Path:
 
 def packaged_assets(root: Path) -> RuntimeAssets:
     try:
-        manifest = RuntimeManifest.model_validate_json((root / "runtime.json").read_text())
+        manifest = RuntimeManifest.model_validate_json((root / "runtime.json").read_text()).root
     except OSError as error:
         raise BootstrapError("Cannot read packaged runtime manifest") from error
     except ValidationError as error:
@@ -109,11 +130,12 @@ def packaged_assets(root: Path) -> RuntimeAssets:
         raise BootstrapError(
             "Packaged runtime is not compatible with this host Python/OS/architecture"
         )
-    version = platform.mac_ver()[0].split(".")
-    if len(version) < 2 or (int(version[0]), int(version[1])) < manifest.minimum_macos:
-        raise BootstrapError(
-            "Packaged runtime requires macOS {}.{} or newer".format(*manifest.minimum_macos)
-        )
+    if isinstance(manifest, DarwinManifest):
+        version = platform.mac_ver()[0].split(".")
+        if len(version) < 2 or (int(version[0]), int(version[1])) < manifest.minimum_macos:
+            raise BootstrapError(
+                "Packaged runtime requires macOS {}.{} or newer".format(*manifest.minimum_macos)
+            )
     root = root.resolve()
     executable = _contained(root, manifest.executable)
     bindir = _contained(root, manifest.bindir)

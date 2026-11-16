@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -13,10 +14,17 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from examples.discord_simulation import Proof as DiscordProof
-from pybeam.runtime.assets import _host_python_library, discover_assets, packaged_assets
+from pybeam.runtime.assets import (
+    LinuxManifest,
+    RuntimeAssets,
+    RuntimeManifest,
+    _host_python_library,
+    discover_assets,
+    packaged_assets,
+)
 from pybeam.runtime.config import BootstrapError, Config
 from tools.build_runtime import (
     ERTS_EXECUTABLES,
@@ -24,6 +32,7 @@ from tools.build_runtime import (
     MachO,
     OTPVersions,
     audit_binary,
+    audit_elf,
     inspect_macho,
     native_binaries,
     stage_hornbeam,
@@ -40,6 +49,159 @@ class NativeState(BaseModel):
     package: Path
     pydantic: Path
     libraries: tuple[Path, ...]
+
+
+@pytest.fixture
+def linux_assets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    manifest = {
+        "python_version": "3.14",
+        "implementation": "cpython",
+        "system": "Linux",
+        "architecture": "x86_64",
+        "wheel_tag": "cp314-cp314-linux_x86_64",
+        "erts_version": "17.1.1",
+        "executable": "erts-17.1.1/bin/erlexec",
+        "bindir": "erts-17.1.1/bin",
+        "root_dir": ".",
+        "code_paths": ["lib/erlang_python-5.0.1/ebin"],
+        "python_library": "libpython3.14.so.1.0",
+    }
+    (tmp_path / "runtime.json").write_text(json.dumps(manifest))
+    for name in (
+        *("erts-17.1.1/bin/" + item for item in ERTS_EXECUTABLES),
+        "bin/start.boot",
+        "lib/erlang_python-5.0.1/ebin/py_launch.beam",
+        "lib/erlang_python-5.0.1/ebin/erlang_python.app",
+        "lib/erlang_python-5.0.1/priv/py_nif.so",
+        "host/lib/libpython3.14.so.1.0",
+    ):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    monkeypatch.setattr("pybeam.runtime.assets.platform.system", lambda: "Linux")
+    monkeypatch.setattr("pybeam.runtime.assets.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr(sys, "base_prefix", str(tmp_path / "host"))
+    monkeypatch.setattr(
+        "pybeam.runtime.assets.platform.mac_ver", lambda: pytest.fail("mac_ver on Linux")
+    )
+    return tmp_path
+
+
+def test_linux_manifest_and_host_library(linux_assets: Path) -> None:
+    manifest = RuntimeManifest.model_validate_json((linux_assets / "runtime.json").read_bytes())
+    assert isinstance(manifest.root, LinuxManifest)
+    assets = packaged_assets(linux_assets)
+    assert assets.python_library == linux_assets / "host/lib/libpython3.14.so.1.0"
+    assert assets.python_home == linux_assets / "host"
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("architecture", "arm64"),
+        ("system", "Darwin"),
+        ("python_library", "libpython3.14.dylib"),
+        ("wheel_tag", "cp314-cp314-macosx_15_0_arm64"),
+        ("minimum_macos", [15, 0]),
+    ],
+)
+def test_linux_manifest_rejects_mismatched_platform(
+    linux_assets: Path, key: str, value: object
+) -> None:
+    file = linux_assets / "runtime.json"
+    payload: object = json.loads(file.read_bytes())
+    assert isinstance(payload, dict)
+    payload[key] = value
+    with pytest.raises(ValidationError):
+        RuntimeManifest.model_validate_json(json.dumps(payload))
+
+
+def test_linux_assets_missing_host_library(linux_assets: Path) -> None:
+    (linux_assets / "host/lib/libpython3.14.so.1.0").unlink()
+    with pytest.raises(BootstrapError, match="matching shared library"):
+        packaged_assets(linux_assets)
+
+
+@pytest.mark.parametrize("missing", ["bin/start.boot", "lib/erlang_python-5.0.1/priv/py_nif.so"])
+def test_linux_assets_missing_native_file(linux_assets: Path, missing: str) -> None:
+    (linux_assets / missing).unlink()
+    with pytest.raises(BootstrapError, match="incomplete"):
+        packaged_assets(linux_assets)
+
+
+@pytest.mark.parametrize("existing", [None, "", "/other/lib"])
+def test_linux_library_search_precedes_existing_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    existing: str | None,
+) -> None:
+    monkeypatch.setattr("pybeam.runtime.assets.platform.system", lambda: "Linux")
+    monkeypatch.delenv("LD_LIBRARY_PATH", raising=False)
+    if existing is not None:
+        monkeypatch.setenv("LD_LIBRARY_PATH", existing)
+    environment = RuntimeAssets(
+        Path("erl"),
+        (),
+        python_home=Path("/host"),
+        python_library=Path("/host/lib/libpython3.14.so.1.0"),
+    ).environment
+    assert environment["PYTHONHOME"] == "/host"
+    assert environment["LD_LIBRARY_PATH"] == "/host/lib" + (
+        ":" + existing if existing is not None else ""
+    )
+    assert "DYLD_LIBRARY_PATH" not in environment
+
+
+@pytest.mark.parametrize(
+    ("machine", "dynamic", "python_nif", "error"),
+    [
+        ("AArch64", "", False, "x86-64"),
+        ("Advanced Micro Devices X86-64", "", True, "CPython 3.14"),
+        ("Advanced Micro Devices X86-64", "(NEEDED) [libevil.so]", False, "Unbundled"),
+        ("Advanced Micro Devices X86-64", "(RUNPATH) [/build/lib]", False, "nonrelocatable"),
+        ("Advanced Micro Devices X86-64", "(RPATH) [$ORIGIN/../lib]", False, "nonrelocatable"),
+        ("Advanced Micro Devices X86-64", "(RUNPATH) []", False, "nonrelocatable"),
+        ("Advanced Micro Devices X86-64", "(NEEDED) [libpython3.15.so.1.0]", True, "CPython 3.14"),
+        (
+            "Advanced Micro Devices X86-64",
+            "(NEEDED) [libpython3.14.so.1.0]\n(NEEDED) [libpython3.14.so.1.0]",
+            True,
+            "CPython 3.14",
+        ),
+    ],
+)
+def test_elf_audit_rejects_unsafe_binaries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    machine: str,
+    dynamic: str,
+    python_nif: bool,
+    error: str,
+) -> None:
+    binary = tmp_path / "native.so"
+    binary.write_bytes(b"\x7fELF")
+    monkeypatch.setattr(
+        "tools.build_runtime.run", lambda args: "Machine: " + machine if "-h" in args else dynamic
+    )
+    with pytest.raises(ValueError, match=error):
+        audit_elf(binary, python_nif=python_nif)
+
+
+def test_elf_audit_and_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    binary = tmp_path / "native.so"
+    binary.write_bytes(b"\x7fELF")
+    monkeypatch.setattr(
+        "tools.build_runtime.run",
+        lambda args: (
+            "Machine: Advanced Micro Devices X86-64"
+            if "-h" in args
+            else "(NEEDED) [libpython3.14.so.1.0]\n(NEEDED) [libc.so.6]"
+        ),
+    )
+    assert audit_elf(binary, python_nif=True).rpaths == ()
+    assert native_binaries(tmp_path, ()) == (binary,)
+    binary.write_bytes(b"text")
+    with pytest.raises(ValueError, match="not ELF"):
+        audit_elf(binary)
 
 
 def test_runtime_tag__requires_explicit_staged_assets(tmp_path: Path) -> None:
@@ -193,6 +355,8 @@ def test_wheel_audit__rejects_universal_required_executables(
         "executable": "erts-17.1.1/bin/erlexec",
         "bindir": "erts-17.1.1/bin",
         "root_dir": ".",
+        "code_paths": ["lib/erlang_python-5.0.1/ebin"],
+        "python_library": "libpython3.14.dylib",
     }
     (assets / "runtime.json").write_text(json.dumps(manifest))
     real_audit = audit_binary
@@ -330,7 +494,8 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         dist_info = next(name for name in archive.namelist() if name.endswith(".dist-info/WHEEL"))
         metadata = archive.read(dist_info).decode()
         assert "Root-Is-Purelib: false" in metadata
-        assert "Tag: cp314-cp314-macosx_" in metadata
+        platform_tag = "linux_x86_64" if platform.system() == "Linux" else "macosx_"
+        assert "Tag: cp314-cp314-" + platform_tag in metadata
         assert (archive.getinfo("pybeam/runtime/_assets/bin/erl").external_attr >> 16) & 0o111
         assert not any(
             name.startswith("hornbeam/") or "/lib/hornbeam-" in name for name in archive.namelist()
@@ -544,10 +709,13 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "        assert await reference.echo(42) == 42\n"
         "        assert await reference.add(1) == 2\n"
         "        assert await Base.add(reference, 2) == 4\n"
-        "    dyld = ctypes.CDLL(None)\n"
-        "    dyld._dyld_image_count.restype = ctypes.c_uint\n"
-        "    dyld._dyld_get_image_name.restype = ctypes.c_char_p\n"
-        "    libraries = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]\n"
+        "    if sys.platform == 'linux':\n"
+        "        libraries = sorted({line.split()[-1] for line in Path('/proc/self/maps').read_text().splitlines() if 'libpython' in line})\n"
+        "    else:\n"
+        "        dyld = ctypes.CDLL(None)\n"
+        "        dyld._dyld_image_count.restype = ctypes.c_uint\n"
+        "        dyld._dyld_get_image_name.restype = ctypes.c_char_p\n"
+        "        libraries = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]\n"
         "    print('NATIVE_OK', sys.version_info[:2], erlang.__name__)\n"
         "    print('NATIVE_STATE', json.dumps({'pid': os.getpid(), 'package': str(Path(pybeam.__file__).resolve()),\n"
         "        'pydantic': pydantic.__file__, 'libraries': [p for p in libraries if 'libpython' in p]}))\n"
@@ -573,14 +741,19 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     assert result.stdout.count("NATIVE_OK") == 1, result.stdout
     assert "(3, 14) erlang" in result.stdout
     assert str(moved / "lib/python3.14/site-packages/pybeam/__init__.py") in result.stdout
-    assert str(host / "lib/libpython3.14.dylib") in result.stdout
+    library = (
+        host
+        / "lib"
+        / ("libpython3.14.so.1.0" if platform.system() == "Linux" else "libpython3.14.dylib")
+    )
+    assert str(library) in result.stdout
     assert "/Users/robby/projects" not in result.stdout + result.stderr
     assert "/mise/" not in result.stdout + result.stderr
     state_line = next(
         line for line in result.stdout.splitlines() if line.startswith("NATIVE_STATE ")
     )
     state = NativeState.model_validate_json(state_line.removeprefix("NATIVE_STATE "))
-    assert state.libraries == (host / "lib/libpython3.14.dylib",)
+    assert state.libraries == (library,)
     assert state.package == moved / "lib/python3.14/site-packages/pybeam/__init__.py"
     assert state.pydantic == moved / "lib/python3.14/site-packages/pydantic/__init__.py"
     with pytest.raises(ProcessLookupError):
@@ -604,14 +777,14 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     assert cli.returncode == 0, cli.stdout + cli.stderr
     assert cli.stdout.count("NATIVE_OK") == 1
     assert str(console / "lib/python3.14/site-packages/pybeam/__init__.py") in cli.stdout
-    assert str(host / "lib/libpython3.14.dylib") in cli.stdout
+    assert str(library) in cli.stdout
     assert "/Users/robby/projects" not in cli.stdout + cli.stderr
     assert "/mise/" not in cli.stdout + cli.stderr
     cli_state_line = next(
         line for line in cli.stdout.splitlines() if line.startswith("NATIVE_STATE ")
     )
     cli_state = NativeState.model_validate_json(cli_state_line.removeprefix("NATIVE_STATE "))
-    assert cli_state.libraries == (host / "lib/libpython3.14.dylib",)
+    assert cli_state.libraries == (library,)
     root = Path(__file__).resolve().parents[1]
     for source, marker in (
         (root / "examples/actors/main.py", "[1, 1, 1, 1, 1]"),

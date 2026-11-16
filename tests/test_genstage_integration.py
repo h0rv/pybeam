@@ -21,7 +21,7 @@ from pybeam.runtime.optional_manifest import (
     approved_manifest,
     write_manifest,
 )
-from tools.runtime_wheel import audit_optional
+from tools.runtime_wheel import audit_optional, optional_payload
 
 
 @dataclass(frozen=True)
@@ -111,6 +111,30 @@ def test_approved_release_is_the_pinned_build() -> None:
             if item.path.parent == app.code_path and item.path.suffix == ".beam"
         }
         assert actual == expected
+
+
+def test_linux_wheel_requires_no_optional_payload(tmp_path: Path) -> None:
+    optional_payload(tmp_path, linux=True)
+    (tmp_path / "optional/genstage").mkdir(parents=True)
+    with pytest.raises(ValueError, match="must not bundle"):
+        optional_payload(tmp_path, linux=True)
+
+
+def test_darwin_wheel_still_requires_verified_payload(tmp_path: Path) -> None:
+    with pytest.raises(OSError):
+        optional_payload(tmp_path, linux=False)
+    (tmp_path / "optional/genstage").mkdir(parents=True)
+    (tmp_path / "optional/genstage/manifest.json").write_text("{}")
+    with pytest.raises(ValueError):
+        optional_payload(tmp_path, linux=False)
+
+
+def test_linux_genstage_reports_unbundled_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(optional.platform, "system", lambda: "Linux")
+    with pytest.raises(BootstrapError, match="GenStage payload is not bundled on Linux"):
+        read_manifest(tmp_path / "genstage")
 
 
 def test_manifest_verifies_all_files(artifact: Artifact) -> None:
