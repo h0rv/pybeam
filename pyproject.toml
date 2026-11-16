@@ -68,7 +68,7 @@ exclude = ["src/pybeam/integrations/genstage/*.erl", "src/pybeam/integrations/ge
 include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]
 
 [tool.uv.sources]
-hornbeam = { git = "https://github.com/h0rv/hornbeam.git", rev = "f062aa7d5634856aa1b8180933fdf41f32228bc4" }
+hornbeam = { git = "https://github.com/h0rv/hornbeam.git", branch = "main" }
 
 [tool.ty.environment]
 python-version = "3.14"
