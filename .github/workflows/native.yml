@@ -1,0 +1,105 @@
+name: Native CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native:
+    # GitHub's macOS 27 arm64 preview image is named xcode-27, not macos-27.
+    runs-on: xcode-27
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: pybeam
+        shell: bash
+    env:
+      ERLANG_PYTHON_REV: d227c0de29fa3f748610352bf8a808a235bcd5c3
+      HORNBEAM_REV: f062aa7d5634856aa1b8180933fdf41f32228bc4
+      CMAKE_BUILD_PARALLEL_LEVEL: '2'
+      ERL_FLAGS: '+S 2:2 +A 2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pybeam
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: h0rv/erlang-python
+          ref: ${{ env.ERLANG_PYTHON_REV }}
+          path: erlang-python
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: h0rv/hornbeam
+          ref: ${{ env.HORNBEAM_REV }}
+          path: hornbeam
+          persist-credentials: false
+      - name: Verify host and configure toolchain
+        id: host
+        run: |
+          sw_vers
+          test "$(uname -m)" = arm64
+          test "$(sw_vers -productVersion | cut -d. -f1)" -ge 27
+          echo "image=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+          brew list openssl@3 >/dev/null || brew install openssl@3
+          echo "KERL_CONFIGURE_OPTIONS=--disable-dynamic-ssl-lib --without-javac --without-wx --with-ssl=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+      - uses: jdx/mise-action@v3
+        with:
+          working_directory: pybeam
+      - name: Install locked Python dependencies
+        run: uv sync --locked --all-extras --python "$(mise which python)"
+      - name: Link pinned sibling sources
+        run: |
+          mkdir -p _checkouts
+          ln -s ../../erlang-python _checkouts/erlang_python
+          ln -s ../../hornbeam _checkouts/hornbeam
+      - name: Restore native build
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            pybeam/_build
+            erlang-python/ebin
+            erlang-python/priv/py_nif.so
+            hornbeam/ebin
+          key: native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.host.outputs.image }}-${{ env.ERLANG_PYTHON_REV }}-${{ env.HORNBEAM_REV }}-${{ hashFiles('pybeam/mise.toml', 'pybeam/rebar.config', 'pybeam/rebar.lock', 'pybeam/tools/build_native.py', 'pybeam/.github/workflows/native.yml') }}
+      - name: Build pinned native runtime
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: uv run --locked --all-extras python tools/build_native.py
+      - name: Stage managed runtime assets
+        run: |
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt \
+            --output "$RUNNER_TEMP/OTP-LICENSE.txt"
+          uv run --locked --all-extras python tools/build_runtime.py \
+            --otp-root "$(mise where erlang)" \
+            --native-app _build/hornbeam/checkouts/erlang_python \
+            --otp-license "$RUNNER_TEMP/OTP-LICENSE.txt" \
+            --native-license ../erlang-python/LICENSE \
+            --output src/pybeam/runtime/_assets
+      - name: Native regression suites
+        # Browser acceptance needs Chromium; benchmark loads need an exclusive window.
+        # Wheel/GenStage gates explicitly skip without PYBEAM_TEST_WHEEL: they need
+        # separately reviewed platform-wheel/optional artifacts, not this source build.
+        run: >-
+          uv run --locked --all-extras pytest
+          --run-frameworks --run-runtime -m 'runtime and not browser'
+          -q -rs --basetemp="$RUNNER_TEMP/native-tests"
+      - name: Upload regression diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-regression-logs
+          path: |
+            ${{ runner.temp }}/native-tests
+            pybeam/erl_crash.dump
+          if-no-files-found: ignore
