@@ -34,11 +34,18 @@ def compiler_environment() -> dict[str, str]:
 
 
 def main() -> None:
-    if sys.version_info[:3] != (3, 14, 10) or sysconfig.get_config_var("Py_GIL_DISABLED") == 1:
-        raise RuntimeError("Native development builds require conventional CPython 3.14.10")
-    config = Path(sys.base_prefix) / "bin/python3.14-config"
+    free_threaded = sysconfig.get_config_var("Py_GIL_DISABLED") == 1
+    if sys.version_info[:3] != (3, 14, 10) or (
+        free_threaded and os.environ.get("PYBEAM_ALLOW_FREE_THREADED") != "1"
+    ):
+        raise RuntimeError(
+            "Native development builds require conventional CPython 3.14.10; "
+            "set PYBEAM_ALLOW_FREE_THREADED=1 to opt into CPython 3.14.10t"
+        )
+    config_name = "python3.14t-config" if free_threaded else "python3.14-config"
+    config = Path(sys.base_prefix) / "bin" / config_name
     if not config.is_file():
-        raise RuntimeError("The selected mise Python is missing python3.14-config")
+        raise RuntimeError("The selected Python is missing " + config_name)
     original_getconf, rebar = shutil.which("getconf"), shutil.which("rebar3")
     if original_getconf is None or rebar is None:
         raise RuntimeError("getconf and the selected mise rebar3 are required by the native build")
@@ -67,6 +74,8 @@ def main() -> None:
                 compiler_environment(),
                 PATH=directory + os.pathsep + os.environ.get("PATH", os.defpath),
                 PYTHON_CONFIG=str(config),
+                PYBEAM_BUILD_PYTHON=sys.executable,
+                PYBEAM_BUILD_ABI="ANY;ANY;ANY;" + ("ON" if free_threaded else "OFF"),
                 CMAKE_BUILD_PARALLEL_LEVEL=jobs,
                 IOMMAP_BUILDOPTS="-j " + jobs,
             )

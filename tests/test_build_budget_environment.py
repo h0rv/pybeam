@@ -47,6 +47,7 @@ def test_build_entry_environment__bounds_real_recursive_make_without_changing_pa
     config.parent.mkdir(parents=True)
     config.touch()
     monkeypatch.setattr(sys, "base_prefix", str(home))
+    monkeypatch.setattr(build_native.sysconfig, "get_config_var", lambda _name: 0)
     monkeypatch.setattr(build_native, "ROOT", native)
     original_which = shutil.which
     monkeypatch.setattr(
