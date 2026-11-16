@@ -55,12 +55,12 @@ test("the showcase shares accessible repository-local SVGs with the README", () 
   }
 });
 
-test("public guides explain API use without contributor or installation workflows", () => {
-  const processContent = /work from source|install a provided wheel|\b(?:mise|uv) (?:run|add|init|sync)\b|sibling (?:runtime |repositories|checkouts)|development_runtime|(?:platform|local) wheel|build artifacts|native (?:assets|build)|libpython|\b(?:PyPI|macOS|toolchain|worktree|roadmap)\b|\b(?:Python|CPython) \d+\.\d+|not yet merged|private branch|release gates/gi;
+test("public guides explain API use and installation without internal process text", () => {
+  const processContent = /\b(?:worktree|roadmap)\b|not yet merged|private branch|release gates/gi;
   for (const source of ["README.md", ...pages.map(({ source }) => source)]) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     assert.doesNotMatch(markdown, processContent, source);
-    assert.doesNotMatch(markdown, /^#{1,6} .*\b(?:install|setup|contributors?|development|build|packaging)\b/im, source);
+    assert.doesNotMatch(markdown, /^#{1,6} .*\bcontributors?\b/im, source);
   }
 });
 

@@ -8,6 +8,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from pybeam.tasks import TaskFunction, TaskLimits, TaskRef, TaskSupervisor
+from tests.typechecking import TYPECHECK_CONFIG
 
 
 class Request(BaseModel):
@@ -70,7 +71,7 @@ def test_tasks__negative_request_and_result_probes(tmp_path: Path) -> None:
     )
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [str(root / ".venv/bin/ty"), "check", "--error-on-warning", str(source)],
+        [str(root / ".venv/bin/ty"), "check", *TYPECHECK_CONFIG, "--error-on-warning", str(source)],
         cwd=root,
         capture_output=True,
         text=True,

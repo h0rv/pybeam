@@ -4,11 +4,18 @@ import subprocess
 from pathlib import Path
 
 from tests.test_actors_typing import ROOT, checker
+from tests.typechecking import TYPECHECK_CONFIG
 
 
 def test_pythonic_actor_types__preserve_constructor_methods_and_returns() -> None:
     result = subprocess.run(
-        [checker(), "check", "--error-on-warning", "tests/pythonic_actors_positive.py"],
+        [
+            checker(),
+            "check",
+            *TYPECHECK_CONFIG,
+            "--error-on-warning",
+            "tests/pythonic_actors_positive.py",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -26,6 +33,7 @@ def test_pythonic_actor_types__reject_every_negative_case(tmp_path: Path) -> Non
         [
             checker(),
             "check",
+            *TYPECHECK_CONFIG,
             "--project",
             str(ROOT),
             "--extra-search-path",

@@ -1,5 +1,6 @@
 import fcntl
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -9,9 +10,19 @@ import pytest
 from tools import build_native
 
 
+@pytest.fixture
+def build_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = shutil.which
+    monkeypatch.setattr(
+        build_native.shutil,
+        "which",
+        lambda name: "/mock/rebar3" if name == "rebar3" else original(name),
+    )
+
+
 @pytest.mark.parametrize("budget", [None, "", "1", "2"])
 def test_build__caps_existing_hooks_and_uses_selected_python(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, budget: str | None
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, budget: str | None, build_tools: None
 ) -> None:
     if budget is None:
         monkeypatch.delenv("CMAKE_BUILD_PARALLEL_LEVEL", raising=False)
@@ -56,7 +67,7 @@ def test_build__caps_existing_hooks_and_uses_selected_python(
 
 @pytest.mark.parametrize("budget", ["3", "10", "0", "-1", "invalid", "1 2"])
 def test_build__rejects_unsafe_budget_before_outputs_or_commands(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, budget: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, budget: str, build_tools: None
 ) -> None:
     home = tmp_path / "python"
     config = home / "bin/python3.14-config"
@@ -71,6 +82,7 @@ def test_build__rejects_unsafe_budget_before_outputs_or_commands(
 
 
 @pytest.mark.parametrize("application", ["erlang_python", "iommap"])
+@pytest.mark.skipif(shutil.which("erl") is None, reason="requires erl to evaluate rebar.config")
 @pytest.mark.parametrize("budget", ["", "1", "2", "10", "invalid"])
 def test_project_dependency_override__supplies_bounded_explicit_jobs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, application: str, budget: str
