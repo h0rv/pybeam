@@ -97,7 +97,11 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     route.fulfill(response=response)
                     assert a.locator("#jobs").get_attribute("data-revision") == revision
                     expect(a.get_by_text("Task result 42.", exact=False)).to_have_count(2)
-                    expect(b.get_by_text("B rejected the stale ACK", exact=False)).to_be_visible()
+                    expect(b.get_by_text("B rejected the stale ACK", exact=False)).to_be_attached()
+                    expect(a.locator("#current-run .result")).to_be_in_viewport()
+                    expect(
+                        a.get_by_role("link", name="Download walkthrough proof")
+                    ).to_be_in_viewport()
                     key = job.get_attribute("id")
                     assert key is not None
                     with httpx.Client(base_url=BASE) as client:

@@ -76,7 +76,10 @@ def test_controlled_browser__two_contexts_sse_post_races_and_sanitized_download(
             expect(b.locator('[data-key="distributed"]')).to_have_attribute(
                 "data-status", "running"
             )
-            assert "No birth receipt observed" in a.locator("#jobs").inner_text()
+            expect(a.locator('#current-run [aria-current="step"]')).to_contain_text(
+                "Start two nodes"
+            )
+            expect(a.locator("#current-run .result")).to_be_in_viewport()
             assert len(held) == 1
             # Actual POST was accepted. Its HTTP acknowledgement is still held in the browser.
             with httpx.Client(base_url=controlled_server) as client:
@@ -97,8 +100,13 @@ def test_controlled_browser__two_contexts_sse_post_races_and_sanitized_download(
             )
             assert a.locator("#jobs").get_attribute("data-revision") == revision
             expect(a.get_by_text("Task result 42.", exact=False)).to_have_count(2)
-            expect(b.get_by_text("B rejected the stale ACK", exact=False)).to_be_visible()
+            expect(b.locator("#current-run .result")).to_contain_text("B returned 42")
+            expect(b.locator("#current-run .result")).to_be_in_viewport()
+            expect(b.get_by_text("B rejected the stale ACK", exact=False)).to_be_attached()
             assert "Controlled boundary" in a.locator("#jobs").inner_text()
+            expect(a.locator("#current-run .result")).to_be_in_viewport()
+            expect(a.get_by_role("link", name="Download walkthrough proof")).to_be_in_viewport()
+            assert a.evaluate("window.scrollY") == 0
             job_id = a.locator('[data-key="distributed"]').get_attribute("id")
             assert job_id is not None
             key = job_id.removeprefix("job-")
@@ -128,6 +136,67 @@ def test_controlled_browser__two_contexts_sse_post_races_and_sanitized_download(
             second.close()
             with httpx.Client(base_url=controlled_server) as client:
                 assert client.get("/__test__/subscribers").text == '{"count":0}'
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("width,height", [(1440, 900), (390, 844)])
+def test_controlled_browser__scenario_navigation_progress_result_and_keyboard(
+    controlled_server: str, tmp_path: Path, width: int, height: int
+) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
+        try:
+            context = browser.new_context(viewport={"width": width, "height": height})
+            page = context.new_page()
+            page.goto(controlled_server)
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            run = page.get_by_role("button", name="Run Controlled boundary:")
+            expect(run).to_be_in_viewport()
+            run.focus()
+            page.keyboard.press("Enter")
+            expect(page.locator('#current-run [aria-current="step"]')).to_contain_text(
+                "Start two nodes"
+            )
+            expect(page.locator("#current-run .result")).to_be_in_viewport()
+            cancel = page.get_by_role("button", name="Cancel Controlled boundary:")
+            expect(cancel).to_be_in_viewport()
+            cancel.focus()
+            with httpx.Client(base_url=controlled_server) as client:
+                assert client.get("/__test__/observe").status_code == 204
+            expect(page.locator(".last-confirmed")).to_contain_text("B returned 42")
+            expect(page.locator('.steps [aria-current="step"]')).to_contain_text("Stop B")
+            expect(page.locator(".last-confirmed")).to_be_in_viewport()
+            expect(page.locator("button[id^=cancel-]")).to_be_focused()
+            page.screenshot(path=str(tmp_path / ("controlled-progress-" + str(width) + ".png")))
+            with httpx.Client(base_url=controlled_server) as client:
+                assert client.get("/__test__/finish").status_code == 204
+            expect(page.locator("#current-run .result")).to_contain_text("Finished. B returned 42")
+            expect(page.locator("#current-run .result")).to_be_in_viewport()
+            expect(page.get_by_role("link", name="Download walkthrough proof")).to_be_in_viewport()
+            assert page.evaluate("window.scrollY") == 0
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            page.screenshot(path=str(tmp_path / ("controlled-finished-" + str(width) + ".png")))
+            page.get_by_role("link", name="Python benchmark smoke", exact=True).click()
+            expect(page).to_have_url(controlled_server + "/?scenario=smoke")
+            expect(page.locator("#jobs h2")).to_have_text("Python benchmark smoke")
+            expect(page.locator("#current-run")).to_contain_text("Ready.")
+            page.go_back()
+            expect(page.locator("#current-run .result")).to_contain_text("Finished.")
+            context.close()
+            plain = browser.new_context(java_script_enabled=False)
+            page = plain.new_page()
+            page.goto(controlled_server + "/?scenario=distributed")
+            page.get_by_role("button", name="Run Controlled boundary:").click()
+            expect(page).to_have_url(controlled_server + "/?scenario=distributed")
+            expect(page.locator("#current-run")).to_contain_text("running")
+            with httpx.Client(base_url=controlled_server) as client:
+                client.get("/__test__/finish")
+            page.reload()
+            expect(page.locator("#current-run .result")).to_contain_text("Finished.")
+            plain.close()
         finally:
             browser.close()
 
@@ -182,7 +251,7 @@ def test_controlled_browser__cancel_ack_cannot_revive_and_full_queue(
                     ).status_code
                     == 409
                 )
-                panel = client.get("/jobs").text
+                panel = client.get("/jobs?scenario=distributed").text
                 assert "queued" in panel
             expect(page.locator('[data-key="distributed"]')).to_have_count(5)
             # Cancel every remaining queued/running item using the public owned routes.

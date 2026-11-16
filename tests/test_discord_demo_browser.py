@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import socket
 import subprocess
 import sys
@@ -8,10 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
+import psutil
 import pytest
 from playwright.async_api import Page, Request, Route, async_playwright, expect
 
 from examples.discord_demo.main import Resources
+from pybeam.runtime.ownership import identity, resolve
 
 ROOT = Path(__file__).resolve().parents[1]
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -39,6 +42,13 @@ async def miniapp(
         port = listener.getsockname()[1]
     url = "http://127.0.0.1:" + str(port)
     log = tmp_path / "discord-miniapp.log"
+    assets = ROOT / "src/pybeam/runtime/_assets"
+    fingerprints = {
+        str(path.relative_to(assets)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in assets.rglob("*")
+        if path.is_file()
+    }
+    assert len(fingerprints) == 723
     with log.open("wb") as output:
         process = await asyncio.create_subprocess_exec(
             sys.executable,
@@ -61,6 +71,13 @@ async def miniapp(
                         continue
                     assert response.status_code == 200, log.read_text()
                     break
+            owned = tuple(
+                identity(child)
+                for child in (
+                    psutil.Process(process.pid),
+                    *psutil.Process(process.pid).children(recursive=True),
+                )
+            )
             yield Miniapp(url, log, process)
         finally:
             with suppress(ProcessLookupError):
@@ -73,6 +90,12 @@ async def miniapp(
                 async with asyncio.timeout(5):
                     await process.wait()
                 pytest.fail("Managed miniapp shutdown timed out: " + log.read_text())
+    assert all(resolve(birth) is None for birth in owned)
+    assert fingerprints == {
+        str(path.relative_to(assets)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in assets.rglob("*")
+        if path.is_file()
+    }
     text = log.read_text()
     assert process.returncode == 143, text
     assert "Application shutdown complete" in text, text
@@ -80,6 +103,126 @@ async def miniapp(
     assert "Traceback" not in text or "Slow SSE peer exceeded" in text, text
     assert "PyBeam cleanup failed" not in text, text
     assert "cleanup was not acknowledged" not in text, text
+
+
+async def test_miniapp__clear_first_screen_origin_forms_and_shared_restart(
+    miniapp: Miniapp, tmp_path: Path
+) -> None:
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            executable_path=str(CHROME), headless=True, chromium_sandbox=True
+        )
+        try:
+            desktop = await browser.new_context(viewport={"width": 1440, "height": 900})
+            phone = await browser.new_context(viewport={"width": 390, "height": 844})
+            first, second = await desktop.new_page(), await phone.new_page()
+            errors: list[str] = []
+            for page, label in ((first, "desktop"), (second, "phone")):
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                await page.goto(miniapp.url)
+                await expect(page.get_by_role("button", name="Join #general")).to_be_in_viewport()
+                await expect(page.get_by_label("Message", exact=True)).to_be_in_viewport()
+                await expect(page.locator("#inspector")).not_to_be_visible()
+                await page.screenshot(path=str(tmp_path / ("chat-ready-" + label + ".png")))
+                print(
+                    "Chat viewport",
+                    label,
+                    "join",
+                    await page.locator("#join-room").bounding_box(),
+                    "composer",
+                    await page.locator("#message").bounding_box(),
+                )
+                await join(page)
+                await expect(page.get_by_role("button", name="Send message")).to_be_enabled()
+            assert (await desktop.cookies())[0]["value"] != (await phone.cookies())[0]["value"]
+            await send(second, "Hello from a private session")
+            for page in (first, second):
+                await expect(page.locator("#messages")).to_contain_text(
+                    "Hello from a private session"
+                )
+                await expect(page.locator("#messages")).to_be_in_viewport()
+                assert await page.evaluate("window.scrollY") == 0
+            captured = {
+                "generation": await first.locator(
+                    'input[name="generation"][form="compose"]'
+                ).input_value(),
+                "csrf": await first.locator('input[name="csrf"][form="compose"]').input_value(),
+            }
+            before = await first.locator("#messages").inner_text()
+            for origin in (
+                "null",
+                "http://localhost:" + miniapp.url.rsplit(":", 1)[1],
+                "https://attacker.invalid",
+            ):
+                response = await first.request.post(
+                    miniapp.url + "/rooms/general/actions",
+                    form={**captured, "action": "send", "text": "must not appear"},
+                    headers={"origin": origin},
+                )
+                assert response.status == 403
+            await first.reload()
+            await expect(first.locator("#messages")).to_contain_text("Hello from a private session")
+            assert await first.locator("#messages").inner_text() == before
+            admitted = asyncio.Event()
+            release = asyncio.Event()
+
+            async def hold(route: Route) -> None:
+                response = await route.fetch()
+                admitted.set()
+                await release.wait()
+                await route.fulfill(response=response)
+
+            await first.route("**/actions", hold)
+            await send(first, "Held reply")
+            async with asyncio.timeout(5):
+                await admitted.wait()
+            await send(second, "Newer message")
+            await expect(first.locator("#messages")).to_contain_text("Newer message")
+            release.set()
+            await expect(first.locator("#ack")).to_contain_text("Confirmed send")
+            await expect(first.locator("#messages")).to_contain_text("Newer message")
+            await first.unroute("**/actions", hold)
+            old_pid = await first.locator("#inspector").get_attribute("data-pid")
+            await first.get_by_role("button", name="Restart room (clears messages)").click()
+            for page, label in ((first, "desktop"), (second, "phone")):
+                await expect(page.locator("#inspector")).not_to_have_attribute(
+                    "data-pid", old_pid or ""
+                )
+                await expect(page.locator(".restart-notice")).to_be_in_viewport()
+                await expect(page.locator("#messages")).not_to_contain_text("Newer message")
+                await expect(page.get_by_role("button", name="Send message")).to_be_disabled()
+                await page.screenshot(path=str(tmp_path / ("chat-restarted-" + label + ".png")))
+            fresh_pid = await first.locator("#inspector").get_attribute("data-pid")
+            stale = await first.request.post(
+                miniapp.url + "/rooms/general/actions",
+                form={**captured, "action": "crash"},
+                headers={"origin": miniapp.url, "hx-request": "true"},
+            )
+            assert "generation changed" in await stale.text()
+            await expect(first.locator("#inspector")).to_have_attribute("data-pid", fresh_pid or "")
+            await join(first)
+            await join(second)
+            await send(second, "After explicit rejoin")
+            await expect(first.locator("#messages")).to_contain_text("After explicit rejoin")
+            for page, label in ((first, "desktop"), (second, "phone")):
+                await page.screenshot(path=str(tmp_path / ("chat-after-" + label + ".png")))
+                assert await page.evaluate(
+                    "document.documentElement.scrollWidth <= window.innerWidth"
+                )
+            plain = await browser.new_context(java_script_enabled=False)
+            page = await plain.new_page()
+            await page.goto(miniapp.url)
+            await join(page)
+            await page.get_by_label("Message", exact=True).fill("Normal form works")
+            await page.get_by_role("button", name="Send message").click()
+            await expect(page.locator("#messages")).to_contain_text("Normal form works")
+            await expect(first.locator("#messages")).to_contain_text("Normal form works")
+            assert not errors
+            await plain.close()
+            await phone.close()
+            await desktop.close()
+        finally:
+            await browser.close()
 
 
 async def test_miniapp__shutdown_drains_live_native_stream(miniapp: Miniapp) -> None:
@@ -91,7 +234,7 @@ async def test_miniapp__shutdown_drains_live_native_stream(miniapp: Miniapp) -> 
             context = await browser.new_context()
             page = await context.new_page()
             await page.goto(miniapp.url + "/rooms/general")
-            await expect(page.locator("#inspector")).to_be_visible()
+            await expect(page.locator("#inspector")).to_be_attached()
             counts = await resource_counts(page, miniapp.url)
             assert counts.streams == counts.subscriptions == 1
             miniapp.process.terminate()
@@ -114,7 +257,7 @@ async def test_miniapp__nonreading_output_peer_releases_native_subscription(
             context = await browser.new_context()
             page = await context.new_page()
             await page.goto(miniapp.url + "/rooms/general")
-            await expect(page.locator("#inspector")).to_be_visible()
+            await expect(page.locator("#inspector")).to_be_attached()
             await join(page)
             baseline = await resource_counts(page, miniapp.url)
             cookie = next(
@@ -198,7 +341,7 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.on("requestfailed", request_failed)
                 await page.goto(miniapp.url + "/rooms/general")
-                await expect(page.locator("#inspector")).to_be_visible()
+                await expect(page.locator("#inspector")).to_be_attached()
                 await join(page)
             baseline = await resource_counts(first, miniapp.url)
             assert baseline.streams == baseline.subscriptions == 2
@@ -313,8 +456,8 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
 
 
 async def join(page: Page) -> None:
-    await page.get_by_role("button", name="Join / rejoin").click()
-    await expect(page.locator("#membership")).to_have_text("Joined this generation.")
+    await page.get_by_role("button", name="Join #").click()
+    await expect(page.locator("#membership")).to_have_text("Joined")
 
 
 async def send(page: Page, text: str) -> None:
@@ -353,9 +496,9 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.on("requestfailed", lambda request: network_errors.append(request.url))
             await first.goto(miniapp.url + "/rooms/general")
-            await expect(first.locator("#inspector")).to_be_visible()
+            await expect(first.locator("#inspector")).to_be_attached()
             await second.goto(miniapp.url + "/rooms/general")
-            await expect(second.locator("#inspector")).to_be_visible()
+            await expect(second.locator("#inspector")).to_be_attached()
             initial = await resource_counts(first, miniapp.url)
             assert initial.streams == initial.subscriptions == 2
             assert initial.operations == 0
@@ -408,14 +551,14 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
             await other.goto(miniapp.url + "/rooms/python")
             await join(other)
             other_pid = await other.locator("#inspector").get_attribute("data-pid")
-            await first.get_by_role("button", name="Crash this native room").click()
+            await first.get_by_role("button", name="Restart room (clears messages)").click()
             await expect(first.locator("#inspector")).not_to_have_attribute(
                 "data-pid", old_pid or ""
             )
             for page in (first, second):
-                await expect(page.locator("#members li")).to_have_text(["No native memberships."])
+                await expect(page.locator("#members li")).to_have_text(["No one has joined."])
                 await expect(page.locator("#messages")).to_contain_text("No messages")
-                await expect(page.locator("#membership")).to_contain_text("Explicit join required")
+                await expect(page.locator("#membership")).to_contain_text("Join to send.")
             fresh_pid = await first.locator("#inspector").get_attribute("data-pid")
             stale = await first.request.post(
                 miniapp.url + "/rooms/general/actions",

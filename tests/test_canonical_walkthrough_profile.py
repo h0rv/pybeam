@@ -91,6 +91,15 @@ def test_canonical_profile__stale_or_tampered_profile_stops_before_native_checks
     assert prepared_target.calls == []
 
 
+def test_canonical_profile__changed_showcase_template_is_rejected(
+    prepared_target: PreparedTarget,
+) -> None:
+    template = prepared_target.sdk / "examples/showcase/job.html"
+    template.write_bytes(template.read_bytes() + b"tampered")
+    with pytest.raises(ValueError, match="source or asset bytes differ"):
+        profile.verify_prepared()
+
+
 def test_canonical_profile__changed_bundled_helper_is_rejected(
     prepared_target: PreparedTarget,
 ) -> None:

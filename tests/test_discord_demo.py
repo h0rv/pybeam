@@ -180,6 +180,8 @@ async def test_render__escapes_messages_and_never_puts_chat_in_ack(demo: Demo) -
     assert 'hx-target="#ack"' in page
     assert "outerHTML" not in page
     assert "every " not in page
+    assert "<details open>" not in rendered
+    assert "Join this room to send" not in rendered
 
 
 @pytest.mark.parametrize(
@@ -246,6 +248,58 @@ async def test_post__ack_cannot_replace_chat_and_csrf_rejects_without_call(
         data["action"] = "crash"
         assert (await client.post("/rooms/general/actions", data=data)).status_code == 403
         assert calls == ["send"]
+
+
+@pytest.mark.parametrize("origin", ["null", "http://localhost:8766", "https://attacker.invalid"])
+async def test_origin__rejected_before_effect_and_valid_plain_form_redirects(
+    demo: Demo, monkeypatch: pytest.MonkeyPatch, origin: str
+) -> None:
+    identity = secrets.token_hex(16)
+    calls: list[Action] = []
+
+    async def change(
+        room_id: str,
+        member: str,
+        generation: int,
+        action: Action,
+        text: str,
+        event_id: str,
+        *,
+        revision: int | None = None,
+    ) -> None:
+        calls.append(action)
+
+    async def snapshot(room_id: str) -> View:
+        return view(identity)
+
+    monkeypatch.setattr(demo, "change", change)
+    monkeypatch.setattr(demo, "view", snapshot)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web.app),
+        base_url=web.owner.origin,
+        cookies={"discord": cookie(identity)},
+    ) as client:
+        data = {
+            "action": "send",
+            "generation": "7",
+            "csrf": web.owner.csrf(identity),
+            "text": "hello",
+        }
+        denied = await client.post("/rooms/general/actions", data=data, headers={"origin": origin})
+        assert denied.status_code == 403
+        assert "No room change was made" in denied.text
+        assert calls == []
+        accepted = await client.post(
+            "/rooms/general/actions", data=data, headers={"origin": web.owner.origin}
+        )
+        assert accepted.status_code == 303
+        assert calls == ["send"]
+        page = await client.get(accepted.headers["location"])
+        assert page.status_code == 200
+        assert page.headers["referrer-policy"] == "same-origin"
+        assert 'id="messages"' in page.text
+        assert 'name="csrf"' in page.text
+        assert "The action was confirmed" in page.text
 
 
 async def test_stream__subscribes_before_snapshot_and_releases_on_close(

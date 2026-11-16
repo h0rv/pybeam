@@ -26,7 +26,7 @@ def test_ui__fixed_profiles_deny_parameters_and_explain_missing_native(tmp_path:
     base = "http://127.0.0.1:38921"
     settings = Settings(trusted_native_root=tmp_path)
     with TestClient(create_app(settings), base_url=base) as client:
-        page = client.get("/")
+        page = client.get("/?scenario=benchmark-pybeam")
         assert "Matching current native build assets unavailable" in page.text
         assert "Run all available benchmarks" in page.text
         assert (

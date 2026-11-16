@@ -1,53 +1,89 @@
-<section aria-label="Last observed distributed state">
-  <p>Last observed receipts, not a live cluster controller. Run executes the fixed finite scenario.
-     Cancel requests owned cleanup, not rollback. A Task shown below may already have exited.</p>
-  {% for alias in ['a', 'b'] %}
-  {% set views = job.nodes|selectattr('observation.alias', 'equalto', alias)|list %}
-  <article class="box" data-node="{{ alias }}">
-    <h4>Node {{ alias|upper }}</h4>
-    {% if views %}{% set view = views[0] %}{% set node = view.observation %}
-    <dl>
-      <dt>Last observed status</dt><dd>{{ view.status }}{% if not job.active %}; observation is terminal{% endif %}</dd>
-      <dt>OS PID and birth identity</dt><dd>{{ node.birth.pid }} @ {{ node.birth.created }}</dd>
-      <dt>Node name</dt><dd>{{ node.handler.node }}</dd>
-      <dt>Handler PID</dt><dd>{{ node.handler.pid }}</dd>
-      <dt>Incarnation</dt><dd>{{ node.handler.incarnation }}</dd>
-    </dl>
-    {% else %}<p>No birth receipt observed. No started state is claimed.</p>{% endif %}
-  </article>
-  {% endfor %}
-  <ol aria-label="Observed OTP exchanges and lifecycle">
-  {% for event in job.observations %}
-    <li data-observation="{{ event.kind }}">
-    {% if event.kind == 'node' %}
-      Observed Node {{ event.alias|upper }} {{ event.status }}. OS birth {{ event.birth.pid }} @ {{ event.birth.created }}.
-    {% elif event.kind == 'exchange' %}
-      <figure>
-        <figcaption>Observed OTP message {{ event.receipt.message_id }} and reverse ACK {{ event.reverse_ack.message_id }}.</figcaption>
-        <svg viewBox="0 0 700 100" role="img" aria-label="Observed data from A to B and reverse ACK from B to A">
-          <text x="10" y="20" fill="currentColor">Node A</text>
-          <text x="570" y="20" fill="currentColor">Node B</text>
-          <line x1="80" y1="30" x2="620" y2="30" stroke="currentColor"/>
-          <text x="250" y="25" fill="currentColor">OTP data →</text>
-          <line x1="80" y1="70" x2="620" y2="70" stroke="currentColor"/>
-          <text x="250" y="65" fill="currentColor">← reverse ACK</text>
-        </svg>
-      </figure>
-      <p>Recipient handler {{ event.recipient.pid }} on {{ event.recipient.node }}, incarnation {{ event.recipient.incarnation }}.
-         Temporary Task PID {{ event.worker }} is distinct from the handler. Task exit was acknowledged.</p>
-      <p>Task result {{ event.result.value }}. Effect count {{ event.result.side_effect_count }}. Python {{ event.result.python_version }}.</p>
-    {% elif event.kind == 'state' %}
-      {% if event.state == 'task_pending' %}Observed pending temporary Task {{ event.worker }}. This is a past observation, not current liveness.
-      {% elif event.state == 'nodedown_uncertain' %}A observed NodeDOWN. The in-flight result and absent delivery are uncertain. No automatic replay.
-      {% elif event.state == 'fresh_empty' %}Explicit rejoin observed empty state on fresh B. The scripted second submission is explicit, not recovery of the lost request.
-      {% elif event.state == 'stale_ack_rejected' %}B rejected the stale ACK from its previous incarnation.
-      {% endif %}
-    {% elif event.kind == 'cleanup' %}
-      Owned cleanup {{ event.state }}. Recorded OS births:
-      <ul>{% for birth in event.owned %}<li>{{ birth.pid }} @ {{ birth.created }}</li>{% endfor %}</ul>
+{% set nodes = job.observations|selectattr('kind', 'equalto', 'node')|list %}
+{% set exchanges = job.observations|selectattr('kind', 'equalto', 'exchange')|list %}
+{% set states = job.observations|selectattr('kind', 'equalto', 'state')|map(attribute='state')|list %}
+{% set cleanup = job.observations|selectattr('kind', 'equalto', 'cleanup')|list %}
+<section aria-label="Walkthrough progress and result">
+  {% if job.proof and job.status == 'finished' %}
+  <p class="result" role="status">Finished. B returned {{ exchanges[-1].result.value }} with {{ exchanges[-1].result.side_effect_count }} effect on each completed submission. B restarted empty. Owned shutdown is confirmed.</p>
+  <a href="/artifact/{{ job.id }}">Download walkthrough proof</a>
+  {% elif job.status == 'queued' %}
+  <p class="result">Queued. Waiting for the current job to finish.</p>
+  {% elif job.status == 'stopping' %}
+  <p class="result">Stopping. Waiting for owned cleanup.</p>
+  {% elif not job.active %}
+  <p class="result">{{ 'Stopped.' if job.status == 'stopped' else 'Run did not finish successfully.' }} No complete walkthrough result was confirmed.</p>
+  {% else %}<p class="result">Running. Waiting for the next observation below.</p>{% endif %}
+  {% if job.observations and not job.proof %}
+  {% set last = job.observations[-1] %}
+  <p class="last-confirmed">Last confirmed:
+    {% if last.kind == 'node' %}Node {{ last.alias|upper }} {{ last.status }}.
+    {% elif last.kind == 'exchange' %}B returned {{ last.result.value }} with {{ last.result.side_effect_count }} effect. The temporary Task exited.
+    {% elif last.kind == 'cleanup' %}Owned cleanup {{ last.state }}.
+    {% elif last.state == 'task_pending' %}A temporary Task was pending on B.
+    {% elif last.state == 'nodedown_uncertain' %}B went down. The interrupted request's outcome is unknown.
+    {% elif last.state == 'fresh_empty' %}Restarted B had empty state.
+    {% elif last.state == 'stale_ack_rejected' %}B rejected the old acknowledgement.
     {% endif %}
+  </p>
+  {% endif %}
+  {% set progress = namespace(waiting=false) %}
+  <ol class="steps" aria-label="Observed steps">
+    {% for label, confirmed in [
+      ('Start two nodes', nodes|length >= 2),
+      ('B returned ' ~ exchanges[0].result.value if exchanges else 'Send work to B', exchanges|length >= 1),
+      ('Stop B. Interrupted request outcome unknown' if 'nodedown_uncertain' in states else 'Stop B. Check interrupted request', 'nodedown_uncertain' in states),
+      ('Restart B with empty state', 'fresh_empty' in states),
+      ('Submit again. B returned ' ~ exchanges[-1].result.value if exchanges|length >= 2 else 'Submit again to fresh B', exchanges|length >= 2),
+      ('Finish owned cleanup', cleanup and cleanup[-1].state == 'confirmed')
+    ] %}
+    {% set current = job.status == 'running' and not confirmed and not progress.waiting %}
+    <li data-step="{{ 'confirmed' if confirmed else 'current' if current else 'unconfirmed' }}" {% if current %}aria-current="step"{% endif %}>
+      <span class="step-mark" aria-hidden="true">{{ '✓' if confirmed else '→' if current else '·' }}</span>
+      {{ label }} <small>{{ 'Confirmed' if confirmed else 'Waiting for observation' if current else 'Not observed' }}</small>
     </li>
-  {% else %}<li>No native observations received.</li>{% endfor %}
+    {% if current %}{% set progress.waiting = true %}{% endif %}
+    {% endfor %}
   </ol>
-  {% if job.proof %}<a href="/artifact/{{ job.id }}">Download sanitized walkthrough proof for job {{ job.id[:8] }}</a>{% endif %}
+  <details>
+    <summary>Node identities and observations</summary>
+    <p>These are recorded observations, not live node controls. No automatic replay was made after interruption.</p>
+    {% for alias in ['a', 'b'] %}
+    {% set views = job.nodes|selectattr('observation.alias', 'equalto', alias)|list %}
+    <article data-node="{{ alias }}">
+      <h4>Node {{ alias|upper }}</h4>
+      {% if views %}{% set view = views[0] %}{% set node = view.observation %}
+      <dl>
+        <dt>Last observed status</dt><dd>{{ view.status }}</dd>
+        <dt>OS PID and birth identity</dt><dd>{{ node.birth.pid }} @ {{ node.birth.created }}</dd>
+        <dt>Node name</dt><dd>{{ node.handler.node }}</dd>
+        <dt>Handler PID</dt><dd>{{ node.handler.pid }}</dd>
+        <dt>Incarnation</dt><dd>{{ node.handler.incarnation }}</dd>
+      </dl>
+      {% else %}<p>No birth receipt observed.</p>{% endif %}
+    </article>
+    {% endfor %}
+    <ol aria-label="Observed exchanges and lifecycle">
+    {% for event in job.observations %}
+      <li data-observation="{{ event.kind }}">
+      {% if event.kind == 'node' %}
+        Observed Node {{ event.alias|upper }} {{ event.status }}. OS birth {{ event.birth.pid }} @ {{ event.birth.created }}.
+      {% elif event.kind == 'exchange' %}
+        <p>Task result {{ event.result.value }}. Effect count {{ event.result.side_effect_count }}. Python {{ event.result.python_version }}.</p>
+        <p>Recipient {{ event.recipient.pid }} on {{ event.recipient.node }}, incarnation {{ event.recipient.incarnation }}. Temporary Task {{ event.worker }} exited.</p>
+        <p>Message {{ event.receipt.message_id }} and reverse ACK {{ event.reverse_ack.message_id }}.</p>
+      {% elif event.kind == 'state' %}
+        {% if event.state == 'task_pending' %}Observed pending temporary Task {{ event.worker }}.
+        {% elif event.state == 'nodedown_uncertain' %}A observed NodeDOWN. The interrupted result and absent delivery are uncertain. No automatic replay.
+        {% elif event.state == 'fresh_empty' %}Explicit rejoin observed empty state on fresh B.
+        {% elif event.state == 'stale_ack_rejected' %}B rejected the stale ACK from its previous incarnation.
+        {% endif %}
+      {% elif event.kind == 'cleanup' %}
+        Owned cleanup {{ event.state }}.
+        <ul>{% for birth in event.owned %}<li>{{ birth.pid }} @ {{ birth.created }}</li>{% endfor %}</ul>
+      {% endif %}
+      </li>
+    {% else %}<li>No native observations received.</li>{% endfor %}
+    </ol>
+    {% for trial in job.trials %}<p>Runner cleanup {{ trial.outcome.cleanup_state }}. {{ trial.outcome.cleanup_survivors|length }} known survivors. {{ trial.outcome.forced_cleanup_count }} forced stops.</p>{% endfor %}
+  </details>
 </section>

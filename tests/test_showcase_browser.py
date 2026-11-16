@@ -76,12 +76,16 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     ),
                 )
                 page.goto(BASE)
-                assert page.title() == "PyBeam local control plane"
+                assert page.title() == "PyBeam showcase"
+                page.goto(BASE + "/?scenario=discord")
                 assert page.locator("#card-discord button").is_disabled()
-                assert page.locator("#card-stream").inner_text().find("0b4dd8") >= 0
-                page.get_by_role("link", name="View example code").first.click()
+                page.goto(BASE + "/?scenario=stream")
+                expect(page.locator("#scenario-details")).to_contain_text("0b4dd8")
+                page.goto(BASE + "/?scenario=smoke")
+                page.get_by_text("Scenario details", exact=True).click()
+                page.get_by_role("link", name="View example code").click()
                 assert "import" in page.locator("body").inner_text()
-                page.goto(BASE)
+                page.goto(BASE + "/?scenario=smoke")
                 page.get_by_role("button", name="Start Python benchmark smoke", exact=True).click()
                 smoke = page.locator('[data-key="smoke"]')
                 finished(smoke)
@@ -103,12 +107,13 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "events/s:",
                     result.throughput_per_second,
                 )
+                page.goto(BASE + "/?scenario=hold")
                 page.get_by_role(
                     "button", name="Start Owned cancellation probe", exact=True
                 ).click()
                 hold = page.locator('[data-key="hold"]')
-                hold.locator("pre").filter(has_text="Guardian owns child PID").wait_for(
-                    timeout=15000
+                expect(hold.locator("pre")).to_contain_text(
+                    "Guardian owns child PID", timeout=15000
                 )
                 hold.get_by_role(
                     "button", name="Cancel Owned cancellation probe", exact=True
@@ -145,13 +150,15 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     ).status
                     == 400
                 )
+                page.get_by_text("Scenario details", exact=True).click()
                 page.get_by_role("button", name="Run all available benchmarks", exact=True).click()
                 for name in profiles:
+                    page.goto(BASE + "/?scenario=benchmark-" + name)
                     profile = page.locator('[data-key="benchmark-' + name + '"]')
                     finished(profile)
                     assert "100" in profile.locator("table").inner_text()
                 comparison = page.get_by_role("table", name="Actual scalar results", exact=False)
-                assert comparison.locator("tbody tr").count() == len(profiles) + 1
+                assert comparison.locator("tbody tr").count() == 1
                 assert errors == []
                 print(
                     "Chrome rendered actual scalar profiles:",
@@ -159,6 +166,7 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "Page and console errors:",
                     errors,
                 )
+                page.goto(BASE + "/?scenario=hold")
                 page.get_by_role(
                     "button", name="Start Owned cancellation probe", exact=True
                 ).click()
@@ -197,9 +205,9 @@ def test_showcase__actual_chrome_controls_and_evidence(
                 page.get_by_role(
                     "button", name="Start Owned cancellation probe", exact=True
                 ).click()
-                page.locator('[data-key="hold"]').first.locator("pre").filter(
-                    has_text="Guardian owns child PID"
-                ).wait_for(timeout=15000)
+                expect(page.locator('[data-key="hold"]').first.locator("pre")).to_contain_text(
+                    "Guardian owns child PID", timeout=15000
+                )
                 shutdown_owned = tuple(
                     identity(child) for child in psutil.Process(server.pid).children(recursive=True)
                 )

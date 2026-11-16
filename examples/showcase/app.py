@@ -86,9 +86,16 @@ def create_app(settings: Settings | None = None) -> Starlette:
 
     def render(request: Request, *, partial: bool = False) -> HTMLResponse:
         manager = jobs()
+        selected = request.query_params.get("scenario", "distributed")
+        card = next((item for item in cards if item.key == selected), None)
+        if card is None:
+            raise HTTPException(404, "Unknown scenario")
+        scenario_jobs = tuple(
+            job for job in reversed(manager.items.values()) if job.card.key == selected
+        )
         measurements = tuple(
             Measurement(job.id, trial, job.card.title)
-            for job in manager.items.values()
+            for job in scenario_jobs
             if job.card.key == "smoke" or job.card.benchmark is not None
             for trial in job.trials
         )
@@ -97,17 +104,18 @@ def create_app(settings: Settings | None = None) -> Starlette:
             name="jobs.html" if partial else "index.html",
             context={
                 "cards": cards,
-                "jobs": tuple(reversed(manager.items.values())),
+                "card": card,
+                "jobs": scenario_jobs,
                 "measurements": measurements,
                 "revision": manager.revision,
             },
         )
 
-    def acknowledgment(request: Request) -> Response:
+    def acknowledgment(request: Request, scenario: str) -> Response:
         if request.headers.get("hx-request") == "true":
             # An enhanced POST never returns a snapshot that could overwrite a later SSE read.
             return Response(status_code=204)
-        return RedirectResponse("/#jobs", status_code=303)
+        return RedirectResponse("/?scenario=" + scenario, status_code=303)
 
     async def favicon(request: Request) -> Response:
         return Response(status_code=204)
@@ -151,7 +159,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             jobs().start(card)
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
-        return acknowledgment(request)
+        return acknowledgment(request, card.key)
 
     async def run_all(request: Request) -> Response:
         manager = jobs()
@@ -164,11 +172,12 @@ def create_app(settings: Settings | None = None) -> Starlette:
             raise HTTPException(409, "Queue full")
         for card in available:
             manager.start(card)
-        return acknowledgment(request)
+        return acknowledgment(request, "benchmark-python")
 
     async def cancel(request: Request) -> Response:
-        jobs().stop(find_job(request))
-        return acknowledgment(request)
+        job = find_job(request)
+        jobs().stop(job)
+        return acknowledgment(request, job.card.key)
 
     async def artifact(request: Request) -> Response:
         job = find_job(request)

@@ -4,42 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
-  <title>PyBeam local control plane</title>
+  <title>PyBeam showcase</title>
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/static/missing.min.css">
+  <link rel="stylesheet" href="/static/showcase.css">
   <script src="/static/htmx.min.js" defer></script>
   <script src="/static/sse.js" defer></script>
 </head>
 <body>
-<main>
-  <header>
-    <p>Local development tool · fixed source catalog</p>
-    <h1>PyBeam control plane</h1>
-    <p>This server runs on CPython with Starlette and Jinja, not on native BEAM. The distributed walkthrough remains unavailable until a prepared runtime is reviewed.</p>
-    <p>One job at a time, at most four queued/running and 16 retained per session.
-       Benchmark comparisons always use the shared runner load lock. Logs show at most 16 KiB.
-       Ordinary jobs have a 30-second guardian budget. The finite distributed walkthrough has a 120-second budget. Limits are sampled watchdog checks.
-       Stop requests are not rollback. Side effects may remain uncertain.</p>
-    <form action="/run-all" method="post" hx-post="/run-all" hx-swap="none"><button>Run all available benchmarks</button></form>
-    <p>Run all queues only the enabled scalar profiles, serially. Missing runtime assets disable native cards.
-       Only this checkout's fixed commands are trusted. No other worktree heads are executed.</p>
-  </header>
-  <section aria-labelledby="catalog-heading">
-    <h2 id="catalog-heading">Example catalog</h2>
-    {% for card in cards %}
-    <article class="box" id="card-{{ card.key }}">
-      <h3>{{ card.title }} <small>[{{ card.status }}]</small></h3>
-      <p>{{ card.explanation }}</p>
-      {% if card.source %}<p><a href="/source/{{ card.key }}">View example code</a> · <code>{{ card.source }}</code></p>{% endif %}
-      {% if card.disabled %}<p>Unavailable: {{ card.disabled }}</p>{% endif %}
-      <form action="/start/{{ card.key }}" method="post" hx-post="/start/{{ card.key }}" hx-swap="none">
-        <button {% if card.disabled %}disabled{% endif %}>{{ 'Run' if card.key == 'distributed' else 'Start' }} {{ card.title }}</button>
-      </form>
-    </article>
+<aside class="scenario-nav">
+  <h1>PyBeam showcase</h1>
+  <nav aria-label="Scenarios">
+    {% for item in cards %}
+    <a href="/?scenario={{ item.key }}" {% if item.key == card.key %}aria-current="page"{% endif %}>{{ item.title }}</a>
     {% endfor %}
-  </section>
+  </nav>
+</aside>
+<main>
   <section id="updates" hx-sse:connect="/events" hx-config='{"sse":{"pauseOnBackground":false}}'>
-    <div id="job-refresh" hx-get="/jobs" hx-trigger="jobs-changed from:#updates" hx-target="#jobs" hx-swap="outerHTML" hx-sync="this:queue last"></div>
+    <div id="job-refresh" hx-get="/jobs?scenario={{ card.key }}" hx-trigger="jobs-changed from:#updates" hx-target="#jobs" hx-swap="outerHTML" hx-sync="this:queue last"></div>
     {% include 'jobs.html' %}
   </section>
 </main>

@@ -63,6 +63,12 @@ class Command(BaseModel):
         return value
 
 
+@dataclass(frozen=True, slots=True)
+class ActionResult:
+    status: Literal["confirmed", "unconfirmed", "unknown"]
+    message: str
+
+
 @dataclass(slots=True)
 class Owner:
     origin: str = "http://127.0.0.1:8766"
@@ -121,7 +127,8 @@ class LocalOnly:
             elif headers.get("transfer-encoding") is not None:
                 reason = "Chunked forms are not supported"
         if reason:
-            await PlainTextResponse(reason, status_code=status)(scope, receive, send)
+            html = templates.get_template("error.html").render(message=reason, origin=owner.origin)
+            await HTMLResponse(html, status_code=status)(scope, receive, send)
             return
 
         streaming = False
@@ -136,7 +143,7 @@ class LocalOnly:
                 message["headers"] = [
                     *message["headers"],
                     (b"x-content-type-options", b"nosniff"),
-                    (b"referrer-policy", b"no-referrer"),
+                    (b"referrer-policy", b"same-origin"),
                     (
                         b"content-security-policy",
                         b"default-src 'self'; script-src 'self'; "
@@ -267,14 +274,25 @@ async def resources(demo: Native, identity: Member) -> Resources:
 
 
 @app.get("/rooms/{room_id}", response_class=HTMLResponse)
-async def room_page(request: Request, room_id: RoomId, demo: Native) -> HTMLResponse:
+async def room_page(
+    request: Request,
+    room_id: RoomId,
+    demo: Native,
+    notice: Literal["confirmed", "unconfirmed", "unknown"] | None = None,
+) -> HTMLResponse:
     identity = owner.identity(request.cookies.get("discord")) or secrets.token_hex(16)
     if demo.owner is None:
         demo.owner = identity
     response = templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"rooms": ROOMS, "room_id": room_id, "member": identity},
+        context={
+            "rooms": ROOMS,
+            "room_id": room_id,
+            "member": identity,
+            "room_html": panel(await demo.view(room_id), identity, demo),
+            "notice": notice,
+        },
         headers={"Cache-Control": "no-store"},
     )
     response.set_cookie(
@@ -304,7 +322,7 @@ async def action(
     if owner.tasks is None or demo.closing or demo.inflight >= 16:
         raise HTTPException(503, "Native operation admission is full")
 
-    async def complete() -> str:
+    async def complete() -> ActionResult:
         try:
             await demo.change(
                 room_id,
@@ -315,24 +333,29 @@ async def action(
                 secrets.token_hex(16),
                 revision=int(command.revision) if command.revision is not None else None,
             )
-            return "Confirmed " + command.action + ". The live stream reads native state."
+            return ActionResult("confirmed", "Confirmed " + command.action + ".")
         except (ValueError, ActorCallError, ActorStoppedError) as error:
-            return "Not confirmed: " + str(error) + ". No automatic retry was made."
+            return ActionResult(
+                "unconfirmed", "Not confirmed: " + str(error) + ". No automatic retry was made."
+            )
         except Exception:
             logger.exception("Native operation or notification failed")
-            return "Outcome unknown. The native call may have effects. Do not blindly retry."
+            return ActionResult(
+                "unknown",
+                "Outcome unknown. The call may have effects. Check the room before retrying.",
+            )
         finally:
             demo.inflight -= 1
 
     demo.inflight += 1
     task = owner.tasks.create_task(complete())
-    message = await asyncio.shield(task)
+    result = await asyncio.shield(task)
     if request.headers.get("hx-request") != "true":
-        return RedirectResponse("/rooms/" + room_id, status_code=303)
+        return RedirectResponse("/rooms/" + room_id + "?notice=" + result.status, status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="ack.html",
-        context={"message": message},
+        context={"message": result.message},
         headers={"Cache-Control": "no-store"},
     )
 

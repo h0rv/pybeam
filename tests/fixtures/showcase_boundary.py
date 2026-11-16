@@ -22,14 +22,16 @@ PORT = 38941
 def controlled_catalog(
     trusted_hornbeam_root: Path | None = None, trusted_native_root: Path | None = None
 ) -> tuple[Card, ...]:
-    card = next(card for card in catalog() if card.key == "distributed")
-    return (
+    return tuple(
         replace(
             card,
             disabled=None,
             title="Controlled boundary: " + card.title,
             explanation="TEST ONLY. No native processes or actual OTP receipts.",
-        ),
+        )
+        if card.key == "distributed"
+        else card
+        for card in catalog()
     )
 
 
@@ -79,6 +81,15 @@ async def main() -> None:
             release.set()
         return Response(status_code=204)
 
+    async def observe(request: Request) -> Response:
+        for key, manager in managers.items():
+            current = manager.items[key]
+            if current.active:
+                manager.update(
+                    replace(current, observations=controlled_walkthrough().observations[:3])
+                )
+        return Response(status_code=204)
+
     async def subscriber_count(request: Request) -> Response:
         return JSONResponse(
             {"count": max((len(manager.subscribers) for manager in managers.values()), default=0)}
@@ -95,6 +106,7 @@ async def main() -> None:
         app.routes.extend(
             [
                 Route("/__test__/finish", finish),
+                Route("/__test__/observe", observe),
                 Route("/__test__/subscribers", subscriber_count),
                 Route("/__test__/ready", ready),
             ]

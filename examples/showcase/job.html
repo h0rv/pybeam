@@ -1,0 +1,61 @@
+<article class="run" id="job-{{ job.id }}" data-status="{{ job.status }}" data-key="{{ job.card.key }}">
+  <div class="run-status">
+    <h3>{{ 'Current run' if job == jobs[0] else 'Run ' + job.id[:8] }} <span role="status">{{ job.status }}</span></h3>
+    {% if job.active %}
+    <form action="/cancel/{{ job.id }}" method="post" hx-post="/cancel/{{ job.id }}" hx-swap="none">
+      <button id="cancel-{{ job.id }}" {% if job.status == 'stopping' %}disabled{% endif %}>{{ 'Stopping…' if job.status == 'stopping' else 'Cancel ' + job.card.title }}</button>
+    </form>
+    {% if job.card.port and job.status == 'running' %}<a href="http://127.0.0.1:{{ job.card.port }}" target="_blank" rel="noopener">Open private demo (may still be starting)</a>{% endif %}
+    {% endif %}
+  </div>
+  {% if job.status in ['stopped', 'stopping'] %}<p>Stop requested. Effects are not rolled back.</p>{% endif %}
+  {% if job.status == 'uncertain' %}<p>Cleanup is uncertain. New measurements are blocked until ownership is resolved. Do not remove the lock or journal.</p>{% endif %}
+  {% if job.error %}<p>{{ job.error }}</p>{% endif %}
+  {% if job.card.key == 'distributed' %}
+  {% include 'distributed.html' %}
+  {% else %}
+    {% if job.trials %}
+    {% for trial in job.trials %}
+    <p class="result">{{ 'Finished.' if job.status == 'finished' else 'Run ended.' }} Outcome {{ trial.outcome.status }}. {% if trial.completed is not none %}Completed {{ trial.completed }} events.{% endif %} Cleanup {{ trial.outcome.cleanup_state }} with {{ trial.outcome.cleanup_survivors|length }} known survivors.</p>
+    {% endfor %}
+    <a href="/artifact/{{ job.id }}">Download actual trials.jsonl</a>
+    <table>
+      <caption>Actual runner evidence</caption>
+      <thead><tr><th>Trial</th><th>Outcome</th><th>Completions</th><th>Events/s</th><th>Latency p95 ns</th><th>Tree RSS bytes</th><th>Cleanup evidence</th></tr></thead>
+      <tbody>{% for trial in job.trials %}<tr>
+        <td>{{ trial.trial }}</td><td>{{ trial.outcome.status }} {{ trial.outcome.reason or '' }}</td>
+        <td>{{ trial.completed if trial.completed is not none else 'unsupported' }}</td>
+        <td>{{ '%.2f'|format(trial.throughput_per_second) if trial.throughput_per_second is not none else 'unsupported' }}</td>
+        <td>{{ trial.latency_ns.p95 if trial.latency_ns else 'unsupported' }}</td>
+        <td>{{ trial.simultaneous_tree_rss_peak_bytes }}</td><td>{{ trial.outcome.cleanup_state }}; {{ trial.outcome.cleanup_survivors|length }} known survivors</td>
+      </tr>{% endfor %}</tbody>
+    </table>
+    <figure>
+      <figcaption>Measured events/s for this run.</figcaption>
+      {% set rates = job.trials|map(attribute='throughput_per_second')|reject('none')|list %}
+      {% if rates %}
+      <svg viewBox="0 0 600 {{ 40 * job.trials|length + 30 }}" role="img" aria-label="Actual events per second by trial">
+        <line x1="100" y1="0" x2="100" y2="{{ 40 * job.trials|length }}" stroke="currentColor"/>
+        {% for trial in job.trials %}{% if trial.throughput_per_second is not none %}
+        <text x="0" y="{{ loop.index0 * 40 + 20 }}" fill="currentColor">Trial {{ trial.trial }}</text>
+        <rect x="100" y="{{ loop.index0 * 40 }}" width="{{ 400 * trial.throughput_per_second / (rates|max) }}" height="25" fill="steelblue"><title>{{ trial.throughput_per_second }} events/s</title></rect>
+        {% endif %}{% endfor %}
+        <text x="100" y="{{ 40 * job.trials|length + 20 }}" fill="currentColor">0</text>
+        <text x="400" y="{{ 40 * job.trials|length + 20 }}" fill="currentColor">{{ '%.2f'|format(rates|max) }} events/s</text>
+      </svg>
+      {% else %}<p>No throughput evidence.</p>{% endif %}
+    </figure>
+    {% elif job.active %}<p>Waiting for runner evidence.</p>{% endif %}
+    <details><summary>Logs and runtime details</summary>
+      <pre>{{ job.logs() }}</pre>
+      {% if job.provenance %}
+      <ul>{% for source in job.provenance.sources %}<li>{{ source.path }} · {{ source.sha }} · dirty={{ source.dirty }} · content SHA256 {{ source.working_tree_sha256 }}</li>{% endfor %}</ul>
+      {% for result in job.results %}
+      <p>{{ result.runtime.mode }} · CPython {{ result.runtime.python or 'unused' }} · OTP {{ result.runtime.otp or 'unused' }} · ERTS {{ result.runtime.erts or 'unused' }} · schedulers {{ result.runtime.schedulers }} · contexts {{ result.runtime.workers }} · interpreters {{ result.runtime.interpreters }} · GIL {{ result.runtime.gil_enabled }}</p>
+      <p>Native source {{ result.runtime.native_source_sha or 'unused' }}</p>
+      <ul>{% for asset in result.runtime.loaded_assets %}<li>{{ asset.path }} · SHA256 {{ asset.sha256 }}</li>{% endfor %}</ul>
+      {% endfor %}
+      {% endif %}
+    </details>
+  {% endif %}
+</article>

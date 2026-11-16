@@ -1,14 +1,46 @@
 <input type="hidden" name="generation" value="{{ view.info.generation }}" form="compose">
 <input type="hidden" name="csrf" value="{{ csrf }}" form="compose">
+<div class="room-toolbar">
+  <p id="membership" data-joined="{{ 'true' if joined else 'false' }}">{{ 'Joined' if joined else 'View only. Join to send.' }}</p>
+  {% if joined %}
+  <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
+        hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
+    <input type="hidden" name="action" value="leave">
+    <input type="hidden" name="revision" value="{{ revision }}">
+    <input type="hidden" name="generation" value="{{ view.info.generation }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button id="leave-room" type="submit">Leave</button>
+  </form>
+  {% else %}
+  <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
+        hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
+    <input type="hidden" name="action" value="join">
+    <input type="hidden" name="generation" value="{{ view.info.generation }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button id="join-room" type="submit">Join #{{ view.snapshot.room_id }}</button>
+  </form>
+  {% endif %}
+  {% if is_owner %}
+  <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
+        hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
+    <input type="hidden" name="action" value="crash">
+    <input type="hidden" name="generation" value="{{ view.info.generation }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button id="restart-room" type="submit" class="danger">Restart room (clears messages)</button>
+  </form>
+  {% endif %}
+</div>
+{% if view.info.generation > 1 and not joined %}
+<p class="restart-notice" role="status">Room restarted. Earlier messages were cleared. Join again to send.</p>
+{% endif %}
 <div class="room-layout">
   <section aria-label="Messages">
-    <h3>Messages <small>{{ view.snapshot.event_ids|length }} / 100</small></h3>
     <ol id="messages">
       {% for event in view.snapshot.history %}
       <li data-event="{{ event.event_id }}"><strong>{{ event.tags[0][:8] }}</strong>
         <p class="message">{{ event.text }}</p></li>
       {% else %}
-      <li>No messages. Restarted rooms begin empty.</li>
+      <li class="empty">No messages yet.{% if not joined %} Join this room to send the first message.{% endif %}</li>
       {% endfor %}
     </ol>
   </section>
@@ -16,42 +48,22 @@
     <h3>Members <small>{{ view.snapshot.members|length }} / 8</small></h3>
     <ul id="members">
       {% for item in view.snapshot.members %}
-      <li data-member="{{ item.member_id }}" data-count="{{ item.count }}"><code>{{ item.member_id[:8] }}</code>{% if item.member_id == member %} (you){% endif %}
-        <small>{{ item.count }} receipts</small></li>
-      {% else %}
-      <li>No native memberships.</li>
-      {% endfor %}
+      <li data-member="{{ item.member_id }}" data-count="{{ item.count }}"><code>{{ item.member_id[:8] }}</code>{% if item.member_id == member %} (you){% endif %}</li>
+      {% else %}<li>No one has joined.</li>{% endfor %}
     </ul>
-    <p id="membership">{% if joined %}Joined this generation.{% else %}Not joined. Explicit join required.{% endif %}</p>
-    {% for action, title, disabled in [('join', 'Join / rejoin', joined), ('leave', 'Leave', not joined)] %}
-    <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
-          hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
-      <input type="hidden" name="action" value="{{ action }}">
-      {% if action == 'leave' and revision is not none %}
-      <input type="hidden" name="revision" value="{{ revision }}">
-      {% endif %}
-      <input type="hidden" name="generation" value="{{ view.info.generation }}">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button type="submit" {% if disabled %}disabled{% endif %}>{{ title }}</button>
-    </form>
-    {% endfor %}
-    <p>Leave stops native message delivery receipts, not this read-only live view.
-      Disconnect closes the stream without changing membership.</p>
   </aside>
 </div>
-<details open>
-  <summary>Native room inspector</summary>
+<details class="inspector">
+  <summary>Room details</summary>
   <dl id="inspector" data-pid="{{ view.info.pid }}" data-generation="{{ view.info.generation }}">
     <dt>BEAM child PID</dt><dd><code>{{ view.info.pid }}</code></dd>
-    <dt>Native generation</dt><dd>{{ view.info.generation }}</dd>
+    <dt>Generation</dt><dd>{{ view.info.generation }}</dd>
     <dt>Room epoch</dt><dd>{{ view.snapshot.epoch }}</dd>
-    <dt>Identity slots used this generation</dt><dd id="identity-slots">{{ view.snapshot.ledger|length }} / 8, including departed members</dd>
+    <dt>Identity slots</dt><dd id="identity-slots">{{ view.snapshot.ledger|length }} / 8, including departed members</dd>
     <dt>Your membership revision</dt><dd id="membership-revision">{{ revision if revision is not none else 'Not present' }}</dd>
-    <dt>Admitted encoded calls / bytes</dt><dd>{{ view.info.admitted_count }} / {{ view.info.admitted_bytes }}</dd>
-    <dt>State</dt><dd>{{ view.snapshot.members|length }} members, {{ view.snapshot.event_ids|length }} events,
-      {{ view.snapshot.history|length }} retained messages</dd>
+    <dt>Admitted calls / bytes</dt><dd>{{ view.info.admitted_count }} / {{ view.info.admitted_bytes }}</dd>
+    <dt>State</dt><dd>{{ view.snapshot.members|length }} members, {{ view.snapshot.event_ids|length }} events, {{ view.snapshot.history|length }} retained messages</dd>
   </dl>
-  <h4>Native receipt ledger</h4>
   <ul id="ledger">
     {% for item in view.snapshot.ledger %}
     <li data-member="{{ item.member_id }}" data-count="{{ item.count }}"
@@ -61,15 +73,5 @@
     </li>
     {% else %}<li>No identities in this generation.</li>{% endfor %}
   </ul>
-  {% if is_owner %}
-  <form action="/rooms/{{ view.snapshot.room_id }}/actions" method="post"
-        hx-post="/rooms/{{ view.snapshot.room_id }}/actions" hx-target="#ack" hx-swap="innerHTML">
-    <input type="hidden" name="action" value="crash">
-    <input type="hidden" name="generation" value="{{ view.info.generation }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="danger">Crash this native room</button>
-  </form>
-  <p>You own local diagnostics. Crash replaces only this child. Old forms cannot kill its replacement.
-    The new PID starts with empty state. Everyone must explicitly rejoin.</p>
-  {% else %}<p>The first local browser owns crash diagnostics.</p>{% endif %}
+  <p>Restart replaces only this room's actor, not the VM. Everyone must join again. Only the first browser session can restart rooms.</p>
 </details>
