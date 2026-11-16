@@ -47,6 +47,10 @@ test("the showcase shares accessible repository-local SVGs with the README", () 
     assert.match(svg, /role="img" aria-labelledby="title desc"/);
     assert.match(svg, /<title id="title">[^<]+<\/title>/);
     assert.match(svg, /<desc id="desc">[^<]+<\/desc>/);
+    assert.match(svg, /@media \(prefers-color-scheme: dark\)/);
+    assert.match(svg, /font-family: system-ui, sans-serif/);
+    assert.match(svg, /rect, path \{ fill: none;/);
+    assert.doesNotMatch(svg, /<linearGradient|<radialGradient|<filter|THE STACK/);
     assert.doesNotMatch(svg, /<script|<foreignObject|(?:href|src)="https?:/i);
   }
 });
