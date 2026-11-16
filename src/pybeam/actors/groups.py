@@ -34,14 +34,36 @@ class DataGroup(Protocol):
     async def close(self) -> None: ...
 
 
-async def open_group(*, max_children: int) -> DataGroup:
+class ExecutionLimits(BaseModel):
+    """Bound physical execution contexts and aggregate admitted pool work."""
+
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+    workers: PositiveInt
+    capacity: PositiveInt
+    max_bytes: PositiveInt
+
+
+async def open_group(*, max_children: int, execution: ExecutionLimits | None = None) -> DataGroup:
+    if execution is None:
+        try:
+            from erlang.actors import DataActorGroup
+        except ImportError as error:
+            raise RuntimeError(
+                "Bounded native actor groups are required; no raw-object fallback"
+            ) from error
+        return await DataActorGroup(max_children=max_children).__aenter__()
+
     try:
-        from erlang.actors import DataActorGroup
+        from erlang.actors import DataActorGroup, PoolLimits
     except ImportError as error:
         raise RuntimeError(
-            "Bounded native actor groups are required; no raw-object fallback"
+            "Pooled native actors are required; no dedicated-mode fallback"
         ) from error
-    return await DataActorGroup(max_children=max_children).__aenter__()
+    native_limits = PoolLimits(
+        workers=execution.workers, capacity=execution.capacity, max_bytes=execution.max_bytes
+    )
+    return await DataActorGroup(max_children=max_children, execution=native_limits).__aenter__()
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +125,17 @@ class ActorGroup:
     """
 
     def __init__(
-        self, *, max_children: int = 128, max_pending: int = 64, max_bytes: int = 1_048_576
+        self,
+        *,
+        max_children: int = 128,
+        max_pending: int = 64,
+        max_bytes: int = 1_048_576,
+        execution: ExecutionLimits | None = None,
     ) -> None:
         self._limits = _ActorGroupConfig(
             max_children=max_children, max_pending=max_pending, max_bytes=max_bytes
         )
+        self._execution = execution
         self._stack = AsyncExitStack()
         self._starts: asyncio.TaskGroup | None = None
         self._native: DataGroup | None = None
@@ -122,7 +150,12 @@ class ActorGroup:
         if self._entered or self._closing:
             raise RuntimeError("ActorGroup cannot be entered twice or after closing")
         self._entered = True
-        native = await open_group(max_children=self._limits.max_children)
+        if self._execution is None:
+            native = await open_group(max_children=self._limits.max_children)
+        else:
+            native = await open_group(
+                max_children=self._limits.max_children, execution=self._execution
+            )
         self._native = native
         self._stack.push_async_callback(native.close)
         try:
