@@ -9,6 +9,7 @@ import pytest
 from pybeam.actors.native import UnboundedMailbox
 from pybeam.mailbox import UnboundedMailbox as SharedUnboundedMailbox
 from tests.test_actors_typing import checker
+from tests.typechecking import TYPECHECK_CONFIG
 
 
 def test_unbounded_policy__uses_the_shared_policy_type() -> None:
@@ -18,7 +19,7 @@ def test_unbounded_policy__uses_the_shared_policy_type() -> None:
 def test_public_actor_types__preserve_concrete_call_arguments_and_returns() -> None:
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [checker(), "check", "tests/actor_public_positive.py"],
+        [checker(), "check", *TYPECHECK_CONFIG, "tests/actor_public_positive.py"],
         cwd=root,
         capture_output=True,
         text=True,
@@ -34,7 +35,16 @@ def test_public_actor_types__reject_invalid_calls_and_unsupported_policies(tmp_p
     probe = tmp_path / "actor_public_negative.py"
     probe.write_text(source)
     result = subprocess.run(
-        [checker(), "check", "--project", str(root), "--output-format", "concise", str(probe)],
+        [
+            checker(),
+            "check",
+            *TYPECHECK_CONFIG,
+            "--project",
+            str(root),
+            "--output-format",
+            "concise",
+            str(probe),
+        ],
         cwd=root,
         capture_output=True,
         text=True,
