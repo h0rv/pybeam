@@ -28,3 +28,5 @@ Check the [runtime requirements](docs/guide/index.md#requirements) before runnin
 
 Explore the runnable [Discord demo](examples/discord_demo/README.md) and
 [showcase](examples/showcase).
+
+For contributor instructions, see [Development](docs/development.md).

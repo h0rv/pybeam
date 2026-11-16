@@ -33,8 +33,11 @@ Use conventional CPython 3.14. `pybeam.run` needs a managed runtime:
 
 A source install alone does not include ERTS or the native extension.
 
-Working from a checkout requires sibling checkouts of `hornbeam`, `erlang-python`,
-`erlang-ws` and `erlang-h1` next to the PyBEAM repository. Native builds use
+Dependency sync and type checks work from a clean checkout without sibling
+repositories; see [Development](../development.md). Sibling checkouts are an
+opt-in for runtime development: building the native runtime locally requires
+`hornbeam`, `erlang-python`, `erlang-ws` and `erlang-h1` next to the PyBEAM
+repository. Native builds use
 CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0 as pinned in
 `mise.toml`. With these tools available, build with `mise run setup`.
 
