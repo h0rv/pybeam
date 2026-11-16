@@ -1,4 +1,5 @@
 import asyncio
+import platform
 from pathlib import Path
 
 from pybeam.runtime.assets import _contained
@@ -8,6 +9,8 @@ from pybeam.runtime.optional_manifest import OptionalManifest, verify_manifest
 
 
 def read_manifest(root: Path) -> OptionalManifest:
+    if platform.system() == "Linux" and root.name == "genstage":
+        raise BootstrapError("The optional GenStage payload is not bundled on Linux")
     try:
         return verify_manifest(root)
     except (OSError, ValueError) as error:

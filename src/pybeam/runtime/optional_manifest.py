@@ -1,5 +1,4 @@
 import hashlib
-import platform
 from pathlib import Path
 from typing import Annotated
 
@@ -77,19 +76,9 @@ def parse_manifest(path: Path) -> OptionalManifest:
     return OptionalManifest.model_validate_json(path.read_bytes())
 
 
-def approved_manifest(
-    name: str, *, system: str | None = None, architecture: str | None = None
-) -> OptionalManifest:
+def approved_manifest(name: str) -> OptionalManifest:
     directory = Path(__file__).with_name("optional_specs")
-    system = platform.system() if system is None else system
-    architecture = platform.machine() if architecture is None else architecture
-    if (system, architecture) == ("Linux", "x86_64"):
-        suffix = "-linux_x86_64"
-    elif (system, architecture) == ("Darwin", "arm64"):
-        suffix = ""
-    else:
-        raise ValueError("Unsupported optional runtime platform")
-    file = contained(directory, Path(name + suffix + ".json"))
+    file = contained(directory, Path(name + ".json"))
     manifest = parse_manifest(file)
     if manifest.name != name:
         raise ValueError("Optional specification name does not match its directory")

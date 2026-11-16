@@ -21,7 +21,7 @@ from pybeam.runtime.optional_manifest import (
     approved_manifest,
     write_manifest,
 )
-from tools.runtime_wheel import audit_optional
+from tools.runtime_wheel import audit_optional, optional_payload
 
 
 @dataclass(frozen=True)
@@ -113,26 +113,28 @@ def test_approved_release_is_the_pinned_build() -> None:
         assert actual == expected
 
 
-def test_optional_specs_are_platform_specific(monkeypatch: pytest.MonkeyPatch) -> None:
-    darwin = approved_manifest("genstage", system="Darwin", architecture="arm64")
-    linux = approved_manifest("genstage", system="Linux", architecture="x86_64")
-    assert linux.sources == darwin.sources
-    assert linux != darwin
-    monkeypatch.setattr(optional_manifest.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(optional_manifest.platform, "machine", lambda: "x86_64")
-    assert approved_manifest("genstage") == linux
-    with pytest.raises(ValueError, match="Unsupported optional runtime platform"):
-        approved_manifest("genstage", system="Linux", architecture="arm64")
+def test_linux_wheel_requires_no_optional_payload(tmp_path: Path) -> None:
+    optional_payload(tmp_path, linux=True)
+    (tmp_path / "optional/genstage").mkdir(parents=True)
+    with pytest.raises(ValueError, match="must not bundle"):
+        optional_payload(tmp_path, linux=True)
 
 
-def test_optional_spec_rejects_other_platform(tmp_path: Path) -> None:
-    other = approved_manifest("genstage", system="Darwin", architecture="arm64")
-    local = approved_manifest("genstage")
-    if local == other:
-        other = approved_manifest("genstage", system="Linux", architecture="x86_64")
-    write_manifest(tmp_path, other)
-    with pytest.raises(ValueError, match="approved pinned specification"):
-        optional_manifest.verify_manifest(tmp_path)
+def test_darwin_wheel_still_requires_verified_payload(tmp_path: Path) -> None:
+    with pytest.raises(OSError):
+        optional_payload(tmp_path, linux=False)
+    (tmp_path / "optional/genstage").mkdir(parents=True)
+    (tmp_path / "optional/genstage/manifest.json").write_text("{}")
+    with pytest.raises(ValueError):
+        optional_payload(tmp_path, linux=False)
+
+
+def test_linux_genstage_reports_unbundled_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(optional.platform, "system", lambda: "Linux")
+    with pytest.raises(BootstrapError, match="GenStage payload is not bundled on Linux"):
+        read_manifest(tmp_path / "genstage")
 
 
 def test_manifest_verifies_all_files(artifact: Artifact) -> None:

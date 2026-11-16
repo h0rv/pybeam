@@ -28,7 +28,7 @@ Linux wheels use the `cp314-cp314-linux_x86_64` tag, not a manylinux tag. Use co
 
 ### Build a wheel
 
-Install the tools in `mise.toml` and sync the locked dependencies. The optional Python Hornbeam dependency expects a sibling `hornbeam` checkout on branch `mvp/runtime-support`.
+Install the tools in `mise.toml` and sync the locked dependencies.
 
 ```sh
 mise install
@@ -41,28 +41,12 @@ mise exec -- uv run --locked python tools/build_runtime.py \
   --native-app _build/default/lib/erlang_python \
   --otp-license build/OTP-LICENSE.txt \
   --native-license _build/default/lib/erlang_python/LICENSE
-```
-
-The wheel also requires the pinned GenStage payload. Its Linux specification is separate from Darwin's; source revisions, file hashes and module identities are checked, not regenerated during a build. Source paths affect compiled macros, so the current Linux pin requires the checkout layout `/home/ubuntu/repos/{pybeam,elixir,gen_stage}` and the tools pinned in `mise.toml`.
-
-```sh
-git clone https://github.com/elixir-lang/elixir.git ../elixir
-git -C ../elixir switch --detach 853b7cd719bce7df87be4271ee91c90acdf706e1
-git clone https://github.com/elixir-lang/gen_stage.git ../gen_stage
-git -C ../gen_stage switch --detach d1532fa56482bc92d90abc777439ff8be34b5b1a
-mise exec -- make -C ../elixir -j2
-mise exec -- sh -c 'export PATH="$PWD/../elixir/bin:$PATH"; mix local.hex --force; cd ../gen_stage && mix compile --no-deps-check'
-mkdir -p build/genstage-bridge
-mise exec -- erlc +deterministic -o build/genstage-bridge src/pybeam/integrations/genstage/pybeam_genstage.erl
-mise exec -- sh -c 'export PATH="$PWD/../elixir/bin:$PATH"; elixirc --ignore-module-conflict -pa ../gen_stage/_build/dev/lib/gen_stage/ebin -o build/genstage-bridge src/pybeam/integrations/genstage/graph.ex'
-cp src/pybeam/integrations/genstage/pybeam_genstage.app build/genstage-bridge/
-mise exec -- uv run --locked python -m tools.build_genstage \
-  --otp "$(mise where erlang)" --elixir ../elixir --genstage ../gen_stage \
-  --bridge build/genstage-bridge --runtime build/runtime
 mise exec -- uv build --wheel
 ```
 
-Install `dist/python_beam-0.1.0a1-cp314-cp314-linux_x86_64.whl` into a Python 3.14 environment. Running `python examples/hello.py` or `python examples/actors/main.py` then starts and stops the bundled runtime without `erl`, rebar3 or mise on PATH. Other source layouts require separately reviewed payload identities, not bypassing the checks.
+Linux wheels do not bundle the optional GenStage payload. Calling the GenStage integration reports that the payload is not bundled on Linux. Core actors and shared state do not require it. Darwin wheels retain their pinned GenStage payload.
+
+Install `dist/python_beam-0.1.0a1-cp314-cp314-linux_x86_64.whl` into a Python 3.14 environment. Running `python examples/hello.py` or `python examples/actors/main.py` then starts and stops the bundled runtime without `erl`, rebar3 or mise on PATH.
 
 ### Use a development runtime
 

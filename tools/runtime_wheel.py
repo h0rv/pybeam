@@ -99,5 +99,14 @@ def runtime_tag(assets: Path) -> str:
             raise ValueError("Wheel tag understates the native macOS deployment target")
         if any(not item.startswith("@loader_path") for item in info.rpaths):
             raise ValueError("Runtime contains a nonrelocatable dylib search path")
-    audit_optional(assets / "optional/genstage")
+    optional_payload(assets, linux=linux)
     return tag
+
+
+def optional_payload(assets: Path, *, linux: bool) -> None:
+    root = assets / "optional/genstage"
+    if linux:
+        if root.exists():
+            raise ValueError("Linux runtime wheels must not bundle the GenStage payload")
+    else:
+        audit_optional(root)
