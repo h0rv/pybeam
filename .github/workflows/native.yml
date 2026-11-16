@@ -111,9 +111,9 @@ jobs:
         # Wheel/GenStage gates explicitly skip without PYBEAM_TEST_WHEEL: they need
         # separately reviewed platform-wheel/optional artifacts, not this source build.
         run: >-
-          uv run --locked --all-extras pytest
+          uv run --locked --all-extras --with pytest-timeout==2.4.0 pytest
           --run-frameworks --run-runtime -m 'runtime and not browser'
-          -vv -rs -o faulthandler_timeout=120
+          -vv -rs --timeout=180 --timeout-method=signal -o faulthandler_timeout=120
           --basetemp="$RUNNER_TEMP/native-tests"
       - name: Upload regression diagnostics
         if: failure()
