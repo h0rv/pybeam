@@ -24,5 +24,7 @@ C-extension crash isolation. OTP supervision does not change those limits.
 
 Read [Get started](docs/guide/index.md), then try [actors](docs/guide/actors.md) or [shared state](docs/guide/state.md).
 
+Check the [runtime requirements](docs/guide/index.md#requirements) before running the examples.
+
 Explore the runnable [Discord demo](examples/discord_demo/README.md) and
 [showcase](examples/showcase).
