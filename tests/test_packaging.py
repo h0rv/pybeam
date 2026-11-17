@@ -442,7 +442,7 @@ def test_staging__resolves_inputs_before_systools_changes_directory(
     license_file.write_text("third-party license")
     monkeypatch.setattr(
         "tools.build_runtime.otp_information",
-        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10"),
+        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10", "4.27.1"),
     )
 
     def command(arguments: list[str], *, cwd: Path | None = None) -> str:
@@ -450,6 +450,7 @@ def test_staging__resolves_inputs_before_systools_changes_directory(
         assert str(native / "ebin") in arguments[-1]
         assert str(tmp_path / "otp") in arguments[-1]
         assert cwd is not None and cwd != tmp_path
+        assert '{mnesia,"4.27.1",load}' in (cwd / "pybeam.rel").read_text()
         raise RuntimeError("captured absolute systools invocation")
 
     monkeypatch.setattr("tools.build_runtime.run", command)
@@ -495,6 +496,7 @@ def test_staging__preserves_isolated_bootstrap_and_discards_nonruntime_files(
         otp / "erts-17.1.1/bin/erl.src": b"%FINAL_ROOTDIR%",
         native / "ebin/erlang_python.app": b'{application,erlang_python,[{vsn,"5.0.1"}]}.',
         native / "ebin/py_launch.beam": b"beam",
+        release / "lib/mnesia-4.27.1/ebin/mnesia.beam": b"mnesia",
         release / "releases/0.1.0/start.boot": b"boot",
         priv / "py_nif.so": b"native",
         priv / "test_helper.py": b"not runtime code",
@@ -521,7 +523,7 @@ def test_staging__preserves_isolated_bootstrap_and_discards_nonruntime_files(
     monkeypatch.setattr("tools.build_runtime.platform.machine", lambda: "x86_64")
     monkeypatch.setattr(
         "tools.build_runtime.otp_information",
-        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10"),
+        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10", "4.27.1"),
     )
     monkeypatch.setattr("tools.build_runtime.run", command)
     monkeypatch.setattr("tools.build_runtime.audit_elf", lambda *_args, **_kwargs: ELF((), ()))
@@ -533,6 +535,10 @@ def test_staging__preserves_isolated_bootstrap_and_discards_nonruntime_files(
     assert not (staged_priv / "test_helper.py").exists()
     assert not (staged_priv / "tests").exists()
     assert not (staged_priv / "_erlang_isolated/__pycache__").exists()
+    assert (output / "lib/mnesia-4.27.1/ebin/mnesia.beam").read_bytes() == b"mnesia"
+    assert (
+        "lib/mnesia-4.27.1/ebin" in json.loads((output / "runtime.json").read_text())["code_paths"]
+    )
 
 
 def test_packaged_assets__rejects_incompatible_host_before_native_launch(

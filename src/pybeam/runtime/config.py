@@ -72,6 +72,7 @@ class Distribution:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Config:
     development_runtime: Path | None = None
+    data_dir: Path = Path(".pybeam/data")
     startup_timeout: float = 30.0
     shutdown_timeout: float = 5.0
     mode: Mode = Mode.MANAGED
@@ -80,6 +81,7 @@ class Config:
     listeners: bool = False
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "data_dir", self.data_dir.resolve())
         if self.development_runtime is not None:
             object.__setattr__(self, "development_runtime", self.development_runtime.resolve())
         _timeout(self.startup_timeout, "startup_timeout")
@@ -122,6 +124,10 @@ def _anchor(value: object, directory: Path) -> object:
         )
     if "development_runtime" in document:
         document["development_runtime"] = _path(document["development_runtime"], directory)
+    data_dir = document.get("data_dir", ".pybeam/data")
+    document["data_dir"] = _path(
+        str(data_dir) if isinstance(data_dir, Path) else data_dir, directory
+    )
     distribution = document.get("distribution")
     if isinstance(distribution, dict) and isinstance(distribution.get("nodes"), list):
         distribution = dict(distribution)
@@ -155,4 +161,4 @@ def load_config(directory: Path) -> Config:
             if not isinstance(tool, dict):
                 raise BootstrapError("Invalid tool.pybeam configuration: tool must be a table")
             return parse_config(tool.get("pybeam", {}), parent)
-    return Config()
+    return parse_config({}, directory)
