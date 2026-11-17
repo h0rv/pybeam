@@ -80,14 +80,30 @@ def test_native__nonreading_output_peer_closes_and_releases_subscription(
             response.raise_for_status()
             assert Json(TickReply).decode(response.content).ticks > ticks_before
 
-            deadline = time.monotonic() + 5
-            with pytest.raises(ConnectionClosed):
-                while True:
-                    remaining = deadline - time.monotonic()
-                    assert remaining > 0, (
-                        "Peer transport remained open after output handler finished"
-                    )
-                    peer.recv(timeout=remaining)
+            try:
+                deadline = time.monotonic() + 5
+                with pytest.raises(ConnectionClosed):
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        assert remaining > 0, (
+                            "Peer transport remained open after output handler finished"
+                        )
+                        peer.recv(timeout=remaining)
+            except BaseException:
+                import subprocess
+                local = peer.socket.getsockname()[1]
+                out = subprocess.run(["netstat", "-an", "-p", "tcp"], capture_output=True, text=True).stdout
+                print("DIAG ports", local, service_server.port, flush=True)
+                for line in out.splitlines():
+                    if "." + str(service_server.port) + " " in line or "." + str(local) + " " in line:
+                        print("DIAG", line, flush=True)
+                try:
+                    peer.ping()
+                    while True:
+                        peer.recv(timeout=3)
+                except BaseException as error:
+                    print("DIAG after ping", type(error).__name__, error, flush=True)
+                raise
 
 
 def test_native__lifespan_worker_continues_after_startup(service_server: RunningServer) -> None:
