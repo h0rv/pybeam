@@ -13,6 +13,7 @@ from pathlib import Path
 from types import FrameType
 
 from pybeam.runtime.assets import RuntimeAssets
+from pybeam.runtime.attach import EPMD, LOOPBACK, App, announce, node_name
 from pybeam.runtime.config import BootstrapError, CleanupError, Config
 
 
@@ -85,6 +86,7 @@ def launch(
     *,
     options: tuple[str, ...] = (),
     extra_environment: dict[str, str] | None = None,
+    debug: bool = False,
 ) -> int:
     if config.distribution is not False:
         raise BootstrapError("Configured distribution requires the explicit LocalCluster launcher")
@@ -129,6 +131,11 @@ def launch(
             },
             ensure_ascii=True,
         )
+        name = node_name(entry)
+        if debug:
+            environment.update(EPMD)
+            options = (*options, "-name", name + "@127.0.0.1", *LOOPBACK)
+        record: Path | None = None
         guardian = environment.get("PYBEAM_GUARDIAN_IDENTITY")
         state = _Shutdown()
         completion_status: int | None = None
@@ -163,6 +170,10 @@ def launch(
                 raise BootstrapError("Cannot start the managed runtime: " + str(error)) from error
             if state.received:
                 _send(process, state.received)
+            if debug:
+                record = announce(
+                    App(name, name + "@127.0.0.1", process.pid, str(entry), str(Path.cwd()))
+                )
             while True:
                 if guardian is not None:
                     from pybeam.runtime.ownership import Identity, resolve
@@ -242,5 +253,7 @@ def launch(
                         grace = max(0.0, state.deadline - time.monotonic())
                     _stop_owned(process, grace)
             finally:
+                if record is not None:
+                    record.unlink(missing_ok=True)
                 signal.signal(signal.SIGINT, previous_int)
                 signal.signal(signal.SIGTERM, previous_term)

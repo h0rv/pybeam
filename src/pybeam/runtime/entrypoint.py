@@ -8,12 +8,12 @@ from pybeam.runtime.loader import Entry, register
 from pybeam.runtime.process import launch
 
 
-def run_file(path: Path, args: list[str]) -> int:
+def run_file(path: Path, args: list[str], *, debug: bool = False) -> int:
     entry = path.resolve()
     if not entry.is_file():
         raise BootstrapError("Python entry file does not exist: " + str(entry))
     config = load_config(Path.cwd())
-    return launch(entry, args, config, discover_assets(config))
+    return launch(entry, args, config, discover_assets(config), debug=debug)
 
 
 def run(main: Entry) -> None:
