@@ -1,39 +1,42 @@
 import asyncio
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Literal
 
-import psutil
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
-
+from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local
 from pybeam.runtime.ownership import identity
 from pybeam.tasks import TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 
 
-class JobRequest(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class JobRequest:
+    value: int
+    delay_ms: int = 100
 
-    value: Annotated[int, Field(ge=0, le=1000)]
-    delay_ms: Annotated[int, Field(ge=50, le=2000)] = 100
+    def __post_init__(self) -> None:
+        if type(self.value) is not int or not 0 <= self.value <= 1000:
+            raise ValueError("value must be an integer from 0 to 1000")
+        if type(self.delay_ms) is not int or not 50 <= self.delay_ms <= 2000:
+            raise ValueError("delay_ms must be an integer from 50 to 2000")
 
 
-class JobResult(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class JobResult:
     value: int
     side_effect_count: int
     python_version: str
 
 
-class EffectState(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EffectState:
     effects: int
     cleanups: int
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CancellationResult(EffectState):
     cancelled: Literal[True]
 
@@ -61,15 +64,17 @@ async def serve() -> None:
             await asyncio.sleep(0.03)
             cleanups += 1
 
-    spec = TaskFunction(double, TypeAdapter(JobRequest), TypeAdapter(JobResult))
+    spec = TaskFunction(double, Json(JobRequest), Json(JobResult))
     active: dict[str, TaskRef[JobResult]] = {}
     limits = TaskLimits(capacity=1, max_bytes=snapshot.max_bytes, shutdown_ms=1000)
     async with asyncio.TaskGroup():
         registered = await local(Request(op="register", definition="double"))
         if registered.status != "ok":
             raise RuntimeError("Recipient definition registration failed")
-        (directory / "b.identity.json").write_text(handler.model_dump_json())
-        (directory / "b.birth.json").write_text(identity(psutil.Process()).model_dump_json())
+        (directory / "b.identity.json").write_text(Json(type(handler)).encode(handler).decode())
+        (directory / "b.birth.json").write_text(
+            Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode()
+        )
         async with asyncio.TaskGroup() as observers:
 
             async def execute(token: str, payload: str) -> None:
@@ -77,8 +82,8 @@ async def serve() -> None:
                 from erlang.tasks import UncertainInflight
 
                 try:
-                    request = JobRequest.model_validate_json(payload)
-                except ValidationError:
+                    request = Json(JobRequest).decode(payload)
+                except ValueError:
                     await local(Request(op="reject", incarnation=handler.incarnation, token=token))
                     return
                 encoded = spec.encode(request)
@@ -94,7 +99,7 @@ async def serve() -> None:
                     )
                     if (
                         not isinstance(bound, str | bytes)
-                        or Reply.model_validate_json(bound).status != "ok"
+                        or Json(Reply).decode(bound).status != "ok"
                     ):
                         raise RuntimeError("Cannot bind request to an empty local Task scope")
                     ref = await supervisor.start(spec, request)
@@ -103,19 +108,31 @@ async def serve() -> None:
                     )
                     if (
                         not isinstance(started, str | bytes)
-                        or Reply.model_validate_json(started).status != "ok"
+                        or Json(Reply).decode(started).status != "ok"
                     ):
                         raise RuntimeError("Cannot prove request-owned local Task PID")
                     active[token] = ref
                     try:
-                        result = (await ref).model_dump_json()
+                        result = Json(type(await ref)).encode(await ref).decode()
                     except asyncio.CancelledError:
                         current = asyncio.current_task()
                         if current is None or current.cancelling():
                             raise
-                        result = CancellationResult(
-                            cancelled=True, effects=effects, cleanups=cleanups
-                        ).model_dump_json()
+                        result = (
+                            Json(
+                                type(
+                                    CancellationResult(
+                                        cancelled=True, effects=effects, cleanups=cleanups
+                                    )
+                                )
+                            )
+                            .encode(
+                                CancellationResult(
+                                    cancelled=True, effects=effects, cleanups=cleanups
+                                )
+                            )
+                            .decode()
+                        )
                     except UncertainInflight:
                         raise
                     except Exception:

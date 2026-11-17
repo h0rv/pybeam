@@ -1,12 +1,12 @@
 import asyncio
 import os
+from dataclasses import replace
 from pathlib import Path
-
-import psutil
 
 from examples.distributed.jobs import JobRequest
 from examples.distributed.probes import controls
 from pybeam import run
+from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, Reply, Request, local, remote, reservation
 from pybeam.runtime.ownership import durable_write, identity
 
@@ -21,9 +21,7 @@ async def sample(directory: Path, stage: str) -> None:
     if peer.identity.node not in own.nodes or own.identity.node not in peer.nodes:
         raise RuntimeError("Mutual OTP nodes() membership missing")
     receipt = await remote("b", Request(op="receipt", id=stage, ack_alias="a"))
-    if receipt.status != "ok" or receipt.receipt != peer.identity.model_copy(
-        update={"message_id": stage}
-    ):
+    if receipt.status != "ok" or receipt.receipt != replace(peer.identity, **{"message_id": stage}):
         raise RuntimeError("Receipt was not produced by the recipient handler")
     ack = receipt.reverse_ack
     if (
@@ -33,7 +31,11 @@ async def sample(directory: Path, stage: str) -> None:
         or ack.receipt.node != own.identity.node
     ):
         raise RuntimeError("B did not receive the reverse OTP acknowledgment")
-    payload = JobRequest(value=21, delay_ms=100).model_dump_json()
+    payload = (
+        Json(type(JobRequest(value=21, delay_ms=100)))
+        .encode(JobRequest(value=21, delay_ms=100))
+        .decode()
+    )
     reserved = await remote("b", reservation(peer.identity.incarnation, stage, payload))
     if reserved.status != "ok" or reserved.token is None:
         raise RuntimeError("Recipient reservation failed")
@@ -62,35 +64,67 @@ async def sample(directory: Path, stage: str) -> None:
         raise RuntimeError("Result did not come from the recipient's acknowledged OTP task")
     durable_write(
         directory / (stage + ".json"),
-        Reply(
-            status="ok",
-            identity=own.identity,
-            recipient=result.identity,
-            receipt=receipt.receipt,
-            reverse_ack=ack,
-            worker=result.worker,
-            worker_kind=result.worker_kind,
-            worker_dead=result.worker_dead,
-            job_id=result.job_id,
-            request_bytes=result.request_bytes,
-            otp_release=peer.otp_release,
-            otp_version=peer.otp_version,
-            definitions=peer.definitions,
-            erts_version=peer.erts_version,
-            private_home=peer.private_home,
-            result=result.result,
-            payload=result.payload,
-            token=token,
-            nodes=own.nodes,
-            events=own.events,
-        ).model_dump_json(),
+        Json(
+            type(
+                Reply(
+                    status="ok",
+                    identity=own.identity,
+                    recipient=result.identity,
+                    receipt=receipt.receipt,
+                    reverse_ack=ack,
+                    worker=result.worker,
+                    worker_kind=result.worker_kind,
+                    worker_dead=result.worker_dead,
+                    job_id=result.job_id,
+                    request_bytes=result.request_bytes,
+                    otp_release=peer.otp_release,
+                    otp_version=peer.otp_version,
+                    definitions=peer.definitions,
+                    erts_version=peer.erts_version,
+                    private_home=peer.private_home,
+                    result=result.result,
+                    payload=result.payload,
+                    token=token,
+                    nodes=own.nodes,
+                    events=own.events,
+                )
+            )
+        )
+        .encode(
+            Reply(
+                status="ok",
+                identity=own.identity,
+                recipient=result.identity,
+                receipt=receipt.receipt,
+                reverse_ack=ack,
+                worker=result.worker,
+                worker_kind=result.worker_kind,
+                worker_dead=result.worker_dead,
+                job_id=result.job_id,
+                request_bytes=result.request_bytes,
+                otp_release=peer.otp_release,
+                otp_version=peer.otp_version,
+                definitions=peer.definitions,
+                erts_version=peer.erts_version,
+                private_home=peer.private_home,
+                result=result.result,
+                payload=result.payload,
+                token=token,
+                nodes=own.nodes,
+                events=own.events,
+            )
+        )
+        .decode(),
     )
     await remote("b", Request(op="ack", incarnation=peer.identity.incarnation, token=token))
 
 
 async def main() -> None:
     directory = Path(os.environ["PYBEAM_CLUSTER_DIRECTORY"])
-    durable_write(directory / "a.birth.json", identity(psutil.Process()).model_dump_json())
+    durable_write(
+        directory / "a.birth.json",
+        Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+    )
     async with asyncio.timeout(10):
         while True:
             joined = await local(Request(op="connect", alias="b"))
@@ -103,15 +137,19 @@ async def main() -> None:
     await controls(directory, peer.identity.incarnation)
     old_incarnation = peer.identity.incarnation
     await sample(directory, "first")
-    first_proof = Reply.model_validate_json((directory / "first.json").read_text())
+    first_proof = Json(Reply).decode((directory / "first.json").read_text())
     previous: HandlerIdentity | None = None
     inflight: Request | None = None
     while True:
         state = await local(Request(op="snapshot"))
-        durable_write(directory / "a.state.json", state.model_dump_json())
+        durable_write(directory / "a.state.json", Json(type(state)).encode(state).decode())
         if (directory / "start-inflight").exists():
             (directory / "start-inflight").unlink()
-            payload = JobRequest(value=99, delay_ms=2000).model_dump_json()
+            payload = (
+                Json(type(JobRequest(value=99, delay_ms=2000)))
+                .encode(JobRequest(value=99, delay_ms=2000))
+                .decode()
+            )
             claim = await remote("b", reservation(old_incarnation, "interrupted", payload))
             if claim.status != "ok" or claim.token is None:
                 raise RuntimeError("In-flight control reservation failed")
@@ -132,25 +170,29 @@ async def main() -> None:
                     await asyncio.sleep(0.01)
             durable_write(
                 directory / "inflight.json",
-                running.model_copy(update={"token": claim.token}).model_dump_json(),
+                Json(type(replace(running, token=claim.token)))
+                .encode(replace(running, token=claim.token))
+                .decode(),
             )
         if (directory / "observe-absent").exists():
             absent = await remote("b", Request(op="receipt", id="absent", ack_alias="a"))
-            durable_write(directory / "absent.json", absent.model_dump_json())
+            durable_write(directory / "absent.json", Json(type(absent)).encode(absent).decode())
             if inflight is not None:
                 lost = await remote("b", inflight)
-                durable_write(directory / "inflight-loss.json", lost.model_dump_json())
+                durable_write(
+                    directory / "inflight-loss.json", Json(type(lost)).encode(lost).decode()
+                )
             (directory / "observe-absent").unlink()
         if (directory / "try-join").exists():
             (directory / "try-join").unlink()
             await local(Request(op="connect", alias="b"))
             refused = await remote("b", Request(op="receipt", id="cookie-control", ack_alias="a"))
-            durable_write(directory / "join-control.json", refused.model_dump_json())
+            durable_write(
+                directory / "join-control.json", Json(type(refused)).encode(refused).decode()
+            )
         if (directory / "rejoin").exists():
             (directory / "rejoin").unlink()
-            previous = HandlerIdentity.model_validate_json(
-                (directory / "b.identity.json").read_text()
-            )
+            previous = Json(HandlerIdentity).decode((directory / "b.identity.json").read_text())
             await local(Request(op="connect", alias="b"))
             peer = await remote("b", Request(op="snapshot"))
             if peer.identity != previous or peer.count != 0 or peer.completed != 0:
@@ -160,8 +202,8 @@ async def main() -> None:
             )
             if stale.status != "stale":
                 raise RuntimeError("Delayed old-generation ACK was accepted")
-            durable_write(directory / "stale.json", stale.model_dump_json())
-            durable_write(directory / "fresh.json", peer.model_dump_json())
+            durable_write(directory / "stale.json", Json(type(stale)).encode(stale).decode())
+            durable_write(directory / "fresh.json", Json(type(peer)).encode(peer).decode())
             await sample(directory, "second")
         await asyncio.sleep(0.05)
 

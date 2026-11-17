@@ -6,6 +6,7 @@ from pathlib import Path
 from benchmarks.contract import Unsupported
 from benchmarks.ownership import spawn_owned
 from examples.showcase.catalog import ROOT, catalog
+from pybeam.codec import Json
 
 
 def main() -> None:
@@ -38,7 +39,7 @@ def main() -> None:
     print("Guardian owns child PID " + str(owned.pid), flush=True)
     time.sleep(25)
     result = Unsupported(reason="Timed demo session ended; no benchmark metrics", features=(key,))
-    (directory / "adapter.json").write_text(result.model_dump_json())
+    (directory / "adapter.json").write_text(Json(type(result)).encode(result).decode())
 
 
 if __name__ == "__main__":

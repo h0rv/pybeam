@@ -1,27 +1,30 @@
 import asyncio
+from dataclasses import dataclass
 from time import perf_counter_ns
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pybeam.codec import Json
 
 PAYLOAD_LIMIT = 1024
 
 
-class Work(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-    id: Annotated[int, Field(ge=0)]
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Work:
+    id: int
     action: Literal["ok", "slow", "fail", "cancel"]
     text: str = ""
 
+    def __post_init__(self) -> None:
+        if type(self.id) is not int or self.id < 0:
+            raise ValueError("id must be a non-negative integer")
 
-class Outcome(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Outcome:
     id: int
     status: Literal["ok", "failed", "cancelled"]
     detail: str
-    python_ns: Annotated[int, Field(ge=0)]
+    python_ns: int
 
 
 async def handle(work: Work) -> str:
@@ -60,8 +63,13 @@ def process(payload: bytes) -> bytes:
     """Parse only at the native boundary; deadlines are cooperative, not isolation."""
     if len(payload) > PAYLOAD_LIMIT:
         raise ValueError("callback payload exceeds 1024 bytes")
-    work = Work.model_validate_json(payload)
-    result = asyncio.run(execute(work)).model_dump_json().encode("utf-8")
+    work = Json(Work).decode(payload)
+    result = (
+        Json(type(asyncio.run(execute(work))))
+        .encode(asyncio.run(execute(work)))
+        .decode()
+        .encode("utf-8")
+    )
     if len(result) > PAYLOAD_LIMIT:
         raise ValueError("callback result exceeds 1024 bytes")
     return result

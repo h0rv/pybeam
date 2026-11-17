@@ -1,12 +1,11 @@
 import asyncio
+import os
 import sys
 import tempfile
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, assert_never
-
-import psutil
 
 from benchmarks.contract import AdapterResult, Budget, Config, Workload
 from benchmarks.ownership import Control, Registry, identity
@@ -24,6 +23,7 @@ from examples.distributed.models import (
 )
 from examples.distributed.policy import walkthrough_budget, walkthrough_stop
 from examples.showcase.catalog import ROOT, Card, distributed_unavailable
+from pybeam.codec import Json
 
 
 @dataclass(frozen=True)
@@ -194,9 +194,9 @@ class Jobs:
                     budget=walkthrough_budget(),
                     adapter_command=(sys.executable, "-m", "examples.showcase.distributed"),
                 )
-            (job.directory / "config.json").write_text(config.model_dump_json())
+            (job.directory / "config.json").write_text(Json(type(config)).encode(config).decode())
             control = Control(
-                owner=identity(psutil.Process()), stop_file=str(job.directory / "stop.request")
+                owner=identity(os.getpid()), stop_file=str(job.directory / "stop.request")
             )
             command = (
                 sys.executable
@@ -210,7 +210,7 @@ class Jobs:
                 "--output",
                 str(job.directory / "result"),
                 "--control",
-                control.model_dump_json(),
+                Json(type(control)).encode(control).decode(),
             )
             try:
                 with (job.directory / "runner.log").open("wb") as log:
@@ -233,19 +233,17 @@ class Jobs:
                     job = replace(
                         job,
                         trials=tuple(
-                            TrialSummary.model_validate_json(line)
+                            Json(TrialSummary).decode(line)
                             for line in path.read_text().splitlines()
                         ),
                     )
                 provenance = job.directory / "result/provenance.json"
                 if provenance.is_file():
-                    job = replace(
-                        job, provenance=Provenance.model_validate_json(provenance.read_text())
-                    )
+                    job = replace(job, provenance=Json(Provenance).decode(provenance.read_text()))
                 job = replace(
                     job,
                     results=tuple(
-                        AdapterResult.model_validate_json(
+                        Json(AdapterResult).decode(
                             (
                                 job.directory
                                 / "result"
@@ -258,7 +256,7 @@ class Jobs:
                     ),
                 )
                 if any(t.outcome.status == "walkthrough" for t in job.trials):
-                    proof = WalkthroughProof.model_validate_json(
+                    proof = Json(WalkthroughProof).decode(
                         (job.directory / "result/trial-0/adapter.json").read_text()
                     )
                     if proof.observations != job.observations:
@@ -267,7 +265,7 @@ class Jobs:
                 registry_path = job.directory / "result/trial-0/ownership.json"
                 uncertain = (
                     registry_path.exists()
-                    and Registry.model_validate_json(registry_path.read_text()).phase != "confirmed"
+                    and Json(Registry).decode(registry_path.read_text()).phase != "confirmed"
                 )
                 status = (
                     "uncertain"
@@ -307,7 +305,7 @@ class Jobs:
                     if len(lines) > 16 or lines[: len(consumed)] != consumed:
                         raise ValueError("Observation count or append-only contract violated")
                     for line in lines[len(consumed) :]:
-                        event = OBSERVATION.validate_json(line)
+                        event = OBSERVATION.decode(line)
                         current = self.items[job.id]
                         self.update(replace(current, observations=(*current.observations, event)))
                         consumed.append(line)

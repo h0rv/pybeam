@@ -4,7 +4,7 @@ version = "0.1.0a1"
 description = "Python-first tools for BEAM services"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = ["pydantic==2.14.3", "typing-extensions>=4.14.1,<5", "psutil>=7,<8"]
+dependencies = []
 
 [project.scripts]
 pybeam = "pybeam.runtime.cli:main"
@@ -15,7 +15,6 @@ showcase = [
     "fastapi==0.163.0",
     "jinja2>=3.1.6,<4",
     "uvicorn>=0.41,<1",
-    "psutil>=7,<8",
 ]
 hornbeam = ["hornbeam"]
 fastapi = [
@@ -43,14 +42,14 @@ dev = [
   "websockets>=15,<17",
   "pydantic==2.14.3",
   "ty>=0.0.104",
-  "types-psutil>=7,<8",
+  "typing-extensions>=4.14.1,<5",
   "playwright>=1.58,<2",
   "hatchling>=1.27,<2",
   "patchelf==0.19.3.0 ; sys_platform == 'linux'",
 ]
 
 [build-system]
-requires = ["hatchling>=1.27,<2", "pydantic==2.14.3", "typing-extensions>=4.14.1,<5"]
+requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 backend-path = [".", "src"]
 
