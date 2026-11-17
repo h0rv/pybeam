@@ -1,5 +1,4 @@
 import asyncio
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from html import escape
 from importlib.resources import files
@@ -9,6 +8,7 @@ from typing import TYPE_CHECKING, Annotated, override
 
 from markupsafe import Markup
 from pydantic import BaseModel, Field, ValidationError
+from pyview import Depends
 from pyview.events import InfoEvent
 from pyview.live_socket import ConnectedLiveViewSocket, LiveViewSocket, is_connected
 from pyview.live_view import LiveView, Session
@@ -18,48 +18,22 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from pybeam.integrations.hornbeam.client import Beam
+from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.pyview.dependencies import beam_services, provider
 from pybeam.integrations.pyview.subscriptions import ViewSubscription
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
     from string.templatelib import Template
 
     from pyview.meta import PyViewMeta
     from pyview.template import RootTemplateContext
-    from starlette.applications import Starlette
     from starlette.requests import Request
 
-    from pybeam.integrations.hornbeam import Services
 
 TOPIC = "demo:counter"
 logger = getLogger("examples.pyview")
 basicConfig(level=INFO, format="%(levelname)s %(name)s: %(message)s")
 logger.setLevel(INFO)
-
-
-@dataclass
-class RuntimeState:
-    client: Services | None = None
-
-    @property
-    def beam(self) -> Services:
-        if self.client is None:
-            message = "Hornbeam lifespan has not started"
-            raise RuntimeError(message)
-        return self.client
-
-
-runtime = RuntimeState()
-
-
-@asynccontextmanager
-async def lifespan(_app: Starlette) -> AsyncGenerator[None]:
-    runtime.client = await Beam.connect()
-    try:
-        yield
-    finally:
-        runtime.client = None
 
 
 @dataclass
@@ -77,22 +51,30 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
     def __init__(self) -> None:
         super().__init__()
         self.subscription: ViewSubscription | None = None
+        self._beam: Services | None = None
         self._initialization = asyncio.Lock()
 
     @override
-    async def mount(self, socket: LiveViewSocket[CounterState], session: Session) -> None:
+    async def mount(
+        self,
+        socket: LiveViewSocket[CounterState],
+        session: Session,
+        beam: Services = Depends(beam_services),  # noqa: B008
+    ) -> None:
         socket.context = CounterState(0)
+        self._beam = beam
         async with self._initialization:
             if is_connected(socket):
-                owner = runtime.beam.for_scope(socket.websocket.scope)
-                self.subscription = await ViewSubscription.start(
-                    owner, socket, TOPIC, counter_event
-                )
+                self.subscription = await ViewSubscription.start(beam, socket, TOPIC, counter_event)
                 logger.info("Subscription connected to %s", TOPIC)
-            socket.context.count = await runtime.beam.incr("shared", 0, namespace="demo")
+            socket.context.count = await beam.incr("shared", 0, namespace="demo")
 
     async def handle_event(
-        self, event: str, socket: LiveViewSocket[CounterState], amount: str = ""
+        self,
+        event: str,
+        socket: LiveViewSocket[CounterState],
+        amount: str = "",
+        beam: Services = Depends(beam_services),  # noqa: B008
     ) -> None:
         if event not in {"increment", "amount"}:
             message = "unexpected counter event"
@@ -105,20 +87,25 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         socket.context.amount = data.amount
         socket.context.error = ""
         if event == "increment":
-            count = await runtime.beam.incr("shared", data.amount, namespace="demo")
+            count = await beam.incr("shared", data.amount, namespace="demo")
             logger.info("Incremented shared BEAM counter: amount=%s count=%s", data.amount, count)
-            await runtime.beam.publish(TOPIC, b"changed")
+            await beam.publish(TOPIC, b"changed")
             logger.info("Published invalidation to %s", TOPIC)
 
     @override
     async def handle_info(
-        self, event: InfoEvent, socket: ConnectedLiveViewSocket[CounterState]
+        self,
+        event: InfoEvent,
+        socket: ConnectedLiveViewSocket[CounterState],
     ) -> None:
         if event.name != TOPIC:
             message = "unexpected counter notification"
             raise ValueError(message)
         async with self._initialization:
-            socket.context.count = await runtime.beam.incr("shared", 0, namespace="demo")
+            if self._beam is None:
+                message = "CounterView has not mounted"
+                raise RuntimeError(message)
+            socket.context.count = await self._beam.incr("shared", 0, namespace="demo")
             logger.info("Subscription update: fresh BEAM read count=%s", socket.context.count)
 
     @override
@@ -166,17 +153,17 @@ class Increment(BaseModel):
 
 
 async def health(_request: Request) -> Response:
-    await runtime.beam.incr("shared", 0, namespace="demo")
+    await provider.services.incr("shared", 0, namespace="demo")
     return PlainTextResponse("ok")
 
 
 async def counter(_request: Request) -> Response:
-    value = await runtime.beam.incr("shared", 0, namespace="demo")
+    value = await provider.services.incr("shared", 0, namespace="demo")
     return PlainTextResponse(str(value))
 
 
 app = PyView(
-    lifespan=lifespan,
+    lifespan=provider.lifespan,
     routes=[
         Route("/health", health, methods=["GET"]),
         Route("/counter", counter, methods=["GET"]),
