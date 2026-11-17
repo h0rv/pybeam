@@ -38,40 +38,14 @@ def _require(value: int, name: str, low: int = 1, high: int | None = None) -> No
         raise ValueError(name + " must be an integer " + bound)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class ExecutionLimits:
-    """Bound physical execution contexts and aggregate admitted pool work."""
-
-    workers: int
-    capacity: int
-    max_bytes: int
-
-    def __post_init__(self) -> None:
-        _require(self.workers, "workers")
-        _require(self.capacity, "capacity")
-        _require(self.max_bytes, "max_bytes")
-
-
-async def open_group(*, max_children: int, execution: ExecutionLimits | None = None) -> DataGroup:
-    if execution is None:
-        try:
-            from erlang.actors import DataActorGroup
-        except ImportError as error:
-            raise RuntimeError(
-                "Bounded native actor groups are required; no raw-object fallback"
-            ) from error
-        return await DataActorGroup(max_children=max_children).__aenter__()
-
+async def open_group(*, max_children: int) -> DataGroup:
     try:
-        from erlang.actors import DataActorGroup, PoolLimits
+        from erlang.actors import DataActorGroup
     except ImportError as error:
         raise RuntimeError(
-            "Pooled native actors are required; no dedicated-mode fallback"
+            "Bounded native actor groups are required; no raw-object fallback"
         ) from error
-    native_limits = PoolLimits(
-        workers=execution.workers, capacity=execution.capacity, max_bytes=execution.max_bytes
-    )
-    return await DataActorGroup(max_children=max_children, execution=native_limits).__aenter__()
+    return await DataActorGroup(max_children=max_children).__aenter__()
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +69,7 @@ class ContextCounts:
 
 
 async def context_counts() -> ContextCounts:
-    """Process-wide native context allocation/destruction counters, not PID counts."""
+    """Process-wide context counters, not actor counts; pool workers outlive groups."""
     from erlang.actors import context_counts as native_counts
 
     counts = await native_counts()
@@ -132,8 +106,9 @@ class ActorGroup:
     """Own native OTP actors within one VM.
 
     Limits bound admitted requests and encoded bytes, not Python heap or RSS.
-    Encoded replies are size-checked too. Exit destroys the owned native contexts;
-    asynchronous library resources still require explicit application cleanup.
+    Encoded replies are size-checked too. Actors lease node-wide workers for each
+    turn; exit releases actor state, not pool contexts. Loop-bound resources must
+    be created and finalized within the same turn.
     """
 
     def __init__(
@@ -142,12 +117,10 @@ class ActorGroup:
         max_children: int = 128,
         max_pending: int = 64,
         max_bytes: int = 1_048_576,
-        execution: ExecutionLimits | None = None,
     ) -> None:
         self._limits = _ActorGroupConfig(
             max_children=max_children, max_pending=max_pending, max_bytes=max_bytes
         )
-        self._execution = execution
         self._stack = AsyncExitStack()
         self._starts: asyncio.TaskGroup | None = None
         self._native: DataGroup | None = None
@@ -162,12 +135,7 @@ class ActorGroup:
         if self._entered or self._closing:
             raise RuntimeError("ActorGroup cannot be entered twice or after closing")
         self._entered = True
-        if self._execution is None:
-            native = await open_group(max_children=self._limits.max_children)
-        else:
-            native = await open_group(
-                max_children=self._limits.max_children, execution=self._execution
-            )
+        native = await open_group(max_children=self._limits.max_children)
         self._native = native
         self._stack.push_async_callback(native.close)
         try:

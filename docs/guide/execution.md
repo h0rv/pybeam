@@ -1,12 +1,12 @@
 # How Python work runs
 
-A BEAM process starts at about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Each task or actor gets a Python context, limits cap how many run at once, and you choose how each context runs Python.
+A BEAM process starts at about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), but Python state and execution resources cost more. PyBeam does not start an interpreter per process. Tasks own execution contexts; actors lease workers from a shared node-wide pool for each call.
 
 ## From a BEAM process to Python
 
 ![A BEAM process sends a call to a mailbox. A Python context takes the call. Supported contexts run as worker or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
 
-1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free. `TaskLimits` or an actor group's `max_children` caps how many contexts exist; starting a task when its ownership slots are full raises `Overloaded` instead of queuing it.
+1. Your task or actor is a BEAM process. Each actor runs one call at a time on a leased worker. An actor group's `max_children` caps actor count, not threads. `TaskLimits` bounds task ownership; starting a task when its ownership slots are full raises `Overloaded` instead of queuing it.
 2. A context owns one OS thread. Its mode decides which interpreter and GIL run your code.
 3. The result comes back as a message. If an actor crashes, its group starts a replacement with fresh state; it does not replay the call. Tasks are temporary children: their supervisor does not restart them.
 
@@ -28,6 +28,8 @@ Use free-threaded CPython 3.14t workers by default. Use isolated OS processes fo
 - Separate nodes: surviving a whole VM failure.
 
 Supported task modes are `worker` and `isolated`; actors remain in `worker`. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
+
+Actor calls use worker-local loops. Blocking calls on different workers can overlap; pure-Python CPU work still needs a GIL-free build for parallel execution. Workers are shared across all actor groups, and a later call can use a different worker and loop. Create and finalize loop-bound resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
 ```python
 # execution.py

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="592" viewBox="0 0 760 592" role="img" aria-labelledby="title desc">
   <title id="title">How a BEAM process reaches Python</title>
-  <desc id="desc">A BEAM process sends a call to a mailbox. A Python context, which owns one OS thread, takes the call; limits cap how many contexts exist. Supported contexts run Python in two modes: worker uses the main interpreter with a shared GIL on 3.14 and no GIL on 3.14t; isolated uses a child OS process so a crash stays in the child. The result returns as a message, or a crash signal goes to the supervisor.</desc>
+  <desc id="desc">A BEAM process sends a call to a mailbox. Actors lease worker contexts from a node-wide pool; tasks own their contexts. Worker contexts use one OS thread and the main interpreter, with a shared GIL on 3.14 and no GIL on 3.14t. Isolated tasks use a child OS process so a crash stays in the child. The result returns as a message, or a crash signal goes to the supervisor.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -31,7 +31,7 @@
   <path d="M380 196V222" marker-end="url(#arrow)"/>
   <rect x="24" y="234" width="712" height="70"/>
   <text x="380.0" y="264" class="heading" text-anchor="middle">Python context</text>
-  <text x="380.0" y="288" class="note" text-anchor="middle">each owns one OS thread; limits cap how many exist</text>
+  <text x="380.0" y="288" class="note" text-anchor="middle">actors lease pooled workers; tasks own contexts</text>
   <path d="M380 305V323H134V337" marker-end="url(#arrow)"/>
   <path d="M380 323H626V337" marker-end="url(#arrow)"/>
   <rect x="24" y="349" width="220" height="112"/>

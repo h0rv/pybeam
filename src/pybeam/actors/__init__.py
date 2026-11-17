@@ -7,6 +7,5 @@ from pybeam.actors.codec import ActorPayloadError as ActorPayloadError
 from pybeam.actors.groups import ActorGroup as ActorGroup
 from pybeam.actors.groups import ActorInfo as ActorInfo
 from pybeam.actors.groups import ContextCounts as ContextCounts
-from pybeam.actors.groups import ExecutionLimits as ExecutionLimits
 from pybeam.actors.groups import context_counts as context_counts
 from pybeam.actors.groups import spawn as spawn

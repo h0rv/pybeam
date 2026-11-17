@@ -5,6 +5,5 @@ from pybeam.actors.codec import ActorCallError as ActorCallError
 from pybeam.actors.codec import ActorConstructionError as ActorConstructionError
 from pybeam.actors.codec import ActorPayloadError as ActorPayloadError
 from pybeam.actors.groups import ActorGroup as ActorGroup
-from pybeam.actors.groups import ExecutionLimits as ExecutionLimits
 from pybeam.actors.groups import spawn as spawn
 from pybeam.runtime.entrypoint import run as run
