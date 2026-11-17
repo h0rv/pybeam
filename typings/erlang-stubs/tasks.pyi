@@ -13,6 +13,10 @@ class RemoteTaskError(RuntimeError):
     message: str
     def __init__(self, type_name: str, message: str) -> None: ...
 
+class TaskCrashed(RuntimeError):
+    reason: object
+    def __init__(self, reason: object) -> None: ...
+
 @final
 class Body:
     def __init__(
@@ -26,7 +30,7 @@ async def start(
     factory: Callable[[], Body] | Callable[[bytes], Awaitable[bytes]],
     payload: bytes,
     *,
-    mode: Literal["worker", "owngil"] = "worker",
+    mode: Literal["worker", "owngil", "isolated"] = "worker",
 ) -> object: ...
 async def outcome(group: object, pid: object) -> Outcome: ...
 async def cancel(group: object, pid: object) -> None: ...
