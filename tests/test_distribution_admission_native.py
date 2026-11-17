@@ -4,6 +4,7 @@ import pytest
 
 from examples.distributed.config import configuration
 from examples.distributed.demo import wait_file
+from pybeam.codec import Json
 from pybeam.distribution import Reply
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import Distribution, PythonNode
@@ -31,14 +32,14 @@ def test_distribution__shared_ingress_and_request_scope_survive_caller_exit(
     )
     cluster = LocalCluster(distribution, config=config)
     with cluster:
-        result = Reply.model_validate_json(wait_file(cluster.directory / "admission.json"))
+        result = Json(Reply).decode(wait_file(cluster.directory / "admission.json"))
         assert result.worker_dead and result.result is not None
         for name in ("scope", "unrelated", "sender-scope"):
-            info = ScopeInfo.model_validate_json(wait_file(cluster.directory / (name + ".json")))
+            info = Json(ScopeInfo).decode(wait_file(cluster.directory / (name + ".json")))
             assert info.children == info.contexts == []
             assert info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
         births = [
-            Identity.model_validate_json(wait_file(cluster.directory / (alias + ".birth.json")))
+            Json(Identity).decode(wait_file(cluster.directory / (alias + ".birth.json")))
             for alias in ("a", "b")
         ]
         assert births[0] != births[1]

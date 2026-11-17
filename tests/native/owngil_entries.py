@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -41,10 +42,15 @@ async def cpu(payload: bytes) -> bytes:
     if not isinstance(deadline, int):
         raise ValueError("Expected a monotonic deadline")
     await asyncio.sleep(max(0, (deadline - time.monotonic_ns()) / 1_000_000_000))
-    begin = time.monotonic_ns()
-    value = 1
-    while time.monotonic_ns() - begin < 400_000_000:
-        value = (value * 13 + 17) % 100_003
-    end = time.monotonic_ns()
+    interval = sys.getswitchinterval()
+    sys.setswitchinterval(1)
+    try:
+        begin = time.monotonic_ns()
+        value = 1
+        while time.monotonic_ns() - begin < 400_000_000:
+            value = (value * 13 + 17) % 100_003
+        end = time.monotonic_ns()
+    finally:
+        sys.setswitchinterval(interval)
     assert value >= 0
     return json.dumps([begin, end]).encode()

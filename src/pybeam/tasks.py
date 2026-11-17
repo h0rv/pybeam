@@ -5,10 +5,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from inspect import iscoroutinefunction
 from types import FunctionType, TracebackType
-from typing import TYPE_CHECKING, Annotated, Literal, Protocol, Self, assert_never, overload
+from typing import TYPE_CHECKING, Literal, Protocol, Self, assert_never, overload
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
-
+from pybeam.codec import Codec
 from pybeam.submissions import AdmissionClosed, CapabilityUnavailable, Overloaded
 
 if TYPE_CHECKING:
@@ -31,14 +30,22 @@ class TaskOwnershipError(RuntimeError):
     pass
 
 
-class TaskLimits(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TaskLimits:
     """Finite ownership slots and aggregate encoded request bytes, not a Python heap limit."""
 
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+    capacity: int
+    max_bytes: int
+    shutdown_ms: int
 
-    capacity: Annotated[int, Field(gt=0, le=18446744073709551615)]
-    max_bytes: Annotated[int, Field(gt=0, le=18446744073709551615)]
-    shutdown_ms: Annotated[int, Field(gt=0, le=4294967295)]
+    def __post_init__(self) -> None:
+        for name, value, maximum in (
+            ("capacity", self.capacity, 18446744073709551615),
+            ("max_bytes", self.max_bytes, 18446744073709551615),
+            ("shutdown_ms", self.shutdown_ms, 4294967295),
+        ):
+            if type(value) is not int or not 0 < value <= maximum:
+                raise ValueError(name + " must be an integer from 1 to " + str(maximum))
 
 
 class ExecutionMode(StrEnum):
@@ -76,8 +83,8 @@ class TaskFunction[Q, R]:
     def __init__(
         self,
         function: Callable[[bytes], Awaitable[bytes]],
-        request: TypeAdapter[Q],
-        result: TypeAdapter[R],
+        request: Codec[Q],
+        result: Codec[R],
         *,
         execution: Literal[ExecutionMode.OWNGIL],
         dedicated_loop: bool = False,
@@ -87,8 +94,8 @@ class TaskFunction[Q, R]:
     def __init__(
         self,
         function: Callable[[Q], Awaitable[R]],
-        request: TypeAdapter[Q],
-        result: TypeAdapter[R],
+        request: Codec[Q],
+        result: Codec[R],
         *,
         execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
@@ -96,9 +103,9 @@ class TaskFunction[Q, R]:
 
     def __init__(
         self,
-        function: Callable[..., Awaitable[object]],
-        request: TypeAdapter[Q],
-        result: TypeAdapter[R],
+        function: Callable[..., Awaitable[R]],
+        request: Codec[Q],
+        result: Codec[R],
         *,
         execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
@@ -134,10 +141,10 @@ class TaskFunction[Q, R]:
         return self._execution
 
     def encode(self, request: Q) -> bytes:
-        return self._request.dump_json(self._request.validate_python(request, strict=True))
+        return self._request.encode(request)
 
     def decode(self, payload: bytes) -> R:
-        return self._result.validate_json(payload, strict=True)
+        return self._result.decode(payload)
 
     def body(self, owners: tuple[object, ...], job: object | None = None) -> Body:
         from erlang.tasks import Body
@@ -150,9 +157,9 @@ class TaskFunction[Q, R]:
             token = _body_owners.set(owners)
             job_token = _body_execution.set(_BodyExecution(job, asyncio.current_task()))
             try:
-                request = self._request.validate_json(payload, strict=True)
+                request = self._request.decode(payload)
                 value = await function(request)
-                return self._result.dump_json(self._result.validate_python(value, strict=True))
+                return self._result.encode(value)
             finally:
                 _body_execution.reset(job_token)
                 _body_owners.reset(token)

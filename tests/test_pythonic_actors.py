@@ -2,11 +2,10 @@ import asyncio
 import itertools
 import sys
 from collections.abc import Callable
-from dataclasses import field
+from dataclasses import dataclass, field
 from types import ModuleType
 
 import pytest
-from pydantic import BaseModel, ConfigDict
 
 import pybeam
 from pybeam.actors import groups
@@ -148,8 +147,8 @@ async def test_single_context__uses_group_ownership(backend: ScriptedGroup) -> N
     assert backend.closed
 
 
-class Payload(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True)
+class Payload:
     values: list[int]
 
 
@@ -234,7 +233,7 @@ def test_boundary__rejects_unsupported_objects_instead_of_sharing_them() -> None
             pass
 
     method = definition(Objects).methods[0]
-    with pytest.raises(ActorPayloadError, match="serialize"):
+    with pytest.raises(ActorPayloadError, match="JSON"):
         method.arguments.encode((object(),), {})
 
 

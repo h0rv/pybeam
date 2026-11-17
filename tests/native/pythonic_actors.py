@@ -2,11 +2,9 @@ import asyncio
 import os
 import tempfile
 from contextlib import ExitStack
-from dataclasses import field
+from dataclasses import dataclass, field
 from io import BufferedRandom
 from weakref import ReferenceType, ref
-
-from pydantic import BaseModel, ConfigDict
 
 import pybeam
 from pybeam.actors.classes import Reference, reference_route
@@ -37,8 +35,8 @@ class Counter:
         return value
 
 
-class Payload(BaseModel):
-    model_config = ConfigDict(frozen=True)
+@dataclass(frozen=True)
+class Payload:
     values: list[int]
 
 

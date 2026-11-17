@@ -1,41 +1,62 @@
 import argparse
 import asyncio
 from dataclasses import dataclass, field, replace
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
 import pybeam
 from pybeam.actors import ActorInfo, ContextCounts, context_counts
+from pybeam.codec import Json
 
-type RoomCount = Annotated[int, Field(ge=1, le=16)]
-type MemberCount = Annotated[int, Field(ge=1, le=64)]
-type EventCount = Annotated[int, Field(ge=1, le=1000)]
-type RoomEpoch = Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
-type MembershipRevision = Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
-type MemberId = Annotated[str, Field(min_length=1, max_length=32)]
+_MAX_INT64 = 9_223_372_036_854_775_807
 
 
-class Config(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid", validate_default=True)
-
-    rooms: RoomCount = 4
-    members: MemberCount = 8
-    events: EventCount = 100
-    max_inflight: Annotated[int, Field(ge=1, le=32)] = 4
-    max_bytes: Annotated[int, Field(ge=4096, le=1_048_576)] = 65_536
-    history: Annotated[int, Field(ge=1, le=32)] = 8
-    seed: Annotated[int, Field(ge=0, le=4_294_967_295)] = 712
+def _bounded(name: str, value: int, low: int, high: int) -> None:
+    if type(value) is not int or not low <= value <= high:
+        raise ValueError(name + " must be an integer from " + str(low) + " to " + str(high))
 
 
-class Event(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+def _text(name: str, value: str, low: int, high: int) -> None:
+    if not low <= len(value) <= high:
+        raise ValueError(name + " must have " + str(low) + " to " + str(high) + " characters")
 
-    room_id: Annotated[str, Field(min_length=1, max_length=32)]
-    event_id: Annotated[str, Field(min_length=1, max_length=64)]
-    epoch: Annotated[int, Field(ge=0)]
-    text: Annotated[str, Field(max_length=256)]
-    tags: Annotated[list[Annotated[str, Field(max_length=32)]], Field(max_length=4)]
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Config:
+    rooms: int = 4
+    members: int = 8
+    events: int = 100
+    max_inflight: int = 4
+    max_bytes: int = 65_536
+    history: int = 8
+    seed: int = 712
+
+    def __post_init__(self) -> None:
+        _bounded("rooms", self.rooms, 1, 16)
+        _bounded("members", self.members, 1, 64)
+        _bounded("events", self.events, 1, 1000)
+        _bounded("max_inflight", self.max_inflight, 1, 32)
+        _bounded("max_bytes", self.max_bytes, 4096, 1_048_576)
+        _bounded("history", self.history, 1, 32)
+        _bounded("seed", self.seed, 0, 4_294_967_295)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Event:
+    room_id: str
+    event_id: str
+    epoch: int
+    text: str
+    tags: list[str]
+
+    def __post_init__(self) -> None:
+        _text("room_id", self.room_id, 1, 32)
+        _text("event_id", self.event_id, 1, 64)
+        _bounded("epoch", self.epoch, 0, _MAX_INT64)
+        _text("text", self.text, 0, 256)
+        if len(self.tags) > 4:
+            raise ValueError("tags must have at most 4 items")
+        for tag in self.tags:
+            _text("tag", tag, 0, 32)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,12 +73,16 @@ class Receipt:
     deliveries: tuple[Delivery, ...]
 
 
-class MembershipInput(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MembershipInput:
+    member_id: str
+    epoch: int
+    revision: int = 0
 
-    member_id: MemberId
-    epoch: RoomEpoch
-    revision: MembershipRevision = 0
+    def __post_init__(self) -> None:
+        _text("member_id", self.member_id, 1, 32)
+        _bounded("epoch", self.epoch, 0, _MAX_INT64)
+        _bounded("revision", self.revision, 0, _MAX_INT64)
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,9 +204,8 @@ class Room:
         )
 
 
-class Proof(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Proof:
     backend: Literal["pybeam"] = "pybeam"
     room_processes: int
     client_task_limit: int
@@ -240,6 +264,10 @@ def check_snapshot(
         tuple(event.event_id for event in snapshot.history) == expected_ids[-history_limit:],
         "Bounded history differs",
     )
+
+
+CONFIG = Json(Config)
+PROOF = Json(Proof)
 
 
 async def simulate(config: Config) -> Proof:
@@ -431,12 +459,12 @@ def parse_config() -> Config:
     )
     parser.add_argument("--config", default="{}", help="Strict finite configuration as JSON")
     args = parser.parse_args()
-    return Config.model_validate_json(args.config)
+    return CONFIG.decode(args.config)
 
 
 async def main() -> None:
     proof = await simulate(parse_config())
-    print(proof.model_dump_json())
+    print(PROOF.encode(proof).decode())
 
 
 if __name__ == "__main__":

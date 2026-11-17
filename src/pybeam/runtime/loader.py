@@ -5,7 +5,7 @@ import os
 import runpy
 import sys
 import traceback
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -23,6 +23,7 @@ class _Session:
     invoked: bool = False
     task: asyncio.Task[object] | None = None
     load_status: int = 0
+    globals: Mapping[str, object] | None = None
 
 
 @dataclass(slots=True)
@@ -53,6 +54,20 @@ def require_managed_entry() -> None:
         raise BootstrapError("Optional applications require a running managed Python entry")
 
 
+def entry_loop() -> asyncio.AbstractEventLoop | None:
+    session = _state.session
+    if session is None or session.task is None:
+        return None
+    return session.task.get_loop()
+
+
+def entry_globals() -> Mapping[str, object]:
+    session = _state.session
+    if session is None or session.globals is None:
+        return {}
+    return session.globals
+
+
 def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         raise BootstrapError("Invalid managed bootstrap arguments")
@@ -78,13 +93,12 @@ def _status(error: BaseException) -> int:
     return 1
 
 
-def _run_entry(path: Path) -> None:
+def _run_entry(path: Path) -> Mapping[str, object]:
     # compile() keeps code constants mortal on free-threaded builds, so threads
     # running the same function contend on their reference counts. Loading
     # through marshal immortalizes them, as running a script with python does.
     if path.suffix != ".py":
-        runpy.run_path(str(path), run_name="__main__")
-        return
+        return runpy.run_path(str(path), run_name="__main__")
     code = marshal.loads(marshal.dumps(compile(path.read_bytes(), path, "exec")))  # noqa: S302
     module = ModuleType("__main__")
     vars(module).update(__file__=str(path), __cached__=None, __package__="")
@@ -97,6 +111,7 @@ def _run_entry(path: Path) -> None:
             del sys.modules["__main__"]
         else:
             sys.modules["__main__"] = previous
+    return module.__dict__
 
 
 def load() -> None:
@@ -116,7 +131,7 @@ def load() -> None:
     sys.path.insert(0, str(Path(argv[0]).parent))
     try:
         # File initialization deliberately runs again inside the embedded interpreter.
-        _run_entry(Path(argv[0]))
+        session.globals = _run_entry(Path(argv[0]))
         if session.entry is None:
             raise BootstrapError("The entry file did not register an async main with pybeam.run")
     except BaseException as error:

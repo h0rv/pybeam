@@ -21,10 +21,9 @@ def main() -> None:
     directory = Path(os.environ["PYBEAM_OWNER_DIRECTORY"])
     marker = directory / "entry"
     entry = (
-        "from pathlib import Path; from pybeam.runtime.ownership import Identity, resolve; "
-        "owner=Identity.model_validate_json("
-        + repr(os.environ.get("PYBEAM_OWNER_IDENTITY"))
-        + "); "
+        "from pathlib import Path; from pybeam.codec import Json; "
+        "from pybeam.runtime.ownership import Identity, resolve; "
+        "owner=Json(Identity).decode(" + repr(os.environ.get("PYBEAM_OWNER_IDENTITY")) + "); "
         "Path("
         + repr(str(marker))
         + ").write_text('live' if resolve(owner) is not None else 'gone')"

@@ -3,6 +3,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal, assert_never
 
+from pybeam.codec import Json
 from pybeam.runtime.cluster import ManagedCleanupAck
 from pybeam.runtime.ownership import Identity, resolve
 from pybeam.runtime.startup import ManagedStartupCensus
@@ -93,10 +94,8 @@ def parse_cleanup(
     if returncode != 0:
         return UnacknowledgedExit("Managed adapter exited unsuccessfully")
     try:
-        ack = ManagedCleanupAck.model_validate_json(
-            (directory / "managed-cleanup.json").read_bytes()
-        )
-        census = ManagedStartupCensus.model_validate_json(
+        ack = Json(ManagedCleanupAck).decode((directory / "managed-cleanup.json").read_bytes())
+        census = Json(ManagedStartupCensus).decode(
             (directory / "managed-startup-census.json").read_bytes()
         )
     except OSError, ValueError:

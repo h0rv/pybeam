@@ -6,10 +6,10 @@ import time
 from pathlib import Path
 
 import httpx
-import psutil
 import pytest
 
 from examples.showcase.catalog import ROOT
+from pybeam.codec import Json
 from pybeam.runtime.ownership import identity, resolve
 from tests.fixtures.showcase_shutdown import CloseEvidence, JobEvidence
 
@@ -48,7 +48,7 @@ def test_sigterm__held_production_sse_reaches_lifespan_and_owned_cleanup(
             stdout=log,
             stderr=log,
         )
-        owner = identity(psutil.Process(process.pid))
+        owner = identity(process.pid)
         try:
             wait_for_text(log_path, "Uvicorn running on", process)
             with (
@@ -70,20 +70,21 @@ def test_sigterm__held_production_sse_reaches_lifespan_and_owned_cleanup(
                 assert returncode in (0, -signal.SIGTERM)
                 assert elapsed < 6
                 assert not stream.is_closed
-                close = CloseEvidence.model_validate_json((tmp_path / "close.json").read_text())
+                close = Json(CloseEvidence).decode((tmp_path / "close.json").read_text())
                 assert close.closing
                 assert (tmp_path / "subscribers-after-disconnect.txt").read_text() == "0"
                 assert resolve(owner) is None
                 if owned_python_job:
                     assert close.stop_requests == (True,)
-                    job = JobEvidence.model_validate_json(
-                        (tmp_path / "job-finished.json").read_text()
-                    )
+                    job = Json(JobEvidence).decode((tmp_path / "job-finished.json").read_text())
                     assert job.status == "stopped"
                     assert job.cleanup_acknowledged
                     assert job.returncode == 0
                     assert resolve(job.birth) is None
-                    print("Controlled Python birth gone: " + job.birth.model_dump_json())
+                    print(
+                        "Controlled Python birth gone: "
+                        + Json(type(job.birth)).encode(job.birth).decode()
+                    )
                 else:
                     assert close.stop_requests == ()
                 print(

@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 from examples.distributed.jobs import CancellationResult, EffectState, JobRequest
+from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local, remote, reservation
 from pybeam.runtime.ownership import durable_write
 
@@ -11,7 +12,7 @@ async def controls(directory: Path, incarnation: str) -> None:
     if unknown.status != "unknown_operation":
         raise RuntimeError("Unknown operation accepted")
     # Unsent reservations expire, but accepted body credits cannot expire.
-    payload = JobRequest(value=7, delay_ms=1000).model_dump_json()
+    payload = Json(JobRequest).encode(JobRequest(value=7, delay_ms=1000)).decode()
     first = await remote("b", reservation(incarnation, "unsent-one", payload))
     second = await remote("b", reservation(incarnation, "unsent-two", payload))
     full = await remote("b", reservation(incarnation, "unsent-full", payload))
@@ -60,7 +61,7 @@ async def controls(directory: Path, incarnation: str) -> None:
                 if result.status == "ok":
                     if result.result is None or result.worker is None or not result.worker_dead:
                         raise RuntimeError("Body cancellation was not acknowledged")
-                    cleanups.append(CancellationResult.model_validate_json(result.result))
+                    cleanups.append(Json(CancellationResult).decode(result.result))
                     break
                 if result.status != "pending":
                     raise RuntimeError("Control cancellation became uncertain")
@@ -83,10 +84,23 @@ async def controls(directory: Path, incarnation: str) -> None:
     await local(Request(op="connect", alias="b"))
     durable_write(
         directory / "controls.json",
-        Reply(
-            status="ok",
-            count=held.count,
-            receipt=disconnected.receipt,
-            result=cleanup.model_dump_json(),
-        ).model_dump_json(),
+        Json(
+            type(
+                Reply(
+                    status="ok",
+                    count=held.count,
+                    receipt=disconnected.receipt,
+                    result=Json(type(cleanup)).encode(cleanup).decode(),
+                )
+            )
+        )
+        .encode(
+            Reply(
+                status="ok",
+                count=held.count,
+                receipt=disconnected.receipt,
+                result=Json(type(cleanup)).encode(cleanup).decode(),
+            )
+        )
+        .decode(),
     )

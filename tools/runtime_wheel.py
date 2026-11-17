@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from pybeam.runtime.assets import RuntimeManifest
+from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import verify_manifest
 from tools.build_runtime import (
     ELF,
@@ -46,7 +46,7 @@ def runtime_tag(assets: Path) -> str:
     )
     if not isinstance(tag, str) or not re.fullmatch(pattern, tag):
         raise ValueError("Unsupported wheel ABI/platform tag")
-    RuntimeManifest.model_validate_json((assets / "runtime.json").read_bytes())
+    MANIFEST.decode((assets / "runtime.json").read_bytes())
     erts: object = manifest.get("erts_version")
     if not isinstance(erts, str) or not re.fullmatch(r"[0-9.]+", erts):
         raise ValueError("Invalid ERTS version")

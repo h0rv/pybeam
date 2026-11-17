@@ -53,7 +53,7 @@ async def membership_lifecycle() -> None:
             try:
                 await room.leave(member, epoch=epoch)
             except ActorCallError as error:
-                assert error.kind == "ValidationError"
+                assert error.kind == "ValueError"
             else:
                 raise AssertionError("Invalid membership input changed native state")
             assert await room.snapshot() == snapshot

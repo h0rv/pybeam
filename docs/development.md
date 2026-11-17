@@ -101,8 +101,14 @@ release whose tag is `v` plus the project version uploads them to PyPI through
 trusted publishing from the `pypi` environment; a manual run uploads only when
 `publish` is selected.
 
-The Darwin GenStage payload is pinned to the bytes of one reviewed wheel and
-cannot be rebuilt from source, so the macOS job repackages that wheel's runtime
-with `tools.genstage_assets`. Upload the reviewed wheel as the only `.whl` asset
-of a GitHub release tagged `genstage-reviewed`; until then, pull requests skip
-the macOS wheel and releases fail.
+The macOS wheel bundles GenStage, compiled in CI by `tools.build_genstage` from
+the Elixir and GenStage commits in `src/pybeam/runtime/optional_specs/genstage.json`.
+Elixir keeps absolute source paths in quoted literals (`quote location: :keep`) and
+`System` embeds its build date, so the build always runs in `/tmp/pybeam-genstage`
+with `SOURCE_DATE_EPOCH` set to the Elixir commit time and deterministic compiler
+options. The payload also carries the OTP compiler from the runner's mise-built
+Erlang, whose bytes differ between macOS and Linux, so the pin is the manifest of
+the macOS CI build and a local Linux build will not match it. The output must match
+the pinned manifest byte for byte. After changing a source pin, copy the
+`genstage-manifest` artifact from the failed macOS release job into `genstage.json`
+and review the diff.

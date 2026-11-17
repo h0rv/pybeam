@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from examples.discord_simulation import Config, Proof
+from pybeam.codec import Json
 from pybeam.runtime.assets import discover_assets
 from pybeam.runtime.config import Config as RuntimeConfig
 
@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 )
 @pytest.mark.parametrize("value", [True, False, 2.0, "2", None, float("nan"), float("inf")])
 def test_config__strict_finite_integer_boundary(field: str, value: object) -> None:
-    with pytest.raises(ValidationError):
-        Config.model_validate({field: value})
+    with pytest.raises(ValueError):
+        Json(Config).load({field: value})
 
 
 @pytest.mark.parametrize(
@@ -44,8 +44,8 @@ def test_config__strict_finite_integer_boundary(field: str, value: object) -> No
     ],
 )
 def test_config__rejects_out_of_capacity(data: dict[str, object]) -> None:
-    with pytest.raises(ValidationError):
-        Config.model_validate(data)
+    with pytest.raises(ValueError):
+        Json(Config).load(data)
 
 
 @pytest.mark.runtime
@@ -70,9 +70,7 @@ def test_simulation__managed_native_proof(request: pytest.FixtureRequest, entry:
     assert result.returncode == 0, result.stdout + result.stderr
     if entry.startswith("examples/"):
         proof = next(
-            Proof.model_validate_json(line)
-            for line in result.stdout.splitlines()
-            if line.startswith("{")
+            Json(Proof).decode(line) for line in result.stdout.splitlines() if line.startswith("{")
         )
         assert proof.events_before_fault == 6
         assert proof.fanout_receipts_before_fault == 18
@@ -130,9 +128,7 @@ def test_simulation__installed_wheel_without_source_or_developer_tools(
     )
     assert result.returncode == 0, result.stdout + result.stderr
     proof = next(
-        Proof.model_validate_json(line)
-        for line in result.stdout.splitlines()
-        if line.startswith("{")
+        Json(Proof).decode(line) for line in result.stdout.splitlines() if line.startswith("{")
     )
     assert proof.fanout_receipts_before_fault == 8
     assert proof.before.pid != proof.after.pid
