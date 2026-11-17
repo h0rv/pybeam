@@ -1,6 +1,6 @@
 # Project boundaries
 
-This is a personal MVP. Do not add company references, project licenses, copyright notices, publishing machinery, or generated reports. Preserve vendored third-party notices. GitHub forks and committed branch pushes under the user's personal `h0rv` account are authorized. Do not force-push, push to upstream repositories, or publish to PyPI without separate permission. Keep README content focused on using the examples, not naming discussions, agent activity, audit history, test counts, or branch bookkeeping.
+This is a personal MVP. Do not add company references, project licenses, copyright notices, or generated reports. Preserve vendored third-party notices. GitHub forks and committed branch pushes under the user's personal `h0rv` account are authorized. Do not force-push, push to upstream repositories, or publish to PyPI without separate permission. Keep README content focused on using the examples, not naming discussions, agent activity, audit history, test counts, or branch bookkeeping.
 
 Bring BEAM capabilities to Python developers, including users of Django, FastAPI, Redis, Celery, and SQLAlchemy; do not require an Elixir or LiveView mental model. Map the useful semantics to concise, first-class Python and asyncio APIs and familiar framework integrations. Users should not need BEAM knowledge or infrastructure plumbing for ordinary use; expose advanced operations separately. Simplicity must not imply free durability or conceal deployment and failure boundaries.
 
