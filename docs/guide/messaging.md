@@ -1,6 +1,6 @@
 # Messaging
 
-Send an order notification to a subscriber.
+Publish a message to every subscriber of a topic.
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     run(main)
 ```
 
-This prints `order-42`. Subscribe before publishing. Leaving the context releases the subscription. Publishing does not acknowledge that a receiver finished processing. Messages are not durable.
+This prints `order-42`. Subscribe before publishing; a subscriber receives only messages published after it subscribes. Leaving the `async with` block ends the subscription. `publish` does not wait for subscribers to handle the message, and messages are not stored.
 
 ## Notify readers of a changed key
 
@@ -46,8 +46,6 @@ if __name__ == "__main__":
     run(main)
 ```
 
-This prints `b'published'`, then `0` subscriptions after context exit. The message contains the key. Reading that key returns its current value, which might already differ from its value when the message was published.
+This prints `b'published'`, then `0` because the subscription ended. The message carries only the key. Reading the key returns its current value, which may have changed again since the message was sent.
 
-Breaking iteration does not release the subscription; leaving the context does. `max_bytes` bounds the queue. If it overflows, the subscription fails rather than silently dropping messages.
-
-For a fixed stream of sample messages, see the [GenStage sample](genstage.md).
+`break` stops reading but does not end the subscription; leaving the block does. `max_bytes` limits unread messages. If a subscriber falls that far behind, its subscription fails instead of silently dropping messages.
