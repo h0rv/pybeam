@@ -7,6 +7,7 @@ import sys
 import sysconfig
 import time
 from pathlib import Path
+from types import FunctionType
 
 import pytest
 
@@ -357,7 +358,7 @@ def test_loader__entry_constants_are_immortal(
     monkeypatch.setattr(sys, "path", list(sys.path))
     loader.load()
     session = loader._state.session
-    assert session is not None and session.entry is not None
+    assert session is not None and isinstance(session.entry, FunctionType)
     mask = next(value for value in session.entry.__code__.co_consts if value == 0xFFFFFFFF)
     assert sys._is_immortal(mask)
 
