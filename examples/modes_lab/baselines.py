@@ -83,12 +83,14 @@ async def fanout(kind: Baseline, count: int, size: int) -> dict[str, object]:
             samples = latency(noop)
             begin = time.monotonic_ns()
             spans = await asyncio.gather(*(job() for _ in range(count)))
+            wall = micros(begin)
             extra = 0
         case "threads":
             with ThreadPoolExecutor(1) as executor:
                 samples = latency(lambda: executor.submit(noop).result())
             begin = time.monotonic_ns()
             spans = await asyncio.gather(*(asyncio.to_thread(spin, size) for _ in range(count)))
+            wall = micros(begin)
             extra = rss_tree() - base
         case "spawn":
             context = multiprocessing.get_context("spawn")
@@ -101,6 +103,7 @@ async def fanout(kind: Baseline, count: int, size: int) -> dict[str, object]:
                 workers.append(process)
                 create.append(micros(started))
             spans = [await asyncio.to_thread(queue.get) for _ in workers]
+            wall = micros(begin)
             extra = sum(int(span.pop("rss_kib")) for span in spans)
             for process in workers:
                 process.join()
@@ -115,6 +118,7 @@ async def fanout(kind: Baseline, count: int, size: int) -> dict[str, object]:
                 samples = latency(lambda: pool.submit(noop).result())
                 begin = time.monotonic_ns()
                 spans = list(pool.map(spin, [size] * count))
+                wall = micros(begin)
     return {
         "kind": "fanout",
         "mode": kind,
@@ -127,7 +131,7 @@ async def fanout(kind: Baseline, count: int, size: int) -> dict[str, object]:
         "latency_p99_us": percentile(samples, 99) if samples else 0,
         "single_ns": int(single["end"]) - int(single["start"]),
         "spans": spans,
-        "wall_us": micros(begin),
+        "wall_us": wall,
         "vm_pid": os.getpid(),
     }
 
