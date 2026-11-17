@@ -1,6 +1,6 @@
 # How Python work runs
 
-A BEAM process costs about 2.7 KB, so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Each task or actor gets a Python context, limits cap how many run at once, and you choose how each context runs Python.
+A BEAM process starts at about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Each task or actor gets a Python context, limits cap how many run at once, and you choose how each context runs Python.
 
 ## From a BEAM process to Python
 
