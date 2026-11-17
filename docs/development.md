@@ -60,13 +60,16 @@ built or downloaded implicitly.
 
 ### Build a Linux wheel
 
-Linux wheels use the `cp314-cp314-linux_x86_64` tag, not a manylinux tag, and
-need conventional CPython 3.14 with a shared `libpython3.14.so.1.0`. The system
-must provide glibc, libm, libstdc++, libgcc_s, libtinfo.so.6, zlib and
-libcrypto.so.3. The build is verified on Ubuntu 22.04.
+Linux wheels need conventional CPython 3.14 with a shared
+`libpython3.14.so.1.0`. Build Erlang with static OpenSSL and without termcap so
+the runtime needs only glibc, libm, libstdc++, libgcc_s and zlib; the wheel is
+then tagged `manylinux_<glibc>_x86_64` for the newest glibc symbol it uses.
+An Erlang that links libtinfo or libcrypto produces a `linux_x86_64` wheel,
+which PyPI rejects. Releases build on Ubuntu 22.04.
 
 ```sh
-mise install
+KERL_CONFIGURE_OPTIONS="--disable-dynamic-ssl-lib --without-termcap --without-javac --without-wx --without-odbc" \
+  MISE_ALL_COMPILE=true mise install
 mise exec -- uv sync --locked --all-extras
 mise exec -- uv run --locked python tools/build_native.py
 mkdir -p build
@@ -79,7 +82,7 @@ mise exec -- uv run --locked python tools/build_runtime.py \
 mise exec -- uv build --wheel
 ```
 
-Install `dist/python_beam-0.1.0a1-cp314-cp314-linux_x86_64.whl` into a Python
+Install the `dist/python_beam-*-manylinux_*_x86_64.whl` wheel into a Python
 3.14 environment; `python examples/hello.py` then runs without `erl`, rebar3 or
 mise on `PATH`. Linux wheels do not bundle the optional GenStage payload;
 Darwin wheels do.
@@ -89,3 +92,11 @@ Darwin wheels do.
 `ActorGroup(execution=ExecutionLimits(workers=..., capacity=..., max_bytes=...))`
 requests pooled actor execution. It needs native support that is still under
 development and fails rather than falling back when that support is missing.
+
+## Releases
+
+`.github/workflows/release.yml` builds the sdist and the Linux x86_64 and
+macOS arm64 wheels, and verifies each clean wheel install. Publishing a GitHub
+release whose tag is `v` plus the project version uploads them to PyPI through
+trusted publishing from the `pypi` environment; a manual run uploads only when
+`publish` is selected.

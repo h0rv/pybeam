@@ -36,6 +36,7 @@ from tools.build_runtime import (
     audit_binary,
     audit_elf,
     inspect_macho,
+    linux_wheel_tag,
     native_binaries,
     stage_hornbeam,
     stage_runtime,
@@ -204,6 +205,41 @@ def test_elf_audit_and_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     binary.write_bytes(b"text")
     with pytest.raises(ValueError, match="not ELF"):
         audit_elf(binary)
+
+
+def test_elf_audit__reads_highest_glibc_symbol_version(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary = tmp_path / "native.so"
+    binary.write_bytes(b"\x7fELF")
+    outputs = {
+        "-h": "Machine: Advanced Micro Devices X86-64",
+        "-d": "(NEEDED) [libc.so.6]",
+        "-V": "Name: GLIBC_2.2.5 Flags: none\nName: GLIBC_2.34 Flags: none\nName: GLIBCXX_3.4.30",
+    }
+    monkeypatch.setattr("tools.build_runtime.run", lambda args: outputs[args[1]])
+    assert audit_elf(binary).glibc == (2, 34)
+
+
+@pytest.mark.parametrize(
+    ("binaries", "tag"),
+    [
+        ((ELF(("libc.so.6",), ()),), "cp314-cp314-manylinux_2_17_x86_64"),
+        (
+            (
+                ELF(("libpython3.14.so.1.0", "libc.so.6"), (), (2, 28)),
+                ELF(("libz.so.1",), (), (2, 35)),
+            ),
+            "cp314-cp314-manylinux_2_35_x86_64",
+        ),
+        ((ELF(("libtinfo.so.6",), (), (2, 28)),), "cp314-cp314-linux_x86_64"),
+        ((ELF(("libcrypto.so.3",), ()),), "cp314-cp314-linux_x86_64"),
+    ],
+)
+def test_linux_wheel_tag__claims_manylinux_only_for_portable_libraries(
+    binaries: tuple[ELF, ...], tag: str
+) -> None:
+    assert linux_wheel_tag(binaries) == tag
 
 
 def test_runtime_tag__requires_explicit_staged_assets(tmp_path: Path) -> None:
@@ -556,8 +592,8 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         dist_info = next(name for name in archive.namelist() if name.endswith(".dist-info/WHEEL"))
         metadata = archive.read(dist_info).decode()
         assert "Root-Is-Purelib: false" in metadata
-        platform_tag = "linux_x86_64" if platform.system() == "Linux" else "macosx_"
-        assert "Tag: cp314-cp314-" + platform_tag in metadata
+        platform_tag = "(?:many)?linux_" if platform.system() == "Linux" else "macosx_"
+        assert re.search("Tag: cp314-cp314-" + platform_tag, metadata)
         assert (archive.getinfo("pybeam/runtime/_assets/bin/erl").external_attr >> 16) & 0o111
         assert not any(
             name.startswith("hornbeam/") or "/lib/hornbeam-" in name for name in archive.namelist()

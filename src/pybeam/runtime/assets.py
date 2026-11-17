@@ -73,7 +73,7 @@ class DarwinManifest(ManifestBase):
 class LinuxManifest(ManifestBase):
     architecture: Literal["x86_64"]
     system: Literal["Linux"]
-    wheel_tag: Literal["cp314-cp314-linux_x86_64"]
+    wheel_tag: Annotated[str, Field(pattern=r"^cp314-cp314-(?:linux|manylinux_2_\d+)_x86_64$")]
     python_library: Literal["libpython3.14.so.1.0"]
 
 

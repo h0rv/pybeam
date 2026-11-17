@@ -30,7 +30,7 @@ litestar = [
 ]
 pyview = [
     "python-multipart>=0.0.20,<1",
-    "pyview-web @ git+https://github.com/ogrodnek/pyview.git@d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972",
+    "pyview-web>=0.9.0,<1",
 ]
 
 [dependency-groups]
@@ -54,9 +54,6 @@ requires = ["hatchling>=1.27,<2", "pydantic==2.14.3", "typing-extensions>=4.14.1
 build-backend = "hatchling.build"
 backend-path = [".", "src"]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.build.hooks.custom]
 path = "tools/hatch_build.py"
 
@@ -69,6 +66,7 @@ include = ["src/pybeam", "tools", "pyproject.toml", "README.md"]
 
 [tool.uv.sources]
 hornbeam = { git = "https://github.com/h0rv/hornbeam.git", branch = "main" }
+pyview-web = { git = "https://github.com/ogrodnek/pyview.git", rev = "d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972" }
 
 [tool.ty.environment]
 python-version = "3.14"
