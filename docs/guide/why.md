@@ -69,3 +69,7 @@ order-42
 ```
 
 Next, try [shared state](state.md) or [supervision](supervision.md).
+
+## Learn more
+
+PyBEAM uses the [BEAM runtime](https://www.erlang.org/) for scheduling and supervision; Saša Jurić's [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE) introduces the ideas behind it.

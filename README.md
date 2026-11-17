@@ -11,7 +11,7 @@ uv add python-beam
 - [Shared state](docs/guide/state.md) stores values and counts atomically across requests.
 - [Messaging](docs/guide/messaging.md) notifies subscribers without a broker.
 - [Background services](docs/guide/background.md) run long-lived loops that stop cleanly.
-- [Web integration](docs/guide/web.md) works with FastAPI, Litestar and PyView.
+- Integrations work with [FastAPI](docs/guide/integrations/fastapi.md), [Litestar](docs/guide/integrations/litestar.md) and [PyView](docs/guide/integrations/pyview.md).
 
 Start with [Get started](docs/guide/index.md), or read [Why PyBEAM](docs/guide/why.md).
 
