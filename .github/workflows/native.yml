@@ -127,9 +127,9 @@ jobs:
             --deselect=tests/test_runtime_native.py::test_native__slow_subscriber_overflows_without_retaining_runtime_owner
             # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
             --deselect=tests/test_runtime_shutdown.py::test_native__shutdown_runs_lifespan_and_closes_live_connection
-            # FastAPI SSE: unresolved incomplete chunked read.
+            # FastAPI SSE stream closes early (incomplete chunked read); cause unknown.
             --deselect=tests/test_fastapi_native.py::test_native__fastapi_example_uses_form_validation_and_push
-            # UncertainInflight from supervisor cleanup; under investigation.
+            # Supervisor cleanup raises UncertainInflight; cause unknown.
             --deselect=tests/test_tasks_native.py::test_tasks__dedicated_uncertainty_keeps_the_existing_watcher_until_cleanup
           )
           uv run --locked --all-extras pytest \
