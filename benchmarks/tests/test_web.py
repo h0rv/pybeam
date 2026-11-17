@@ -1,4 +1,6 @@
 import asyncio
+import errno
+import resource
 import socket
 import subprocess
 import sys
@@ -9,10 +11,11 @@ import pytest
 import pytest_asyncio
 from pydantic import ValidationError
 from uvicorn import Config, Server
+from websockets.asyncio.client import ClientConnection
 
 from benchmarks.web.app import app
 from benchmarks.web.run import container_command, memory, memory_delta, stop_worker
-from benchmarks.web.ws import Command, Pool
+from benchmarks.web.ws import Command, Pool, ensure_client_fds
 
 
 @pytest_asyncio.fixture(loop_scope="function")
@@ -65,6 +68,62 @@ async def test_empty_pool() -> None:
     assert reply.held == 0
     assert not reply.latency_ms
     assert not reply.errors
+
+
+@pytest.mark.parametrize(
+    ("soft", "hard", "target", "raised"),
+    [
+        (1024, 200000, 12500, True),
+        (1024, resource.RLIM_INFINITY, 12500, True),
+        (65536, 200000, 12500, False),
+        (resource.RLIM_INFINITY, resource.RLIM_INFINITY, 12500, False),
+        (32, 32, 0, False),
+    ],
+)
+def test_client_fd_budget(
+    monkeypatch: pytest.MonkeyPatch, soft: int, hard: int, target: int, raised: bool
+) -> None:
+    changes: list[tuple[int, int]] = []
+    monkeypatch.setattr("benchmarks.web.ws.resource.getrlimit", lambda limit: (soft, hard))
+    monkeypatch.setattr(
+        "benchmarks.web.ws.resource.setrlimit", lambda limit, limits: changes.append(limits)
+    )
+    ensure_client_fds(target)
+    assert changes == ([(target + 64, hard)] if raised else [])
+
+
+@pytest.mark.asyncio
+async def test_insufficient_client_fds_abort_before_connecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("benchmarks.web.ws.resource.getrlimit", lambda limit: (1024, 1024))
+    with pytest.raises(RuntimeError, match="Client-side file descriptor limit cannot cover"):
+        await Pool("ws://127.0.0.1:1/ws", "127.0.0.2").ramp(5000)
+
+
+def test_client_fd_raise_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def denied(limit: int, limits: tuple[int, int]) -> None:
+        raise PermissionError("limit denied")
+
+    monkeypatch.setattr("benchmarks.web.ws.resource.getrlimit", lambda limit: (1024, 200000))
+    monkeypatch.setattr("benchmarks.web.ws.resource.setrlimit", denied)
+    with pytest.raises(RuntimeError, match="Client-side file descriptor limit could not be raised"):
+        ensure_client_fds(5000)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("number", [errno.EMFILE, errno.ENFILE])
+async def test_client_fd_exhaustion_is_not_a_server_error(
+    monkeypatch: pytest.MonkeyPatch, number: int
+) -> None:
+    async def exhausted(*args: object, **kwargs: object) -> ClientConnection:
+        raise OSError(number, "file descriptor exhaustion")
+
+    monkeypatch.setattr("benchmarks.web.ws.connect", exhausted)
+    errors: list[str] = []
+    with pytest.raises(RuntimeError, match="Client-side file descriptor exhaustion"):
+        await Pool("ws://127.0.0.1:1/ws", "127.0.0.2").open_one(errors)
+    assert errors == []
 
 
 @pytest.mark.asyncio

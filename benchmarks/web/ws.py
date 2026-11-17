@@ -1,5 +1,7 @@
 import argparse
 import asyncio
+import errno
+import resource
 import sys
 import time
 from dataclasses import dataclass, field
@@ -24,6 +26,26 @@ class Reply(BaseModel):
     latency_ms: list[float] = Field(default_factory=list)
 
 
+def ensure_client_fds(target: int) -> None:
+    if target == 0:
+        return
+    required = target + 64
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if soft == resource.RLIM_INFINITY or soft >= required:
+        return
+    if hard != resource.RLIM_INFINITY and hard < required:
+        raise RuntimeError(
+            "Client-side file descriptor limit cannot cover "
+            + str(target)
+            + " connections plus 64 descriptors of headroom: hard limit "
+            + str(hard)
+        )
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (required, hard))
+    except (OSError, ValueError) as error:
+        raise RuntimeError("Client-side file descriptor limit could not be raised") from error
+
+
 @dataclass(slots=True)
 class Pool:
     url: str
@@ -44,9 +66,12 @@ class Pool:
             )
             self.sockets.append(socket)
         except (OSError, TimeoutError, InvalidHandshake) as error:
+            if isinstance(error, OSError) and error.errno in (errno.EMFILE, errno.ENFILE):
+                raise RuntimeError("Client-side file descriptor exhaustion") from error
             errors.append(type(error).__name__ + ": " + str(error))
 
     async def ramp(self, target: int) -> Reply:
+        ensure_client_fds(target)
         errors: list[str] = []
         while len(self.sockets) < target and not errors:
             async with asyncio.TaskGroup() as group:
