@@ -113,30 +113,10 @@ jobs:
         # Deselected release gates need a reviewed platform wheel with GenStage
         # and an exact-byte prepared distribution profile, not this source build.
         run: |
-          # Known-failure quarantine, separate from reviewed-artifact release gates.
-          quarantine=(
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_native.py::test_native__nonreading_output_peer_closes_and_releases_subscription
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_native.py::test_native__idle_websocket_push_needs_no_client_poll
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_native.py::test_native__five_item_messages_reach_asgi
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_native.py::test_native__two_websocket_clients_share_state_and_pubsub
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_native.py::test_native__slow_subscriber_overflows_without_retaining_runtime_owner
-            # Hornbeam -> livery 0.9.2 -> erlang_ws 0.5.0 lacks send_sync/3 and abort/1; fork fix needed.
-            --deselect=tests/test_runtime_shutdown.py::test_native__shutdown_runs_lifespan_and_closes_live_connection
-            # FastAPI SSE: unresolved incomplete chunked read.
-            --deselect=tests/test_fastapi_native.py::test_native__fastapi_example_uses_form_validation_and_push
-            # UncertainInflight from supervisor cleanup; under investigation.
-            --deselect=tests/test_tasks_native.py::test_tasks__dedicated_uncertainty_keeps_the_existing_watcher_until_cleanup
-          )
           uv run --locked --all-extras pytest \
             --run-frameworks --run-runtime -m 'runtime and not browser' \
             --deselect=tests/test_genstage_wheel.py::test_installed_genstage_without_developer_environment \
             --deselect=tests/test_runtime_bytecode_native.py::test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged \
-            "${quarantine[@]}" \
             -vv -rs --timeout=180 --timeout-method=signal -o faulthandler_timeout=120 \
             --basetemp="$RUNNER_TEMP/native-tests"
       - name: Upload regression diagnostics
