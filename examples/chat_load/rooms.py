@@ -1,7 +1,10 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator, AsyncIterable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 type Source = Callable[[str], AbstractAsyncContextManager[AsyncIterable[bytes]]]
 
@@ -35,6 +38,8 @@ class Hub:
                         except asyncio.QueueFull:
                             listener.shutdown(immediate=True)
                             room.listeners.discard(listener)
+        except Exception:
+            logger.exception("Room subscription %s failed; closing its sockets", topic)
         finally:
             room.close()
             room.ready.set()
