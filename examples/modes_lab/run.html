@@ -38,7 +38,7 @@
           <span class="victim">×</span>
           {% for index in range(run.count - 1) %}<span class="{{ 'alive' if not lane.aborted and index < (lane.outcome.others_alive or 0) else 'dead' }}"></span>{% endfor %}
         </div>
-        {% if lane.aborted %}<span class="bad">The whole OS process died: 0 of {{ run.count - 1 }} other workers survived, and neither did the BEAM VM or the app around them.</span>
+        {% if lane.aborted %}<span class="bad">The whole OS process died: 0 of {{ run.count - 1 }} other workers survived{% if lane.lane.engine == "beam" %}, and the BEAM VM went with them{% else %}, nor did the app around them{% endif %}.</span>
         {% else %}<span class="{{ 'good' if lane.outcome.others_alive == run.count - 1 else 'bad' }}">{{ lane.outcome.others_alive }} of {{ run.count - 1 }} other workers kept running.</span>
           <span class="muted">Victim saw <code>{{ lane.outcome.victim_result }}</code>; a replacement took {{ '%.0f'|format(lane.outcome.replacement_us / 1000) }} ms.</span>{% endif %}
       {% else %}
