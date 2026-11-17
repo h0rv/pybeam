@@ -97,7 +97,7 @@ run(Directory, W, Runtime, Mode) ->
             inflight_peak => Peak, failures => 0, recovered => null, lost => 0,
             cleanup_acknowledged => true,
             semantic_differences => [<<"Client admission only: unbounded destination gen_server mailboxes; no finite mailbox claim">>,
-                <<"No PyBeam NIF or paired native checkout is loaded; OTP crypto hashes build assets outside timing">>],
+                <<"No PyBEAM NIF or paired native checkout is loaded; OTP crypto hashes build assets outside timing">>],
             unsupported_features => [<<"destination_queue">>]}
     catch Class:Reason:Stack ->
         cleanup(Directory, Workers, Origin),

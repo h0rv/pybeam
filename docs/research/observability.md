@@ -74,7 +74,7 @@ process_info(P, [registered_name, links, monitors,
 [{T, ets:info(T, owner)} || T <- ets:all()].
 ```
 
-These are existing OTP APIs, not a PyBeam inspection API. Check `whereis/1` before querying absent services. At the checkpoint, `hornbeam_state` owns `hornbeam_state_table` without an heir. Hornbeam uses `one_for_one`; erlang-python uses `one_for_all`, while context children are temporary. Restart does not imply state recovery. WebSocket and native resource cleanup remain unverified by this probe.
+These are existing OTP APIs, not a PyBEAM inspection API. Check `whereis/1` before querying absent services. At the checkpoint, `hornbeam_state` owns `hornbeam_state_table` without an heir. Hornbeam uses `one_for_one`; erlang-python uses `one_for_all`, while context children are temporary. Restart does not imply state recovery. WebSocket and native resource cleanup remain unverified by this probe.
 
 ## Optional tools and limits
 

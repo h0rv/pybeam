@@ -12,7 +12,7 @@
   {% for lane in run.lanes %}
   <div class="lane">
     <div>
-      <div class="family">{{ "PyBeam" if lane.lane.engine == "beam" else "Python today" }} · {{ lane.lane.runtime }}</div>
+      <div class="family">{{ "PyBEAM" if lane.lane.engine == "beam" else "Python today" }} · {{ lane.lane.runtime }}</div>
       <h3>{{ lane.lane.label }}</h3>
       <small><code>{{ lane.lane.setting }}</code></small>
     </div>

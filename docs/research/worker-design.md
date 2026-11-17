@@ -4,7 +4,7 @@ A design proposal measured against [actor capacity](actor-capacity.md). Nothing 
 
 ## Problem
 
-Today a PyBeam actor is a native worker context with its own OS thread, and every actor method body runs on one shared asyncio loop thread. On both 3.14 and 3.14t:
+Today a PyBEAM actor is a native worker context with its own OS thread, and every actor method body runs on one shared asyncio loop thread. On both 3.14 and 3.14t:
 
 - each actor costs one thread and 50–60 KiB;
 - `time.sleep` or CPU work in one actor stalls every actor (32 × 50 ms took 1.62–1.65 s);
@@ -22,7 +22,7 @@ The same worker contexts called directly from BEAM processes run Python on all 8
 6. **Crash-prone code opts into isolated workers.** An isolated worker is a child OS process. It is the only mode that survives `os.abort()`, at 21–27 MiB and 61–132 ms to start per process. The same actor API selects the pool kind; application code does not change.
 7. **Own-GIL is removed.** 14 of 17 common compiled packages, including pydantic-core, uvloop, numpy, and SQLAlchemy, refuse to load in subinterpreters. `ExecutionMode.OWNGIL` and its named-entry path go away, and the chat demo's `CHECKSUM` job moves from `ExecutionMode.OWNGIL` to a 3.14t worker.
 
-8. **Module globals are shared.** On 3.14t, all workers run in one interpreter, so module-level mutable state is shared across actors and threads. CPython's free-threading guide leaves synchronization to the program and recommends `threading.Lock` over relying on built-in types' internal locks. PyBeam documents this and points users to actor state or the shared store.
+8. **Module globals are shared.** On 3.14t, all workers run in one interpreter, so module-level mutable state is shared across actors and threads. CPython's free-threading guide leaves synchronization to the program and recommends `threading.Lock` over relying on built-in types' internal locks. PyBEAM documents this and points users to actor state or the shared store.
 
 One API covers all of it: an actor class, its methods, a state write call, and the pool kind. Mode choices are deployment settings, not separate programming models.
 
@@ -39,6 +39,6 @@ One API covers all of it: an actor class, its methods, a state write call, and t
 - **Call-rate ceiling.** Worker-context calls reached about 32,000–43,000 per second on both builds, with 8 contexts and 1M callers. Own-GIL reached 116,000–185,000 per second through the same path. The cause is being traced in the scheduler work, and the pool design depends on the result.
 - **Retiring workers.** Growth was measured; retirement was not. An idle worker costs under 0.1 MiB, so an idle timeout matters less than the cap.
 - **3.14t single-thread cost.** On the FastAPI path, one 3.14t thread was 34% slower than one 3.14 thread, so 3.14t wins only with two or more busy workers.
-- **The sticky timeout value.** Temporal uses 5 s (Go) and 10 s (Python). PyBeam's value needs a measurement of state-load cost against queueing.
+- **The sticky timeout value.** Temporal uses 5 s (Go) and 10 s (Python). PyBEAM's value needs a measurement of state-load cost against queueing.
 
 Out of scope for now: GPU workers and per-queue worker pools.

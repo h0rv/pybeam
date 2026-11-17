@@ -6,7 +6,7 @@ These are single trials on one Linux x86-64 VM with eight CPUs, not compatibilit
 
 Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task boundary with the keyword-only `TaskFunction(..., execution=ExecutionMode.WORKER, dedicated_loop=False)`. Worker is the default; isolated accepts importable byte entries with caller-side codecs. Own-GIL mode remains in code but is unsupported.
 
-| Mode / build | How to select in PyBeam | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility | Cost |
+| Mode / build | How to select in PyBEAM | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility | Cost |
 |---|---|---|---|---|---|---|
 | worker / 3.14 | `execution=ExecutionMode.WORKER` (default) | Yes / yes | No Python bytecode parallelism under the GIL | None; VM dies | Main-interpreter extensions | ~15 KiB/context; ~17 µs raw calls |
 | worker / 3.14t | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution | ~21 KiB/context; ~29 µs raw calls |
@@ -26,21 +26,21 @@ Define a plain module-level `async def entry(payload: bytes) -> bytes`; no decor
 
 The caller encodes the request and decodes the result through the `Codec` protocol's `encode` and `decode` methods. With the stdlib-only `Json` codec, entries receive and return JSON bytes. An empty string or byte value is valid encoded JSON; a zero-length result is not valid JSON and raises caller-side `CodecError`. Other codecs can define a different byte format. Worker callables still receive and return typed Python values; named entries receive and return bytes, not the caller's request/result objects.
 
-Entry modules cannot import unsupported native extensions such as `pydantic_core` or NumPy (including single-phase-init extensions). Nested PyBeam supervisors are unsupported inside named entries. Python failures surface as `RemoteTaskError(type_name, message)`; original exception identity and remote traceback objects do not cross interpreters. Module import and attribute-resolution failures are terminal errors too: the optional extension-import regression produces a remote `ImportError`, releases the ticket, and permits clean shutdown. A context that dies without a terminal reply remains uncertain.
+Entry modules cannot import unsupported native extensions such as `pydantic_core` or NumPy (including single-phase-init extensions). Nested PyBEAM supervisors are unsupported inside named entries. Python failures surface as `RemoteTaskError(type_name, message)`; original exception identity and remote traceback objects do not cross interpreters. Module import and attribute-resolution failures are terminal errors too: the optional extension-import regression produces a remote `ImportError`, releases the ticket, and permits clean shutdown. A context that dies without a terminal reply remains uncertain.
 
 Cancellation and shutdown are cooperative: CPU/native-blocked entry loops delay cancellation until they yield. Owngil provides CPU parallelism and separate interpreter state, **not native-crash containment**; a crashing extension still kills the VM.
 
 ### Isolated byte-entry contract
 
-Use a plain module-level `async def entry(payload: bytes) -> bytes` with `execution=ExecutionMode.ISOLATED` and caller-side `Codec` encoding/decoding. `Json` supports standard types and dataclasses without optional dependencies. Each task owns a fresh child process and loop; `dedicated_loop=True` is rejected. Child startup and separate interpreter/module memory make this more expensive than shared workers. PyBeam selects the caller's Python executable through the runtime's `isolated_python` option rather than discovering it through an occupied managed worker.
+Use a plain module-level `async def entry(payload: bytes) -> bytes` with `execution=ExecutionMode.ISOLATED` and caller-side `Codec` encoding/decoding. `Json` supports standard types and dataclasses without optional dependencies. Each task owns a fresh child process and loop; `dedicated_loop=True` is rejected. Child startup and separate interpreter/module memory make this more expensive than shared workers. PyBEAM selects the caller's Python executable through the runtime's `isolated_python` option rather than discovering it through an occupied managed worker.
 
-Isolated entry modules **can import PyBeam**. The native task probe uses stdlib dataclasses and `Json` in the caller, and imports `pybeam` and `pybeam.codec.Json` in a different OS process. Pydantic remains a development/test dependency, not a PyBeam core dependency, so the probe also checks module-level imports of Pydantic **2.14.3** and `pydantic_core` **2.50.4** as optional-extension coverage; neither supplies the task codecs. These imports do not certify every extension's compatibility. Isolated entries must not import `erlang.tasks` or submit nested tasks: the child has no actor-gate/native task hooks.
+Isolated entry modules **can import PyBEAM**. The native task probe uses stdlib dataclasses and `Json` in the caller, and imports `pybeam` and `pybeam.codec.Json` in a different OS process. Pydantic remains a development/test dependency, not a PyBEAM core dependency, so the probe also checks module-level imports of Pydantic **2.14.3** and `pydantic_core` **2.50.4** as optional-extension coverage; neither supplies the task codecs. These imports do not certify every extension's compatibility. Isolated entries must not import `erlang.tasks` or submit nested tasks: the child has no actor-gate/native task hooks.
 
 Python exceptions and module import/lookup failures remain terminal `RemoteTaskError` outcomes. A confirmed child exit instead raises **`pybeam.tasks.TaskCrashed`**, also returned by `ref.exception()`, with `.reason`, for example `('signal', 6)` after `os.abort()`. The process exited and execution stopped, but **external effects are unknown**. The task is **never restarted or retried**. Confirmed death releases its native admission ticket and leaves the supervisor open for a following task; as with other completed tasks, observe the outcome to release the Python handle's slot. A timeout or context death without child-exit acknowledgement remains `UncertainInflight`, not proof of stopped execution. A terminal result already received wins over a later child exit.
 
 Cancellation and shutdown use the existing cooperative cancel path. An acknowledged terminal cancellation yields `asyncio.CancelledError`; if interruption escalates to child termination without that acknowledgement, it yields `TaskCrashed`. Child crashes are contained, but isolated processes are **not a sandbox**, and neither cancellation nor crash containment rolls back effects.
 
-Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBeam limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
+Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBEAM limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
 
 ## Mapping work to execution resources
 
@@ -81,9 +81,9 @@ Creation checkpoints were 1, 8, 64, 256 and 1000, with a 100 s deadline. The two
 
 `sys._is_gil_enabled()` stayed false in all tested 3.14t contexts, including after successful pydantic and numpy imports. Both imports failed in owngil without enabling the GIL. Conventional contexts reported true. Import versions: pydantic **2.14.3**, pydantic-core **2.50.4**, numpy **2.5.5**, installed from wheels into separate environments. CPU probes preceded optional-library imports. Ratios near one, including conventional isolated threads at 1.23×, do not establish parallel bytecode execution.
 
-## PyBeam task probe
+## PyBEAM task probe
 
-The public `TaskSupervisor` / `TaskFunction` probe ran the same calibrated sum-of-squares workload in N tasks, after importing PyBeam and pydantic. Creation was outside timing. Timing began at a shared start gate and ended when every `TaskRef.result()` completed. These historical measurements used `+S 1:1`; the current launcher leaves the BEAM scheduler count at its runtime default.
+The public `TaskSupervisor` / `TaskFunction` probe ran the same calibrated sum-of-squares workload in N tasks, after importing PyBEAM and pydantic. Creation was outside timing. Timing began at a shared start gate and ended when every `TaskRef.result()` completed. These historical measurements used `+S 1:1`; the current launcher leaves the BEAM scheduler count at its runtime default.
 
 | Build / task loop | Wall ms, N=1 / 2 / 4 / 8 | Speedup, N=1 / 2 / 4 / 8 | GIL inside tasks |
 |---|---|---|---|
@@ -96,16 +96,16 @@ Dedicated tasks had **~1 s extra completion latency per batch on both builds; it
 
 ### Free-threaded shared-object contention
 
-Code loading matters on 3.14t. The [managed entry loader][managed-loader] uses [`runpy.run_path()`][run-path], which compiles source in-process. [Explicit `compile()` suppresses constant immortalization][constant-compilation], leaving large integer constants such as `0xFFFFFFFF` mortal; marshal/pyc-loaded code [interns and immortalizes those constants][constant-interning]. Threads repeatedly referencing the same mortal object contend on [atomic shared-refcount updates][ft-refcounts]; immortal objects bypass them. This affects plain threads too, not just PyBeam tasks.
+Code loading matters on 3.14t. The [managed entry loader][managed-loader] uses [`runpy.run_path()`][run-path], which compiles source in-process. [Explicit `compile()` suppresses constant immortalization][constant-compilation], leaving large integer constants such as `0xFFFFFFFF` mortal; marshal/pyc-loaded code [interns and immortalizes those constants][constant-interning]. Threads repeatedly referencing the same mortal object contend on [atomic shared-refcount updates][ft-refcounts]; immortal objects bypass them. This affects plain threads too, not just PyBEAM tasks.
 
-A standalone checksum loop, `value = (value * 31 + index) & 0xFFFFFFFF`, showed the difference with ordinary Python threads, without PyBeam or Erlang:
+A standalone checksum loop, `value = (value * 31 + index) & 0xFFFFFFFF`, showed the difference with ordinary Python threads, without PyBEAM or Erlang:
 
 | Loading | Mask immortal? | Completion wall ms, N=1 / 4 / 8 |
 |---|---|---|
 | Direct file execution | Yes | 276 / 310 / 446 |
 | Source via `runpy.run_path()` | No | 335 / 1659 / 3450 |
 
-On PyBeam `d4f6374` with erlang-python `c007eb5` and CPython 3.14.10t, the same checksum at 3,000,000 iterations per dedicated-loop task gave:
+On PyBEAM `d4f6374` with erlang-python `c007eb5` and CPython 3.14.10t, the same checksum at 3,000,000 iterations per dedicated-loop task gave:
 
 | Checksum code | Per-task thread CPU ms, N=4 | Per-task thread CPU ms, N=8 |
 |---|---:|---:|
@@ -137,12 +137,12 @@ The prototype passed lint/format/strict typing. Core units: conventional **612 p
 
 ## Reproduce
 
-Toolchain: Linux x86-64, eight CPUs, CPython **3.14.10** (conventional and free-threaded), Erlang/OTP **29.1.2**, rebar3 **3.28.0**, CMake **4.5.0**, uv **0.13.8**. PyBeam prototype: `98a72e2`; raw free-threaded and fixed isolated runtime: erlang-python `249a97016479c44ef5cf4a51ebe70a06176e32ec`. Earlier conventional worker/owngil measurements reused the existing PyBeam native build; its revision was not recorded in the original measurement records. Later combined records label the revision used for the extra probes. Do not treat the rows as a controlled same-revision experiment. Subsequent PyBeam rebuild against fork main `54ccee8367341eb83acab1280b4316ba034e3bf4` also detected free-threaded Python.
+Toolchain: Linux x86-64, eight CPUs, CPython **3.14.10** (conventional and free-threaded), Erlang/OTP **29.1.2**, rebar3 **3.28.0**, CMake **4.5.0**, uv **0.13.8**. PyBEAM prototype: `98a72e2`; raw free-threaded and fixed isolated runtime: erlang-python `249a97016479c44ef5cf4a51ebe70a06176e32ec`. Earlier conventional worker/owngil measurements reused the existing PyBEAM native build; its revision was not recorded in the original measurement records. Later combined records label the revision used for the extra probes. Do not treat the rows as a controlled same-revision experiment. Subsequent PyBEAM rebuild against fork main `54ccee8367341eb83acab1280b4316ba034e3bf4` also detected free-threaded Python.
 
-Use a private PyBeam worktree with private sibling runtime sources. Link `_checkouts/erlang_python`, `hornbeam`, `ws`, `h1` to those sources, as setup does; do not reuse another checkout's mutable native build. Hornbeam was `d1ccbbe`, ws `4a1d356`, h1 `e1a01f3`. Some tests also assume sibling paths and a `_build/default` profile; the prototype supplied private sibling links and a `default` alias to `hornbeam`. Root-run examples need explicit development-runtime configuration; no free-threaded packaged assets were staged.
+Use a private PyBEAM worktree with private sibling runtime sources. Link `_checkouts/erlang_python`, `hornbeam`, `ws`, `h1` to those sources, as setup does; do not reuse another checkout's mutable native build. Hornbeam was `d1ccbbe`, ws `4a1d356`, h1 `e1a01f3`. Some tests also assume sibling paths and a `_build/default` profile; the prototype supplied private sibling links and a `default` alias to `hornbeam`. Root-run examples need explicit development-runtime configuration; no free-threaded packaged assets were staged.
 
 ```bash
-# In the prepared private PyBeam worktree, with mise on PATH:
+# In the prepared private PyBEAM worktree, with mise on PATH:
 mise trust
 mise install
 export UV_PYTHON="$(mise exec -- uv python find 3.14t)"
@@ -191,7 +191,7 @@ cmake -S c_src -B _build/cmake \
 CMAKE_BUILD_PARALLEL_LEVEL=2 rebar3 compile
 ```
 
-The external PyBeam script uses only public task APIs, a bounded `TaskSupervisor`, `TaskFunction(..., dedicated_loop=...)`, a cross-thread start gate, and per-task elapsed-work timestamps/thread IDs/GIL status. Run the same script with each matching Python environment and a working-directory configuration containing `[tool.pybeam] development_runtime = "/absolute/path/to/profile"`. It calls `pybeam.run(main)`; no custom Erlang launcher or scheduler change is needed.
+The external PyBEAM script uses only public task APIs, a bounded `TaskSupervisor`, `TaskFunction(..., dedicated_loop=...)`, a cross-thread start gate, and per-task elapsed-work timestamps/thread IDs/GIL status. Run the same script with each matching Python environment and a working-directory configuration containing `[tool.pybeam] development_runtime = "/absolute/path/to/profile"`. It calls `pybeam.run(main)`; no custom Erlang launcher or scheduler change is needed.
 
 With `PYBEAM` naming the SDK source worktree, `PYBEAM_ENV` its matching dependency environment, and `PROBE_PROJECT` the configured working directory, the command is:
 

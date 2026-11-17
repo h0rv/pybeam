@@ -956,5 +956,5 @@ async def test_native__services_are_opt_in_and_cleanup_is_acknowledged(
     (tmp_path / "native-demo-startup.log").write_text(text)
     assert process.returncode == 0, text
     assert ("managed services drained" if enabled else "services remain opt-in") in text
-    assert "PyBeam cleanup failed" not in text
+    assert "PyBEAM cleanup failed" not in text
     assert "cleanup was not acknowledged" not in text

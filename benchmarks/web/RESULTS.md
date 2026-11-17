@@ -1,7 +1,7 @@
 # ASGI serving benchmark
 
 One application returns 19-byte JSON from `GET /` and echoes text on `/ws`.
-The four launch paths are A: Hornbeam; B: Uvicorn in PyBeam's managed runtime;
+The four launch paths are A: Hornbeam; B: Uvicorn in PyBEAM's managed runtime;
 C: standalone Uvicorn, one worker; C2: standalone Uvicorn, two workers.
 This measures serving only, not shared state, persistence, or application work.
 
@@ -57,7 +57,7 @@ not that later merge.
 | BEAM | OTP 29.1.2 / ERTS 17.1.1 |
 | Python libraries | FastAPI 0.163.0, Uvicorn 0.54.0, websockets 16.1.1 |
 | Load / container tools | oha 1.17.0, Docker 29.9.2, cgroups v2 |
-| PyBeam | A/B: `e071491`; C/C2: `68e7b225e48adc5008ec8cb15f7f48842628ed3a` |
+| PyBEAM | A/B: `e071491`; C/C2: `68e7b225e48adc5008ec8cb15f7f48842628ed3a` |
 | Hornbeam | `c97d49e6537603ec46cd55116a1f1bb1e49a69ee` |
 | erlang-python measured for A/B | `04058f3ea1b0946376b0b02b8fc908716c708e05` (capacity fixes and `TCP_NODELAY` enabled) |
 | Container base | Ubuntu 22.04, glibc 2.35; digest pinned in `Dockerfile` |

@@ -77,7 +77,7 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     ),
                 )
                 page.goto(BASE)
-                assert page.title() == "PyBeam showcase"
+                assert page.title() == "PyBEAM showcase"
                 page.goto(BASE + "/?scenario=discord")
                 assert page.locator("#card-discord button").is_disabled()
                 page.goto(BASE + "/?scenario=stream")

@@ -63,7 +63,7 @@ def native_http_server(request: pytest.FixtureRequest, tmp_path: Path) -> Genera
                 pytest.fail("Managed launcher did not exit: " + log.read_text())
     assert process.returncode == 143, log.read_text()
     assert "cleanup was not acknowledged" not in log.read_text()
-    assert "PyBeam cleanup failed" not in log.read_text()
+    assert "PyBEAM cleanup failed" not in log.read_text()
 
 
 @pytest.mark.runtime
