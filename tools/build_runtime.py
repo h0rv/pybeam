@@ -296,6 +296,7 @@ def stage_runtime(
             if item.name not in {
                 "py_nif.so",
                 "_erlang_impl",
+                "_erlang_isolated",
                 "erlang-stubs",
                 "erlang_services.py",
                 "py_isolated_child.py",

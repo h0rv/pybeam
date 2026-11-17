@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -27,6 +28,7 @@ from pybeam.runtime.assets import (
 )
 from pybeam.runtime.config import BootstrapError, Config
 from tools.build_runtime import (
+    ELF,
     ERTS_EXECUTABLES,
     MACHO_MAGICS,
     MachO,
@@ -416,6 +418,66 @@ def test_staging__hornbeam_services_include_runtime_code_and_notices(tmp_path: P
     assert (output / result.parent / "priv/worker.py").is_file()
     assert not (output / result.parent / "priv/__pycache__").exists()
     assert (output / "notices/hornbeam-LICENSE").read_text() == "third-party notice"
+
+
+def test_staging__preserves_isolated_bootstrap_and_discards_nonruntime_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    otp, release, output = tmp_path / "otp", tmp_path / "release", tmp_path / "output"
+    native = release / "lib/erlang_python-5.0.1"
+    priv = native / "priv"
+    runtime_files = {
+        "_erlang_impl/__init__.py": b"from . import _server\n",
+        "_erlang_impl/_server.py": b"from _erlang_isolated._server import serve\n",
+        "_erlang_isolated/__init__.py": b"",
+        "_erlang_isolated/_etf.py": b"# ETF codec\n",
+        "_erlang_isolated/_isolated.py": b"# Child runtime\n",
+        "_erlang_isolated/_server.py": b"# Shared server helpers\n",
+        "_erlang_isolated/_shm.py": b"# Shared memory helpers\n",
+        "py_isolated_child.py": b"from _erlang_isolated import _isolated\n",
+    }
+    files = {
+        otp / "erts-17.1.1/bin/erl.src": b"%FINAL_ROOTDIR%",
+        native / "ebin/erlang_python.app": b'{application,erlang_python,[{vsn,"5.0.1"}]}.',
+        native / "ebin/py_launch.beam": b"beam",
+        release / "releases/0.1.0/start.boot": b"boot",
+        priv / "py_nif.so": b"native",
+        priv / "test_helper.py": b"not runtime code",
+        priv / "tests/test_helper.py": b"not runtime code",
+        priv / "_erlang_isolated/__pycache__/_isolated.pyc": b"cache",
+        tmp_path / "LICENSE": b"third-party notice",
+        **{priv / name: content for name, content in runtime_files.items()},
+        **{release / "erts-17.1.1/bin" / name: b"executable" for name in ERTS_EXECUTABLES},
+    }
+    for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    archive = tmp_path / "release.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        for path in release.iterdir():
+            bundle.add(path, arcname=path.name)
+
+    def command(_arguments: list[str], *, cwd: Path | None = None) -> str:
+        if cwd is not None:
+            shutil.copyfile(archive, cwd / "pybeam.tar.gz")
+        return ""
+
+    monkeypatch.setattr("tools.build_runtime.platform.system", lambda: "Linux")
+    monkeypatch.setattr("tools.build_runtime.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        "tools.build_runtime.otp_information",
+        lambda _erl: OTPVersions("17.1.1", "11.0", "8.0", "5.10"),
+    )
+    monkeypatch.setattr("tools.build_runtime.run", command)
+    monkeypatch.setattr("tools.build_runtime.audit_elf", lambda *_args, **_kwargs: ELF((), ()))
+    notice = tmp_path / "LICENSE"
+    stage_runtime(otp, native, notice, notice, output)
+    staged_priv = output / "lib/erlang_python-5.0.1/priv"
+    for name, content in runtime_files.items():
+        assert (staged_priv / name).read_bytes() == content
+    assert not (staged_priv / "test_helper.py").exists()
+    assert not (staged_priv / "tests").exists()
+    assert not (staged_priv / "_erlang_isolated/__pycache__").exists()
 
 
 def test_packaged_assets__rejects_incompatible_host_before_native_launch(
