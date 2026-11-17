@@ -45,8 +45,11 @@ class ExecutionMode(StrEnum):
 
     Worker shares the main interpreter: GIL on 3.14, parallel threads on
     3.14t; a native crash kills the VM. Owngil owns an interpreter per context
-    but rejects pydantic_core/numpy (including PyBeam's pydantic codecs) and
-    is not a crash boundary. Isolated uses a child OS process that contains
+    and is not a crash boundary. Owngil tasks need approval for fork changes:
+    py_task hard-codes worker and retained main-interpreter closures must become
+    bodies named by importable module path. PyBeam must also move its pydantic
+    codecs to the caller and pass raw bytes: subinterpreters reject pydantic_core
+    (and numpy). Isolated uses a child OS process that contains
     os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
     Only worker is currently available for PyBeam tasks.
     """
@@ -75,8 +78,12 @@ class TaskFunction[Q, R]:
     ) -> None:
         if execution is ExecutionMode.OWNGIL:
             raise CapabilityUnavailable(
-                "owngil tasks are unavailable: PyBeam task codecs use pydantic_core, "
-                "which subinterpreters with check_multi_interp_extensions reject"
+                "owngil tasks are unavailable: py_task hard-codes mode => worker; "
+                "retained main-interpreter closures cannot cross interpreters. "
+                "Task mode support and bodies named by importable module path need "
+                "approved erlang-python fork changes. PyBeam must move task codecs "
+                "to the caller and pass raw bytes because subinterpreters with "
+                "check_multi_interp_extensions reject pydantic_core"
             )
         if execution is ExecutionMode.ISOLATED:
             raise CapabilityUnavailable(

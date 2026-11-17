@@ -11,10 +11,10 @@ Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task bou
 | worker / 3.14 | `execution=ExecutionMode.WORKER` (default) | Yes / yes | No Python bytecode parallelism under the GIL | None; VM dies | Main-interpreter extensions | ~15 KiB/context; ~17 µs raw calls |
 | worker / 3.14t | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution | ~21 KiB/context; ~29 µs raw calls |
 | worker + dedicated loop / 3.14t | Also `dedicated_loop=True` | Development tasks / no actor loop option | Measured across task loops | None; VM dies | Same as worker / 3.14t | Context-owned loop; ~1 s unexplained task completion overhead |
-| owngil | `execution=ExecutionMode.OWNGIL` (rejected) | No / no | Across raw contexts | None; VM dies | Rejects pydantic_core/numpy, including PyBeam task codecs | ~11–28 MiB/context; ~14 µs raw calls |
+| owngil | `execution=ExecutionMode.OWNGIL` (rejected) | No: worker hard-coded and retained closures interpreter-local / no | Across raw contexts, not tasks | None; VM dies | Rejects pydantic_core/numpy; PyBeam codecs must move to caller | ~11–28 MiB/context; ~14 µs raw calls |
 | isolated | `execution=ExecutionMode.ISOLATED` (rejected) | No / no | Across raw child processes | Contains `os.abort()`; not a sandbox | pydantic/numpy imported in probes | ~24–40 MiB/context; ~76–81 µs raw calls |
 
-Costs are single-trial raw-context measurements below, not task guarantees. `dedicated_loop` changes loop ownership, not interpreter or process isolation. Actors remain worker-only because their local objects belong to the main interpreter.
+Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Owngil tasks need approval for two erlang-python fork changes: accept a task mode instead of hard-coded worker, and resolve bodies by importable module path instead of passing retained main-interpreter closures. Separately, PyBeam must move its in-body pydantic codecs to the caller and pass raw bytes because subinterpreters reject pydantic_core. `dedicated_loop` changes loop ownership, not interpreter or process isolation. Actors remain worker-only because their local objects belong to the main interpreter.
 
 Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBeam limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
 
@@ -48,8 +48,8 @@ CPython **3.14.10 / 3.14.10t**; `erl +S 8:8`. Creation is the cumulative mean at
 |---|---|---:|---:|---:|---:|---:|---|---|---|
 | worker / 3.14 | Yes; 1000 | 1.335 | 15.05 | 17 / 31 | 0.96× | 0.97× | Shared | Both import | VM dies, exit 134 |
 | worker / 3.14t | Yes; 1000 | 1.536 | 21.22 | 29 / 51 | 4.71× | 5.03× | Shared | Both import | VM dies, exit 134 |
-| owngil / 3.14 | Yes; 1000 | 78.560 | 10,800.31 | 14 / 23 | 5.27× | 0.96× | Separate | Both rejected | VM dies, exit 134 |
-| owngil / 3.14t | Yes; 288 in 100 s | 345.199 | 28,525.98 | 14 / 21 | 4.14× | 4.28× | Separate | Both rejected | VM dies, exit 134 |
+| owngil / 3.14 | Raw contexts only; 1000 | 78.560 | 10,800.31 | 14 / 23 | 5.27× | 0.96× | Separate | Both rejected | VM dies, exit 134 |
+| owngil / 3.14t | Raw contexts only; 288 in 100 s | 345.199 | 28,525.98 | 14 / 21 | 4.14× | 4.28× | Separate | Both rejected | VM dies, exit 134 |
 | isolated / 3.14 | With PR #5 fix; 1000 | 90.065 | 24,402.20 | 76 / 146 | 4.73× | 1.23× | Separate | Both import | VM survives; child restarts |
 | isolated / 3.14t | With PR #5 fix; 314 in 100 s | 320.468 | 40,167.00 | 81 / 138 | 4.51× | 7.44× | Separate | Both import | VM survives; child restarts |
 
@@ -82,7 +82,7 @@ Dedicated tasks had **~1 s extra completion latency per batch on both builds; it
 
 - Setting: `TaskFunction(..., execution=ExecutionMode.WORKER)`; values are `worker`, `owngil`, and `isolated`. Default: conventional **3.14 worker**, because it is reproducible and the packaged wheels are conventional.
 - Recommended development path for CPU parallelism: **3.14t with dedicated-loop tasks**, opt in with `PYBEAM_ALLOW_FREE_THREADED=1`. Free-threaded packaged wheels have not been built. Shared-loop tasks do not parallelize on either build.
-- Actors stay worker-only: local objects require the main interpreter. Owngil is not offered for PyBeam tasks because subinterpreters reject pydantic_core, which their codecs require.
+- Actors stay worker-only: local objects require the main interpreter. Owngil tasks have three blockers: (1) `py_task` hard-codes worker mode; (2) `erlang._actor_retain(factory)` / `erlang._actor_unwrap` in `priv/_erlang_impl/_tasks.py` pass interpreter-local closures, not importable body paths; (3) `TaskFunction.body.invoke` runs pydantic codecs inside the body, where subinterpreters reject pydantic_core. The first two need approved erlang-python fork changes for task modes and importable module-path bodies; the third is PyBeam-side work to move codecs to the caller and pass raw bytes. Raw `py_context` measurements do not establish task support.
 - Isolated tasks are the next step: they need fork support to replace hard-coded worker mode and main-interpreter task bodies, plus the isolated bootstrap fix in h0rv/erlang-python PR #5. Mode acceptance alone does not solve object references or process serialization. This is fork work, not a PyBeam scheduler or fallback.
 - Open: complete 3.14t integration acceptance, including the hang and `ws_session:send_sync/3` `undef`; the 3.14t owngil/isolated creation slowdown; the untraced dedicated-loop latency.
 

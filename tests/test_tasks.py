@@ -58,7 +58,14 @@ def test_task_function__worker_default_and_explicit(dedicated_loop: bool) -> Non
 @pytest.mark.parametrize(
     ("execution", "reason"),
     [
-        (ExecutionMode.OWNGIL, "pydantic_core.*check_multi_interp_extensions reject"),
+        (
+            ExecutionMode.OWNGIL,
+            "py_task hard-codes mode => worker; "
+            "retained main-interpreter closures cannot cross interpreters.*"
+            "Task mode support and bodies named by importable module path need "
+            "approved erlang-python fork changes.*PyBeam must move task codecs "
+            "to the caller and pass raw bytes.*check_multi_interp_extensions reject pydantic_core",
+        ),
         (
             ExecutionMode.ISOLATED,
             "py_task hard-codes mode => worker.*main-interpreter objects; "
