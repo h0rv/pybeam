@@ -43,7 +43,8 @@ Inspect = fun() ->
     GateState = fun(G, Occupied) ->
         case maps:get(closed, G) of
             true -> <<"draining">>;
-            false -> case Occupied >= maps:get(capacity, G) of
+            false -> case Occupied >= maps:get(capacity, G) orelse
+                          maps:get(bytes, G) >= maps:get(max_bytes, G) of
                 true -> <<"full">>; false -> <<"running">> end
         end
     end,

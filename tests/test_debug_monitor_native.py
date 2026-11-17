@@ -82,6 +82,10 @@ def test_monitor__reads_real_actor_task_and_queue_state_without_changing_app(
                 assert stats["Owned results"] == "1"
                 assert stats["Free slots"] == "0"
                 assert retained.state == "full"
+                byte_stats = {stat.name: stat.value for stat in supervisors["2"].stats}
+                assert byte_stats["Free slots"] == "1"
+                assert byte_stats["Encoded bytes"] == byte_stats["Byte limit"] == "1"
+                assert supervisors["2"].state == "full"
                 assert {stat.name: stat.value for stat in rows["queue"].stats} == {
                     "Queue depth": "1",
                     "Active leases": "1",
