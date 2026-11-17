@@ -51,7 +51,6 @@ from tools.runtime_wheel import runtime_tag
 class NativeState:
     pid: int
     package: Path
-    pydantic: Path
     libraries: tuple[Path, ...]
 
 
@@ -809,7 +808,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     entry.write_text(
         "import sys, os, json\n"
         "from pathlib import Path\n"
-        "import pybeam, pydantic\n"
+        "import pybeam\n"
         "from pybeam.actors import ActorGroup, actor, spawn\n"
         "@actor\n"
         "class Base:\n"
@@ -836,7 +835,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         "        libraries = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]\n"
         "    print('NATIVE_OK', sys.version_info[:2], erlang.__name__)\n"
         "    print('NATIVE_STATE', json.dumps({'pid': os.getpid(), 'package': str(Path(pybeam.__file__).resolve()),\n"
-        "        'pydantic': pydantic.__file__, 'libraries': [p for p in libraries if 'libpython' in p]}))\n"
+        "        'libraries': [p for p in libraries if 'libpython' in p]}))\n"
         "pybeam.run(main)\n"
     )
     relocated = tmp_path / "application-moved"
@@ -873,7 +872,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     state = Json(NativeState).decode(state_line.removeprefix("NATIVE_STATE "))
     assert state.libraries == (library,)
     assert state.package == moved / "lib/python3.14/site-packages/pybeam/__init__.py"
-    assert state.pydantic == moved / "lib/python3.14/site-packages/pydantic/__init__.py"
+    assert not (moved / "lib/python3.14/site-packages/pydantic").exists()
     with pytest.raises(ProcessLookupError):
         os.kill(state.pid, 0)
     with pytest.raises(ProcessLookupError):
