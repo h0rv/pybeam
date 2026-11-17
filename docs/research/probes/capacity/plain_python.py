@@ -19,13 +19,16 @@ def threads() -> dict[str, object]:
     release = threading.Event()
     started = time.perf_counter()
     pool = [threading.Thread(target=release.wait) for _ in range(COUNT)]
-    for thread in pool:
-        thread.start()
-    spawn = time.perf_counter() - started
-    rss, count = status()
-    release.set()
-    for thread in pool:
-        thread.join()
+    try:
+        for thread in pool:
+            thread.start()
+        spawn = time.perf_counter() - started
+        rss, count = status()
+    finally:
+        release.set()
+        for thread in pool:
+            if thread.is_alive():
+                thread.join()
     started = time.perf_counter()
     pool = [threading.Thread(target=time.sleep, args=(0.05,)) for _ in range(min(COUNT, 1000))]
     for thread in pool:
