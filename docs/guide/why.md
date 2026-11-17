@@ -46,7 +46,7 @@ Subscribe to a topic, publish a message, and receive it:
 
 ```python
 # messaging.py
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:

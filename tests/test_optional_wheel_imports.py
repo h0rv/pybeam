@@ -41,7 +41,7 @@ def test_installed_extra__imports_without_other_frameworks_or_vm(
         "import sys\n"
         "import pybeam\n"
         "from pybeam.services.background import ServiceSlot\n"
-        "from pybeam.hornbeam import Beam, run\n"
+        "from pybeam.integrations.hornbeam import Beam, run\n"
         + imports
         + "\nassert not "
         + repr(forbidden)

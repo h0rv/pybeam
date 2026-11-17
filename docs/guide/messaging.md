@@ -4,7 +4,7 @@ Publish a message to every subscriber of a topic.
 
 ```python
 # messaging.py
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:
@@ -32,7 +32,7 @@ Subscribe before publishing; a subscriber receives only messages published after
 
 ```python
 # subscriptions.py
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:

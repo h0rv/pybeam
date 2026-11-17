@@ -4,7 +4,7 @@ Store values and count events across requests, without defining an actor.
 
 ```python
 # state.py
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:
@@ -40,7 +40,7 @@ b'published'
 
 Each store keeps its own keys. `incr` adds to a counter and returns the new value in one atomic operation, so concurrent requests never lose an increment. A separate `get` and `set` is not atomic.
 
-Start programs that use shared state with `run` from `pybeam.hornbeam`.
+Start programs that use shared state with `run` from `pybeam.integrations.hornbeam`.
 
 Values live in memory and are lost when the program stops. Delete keys you no longer need. For state with its own methods, use an [actor](actors.md).
 

@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException
 from uvicorn import Config, Server
 
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 from pybeam.integrations.hornbeam.contracts import Services
 
 

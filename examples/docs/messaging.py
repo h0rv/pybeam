@@ -1,5 +1,5 @@
 # messaging.py
-from pybeam.hornbeam import Beam, run
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:

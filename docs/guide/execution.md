@@ -106,6 +106,6 @@ Subinterpreters isolate Python state, not native crashes. Only a separate OS pro
 | `worker` · 3.14 | 8, at most 32 calls admitted | 2.7 KB | 232 ms | 2.59 s |
 | `worker` · 3.14t | 8, at most 32 calls admitted | 2.7 KB | 258 ms | 1.80 s |
 
-For empty calls on one machine, asyncio is cheaper and faster. What the BEAM callers add: each one is preemptively scheduled, supervised and can live on another node, and the admission limit bounds how much Python work runs at once.
+Asyncio is fast and simple, but each event loop lives in one Python process, often inside a container; its tasks are isolated from other processes and lost if that process crashes. PyBEAM callers are preemptively scheduled and supervised, and can run on another machine. The admission limit bounds how much Python work runs at once.
 
 Numbers on this page come from one 8-core machine and vary with hardware and load.
