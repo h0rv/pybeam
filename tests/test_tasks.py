@@ -105,7 +105,7 @@ def test_task_function__strict_request_and_result_boundaries() -> None:
     with pytest.raises(CodecError):
         function.decode(b"21")
     with pytest.raises(CodecError):
-        TaskLimits.model_validate({"capacity": "1", "max_bytes": 100, "shutdown_ms": 100})
+        Json(TaskLimits).load({"capacity": "1", "max_bytes": 100, "shutdown_ms": 100})
 
 
 def test_tasks__core_import_does_not_require_native_or_frameworks() -> None:

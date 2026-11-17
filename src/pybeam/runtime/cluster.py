@@ -13,7 +13,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import Annotated, Self
 
-import psutil
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pybeam.runtime.assets import RuntimeAssets, discover_assets
@@ -107,7 +106,7 @@ class LocalCluster:
             and self.config.shutdown_timeout != guardian.stop_policy.node_shutdown_seconds
         ):
             raise BootstrapError("Managed stop policy differs from the node cleanup budget")
-        self._owner_identity = identity(psutil.Process())
+        self._owner_identity = identity(os.getpid())
         self._launcher_history: list[Identity] = []
         self._forced_cleanup_count = 0
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -189,12 +188,12 @@ class LocalCluster:
                     "-m",
                     "pybeam.runtime.guardian",
                     str(self.directory),
-                    identity(psutil.Process()).model_dump_json(),
+                    identity(os.getpid()).model_dump_json(),
                 ],
                 env=environment,
                 start_new_session=True,
             )
-            self._guardian_identity = identity(psutil.Process(self._guardian.pid))
+            self._guardian_identity = identity(self._guardian.pid)
             deadline = time.monotonic() + 5
             while not (self.directory / "ownership.json").exists():
                 if self._guardian.poll() is not None or time.monotonic() > deadline:
@@ -421,7 +420,7 @@ def _node(path: Path) -> None:
     descriptor = _NodeLaunch.model_validate_json(path.read_text())
     directory = Path(descriptor.environment["PYBEAM_CLUSTER_DIRECTORY"])
     alias = descriptor.environment["PYBEAM_NODE_ALIAS"]
-    launcher = identity(psutil.Process())
+    launcher = identity(os.getpid())
     try:
         status = launch(
             descriptor.entry,
