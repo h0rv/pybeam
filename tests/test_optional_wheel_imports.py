@@ -13,7 +13,7 @@ import pytest
     [
         ("fastapi", ("fastapi.dependencies",)),
         ("litestar", ("litestar.channels", "litestar.store")),
-        ("pyview", ("pyview.subscriptions",)),
+        ("pyview", ("pyview.subscriptions", "pyview.dependencies")),
     ],
 )
 def test_installed_extra__imports_without_other_frameworks_or_vm(

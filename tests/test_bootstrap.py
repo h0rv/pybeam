@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import os
 import py_compile
@@ -19,6 +20,33 @@ from pybeam.runtime.config import BootstrapError, CleanupError, Config, load_con
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = Config()
+
+
+@pytest.fixture(autouse=True)
+def preserve_main_module(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "__main__", sys.modules["__main__"])
+
+
+def test_loader__entry_classes_keep_source_after_loading(tmp_path: Path) -> None:
+    entry = tmp_path / "entry.py"
+    source = "class View:\n    pass\n"
+    entry.write_text(source)
+    namespace = loader._run_entry(entry)
+    view = namespace["View"]
+    assert isinstance(view, type)
+    assert inspect.getfile(view) == str(entry)
+    assert inspect.getsource(view) == source
+    assert vars(sys.modules["__main__"]) is namespace
+    assert namespace["__spec__"] is None
+
+
+def test_loader__failed_entry_restores_main_module(tmp_path: Path) -> None:
+    previous = sys.modules["__main__"]
+    entry = tmp_path / "entry.py"
+    entry.write_text("raise ValueError('load failed')\n")
+    with pytest.raises(ValueError, match="load failed"):
+        loader._run_entry(entry)
+    assert sys.modules["__main__"] is previous
 
 
 def test_import__does_not_load_erlang() -> None:

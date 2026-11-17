@@ -42,6 +42,8 @@ Many BEAM callers can share a finite pool of Python execution resources. The for
 
 Tasks also allocate a worker context per native task child. `TaskFunction` defaults to `dedicated_loop=False`, taking the shared path; `dedicated_loop=True` runs the body on its context-owned loop. Both still use the main interpreter. Construct and finalize loop-bound resources within their owning body/loop.[P1][R8]
 
+With the pinned runtime, `threading.local()` values persist on each worker context's dedicated thread, while each top-level call gets a fresh `contextvars` context. Nested calls stay in the outer call's context.
+
 ```mermaid
 flowchart TB
   subgraph VM["One BEAM OS process"]

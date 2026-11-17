@@ -20,12 +20,7 @@ class InfoReceiver(Protocol):
 
 
 class ViewSubscription:
-    """Retain on the view during connected mount; await close on disconnect.
-
-    ``beam`` must already be selected with ``beam.for_scope(socket.websocket.scope)``.
-    Consumer failures are re-raised by ``wait`` and ``aclose``. PyView suppresses
-    WebSocket output errors, so those failures cannot be observed here.
-    """
+    """Retain the handle from ``services.subscribe`` and await close on disconnect."""
 
     def __init__(
         self,
