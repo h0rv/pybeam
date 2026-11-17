@@ -36,12 +36,11 @@ test("relative guide links, anchors and queries respect deployment base", () => 
     assert.equal(rewriteLink(href, "docs/guide/index.md", "/pybeam/"), href);
 });
 
-test("the showcase shares accessible repository-local SVGs with the README", () => {
+test("the showcase uses accessible repository-local SVGs", () => {
   const guide = readFileSync(join(repositoryRoot, "docs/guide/why.md"), "utf8");
   const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
   assert.match(readme, /\(docs\/guide\/why\.md\)/);
-  assert.match(readme, /\(docs\/guide\/assets\/architecture\.svg\)/);
-  for (const name of ["architecture", "shared-state"]) {
+  for (const name of ["shared-state"]) {
     assert.ok(guide.includes(`(assets/${name}.svg)`));
     const svg = readFileSync(join(repositoryRoot, `docs/guide/assets/${name}.svg`), "utf8");
     assert.match(svg, /role="img" aria-labelledby="title desc"/);

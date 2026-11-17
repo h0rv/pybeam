@@ -1,8 +1,8 @@
 # Background services
 
-Run a periodic heartbeat and wait for cleanup when stopping it.
+Run a long-lived loop and stop it cleanly.
 
-Save this function as `background_body.py`. The service entry must be a module-level async function in an importable module, so it can be found by module and name. A closure cannot be used.
+Save this function as `background_body.py`. A service must be a module-level async function, not a closure or lambda.
 
 ```python
 import asyncio
@@ -18,7 +18,7 @@ async def watch(ready: asyncio.Event) -> None:
         print("cleanup complete")
 ```
 
-Save this entry file beside it and run it with Python.
+Save this file beside it and run it.
 
 ```python
 import asyncio
@@ -44,6 +44,6 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-The service prints `heartbeat` once per second until stopped. The entry waits for the first heartbeat, then stops it. You will see `cleanup complete`, then `cancelled`. The event confirms that work started without relying on a timed sleep.
+It prints `heartbeat`, `cleanup complete`, then `cancelled`. `main` waits for the first heartbeat and then stops the service. Waiting on the event, instead of sleeping, proves the loop started.
 
-The slot admits one live service. Retain its handle and call `stop` in `finally`. `stop` requests cooperative cancellation and waits for cleanup. A timeout from `wait` or `stop` does not prove the body has ended. Arguments are passed directly, not serialized.
+`ServiceSlot(capacity=1)` runs at most one service at a time. Keep the handle `start` returns and call `stop` in `finally`. `stop` cancels the loop and waits for its `finally` block to finish. If `stop` times out, the loop may still be running.
