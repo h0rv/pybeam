@@ -1,5 +1,7 @@
 # Python execution and durability
 
+Historical research note: own-GIL subinterpreter mode is unsupported because common native extensions do not load in it; use free-threaded 3.14t workers or isolated OS processes instead. See the [compatibility results](execution-modes.md#unsupported-own-gil-subinterpreters).
+
 ## Direction and evidence
 
 Bring BEAM capabilities to Python developers through familiar Python/asyncio APIs and framework integrations. Ordinary use should not require learning Erlang, Elixir, or BEAM operations. Hide integration plumbing, not ownership, overload, cancellation, restart, or durability guarantees. This is not a proposal for another Python scheduler, web framework, ORM, task queue, or workflow engine.
@@ -69,7 +71,7 @@ A scalable direction is **many logical jobs → bounded admission → finite nat
 |---|---|---|---|
 | Conventional CPython workers | One Python bytecode lane under the main interpreter's shared GIL; I/O and native libraries that release it can overlap | Shared module/native state; CPU-bound Python threads do not execute bytecode in parallel there | Conventional CPython 3.14.10 remains the builder default and packaged-wheel ABI; `workers` is limited to one and the launcher uses one regular BEAM scheduler (`+S 1:1`).[P2][P3][P4] |
 | Free-threaded CPython | Multiple actual threads can execute Python in parallel in one interpreter | Shared-state synchronization, extension compatibility, memory and single-thread overhead; one loop still runs one coroutine step at a time | Builder accepts CPython 3.14.10t with `PYBEAM_ALLOW_FREE_THREADED=1`. Dedicated-loop task CPU parallelism was measured; shared-loop tasks do not parallelize. Packaged wheels remain conventional and full integration acceptance is incomplete.[P2][R9] |
-| Own-GIL subinterpreters | Separate interpreter state and GIL per lane, with one pthread per context; parallel execution across lanes | Interpreter/import overhead, extension compatibility and data transfer; shared address space/native-crash fate | Fork constructs `PyInterpreterConfig_OWN_GIL`; public support is gated to Python 3.14+. Actor object references require the main interpreter.[R10][R11][R12] |
+| Own-GIL subinterpreters | Separate interpreter state and GIL per lane, with one pthread per context; parallel execution across lanes | Interpreter/import overhead, extension compatibility and data transfer; shared address space/native-crash fate | Fork constructs `PyInterpreterConfig_OWN_GIL`; retained in code but unsupported because common native extensions reject subinterpreters. Actor object references require the main interpreter.[R10][R11][R12] |
 | Isolated Python processes | Independent process/interpreter execution; stronger containment of a Python/native child crash | Startup, memory, framing/serialization and IPC; not automatically a sandbox | Fork's `isolated` context runs a Python child through a port and Unix socket. This is not a PyBeam actor-backend switch.[R13] |
 | Multiple BEAM nodes | Independent VMs/OS processes with local Python execution resources; can combine with execution strategies above | Placement, deployment, data transfer and partial failure; local nodes share host-failure risk | Experimental `LocalCluster` owns exactly two trusted local VMs, not a general cluster/deployment product.[P5] |
 

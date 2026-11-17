@@ -1,5 +1,7 @@
 # Runtime contracts and gaps
 
+Historical research note: own-GIL subinterpreter mode is unsupported because common native extensions do not load in it; use free-threaded 3.14t workers or isolated OS processes instead. See the [compatibility results](execution-modes.md#unsupported-own-gil-subinterpreters).
+
 ## Evidence boundary
 
 This is source-only research, not runtime certification. E means `erlang-python@aa8f021`; H means `hornbeam@1217ae8`. Paths below are relative to those sibling repositories. Both checkouts matched these revisions at inspection. Concurrent service-binding and WebSocket changes are excluded. Extensions checkpoint `a788a41`, current `AGENTS.md` and `README.md`, and the archived `/tmp/hornbeam-mvp-notes.mlpmlD/{WORKLOG.md,docs/architecture.md}` provide context, not runtime guarantees. No builds or runtime experiments were run against shared outputs.
