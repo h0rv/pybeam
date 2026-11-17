@@ -106,6 +106,9 @@ the Elixir and GenStage commits in `src/pybeam/runtime/optional_specs/genstage.j
 Elixir keeps absolute source paths in quoted literals (`quote location: :keep`) and
 `System` embeds its build date, so the build always runs in `/tmp/pybeam-genstage`
 with `SOURCE_DATE_EPOCH` set to the Elixir commit time and deterministic compiler
-options. The output must match the pinned manifest byte for byte. After changing a
-source pin, copy the `genstage-manifest` artifact from the failed macOS release job
-into `genstage.json` and review the diff.
+options. The payload also carries the OTP compiler from the runner's mise-built
+Erlang, whose bytes differ between macOS and Linux, so the pin is the manifest of
+the macOS CI build and a local Linux build will not match it. The output must match
+the pinned manifest byte for byte. After changing a source pin, copy the
+`genstage-manifest` artifact from the failed macOS release job into `genstage.json`
+and review the diff.
