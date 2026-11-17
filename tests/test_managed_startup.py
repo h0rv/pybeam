@@ -2,7 +2,6 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
-import psutil
 import pytest
 
 from benchmarks.managed import AcknowledgedExit, Draining, FailedManagedShutdown, read_exit
@@ -207,9 +206,7 @@ def test_startup_observer__census_is_updated_before_registration_ack(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     current = identity(os.getpid())
-    parent = psutil.Process().parent()
-    assert parent is not None
-    launcher = identity(parent)
+    launcher = identity(os.getppid())
     endpoint = GuardianEndpoint(directory=tmp_path, owner=current, guardian=current)
     registration = Registration(
         process=current,

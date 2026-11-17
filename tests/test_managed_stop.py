@@ -173,7 +173,7 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     summary = summarize(0, tmp_path, config, outcome)
     assert summary.completed is None and summary.throughput_per_second is None
     with pytest.raises(ValueError, match="cooperative"):
-        summarize(0, tmp_path, config, replace(outcome, forced_cleanup_count=1))
+        summarize(0, tmp_path, config, outcome.model_copy(update={"forced_cleanup_count": 1}))
     with pytest.raises(ValueError, match="cannot satisfy a benchmark"):
         summarize(0, tmp_path, Config(python_source=str(ROOT)), outcome)
 

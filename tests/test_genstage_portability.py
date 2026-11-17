@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_typing__uses_checkout_local_contracts() -> None:
-    paths = Json(list[str]).validate_python(
+    paths = Json(list[str]).load(
         tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["ty"]["environment"][
             "extra-paths"
         ]
@@ -34,9 +34,7 @@ class Task:
 
 
 def test_genstage_commands__do_not_require_private_checkout_inputs() -> None:
-    tasks = Json(dict[str, Task]).validate_python(
-        tomllib.loads((ROOT / "mise.toml").read_text())["tasks"]
-    )
+    tasks = Json(dict[str, Task]).load(tomllib.loads((ROOT / "mise.toml").read_text())["tasks"])
     assert '--out-dir "${usage_output}/wheel"' in tasks["build:optional-genstage"].run
     for name, task in tasks.items():
         if "genstage" in name:

@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import httpx
+import psutil
 import pytest
 from playwright.sync_api import APIResponse, Route, expect, sync_playwright
 
@@ -55,7 +56,7 @@ def wait_ready(job: JobAudit) -> NativeReady:
     assert ready.nodes[0].birth != ready.nodes[1].birth
     for node in ready.nodes:
         process = resolve(node.birth)
-        assert process is not None and process.exe().endswith("/beam.smp")
+        assert process is not None and psutil.Process(process.pid).exe().endswith("/beam.smp")
         assert node.birth in ready.outer.owned and node.birth in current.owned
     assert ready.exchange.result.value == 42 and ready.exchange.result.side_effect_count == 1
     return ready
@@ -74,7 +75,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
     ):
         listener.bind(("127.0.0.1", 0))
         listener.listen()
-        host, port = Json(tuple[str, int]).validate_python(listener.getsockname(), strict=True)
+        host, port = Json(tuple[str, int]).load(list(listener.getsockname()))
         base = "http://" + host + ":" + str(port)
         (tmp_path / "private-url.txt").write_text(base)
         process = subprocess.Popen(

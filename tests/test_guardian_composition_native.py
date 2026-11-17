@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -67,7 +68,7 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
                     target = Json(Identity).decode((tmp_path / "adapter.birth.json").read_text())
                 victim = resolve(target)
                 assert victim is not None
-                victim.kill()
+                os.kill(victim.pid, signal.SIGKILL)
             if mode in {"cancel", "inner_death"}:
                 (tmp_path / "stop.request").touch()
             else:

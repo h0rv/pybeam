@@ -1,4 +1,3 @@
-from dataclasses import FrozenInstanceError
 from dataclasses import replace
 from pathlib import Path
 from subprocess import run
@@ -32,7 +31,7 @@ def test_policy__requires_explicit_positive_limits() -> None:
 
 @pytest.mark.parametrize("capacity,max_bytes", [(0, 1), (-1, 1), (1, 0), (1, -1)])
 def test_policy__rejects_nonpositive_limits(capacity: int, max_bytes: int) -> None:
-    with pytest.raises(ValueError) as caught:
+    with pytest.raises(ValueError):
         BoundedMailbox(capacity=capacity, max_bytes=max_bytes)
 
 

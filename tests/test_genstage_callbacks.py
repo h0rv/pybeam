@@ -37,9 +37,7 @@ def test_process__should_reject_oversized_result_without_truncation() -> None:
 
 def test_process__should_surface_failure_and_deadline_cancellation() -> None:
     failed = Json(Outcome).decode(process(Json(Work).encode(Work(id=1, action="fail"))))
-    cancelled = Json(Outcome).decode(
-        process(Json(Work).encode(Work(id=2, action="cancel")))
-    )
+    cancelled = Json(Outcome).decode(process(Json(Work).encode(Work(id=2, action="cancel"))))
     assert failed.status == "failed"
     assert failed.detail == "deliberate callback failure"
     assert cancelled.status == "cancelled"

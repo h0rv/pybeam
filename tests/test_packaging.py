@@ -91,7 +91,7 @@ def linux_assets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_linux_manifest_and_host_library(linux_assets: Path) -> None:
     manifest = Json(RuntimeManifest).decode((linux_assets / "runtime.json").read_bytes())
-    assert isinstance(manifest.root, LinuxManifest)
+    assert isinstance(manifest, LinuxManifest)
     assets = packaged_assets(linux_assets)
     assert assets.python_library == linux_assets / "host/lib/libpython3.14.so.1.0"
     assert assets.python_home == linux_assets / "host"

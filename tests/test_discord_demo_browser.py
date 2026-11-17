@@ -74,7 +74,7 @@ async def miniapp(
                     assert response.status_code == 200, log.read_text()
                     break
             owned = tuple(
-                identity(child)
+                identity(child.pid)
                 for child in (
                     psutil.Process(process.pid),
                     *psutil.Process(process.pid).children(recursive=True),

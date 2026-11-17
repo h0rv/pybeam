@@ -68,7 +68,7 @@ def test_projection__only_allowlisted_receipt_fields() -> None:
         assert forbidden not in text
     assert Json(WalkthroughProof).decode(text) == public
     with pytest.raises(ValueError):
-        OBSERVATION.validate_json('{"kind":"state","state":"fresh_empty","cookie":"secret"}')
+        OBSERVATION.decode('{"kind":"state","state":"fresh_empty","cookie":"secret"}')
 
 
 @pytest.mark.parametrize("field", ["node", "pid", "incarnation", "message_id"])
@@ -131,9 +131,9 @@ def test_runner__walkthrough_is_not_measurement(tmp_path: Path) -> None:
     assert summary.latency_ns is None
     assert summary.simultaneous_tree_rss_peak_bytes is None
     with pytest.raises(ValueError, match="cannot satisfy a benchmark"):
-        summarize(0, tmp_path, replace(config, purpose="measurement"), outcome)
+        summarize(0, tmp_path, config.model_copy(update={"purpose": "measurement"}), outcome)
     with pytest.raises(ValueError, match="cannot satisfy a walkthrough"):
-        summarize(0, tmp_path, config, replace(outcome, status="passed"))
+        summarize(0, tmp_path, config, outcome.model_copy(update={"status": "passed"}))
 
 
 async def test_subscribers__bounded_coalesced_fresh_and_disconnect(tmp_path: Path) -> None:
@@ -233,7 +233,7 @@ def test_adapter__controlled_boundary_writes_typed_adapter_json(
     distributed.walkthrough(tmp_path, endpoint)
     proof = Json(WalkthroughProof).decode((tmp_path / "adapter.json").read_text())
     events = tuple(
-        OBSERVATION.validate_json(line)
+        OBSERVATION.decode(line)
         for line in (tmp_path / "observations.jsonl").read_text().splitlines()
     )
     assert proof.observations == events

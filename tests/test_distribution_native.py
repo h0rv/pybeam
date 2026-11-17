@@ -64,10 +64,10 @@ def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
         with pytest.raises(RuntimeError, match="only once"):
             cluster.__enter__()
         epmd = resolve(cluster.identities[0])
-        assert epmd is not None and epmd.exe().endswith("/epmd")
+        assert epmd is not None and psutil.Process(epmd.pid).exe().endswith("/epmd")
         discovery_listeners = [
             connection
-            for connection in epmd.net_connections(kind="inet")
+            for connection in psutil.Process(epmd.pid).net_connections(kind="inet")
             if connection.status == psutil.CONN_LISTEN
         ]
         assert discovery_listeners
@@ -77,10 +77,10 @@ def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
         for alias in ("a", "b"):
             birth = Json(Identity).decode((cluster.directory / (alias + ".birth.json")).read_text())
             vm = resolve(birth)
-            assert vm is not None and vm.exe().endswith("/beam.smp")
+            assert vm is not None and psutil.Process(vm.pid).exe().endswith("/beam.smp")
             listeners = [
                 connection
-                for connection in vm.net_connections(kind="inet")
+                for connection in psutil.Process(vm.pid).net_connections(kind="inet")
                 if connection.status == psutil.CONN_LISTEN
             ]
             assert listeners

@@ -79,4 +79,6 @@ def test_execution_limits__immutable_strict_value_and_public_exports() -> None:
     with pytest.raises(FrozenInstanceError):
         limits.__setattr__("workers", 8)
     with pytest.raises(ValueError, match="unexpected fields"):
-        Json(ExecutionLimits).load({**Json(type(limits)).dump(limits), "unexpected": 1})
+        Json(ExecutionLimits).load(
+            {"workers": 4, "capacity": 32, "max_bytes": 1_048_576, "unexpected": 1}
+        )

@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from pybeam.runtime.assets import RuntimeManifest
+from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import verify_manifest
 from tools.build_runtime import (
     ERTS_EXECUTABLES,
@@ -40,7 +40,7 @@ def runtime_tag(assets: Path) -> str:
     pattern = r"cp314-cp314-linux_x86_64" if linux else r"cp314-cp314-macosx_\d+_\d+_arm64"
     if not isinstance(tag, str) or not re.fullmatch(pattern, tag):
         raise ValueError("Unsupported wheel ABI/platform tag")
-    RuntimeManifest.model_validate_json((assets / "runtime.json").read_bytes())
+    MANIFEST.decode((assets / "runtime.json").read_bytes())
     erts: object = manifest.get("erts_version")
     if not isinstance(erts, str) or not re.fullmatch(r"[0-9.]+", erts):
         raise ValueError("Invalid ERTS version")

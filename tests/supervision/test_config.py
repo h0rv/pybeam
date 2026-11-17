@@ -18,19 +18,19 @@ from pybeam.supervision.config import (
 
 @pytest.mark.parametrize("count", [-1, -100])
 def test_budget_rejects_negative_count(count: int) -> None:
-    with pytest.raises(ValueError) as caught:
+    with pytest.raises(ValueError):
         RestartBudget(max_restarts=count)
 
 
 @pytest.mark.parametrize("window", [0, -1])
 def test_budget_rejects_nonpositive_window(window: int) -> None:
-    with pytest.raises(ValueError) as caught:
+    with pytest.raises(ValueError):
         RestartBudget(window_seconds=window)
 
 
 @pytest.mark.parametrize("grace", [-1, 4294967296])
 def test_shutdown_rejects_outside_otp_timer_range(grace: int) -> None:
-    with pytest.raises(ValueError) as caught:
+    with pytest.raises(ValueError):
         Shutdown(grace)
 
 
@@ -72,9 +72,7 @@ def test_numeric_configuration__rejects_coercion(
         "from pybeam.supervision.config import RestartBudget, Shutdown, SupervisorConfig\n"
         "try:\n    "
         + constructor.format(value)
-        + "\nexcept ValueError as error:\n    assert {!r} in str(error)\n".format(
-            location
-        )
+        + "\nexcept ValueError as error:\n    assert {!r} in str(error)\n".format(location)
         + "else:\n    raise AssertionError('invalid numeric value accepted')\n"
     )
     subprocess.run([sys.executable, "-c", script], check=True, timeout=10)

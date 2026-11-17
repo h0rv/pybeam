@@ -1,5 +1,6 @@
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -174,15 +175,15 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "Guardian owns child PID", timeout=15000
                 )
                 descendants = psutil.Process(server.pid).children(recursive=True)
-                captured = tuple(identity(child) for child in descendants)
+                captured = tuple(identity(child.pid) for child in descendants)
                 guardian = next(
-                    identity(child)
+                    identity(child.pid)
                     for child in descendants
                     if "benchmarks.guardian" in child.cmdline()
                 )
                 target = resolve(guardian)
                 assert target is not None
-                target.kill()
+                os.kill(target.pid, signal.SIGKILL)
                 failed_hold.locator('[role="status"]').filter(has_text="failed").wait_for(
                     timeout=15000
                 )
@@ -206,7 +207,8 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "Guardian owns child PID", timeout=15000
                 )
                 shutdown_owned = tuple(
-                    identity(child) for child in psutil.Process(server.pid).children(recursive=True)
+                    identity(child.pid)
+                    for child in psutil.Process(server.pid).children(recursive=True)
                 )
                 assert errors == []
                 browser.close()
