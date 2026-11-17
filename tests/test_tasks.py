@@ -1,19 +1,20 @@
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_type
 
 import pytest
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
+from pybeam.codec import CodecError, Json
 from pybeam.submissions import CapabilityUnavailable
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
 
 
-class Request(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True)
+class Request:
     value: int
 
 
@@ -22,7 +23,7 @@ async def render(request: Request) -> str:
 
 
 async def checked(supervisor: TaskSupervisor) -> None:
-    function = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    function = TaskFunction(render, Json(Request), Json(str))
     ref = await supervisor.start(function, Request(value=21))
     assert_type(ref, TaskRef[str])
     assert_type(function.execution, ExecutionMode)
@@ -45,12 +46,12 @@ def test_execution_mode__values() -> None:
 def test_task_function__worker_default_and_explicit(
     dedicated_loop: bool, execution: ExecutionMode
 ) -> None:
-    default = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    default = TaskFunction(render, Json(Request), Json(str))
     assert default.execution is ExecutionMode.WORKER
     explicit = TaskFunction(
         render,
-        TypeAdapter(Request),
-        TypeAdapter(str),
+        Json(Request),
+        Json(str),
         execution=execution,
         dedicated_loop=dedicated_loop,
     )
@@ -67,7 +68,7 @@ def test_task_function__worker_default_and_explicit(
             "retained main-interpreter closures cannot cross interpreters.*"
             "Task mode support and bodies named by importable module path need "
             "approved erlang-python fork changes.*PyBeam must move task codecs "
-            "to the caller and pass raw bytes.*check_multi_interp_extensions reject pydantic_core",
+            "to the caller and pass raw bytes.*check_multi_interp_extensions reject some extension modules",
         ),
         (
             ExecutionMode.ISOLATED,
@@ -84,8 +85,8 @@ def test_task_function__unavailable_modes(
     with pytest.raises(CapabilityUnavailable, match=reason):
         TaskFunction(
             render,
-            TypeAdapter(Request),
-            TypeAdapter(str),
+            Json(Request),
+            Json(str),
             execution=execution,
             dedicated_loop=dedicated_loop,
         )
@@ -94,16 +95,16 @@ def test_task_function__unavailable_modes(
 @pytest.mark.parametrize("execution", ["unknown"])
 def test_task_function__unknown_execution_mode(execution: ExecutionMode) -> None:
     with pytest.raises(ValueError, match="'unknown' is not a valid ExecutionMode"):
-        TaskFunction(render, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+        TaskFunction(render, Json(Request), Json(str), execution=execution)
 
 
 def test_task_function__strict_request_and_result_boundaries() -> None:
-    function = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    function = TaskFunction(render, Json(Request), Json(str))
     assert function.encode(Request(value=21)) == b'{"value":21}'
     assert function.decode(b'"result"') == "result"
-    with pytest.raises(ValidationError):
+    with pytest.raises(CodecError):
         function.decode(b"21")
-    with pytest.raises(ValidationError):
+    with pytest.raises(CodecError):
         TaskLimits.model_validate({"capacity": "1", "max_bytes": 100, "shutdown_ms": 100})
 
 
@@ -127,15 +128,15 @@ def test_tasks__core_import_does_not_require_native_or_frameworks() -> None:
 def test_tasks__negative_request_and_result_probes(tmp_path: Path) -> None:
     source = tmp_path / "negative.py"
     source.write_text(
-        "from pydantic import TypeAdapter\n"
+        "from pybeam.codec import Json\n"
         "from pybeam.tasks import TaskFunction, TaskSupervisor\n"
         "async def render(value: int) -> str:\n"
         "    return str(value)\n"
         "async def bad(sup: TaskSupervisor) -> None:\n"
-        "    function = TaskFunction(render, TypeAdapter(int), TypeAdapter(str))\n"
+        "    function = TaskFunction(render, Json(int), Json(str))\n"
         "    await sup.start(function, 'wrong')\n"
         "    value: int = await (await sup.start(function, 1))\n"
-        "    TaskFunction(render, TypeAdapter(int), TypeAdapter(str), execution='worker')\n"
+        "    TaskFunction(render, Json(int), Json(str), execution='worker')\n"
     )
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(

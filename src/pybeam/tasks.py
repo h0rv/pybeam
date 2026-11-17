@@ -4,10 +4,9 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 from types import TracebackType
-from typing import TYPE_CHECKING, Annotated, Protocol, Self, assert_never
+from typing import TYPE_CHECKING, Protocol, Self, assert_never
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
-
+from pybeam.codec import Codec
 from pybeam.submissions import AdmissionClosed, CapabilityUnavailable, Overloaded
 
 if TYPE_CHECKING:
@@ -30,14 +29,22 @@ class TaskOwnershipError(RuntimeError):
     pass
 
 
-class TaskLimits(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TaskLimits:
     """Finite ownership slots and aggregate encoded request bytes, not a Python heap limit."""
 
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+    capacity: int
+    max_bytes: int
+    shutdown_ms: int
 
-    capacity: Annotated[int, Field(gt=0, le=18446744073709551615)]
-    max_bytes: Annotated[int, Field(gt=0, le=18446744073709551615)]
-    shutdown_ms: Annotated[int, Field(gt=0, le=4294967295)]
+    def __post_init__(self) -> None:
+        for name, value, maximum in (
+            ("capacity", self.capacity, 18446744073709551615),
+            ("max_bytes", self.max_bytes, 18446744073709551615),
+            ("shutdown_ms", self.shutdown_ms, 4294967295),
+        ):
+            if type(value) is not int or not 0 < value <= maximum:
+                raise ValueError(name + " must be an integer from 1 to " + str(maximum))
 
 
 class ExecutionMode(StrEnum):
@@ -47,9 +54,9 @@ class ExecutionMode(StrEnum):
     3.14t; a native crash kills the VM. Owngil owns an interpreter per context
     and is not a crash boundary. Owngil tasks need approval for fork changes:
     py_task hard-codes worker and retained main-interpreter closures must become
-    bodies named by importable module path. PyBeam must also move its pydantic
-    codecs to the caller and pass raw bytes: subinterpreters reject pydantic_core
-    (and numpy). Isolated uses a child OS process that contains
+    bodies named by importable module path. Codecs must also run in the caller
+    and pass raw bytes: subinterpreters reject some extensions, such as
+    pydantic_core and numpy. Isolated uses a child OS process that contains
     os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
     Only worker is currently available for PyBeam tasks.
     """
@@ -70,8 +77,8 @@ class TaskFunction[Q, R]:
     def __init__(
         self,
         function: Callable[[Q], Awaitable[R]],
-        request: TypeAdapter[Q],
-        result: TypeAdapter[R],
+        request: Codec[Q],
+        result: Codec[R],
         *,
         execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
@@ -84,7 +91,7 @@ class TaskFunction[Q, R]:
                 "Task mode support and bodies named by importable module path need "
                 "approved erlang-python fork changes. PyBeam must move task codecs "
                 "to the caller and pass raw bytes because subinterpreters with "
-                "check_multi_interp_extensions reject pydantic_core"
+                "check_multi_interp_extensions reject some extension modules"
             )
         if execution == ExecutionMode.ISOLATED:
             raise CapabilityUnavailable(
@@ -104,10 +111,10 @@ class TaskFunction[Q, R]:
         return self._execution
 
     def encode(self, request: Q) -> bytes:
-        return self._request.dump_json(self._request.validate_python(request, strict=True))
+        return self._request.encode(request)
 
     def decode(self, payload: bytes) -> R:
-        return self._result.validate_json(payload, strict=True)
+        return self._result.decode(payload)
 
     def body(self, owners: tuple[object, ...], job: object | None = None) -> Body:
         from erlang.tasks import Body
@@ -116,9 +123,9 @@ class TaskFunction[Q, R]:
             token = _body_owners.set(owners)
             job_token = _body_execution.set(_BodyExecution(job, asyncio.current_task()))
             try:
-                request = self._request.validate_json(payload, strict=True)
+                request = self._request.decode(payload)
                 value = await self._function(request)
-                return self._result.dump_json(self._result.validate_python(value, strict=True))
+                return self._result.encode(value)
             finally:
                 _body_execution.reset(job_token)
                 _body_owners.reset(token)
