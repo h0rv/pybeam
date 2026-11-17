@@ -10,7 +10,7 @@ from pybeam.integrations.hornbeam.dependencies import BeamProvider as ServicesPr
 
 class BeamProvider(ServicesProvider):
     async def __call__(self, connection: HTTPConnection) -> Services:
-        return self.for_scope(connection.scope)
+        return self.services.for_scope(connection.scope)
 
     def subscription(
         self, topic: str, *, max_bytes: int = 65536

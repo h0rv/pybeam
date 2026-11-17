@@ -178,35 +178,15 @@ async def test_fastapi__cancelled_receive_releases_subscription() -> None:
     assert not state.channels
 
 
-async def test_fastapi__missing_scope_owner_uses_lifespan_connection() -> None:
+async def test_fastapi__missing_scope_owner_is_an_error() -> None:
     state = ServiceState()
     app = fake_app(state)
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as client,
     ):
-        response = await client.get("/counter")
-        assert response.status_code == 200
-        assert response.text == '<output id="count">0</output>'
-
-
-@pytest.mark.parametrize("extensions", [None, {}, {"hornbeam.owner": None}])
-async def test_fastapi__unowned_scope_returns_shared_services(
-    extensions: dict[str, object] | None,
-) -> None:
-    beam = FakeServices(ServiceState(), owner="application-owner")
-
-    async def connect() -> Services:
-        return beam
-
-    provider = BeamProvider(connect)
-    scope = event_scope()
-    if extensions is None:
-        del scope["extensions"]
-    else:
-        scope["extensions"] = extensions
-    async with provider.lifespan(FastAPI()):
-        assert await provider(HTTPConnection(scope)) is beam
+        with pytest.raises(RuntimeError, match="Hornbeam"):
+            await client.get("/counter")
 
 
 async def test_fastapi__connects_once_and_keeps_scope_owners_independent() -> None:

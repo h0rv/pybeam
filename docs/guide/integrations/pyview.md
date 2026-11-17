@@ -81,7 +81,7 @@ $ uv run pyview_app.py
 
 Open [localhost:8769](http://127.0.0.1:8769/) in your browser. The counter starts at `0`; clicking **Increment** shows `1`.
 
-`services.lifespan` connects once for the application. `Depends(services)` passes services to each handler, using the connection's ownership scope when supplied or the lifespan connection otherwise. The initial HTTP render uses the lifespan connection. Dependencies require an active application lifespan. Do not create subscriptions during the initial HTTP render.
+`services.lifespan` connects once for the application. `Depends(services)` passes the shared services to each handler. Connected handlers use the WebSocket's ownership scope; the initial HTTP render uses the application connection. Dependencies require an active application lifespan. Do not create subscriptions during the initial HTTP render.
 
 Each view reads the shared counter when it mounts or increments. Other open views do not refresh automatically in this example. Values live in memory and are lost when the program stops. Stop the server with Ctrl+C.
 
