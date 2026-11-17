@@ -5,6 +5,29 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 syst
 main { max-width: 1400px; margin: auto; padding: 24px 28px 16px; }
 header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
 h1 { margin: 2px 0 0; font-size: 28px; font-weight: 650; letter-spacing: -.7px; }
+.scenario { border: 1px solid var(--line); background: var(--panel); padding: 18px; margin-bottom: 20px; }
+.scenario-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+.scenario h2 { font-size: 22px; margin-top: 4px; }
+.run-control { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.countdown { font-size: 24px; font-variant-numeric: tabular-nums; }
+progress { width: 100%; height: 5px; margin: 16px 0 8px; accent-color: var(--fault); }
+.narration { margin: 0; }
+.narration > div { display: grid; grid-template-columns: 140px 1fr; gap: 12px; margin: 8px 0; }
+.narration dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
+.narration dd { margin: 0; font-size: 13px; }
+.observed { display: block; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.target-room .identity strong { text-decoration: underline; text-underline-offset: 3px; }
+.target-room .identity small { color: var(--fault); font-size: 8px; text-decoration: none; }
+.results { margin-top: 22px; }
+.results h2 { font-size: 18px; }
+.results p { color: var(--muted); font-size: 11px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+thead th { color: var(--muted); font-weight: 500; }
+th:first-child { width: 10%; }
+td { background: var(--panel); font-variant-numeric: tabular-nums; line-height: 1.7; }
+td strong { font-weight: 550; }
+@media (max-width: 700px) { h1 { font-size: 23px; } .scenario-heading { align-items: flex-start; flex-direction: column; } .narration > div { grid-template-columns: 1fr; gap: 2px; } }
 .eyebrow { margin: 0; font-size: 10px; letter-spacing: 1.6px; color: var(--muted); }
 .load { margin: 0; text-align: right; font-size: 12px; color: var(--muted); }
 .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }

@@ -49,9 +49,14 @@ $ uv run --locked --extra fastapi python -m examples.chat_load.crash_test
 Open `http://127.0.0.1:8802`; servers use ports 8800/8801. The dashboard also
 starts with `mise run example:crash-test`. Flags: `--usual-url`, `--pybeam-url`,
 `--rooms`, `--clients`, `--rate` (messages/s/socket). Traffic runs once per
-dashboard process, not per tab. Keep this local.
+dashboard process, not per tab. Choose **Start crash test** for a narrated run:
+an 8 s baseline, then raise, CPU hog and native abort in room-1 on both stacks
+together. Each fault gets 10 s of observation and 5 s of recovery. Watch rooms
+2–8; the results retain each side's actual request outcome, worst rolling p99,
+pending age, socket drops and lost messages. Expectations are separate from
+measurements; **Run again** repeats the sequence. Keep this local.
 
-Buttons target `room-1` through `POST /rooms/{room}/faults/{kind}`:
+The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 
 | Fault | Usual stack | PyBeam |
 | --- | --- | --- |

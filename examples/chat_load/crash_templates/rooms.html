@@ -1,11 +1,14 @@
+{% include 'scenario.html' %}
 <div class="columns">
 {% for side in live.sides.values() %}
   <section aria-label="{{ side.title }} live room metrics" class="room-panel">
+    <div class="side-heading"><h2>{{ side.title }}</h2><span class="target">room-1 = fault target</span></div>
+    <p class="stack">{% if side.key == 'usual' %}8 web workers · KV cache · message broker · task-queue worker{% else %}1 process{% endif %}</p>
     <div class="table-heading"><span>ROOM / STATUS</span><span>P99 / 2 S</span><span>HISTORY</span><span>SOCKETS</span></div>
     {% for room in side.rooms %}
     {% set status = room.status(now) %}
-    <article class="room {{ 'affected' if status != 'healthy' else '' }}" data-room="{{ side.key }}-{{ room.name }}">
-      <div class="identity"><strong>{{ room.name }}</strong><span class="status">{{ status }}</span></div>
+    <article class="room {{ 'target-room' if loop.first else '' }} {{ 'affected' if status != 'healthy' or (room.p99 is not none and room.p99 > 100) or room.oldest_ms(now) > 500 else '' }}" data-room="{{ side.key }}-{{ room.name }}">
+      <div class="identity"><strong>{{ room.name }}{% if loop.first %} <small>TARGET</small>{% endif %}</strong><span class="status">{{ status }}</span></div>
       <div class="latency"><strong>{% if room.p99 is not none %}{{ '%.1f' | format(room.p99) }}<small> ms</small>{% else %}—{% endif %}</strong><span>{{ room.sample_count }} acks</span></div>
       <svg class="spark" viewBox="0 0 120 28" role="img" aria-label="{{ room.name }} p99 history, 100 millisecond ceiling">
         <path class="baseline" d="M0 24H120"></path>
@@ -19,3 +22,4 @@
   </section>
 {% endfor %}
 </div>
+{% include 'results.html' %}

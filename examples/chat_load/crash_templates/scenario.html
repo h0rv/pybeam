@@ -1,0 +1,29 @@
+{% macro metrics(item) -%}
+worst p99 {% if item.p99 is none %}—{% else %}{{ '%.1f' | format(item.p99) }} ms{% endif %} · max pending {{ '%.0f' | format(item.pending_ms) }} ms · {{ item.dropped }} sockets dropped · {{ item.lost }} messages lost
+{%- endmacro %}
+<section class="scenario" aria-label="Guided crash test">
+  <div class="scenario-heading">
+    <div>
+      <p class="eyebrow">{% if live.running %}STEP {{ live.step_number }} OF 7{% elif live.phase == 'done' %}7 OF 7 COMPLETE{% else %}ONE GUIDED RUN · BOTH STACKS TOGETHER{% endif %}</p>
+      <h2>{% if live.phase == 'baseline' %}Baseline · watch the other rooms{% elif live.phase == 'observe' %}{{ live.current.title }}{% elif live.phase == 'recovery' %}Recovery · let both stacks settle{% elif live.phase == 'done' %}Done · compare the measured results{% elif live.phase == 'interrupted' %}Run interrupted{% else %}Break one room. Watch the others.{% endif %}</h2>
+    </div>
+    <div class="run-control">
+      {% if live.running %}<strong class="countdown">{{ live.remaining(now) }} s</strong>{% endif %}
+      <button type="button" hx-post="/run" hx-target="#live" hx-swap="innerHTML" hx-disabled-elt="this" {% if live.running %}disabled{% endif %}>{% if live.running %}Crash test running{% elif live.phase in ('done', 'interrupted') %}Run again{% else %}Start crash test{% endif %}</button>
+    </div>
+  </div>
+  <progress value="{{ live.step_number }}" max="7" aria-label="Scenario progress"></progress>
+  <dl class="narration">
+    <div><dt>What this simulates</dt><dd>{% if live.phase in ('observe', 'recovery') %}{{ live.current.simulates }}{% else %}Both stacks serve the same chat traffic: {{ live.settings.rooms }} rooms × {{ live.settings.clients }} users each, {{ live.settings.rate | round(1) }} messages/s/user.{% endif %}</dd></div>
+    <div><dt>Expected</dt><dd>{% if live.phase == 'observe' %}{{ live.current.expected }}{% elif live.phase == 'recovery' %}Requests have finished; disconnected clients reconnect automatically. The next step waits five seconds.{% elif live.phase == 'done' %}Outcomes depend on worker assignment and this machine. Measurements, not the expectations above, describe this run.{% else %}Room-1 is about to be broken on both sides at once. {% if live.settings.rooms > 1 %}Watch rooms 2–{{ live.settings.rooms }}.{% else %}Configure more than one room to compare other-room latency.{% endif %}{% endif %}</dd></div>
+    <div><dt>What happened</dt><dd>
+      {% for key, side in live.sides.items() %}
+      <span class="observed"><strong>{{ side.title }}:</strong>
+        {% if live.phase == 'observe' %}{{ side.result }}; {{ metrics(live.observations[key].measurement) }}
+        {% elif live.phase == 'recovery' %}{{ live.results[-1].outcomes[key] }}; {{ metrics(live.results[-1].measurements[key]) }}
+        {% elif live.phase == 'done' %}{{ metrics(live.total(key)) }} across {{ live.results | length }} observation windows
+        {% else %}{{ side.rooms | sum(attribute='connected') }} connected sockets; {% if live.running %}measuring baseline{% else %}traffic is live{% endif %}{% endif %}.</span>
+      {% endfor %}
+    </dd></div>
+  </dl>
+</section>

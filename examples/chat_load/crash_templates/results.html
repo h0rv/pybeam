@@ -1,0 +1,15 @@
+<section class="results" aria-label="Completed fault results">
+  <h2>Results · other rooms only</h2>
+  <p>Peak rolling p99 and maximum pending age during each 10 s observation window. Dropped counts distinct sockets per window; lost counts pending messages discarded at disconnect.</p>
+  <table>
+    <thead><tr><th scope="col">Fault</th>{% for side in live.sides.values() %}<th scope="col">{{ side.title }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for result in live.results %}
+      <tr><th scope="row">{{ result.step.kind }}</th>
+      {% for key in live.sides %}{% set item = result.measurements[key] %}
+        <td>{{ result.outcomes[key] }}<br><strong>Worst p99 {% if item.p99 is none %}—{% else %}{{ '%.1f' | format(item.p99) }} ms{% endif %} · {{ item.dropped }} sockets dropped</strong><br>Max pending {{ '%.0f' | format(item.pending_ms) }} ms · {{ item.lost }} messages lost</td>
+      {% endfor %}</tr>
+    {% else %}<tr><td colspan="3">Results appear as each fault finishes. No faults have been observed yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
