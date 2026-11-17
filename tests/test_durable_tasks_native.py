@@ -92,7 +92,8 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
         Args = ["+S", "2:2", "+A", "2", "-setcookie", atom_to_list(erlang:get_cookie())]
                ++ BOOT_ARGS ++ Paths,
         Peers = [begin
-            {ok, Peer, Node} = peer:start(#{name => Name, connection => standard_io,
+            {ok, Peer, Node} = peer:start(#{name => Name, host => "127.0.0.1",
+                longnames => true, connection => standard_io,
                 exec => EXECUTABLE, args => Args}),
             {Peer, Node}
         end || Name <- [durable_py_a, durable_py_b, durable_py_c]],
@@ -165,7 +166,14 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
         expression = expression.replace(key, value)
     environment = dict(os.environ, **assets.environment)
     environment["ERL_CRASH_DUMP"] = str(tmp_path / "erl_crash.dump")
-    argv = [str(assets.executable), "+S", "2:2", "-noshell", "-sname", "durable_py_controller"]
+    argv = [
+        str(assets.executable),
+        "+S",
+        "2:2",
+        "-noshell",
+        "-name",
+        "durable_py_controller@127.0.0.1",
+    ]
     argv.extend(boot_args)
     argv.extend(("-pa", *(str(path) for path in assets.code_paths), "-eval", expression))
     result = subprocess.run(
