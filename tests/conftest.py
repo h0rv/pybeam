@@ -19,6 +19,8 @@ RUNTIME_LAUNCHER = ROOT.parent / "hornbeam" / "examples" / "run_asgi.escript"
 FRAMEWORK_TESTS = frozenset(
     {
         "test_browser_gate.py",
+        "test_chat_crash_test.py",
+        "test_chat_load.py",
         "test_chat_load_native.py",
         "test_discord_demo.py",
         "test_discord_demo_browser.py",

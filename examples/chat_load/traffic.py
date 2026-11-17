@@ -19,6 +19,7 @@ from websockets.exceptions import ConnectionClosed
 
 from examples.chat_load.protocol import (
     Ack,
+    Fault,
     JobAccepted,
     JobDone,
     JobRequest,
@@ -136,6 +137,8 @@ class Tally:
 
     def record(self, room: str, client: str, push: Push) -> None:
         match push:
+            case Fault():
+                pass
             case Ack(id=id):
                 started = self.sent.get((room, client, id))
                 if started is None:

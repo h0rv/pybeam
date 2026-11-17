@@ -4,7 +4,7 @@ x-app: &app
   build:
     context: ../../..
     dockerfile: examples/chat_load/conventional/Dockerfile
-  command: uvicorn examples.chat_load.conventional.app:app --host 0.0.0.0 --port 8000 --log-level warning
+  command: uvicorn examples.chat_load.conventional.app:app --host 0.0.0.0 --port 8000 --workers 8 --log-level info
   depends_on:
     kv:
       condition: service_healthy
@@ -12,16 +12,10 @@ x-app: &app
       condition: service_healthy
 
 services:
-  proxy:
-    image: nginx:1-alpine
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  app:
+    <<: *app
     ports:
-      - 127.0.0.1:8801:8801
-    depends_on: [app-1, app-2]
-
-  app-1: *app
-  app-2: *app
+      - 127.0.0.1:8801:8000
 
   worker:
     <<: *app

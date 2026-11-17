@@ -201,6 +201,10 @@ run = 'exec uv run --locked --extra fastapi --extra hornbeam python -m examples.
 description = "Simulate chat traffic against a running chat server and print measured results"
 run = "uv run --locked python -m examples.chat_load.traffic"
 
+[tasks."example:crash-test"]
+description = "Live side-by-side room fault dashboard on port 8802; chat servers must be running"
+run = "uv run --locked --extra fastapi python -m examples.chat_load.crash_test"
+
 [tasks."example:discord-simulation"]
 wait_for = ["setup", "build"]
 description = "Standalone native room CLI with 800 receipt proof; requires staged assets"
