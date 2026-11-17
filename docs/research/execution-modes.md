@@ -2,6 +2,22 @@
 
 These are single trials on one Linux x86-64 VM with eight CPUs, not compatibility certification or production limits. Conventional CPython is the default. See the [execution model](execution-model.md) for ownership, cancellation and durability boundaries.
 
+## Choosing a mode
+
+Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task boundary with the keyword-only `TaskFunction(..., execution=ExecutionMode.WORKER, dedicated_loop=False)`. Only worker is available today; choosing either other value raises `pybeam.submissions.CapabilityUnavailable` at construction, also with `dedicated_loop=True`.
+
+| Mode / build | How to select in PyBeam | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility | Cost |
+|---|---|---|---|---|---|---|
+| worker / 3.14 | `execution=ExecutionMode.WORKER` (default) | Yes / yes | No Python bytecode parallelism under the GIL | None; VM dies | Main-interpreter extensions | ~15 KiB/context; ~17 µs raw calls |
+| worker / 3.14t | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution | ~21 KiB/context; ~29 µs raw calls |
+| worker + dedicated loop / 3.14t | Also `dedicated_loop=True` | Development tasks / no actor loop option | Measured across task loops | None; VM dies | Same as worker / 3.14t | Context-owned loop; ~1 s unexplained task completion overhead |
+| owngil | `execution=ExecutionMode.OWNGIL` (rejected) | No / no | Across raw contexts | None; VM dies | Rejects pydantic_core/numpy, including PyBeam task codecs | ~11–28 MiB/context; ~14 µs raw calls |
+| isolated | `execution=ExecutionMode.ISOLATED` (rejected) | No / no | Across raw child processes | Contains `os.abort()`; not a sandbox | pydantic/numpy imported in probes | ~24–40 MiB/context; ~76–81 µs raw calls |
+
+Costs are single-trial raw-context measurements below, not task guarantees. `dedicated_loop` changes loop ownership, not interpreter or process isolation. Actors remain worker-only because their local objects belong to the main interpreter.
+
+Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBeam limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
+
 ## Mapping work to execution resources
 
 ### Worker: conventional Python
@@ -58,17 +74,16 @@ Dedicated tasks had **~1 s extra completion latency per batch on both builds; it
 
 - **owngil extensions:** [the interpreter configuration][own-gil] sets `check_multi_interp_extensions = 1`. Actual imports returned `module pydantic_core._pydantic_core does not support loading in subinterpreters` and `module numpy._core._multiarray_umath does not support loading in subinterpreters` (the latter wrapped by NumPy). Free-threading does not remove subinterpreter compatibility requirements.
 - **Actors require the main interpreter:** [local-object retention/unwrapping][local-object] rejects other interpreters with `Actors require the main interpreter`; [context validation][local-context] rejects subinterpreters with `local_objects_require_worker`.
-- **Mode is not a PyBeam actor/task option:** [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. `dedicated_loop=True` selects a loop, not a different interpreter or process.
+- **Native actors/tasks are worker-only:** [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. PyBeam's `execution` setting rejects unavailable modes rather than silently falling back. `dedicated_loop=True` selects a loop, not a different interpreter or process.
 - **Isolated bootstrap:** [package initialization][bootstrap-import] eagerly imported [_supervision, which imports erlang][bootstrap-supervision], before [the child installed its synthetic erlang module][bootstrap-child]. This produced `ModuleNotFoundError: No module named 'erlang'` and `{handshake_failed,closed}`. [PR #5](https://github.com/h0rv/erlang-python/pull/5) fixes the import order. The isolated results above used its `249a970` fix; fork main at `54ccee8` still lacks it. PyBeam follows main, not that PR commit.
 - **owngil is not a crash boundary:** its subinterpreter runs inside the BEAM address space. The separate crash probes terminated the whole VM on both builds. Only isolated contained `os.abort()` in these trials.
 
 ## Decisions and open questions
 
-- Default: conventional **3.14 worker**, because it is reproducible and the packaged wheels are conventional.
+- Setting: `TaskFunction(..., execution=ExecutionMode.WORKER)`; values are `worker`, `owngil`, and `isolated`. Default: conventional **3.14 worker**, because it is reproducible and the packaged wheels are conventional.
 - Recommended development path for CPU parallelism: **3.14t with dedicated-loop tasks**, opt in with `PYBEAM_ALLOW_FREE_THREADED=1`. Free-threaded packaged wheels have not been built. Shared-loop tasks do not parallelize on either build.
-- Restrict owngil experiments to extension-free code; never select it for PyBeam actors today.
-- Use isolated for crash containment once the fork fix lands. It is not currently a PyBeam actor/task backend option.
-- A per-actor/task mode option first needs erlang-python to accept a mode rather than hard-coding worker. Mode acceptance alone does not solve main-interpreter object references or process serialization. This is upstream/fork work, not a PyBeam scheduler or fallback.
+- Actors stay worker-only: local objects require the main interpreter. Owngil is not offered for PyBeam tasks because subinterpreters reject pydantic_core, which their codecs require.
+- Isolated tasks are the next step: they need fork support to replace hard-coded worker mode and main-interpreter task bodies, plus the isolated bootstrap fix in h0rv/erlang-python PR #5. Mode acceptance alone does not solve object references or process serialization. This is fork work, not a PyBeam scheduler or fallback.
 - Open: complete 3.14t integration acceptance, including the hang and `ws_session:send_sync/3` `undef`; the 3.14t owngil/isolated creation slowdown; the untraced dedicated-loop latency.
 
 The prototype passed lint/format/strict typing. Core units: conventional **612 passed, 11 skipped**; 3.14t **608 passed, 4 failed, 11 skipped** (conventional-only wheel-manifest fixtures). Full 3.14t integration was interrupted after 740 s: **29 failed, 26 passed, 5 skipped, 7 errors**, including source-layout/asset setup issues, so this is not a controlled comparison to the earlier two-WebSocket-failure baseline. After private sibling-path setup, focused task/supervision/actor suites passed **32 tests**. An actor argument-retention assertion also failed on conventional Python. None of this establishes full free-threaded runtime compatibility.

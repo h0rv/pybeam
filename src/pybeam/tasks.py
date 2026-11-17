@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Generator
 from contextvars import ContextVar
 from dataclasses import dataclass
+from enum import StrEnum
 from types import TracebackType
 from typing import TYPE_CHECKING, Annotated, Protocol, Self, assert_never
 
@@ -39,6 +40,22 @@ class TaskLimits(BaseModel):
     shutdown_ms: Annotated[int, Field(gt=0, le=4294967295)]
 
 
+class ExecutionMode(StrEnum):
+    """Execution boundaries supported by erlang-python contexts.
+
+    Worker shares the main interpreter: GIL on 3.14, parallel threads on
+    3.14t; a native crash kills the VM. Owngil owns an interpreter per context
+    but rejects pydantic_core/numpy (including PyBeam's pydantic codecs) and
+    is not a crash boundary. Isolated uses a child OS process that contains
+    os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
+    Only worker is currently available for PyBeam tasks.
+    """
+
+    WORKER = "worker"
+    OWNGIL = "owngil"
+    ISOLATED = "isolated"
+
+
 class TaskFunction[Q, R]:
     """A typed request and result codec. Budgets cover requests, not closures.
 
@@ -53,12 +70,30 @@ class TaskFunction[Q, R]:
         request: TypeAdapter[Q],
         result: TypeAdapter[R],
         *,
+        execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
     ) -> None:
+        if execution is ExecutionMode.OWNGIL:
+            raise CapabilityUnavailable(
+                "owngil tasks are unavailable: PyBeam task codecs use pydantic_core, "
+                "which subinterpreters with check_multi_interp_extensions reject"
+            )
+        if execution is ExecutionMode.ISOLATED:
+            raise CapabilityUnavailable(
+                "isolated tasks are unavailable: erlang-python's py_task hard-codes "
+                "mode => worker and task bodies are main-interpreter objects; "
+                "fork support and the isolated bootstrap fix "
+                "(h0rv/erlang-python PR #5) are required"
+            )
+        self._execution = execution
         self._dedicated_loop = dedicated_loop
         self._function = function
         self._request = request
         self._result = result
+
+    @property
+    def execution(self) -> ExecutionMode:
+        return self._execution
 
     def encode(self, request: Q) -> bytes:
         return self._request.dump_json(self._request.validate_python(request, strict=True))
