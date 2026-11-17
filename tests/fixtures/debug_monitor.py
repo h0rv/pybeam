@@ -19,6 +19,10 @@ async def parked(value: int) -> int:
     return value
 
 
+async def completed(value: int) -> int:
+    return value
+
+
 async def main() -> None:
     queue = DurableQueue("monitor", max_items=4)
     await queue.put(b"one")
@@ -27,9 +31,11 @@ async def main() -> None:
         queue.get(),
         ActorGroup(max_pending=2) as actors,
         TaskSupervisor(TaskLimits(capacity=3, max_bytes=4096, shutdown_ms=1000)) as tasks,
+        TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as retained,
     ):
         counter = await actors.spawn(Counter)
         await tasks.start(TaskFunction(parked, Json(int), Json(int)), 7)
+        await retained.start(TaskFunction(completed, Json(int), Json(int)), 7)
         pending = asyncio.create_task(counter.wait(), name="counter-wait")
         try:
             await asyncio.sleep(0.05)

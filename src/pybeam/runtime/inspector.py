@@ -32,31 +32,32 @@ NATIVE_INSPECT = """
 Inspect = fun() ->
     Text = fun(T) -> unicode:characters_to_binary(io_lib:format("~p", [T])) end,
     Stat = fun(K, V) -> #{name => K, value => Text(V)} end,
-    GateStats = fun(G) ->
+    GateStats = fun(G, Occupied) ->
         [Stat(<<"Admitted calls">>, maps:get(count, G)),
-         Stat(<<"Free slots">>, max(0, maps:get(capacity, G) - maps:get(count, G))),
+         Stat(<<"Free slots">>, max(0, maps:get(capacity, G) - Occupied)),
          Stat(<<"Capacity">>, maps:get(capacity, G)),
          Stat(<<"Encoded bytes">>, maps:get(bytes, G)),
          Stat(<<"Byte limit">>, maps:get(max_bytes, G)),
          Stat(<<"Unsettled calls">>, maps:get(unsettled, G))]
     end,
-    GateState = fun(G) ->
+    GateState = fun(G, Occupied) ->
         case maps:get(closed, G) of
             true -> <<"draining">>;
-            false -> case maps:get(count, G) >= maps:get(capacity, G) of
+            false -> case Occupied >= maps:get(capacity, G) of
                 true -> <<"full">>; false -> <<"running">> end
         end
     end,
     Actors = fun() ->
         [begin
             G = py_nif:actor_gate_info(Gate),
+            Occupied = maps:get(count, G),
             Mailbox = case process_info(Pid, message_queue_len) of
                 {message_queue_len, N} -> N; undefined -> 0 end,
             #{kind => <<"actor">>, identity => Text({Group, Id}), name => Id,
               state => case is_process_alive(Pid) of
-                  true -> GateState(G); false -> <<"restarting">> end,
+                  true -> GateState(G, Occupied); false -> <<"restarting">> end,
               stats => [Stat(<<"Generation">>, Generation),
-                        Stat(<<"Mailbox messages">>, Mailbox) | GateStats(G)]}
+                        Stat(<<"Mailbox messages">>, Mailbox) | GateStats(G, Occupied)]}
         end || {{Group, Id}, Pid, Generation, Gate, _, _}
                    <- ets:tab2list(py_actor_generations)]
     end,
@@ -64,9 +65,10 @@ Inspect = fun() ->
         [begin
             #{gate := Gate, jobs := Jobs} = sys:get_state(Pid, 100),
             G = py_nif:actor_gate_info(Gate),
+            Occupied = max(map_size(Jobs), maps:get(count, G)),
             #{kind => <<"tasks">>, identity => Text(Pid), name => <<"Task supervisor">>,
-              state => GateState(G),
-              stats => [Stat(<<"Owned results">>, map_size(Jobs)) | GateStats(G)]}
+              state => GateState(G, Occupied),
+              stats => [Stat(<<"Owned results">>, map_size(Jobs)) | GateStats(G, Occupied)]}
         end || {_, Pid, _, [py_task_group]} <- supervisor:which_children(py_actor_root),
                is_pid(Pid)]
     end,
