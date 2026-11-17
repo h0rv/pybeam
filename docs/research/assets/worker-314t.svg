@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="550" viewBox="0 0 640 550" role="img" aria-labelledby="title desc">
+  <title id="title">Worker contexts on free-threaded CPython 3.14t</title>
+  <desc id="desc">Many BEAM callers share a bounded pool of worker contexts. Each context has an OS thread in the main interpreter, sharing module state without a GIL in the tested build. Threads can execute Python in parallel, but share the BEAM address space. A native abort takes down the entire VM.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; text-anchor: middle; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 19px; }
+    .heading { font-size: 23px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 18px; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 7 4 1 7"/></marker>
+  </defs>
+  <rect x="24" y="16" width="592" height="518"/>
+  <text x="320" y="49" class="heading">worker · CPython 3.14t</text>
+  <text x="320" y="77" class="note">One BEAM OS process</text>
+  <rect x="48" y="98" width="544" height="76"/>
+  <text x="320" y="129">BEAM processes</text>
+  <text x="320" y="156" class="note">Many callers · bounded context pool</text>
+  <path d="M320 175V204" marker-end="url(#arrow)"/>
+  <rect x="48" y="216" width="544" height="230"/>
+  <text x="320" y="249" class="heading">Main interpreter</text>
+  <text x="320" y="277" class="note">No GIL (verified after imports)</text>
+  <rect x="72" y="301" width="224" height="70"/>
+  <rect x="344" y="301" width="224" height="70"/>
+  <text x="184" y="329">Worker context</text>
+  <text x="184" y="355" class="note">OS thread</text>
+  <text x="456" y="329">Worker context</text>
+  <text x="456" y="355" class="note">OS thread</text>
+  <text x="320" y="420" class="note">Shared module state · parallel threads</text>
+  <text x="320" y="498">os.abort() → whole VM exits</text>
+</svg>

@@ -4,28 +4,23 @@ These are single trials on one Linux x86-64 VM with eight CPUs, not compatibilit
 
 ## Mapping work to execution resources
 
-```mermaid
-flowchart TB
-  Callers["Many BEAM caller processes"] --> Router["Admission and routing to a bounded context pool"]
-  subgraph VM["One BEAM OS process"]
-    Router
-    subgraph Main["Main interpreter: shared GIL on 3.14, no GIL on 3.14t when still disabled"]
-      W1["Worker context: pthread"]
-      W2["Worker context: pthread"]
-    end
-    subgraph Sub["Own-GIL subinterpreter: separate interpreter state"]
-      O["owngil context: pthread; GIL disabled on the tested 3.14t build"]
-    end
-    Router --> W1
-    Router --> W2
-    Router --> O
-    Router --> Port["Isolated context: BEAM owner and socket"]
-  end
-  subgraph Child["Isolated child OS process"]
-    I["Separate Python interpreter and execution thread"]
-  end
-  Port --> I
-```
+### Worker: conventional Python
+
+![Worker on CPython 3.14: BEAM callers share a bounded context pool. Context threads share the main interpreter and GIL inside the BEAM OS process. A native abort kills the whole VM.](assets/worker-314.svg)
+
+### Worker: free-threaded Python
+
+![Worker on CPython 3.14t: context threads share the main interpreter without a GIL in the tested build. Threads can run Python in parallel, but a native abort still kills the whole VM.](assets/worker-314t.svg)
+
+### Own-GIL subinterpreters
+
+![Each owngil context has a thread and separate subinterpreter state, with its own GIL on 3.14 and no GIL in the tested 3.14t build. All share one BEAM OS process, so a native abort kills the whole VM.](assets/owngil.svg)
+
+### Isolated children
+
+![Each isolated context owns a separate child OS process with a Python interpreter and execution thread. A native abort kills only that child; the BEAM VM survives and the child restarts.](assets/isolated.svg)
+
+The isolated diagram describes the fixed runtime measured below; it requires the PR #5 bootstrap fix.
 
 A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context currently costs one pthread; isolated contexts instead cost a child process. This is **not actor pooling**: today's actors/tasks allocate worker contexts per native child, so a million Python actors would still imply roughly a million context pthreads plus other overhead.
 
