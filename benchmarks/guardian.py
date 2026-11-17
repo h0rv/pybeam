@@ -11,6 +11,7 @@ from typing import Literal, TextIO, assert_never
 
 import psutil
 from examples.distributed.models import WalkthroughProof
+from pybeam.codec import Json
 from pybeam.runtime.guardian import (
     AuthorizationError,
     GuardianEndpoint,
@@ -66,13 +67,14 @@ def snapshot(value: Identity, role: str) -> ProcessSample | None:
     if process is None:
         return None
     try:
-        cpu = process.cpu_times()
+        target = psutil.Process(process.pid)
+        cpu = target.cpu_times()
         return ProcessSample(
             identity=value,
             role="adapter" if role == "adapter" else "descendant",
-            rss_bytes=process.memory_info().rss,
+            rss_bytes=target.memory_info().rss,
             cpu_seconds=cpu.user + cpu.system,
-            threads=process.num_threads(),
+            threads=target.num_threads(),
         )
     except psutil.NoSuchProcess:
         return None
@@ -151,12 +153,12 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
     endpoint = GuardianEndpoint(
         directory=directory.resolve(),
         owner=parent,
-        guardian=identity(psutil.Process()),
+        guardian=identity(os.getpid()),
         stop_file=None if control is None else Path(control.stop_file),
         control_owner=None if control is None else control.owner,
         stop_policy=config.stop_policy,
     )
-    durable_write(directory / "guardian.json", endpoint.model_dump_json())
+    durable_write(directory / "guardian.json", Json(type(endpoint)).encode(endpoint).decode())
     with (
         (directory / "stdout.log").open("wb") as stdout,
         (directory / "stderr.log").open("wb") as stderr,
@@ -172,7 +174,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
             start_new_session=True,
         )
         children.append(process)
-        adapter = identity(psutil.Process(process.pid))
+        adapter = identity(process.pid)
         owned.add(adapter)
         record(directory, owned, "tracking")
         try:
@@ -201,7 +203,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     and signal is StopSignal.NONE
                     and isinstance(phase, Active)
                 ):
-                    request = SpawnRequest.model_validate_json(request_path.read_text())
+                    request = Json(SpawnRequest).decode(request_path.read_text())
                     index = len(children)
                     child_out = stack.enter_context(
                         (directory / (str(index) + ".stdout.log")).open("wb")
@@ -218,14 +220,18 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                         start_new_session=True,
                     )
                     children.append(child)
-                    child_identity = identity(psutil.Process(child.pid))
+                    child_identity = identity(child.pid)
                     owned.add(child_identity)
                     record(directory, owned, "tracking")
                     if sys.platform == "linux":
                         target = psutil.Process(child.pid)
                         target.cpu_affinity(cpus[:1])
                     reply = directory / "spawn.reply.pending"
-                    reply.write_text(SpawnReply(identity=child_identity).model_dump_json())
+                    reply.write_text(
+                        Json(type(SpawnReply(identity=child_identity)))
+                        .encode(SpawnReply(identity=child_identity))
+                        .decode()
+                    )
                     os.replace(reply, directory / "spawn.reply.json")
                     request_path.unlink()
                 observed = tuple(
@@ -234,7 +240,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                     if (sample := snapshot(value, "adapter" if value == adapter else "descendant"))
                     is not None
                 )
-                harness = resolve(parent)
+                harness = None if resolve(parent) is None else psutil.Process(parent.pid)
                 guardian_cpu = psutil.Process().cpu_times()
                 harness_cpu = None if harness is None else harness.cpu_times()
                 append_sample(
@@ -346,13 +352,13 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
             cleanup_start = time.monotonic_ns()
             forced = sum(resolve(value) is not None for value in owned)
             survivors = cleanup(owned)
-            registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+            registry = Json(Registry).decode((directory / "ownership.json").read_text())
             record(directory, owned, registry.phase)
             cleanup_duration = time.monotonic_ns() - cleanup_start
             for child in children:
                 with contextlib.suppress(subprocess.TimeoutExpired):
                     child.wait(timeout=1.0)
-    registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+    registry = Json(Registry).decode((directory / "ownership.json").read_text())
     status: Literal["passed", "failed", "unsupported", "walkthrough", "cancelled"]
     cleanup_state: Literal["confirmed", "uncertain"] = "confirmed"
     match completion:
@@ -386,12 +392,12 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
 
 def main() -> None:
     directory = Path(sys.argv[1])
-    parent = Identity.model_validate_json(sys.argv[2])
+    parent = Json(Identity).decode(sys.argv[2])
     control = (
         Control.model_validate_json(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
     )
     outcome = supervise(directory, parent, control)
-    registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+    registry = Json(Registry).decode((directory / "ownership.json").read_text())
     record(directory, set(registry.owned), outcome.cleanup_state)
     if outcome.cleanup_state == "confirmed" and len(sys.argv) > 4:
         write_lease(int(sys.argv[4]), None)

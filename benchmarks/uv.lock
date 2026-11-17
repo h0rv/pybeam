@@ -188,11 +188,6 @@ wheels = [
 name = "python-beam"
 version = "0.1.0a1"
 source = { editable = "../" }
-dependencies = [
-    { name = "psutil" },
-    { name = "pydantic" },
-    { name = "typing-extensions" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -202,14 +197,10 @@ requires-dist = [
     { name = "jinja2", marker = "extra == 'fastapi'", specifier = ">=3.1.6,<4" },
     { name = "jinja2", marker = "extra == 'showcase'", specifier = ">=3.1.6,<4" },
     { name = "litestar", extras = ["jinja"], marker = "extra == 'litestar'", specifier = "==2.25.0" },
-    { name = "psutil", specifier = ">=7,<8" },
-    { name = "psutil", marker = "extra == 'showcase'", specifier = ">=7,<8" },
-    { name = "pydantic", specifier = "==2.14.3" },
     { name = "pydantic", marker = "extra == 'litestar'", specifier = "==2.14.3" },
     { name = "python-multipart", marker = "extra == 'fastapi'", specifier = ">=0.0.20,<1" },
     { name = "python-multipart", marker = "extra == 'pyview'", specifier = ">=0.0.20,<1" },
     { name = "pyview-web", marker = "extra == 'pyview'", git = "https://github.com/ogrodnek/pyview.git?rev=d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972" },
-    { name = "typing-extensions", specifier = ">=4.14.1,<5" },
     { name = "uvicorn", marker = "extra == 'fastapi'", specifier = "==0.54.0" },
     { name = "uvicorn", marker = "extra == 'showcase'", specifier = ">=0.41,<1" },
 ]
@@ -227,7 +218,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.14,<1" },
     { name = "ty", specifier = ">=0.0.104" },
-    { name = "types-psutil", specifier = ">=7,<8" },
+    { name = "typing-extensions", specifier = ">=4.14.1,<5" },
     { name = "websockets", specifier = ">=15,<17" },
 ]
 

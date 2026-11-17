@@ -1,10 +1,11 @@
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Literal
 from unittest.mock import patch
 
-import psutil
+from pybeam.codec import Json
 
 from benchmarks import guardian
 from benchmarks.contract import Identity
@@ -23,11 +24,14 @@ def main() -> None:
         original(directory, owned, phase)
         if phase == "spawning" and len(owned) == (0 if mode == "adapter_start" else 1):
             durable_write(
-                directory / "startup-guardian.json", identity(psutil.Process()).model_dump_json()
+                directory / "startup-guardian.json",
+                Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
             )
             durable_write(
                 directory / "startup-owned.json",
-                Registry(phase=phase, owned=tuple(owned)).model_dump_json(),
+                Json(type(Registry(phase=phase, owned=tuple(owned))))
+                .encode(Registry(phase=phase, owned=tuple(owned)))
+                .decode(),
             )
             time.sleep(30)
 
