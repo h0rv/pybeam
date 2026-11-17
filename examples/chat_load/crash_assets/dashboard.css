@@ -8,6 +8,7 @@ h1 { margin: 6px 0; font-size: clamp(26px, 3vw, 32px); font-weight: 650; letter-
 h2, h3, p { margin: 0; }
 h2 { font-size: 21px; font-weight: 620; }
 .intro { color: var(--muted); max-width: 680px; }
+#stream-status { margin-bottom: 12px; padding: 10px; border: 1px solid var(--fault); color: var(--fault); background: var(--tint); }
 .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; color: var(--muted); }
 .scenario { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-block: 1px solid var(--line); }
 .scenario h2 { font-size: 16px; margin: 4px 0; }

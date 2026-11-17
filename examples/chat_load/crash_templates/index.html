@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/assets/dashboard.css">
   <script src="/static/htmx.min.js" defer></script>
   <script src="/static/sse.js" defer></script>
+  <script src="/assets/dashboard.js" defer></script>
 </head>
 <body>
 <main>
@@ -17,6 +18,7 @@
     <h1>One room crashes. Who else notices?</h1>
     <p class="intro">Same traffic. The same native crash in Room 1. Two stacks, side by side.</p>
   </header>
+  <p id="stream-status" role="status">Connecting to the live view…</p>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
        hx-config='{"sse":{"pauseOnBackground":false}}'>
     {% include 'rooms.html' %}
@@ -28,8 +30,8 @@
     <p>Each test waits 4 s, injects the same fault on both sides concurrently, watches the other rooms for 10 s, then allows 5 s for recovery. The displayed user switches to an actually affected user, matched across both sides. Connections retry without replay. “Unconfirmed” means a pending send was discarded at disconnect; it might have reached the server.</p>
     <p>Worker assignment and this machine affect the result. Zero disconnects does not mean zero latency impact. A lost fault request alone does not prove a process died. Keep this demo local.</p>
     <div class="alternatives">
-      <button type="button" hx-post="/run/hog" hx-target="#live" hx-swap="innerHTML">Block one worker for 3 s · both stacks</button>
-      <button type="button" hx-post="/run/raise" hx-target="#live" hx-swap="innerHTML">Raise an exception · both stacks</button>
+      <button type="button" data-run hx-post="/run/hog" hx-swap="none" disabled>Block one worker for 3 s · both stacks</button>
+      <button type="button" data-run hx-post="/run/raise" hx-swap="none" disabled>Raise an exception · both stacks</button>
     </div>
     <p>Wait for a test to finish before starting another. Results describe the latest test only.</p>
   </details>

@@ -5,7 +5,7 @@
     <p>{% if live.current %}{{ live.current.simulates }}{% else %}Watch whether the other users have to reconnect.{% endif %}</p>
   </div>
   <div class="run-control">
-    <button class="primary" type="button" hx-post="/run" hx-target="#live" hx-swap="innerHTML" hx-disabled-elt="this" {% if live.running or not live.ready %}disabled{% endif %}>{% if live.running %}Test running…{% elif not live.ready %}Waiting for both stacks…{% elif live.phase == 'ready' %}Crash Room 1 on both{% else %}Crash Room 1 again{% endif %}</button>
+    <button class="primary" type="button" data-run data-ready="{{ 'true' if not live.running and live.ready else 'false' }}" hx-post="/run" hx-swap="none" hx-disabled-elt="this" disabled>{% if live.running %}Test running…{% elif not live.ready %}Waiting for both stacks…{% elif live.phase == 'ready' %}Crash Room 1 on both{% else %}Crash Room 1 again{% endif %}</button>
     <span>{{ live.settings.rooms }} rooms × {{ live.settings.clients }} users per side · {{ live.settings.rate | round(1) }} messages/s/user</span>
   </div>
 </section>
