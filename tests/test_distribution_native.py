@@ -199,7 +199,7 @@ def test_distribution__parent_exit_reaps_private_epmd_and_both_native_vms() -> N
     directory = Path(parent.stdout.strip())
     assert directory.name.startswith("pybeam-distribution-")
     journal = Json(Registry).decode((directory / "ownership.json").read_text())
-    assert journal.phase == "confirmed"
+    assert journal.phase == "confirmed", parent.stderr
     assert all(resolve(value) is None for value in journal.owned)
     assert not (directory / "home" / ".erlang.cookie").exists()
     shutil.rmtree(directory)
