@@ -100,3 +100,9 @@ macOS arm64 wheels, and verifies each clean wheel install. Publishing a GitHub
 release whose tag is `v` plus the project version uploads them to PyPI through
 trusted publishing from the `pypi` environment; a manual run uploads only when
 `publish` is selected.
+
+The Darwin GenStage payload is pinned to the bytes of one reviewed wheel and
+cannot be rebuilt from source, so the macOS job repackages that wheel's runtime
+with `tools.genstage_assets`. Upload the reviewed wheel as the only `.whl` asset
+of a GitHub release tagged `genstage-reviewed`; until then, pull requests skip
+the macOS wheel and releases fail.
