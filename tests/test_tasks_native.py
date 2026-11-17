@@ -56,7 +56,7 @@ def test_tasks__dedicated_uncertainty_keeps_the_existing_watcher_until_cleanup(
             capacity=1, max_bytes=100, shutdown_ms=200
         )).__aenter__()
         ref = await sup.start(TaskFunction(
-            body, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+            body, Json(int), Json(int), dedicated_loop=True
         ), 42)
         await wait_for(entered)
         try:
@@ -100,11 +100,11 @@ def test_tasks__dedicated_nested_reply_returns_to_its_original_waiter(tmp_path: 
                 executions['parent'] += 1
                 loops.append(asyncio.get_running_loop())
                 other = await sup.start(TaskFunction(
-                    child, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+                    child, Json(int), Json(int), dedicated_loop=True
                 ), value)
                 return await other
             ref = await sup.start(TaskFunction(
-                parent, TypeAdapter(int), TypeAdapter(int), dedicated_loop=True
+                parent, Json(int), Json(int), dedicated_loop=True
             ), 21)
             pid = ref.pid
             async with asyncio.timeout(4):
@@ -155,7 +155,7 @@ def test_tasks__observed_original_exception_releases_native_ownership(
                     raise
             sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)).__aenter__()
             ref = await sup.start(TaskFunction(
-                fail, TypeAdapter(int), TypeAdapter(int), dedicated_loop=dedicated_loop
+                fail, Json(int), Json(int), dedicated_loop=dedicated_loop
             ), 1)
             async def observe():
                 if observation == 'exception':
@@ -293,10 +293,10 @@ def test_tasks__direct_self_waits_are_denied_before_watcher_or_cancel(tmp_path: 
                 await descendant_release.wait()
                 return await ref
             descendants.append(asyncio.create_task(descendant()))
-            sibling = await sup.start(TaskFunction(other, TypeAdapter(int), TypeAdapter(int)), value)
+            sibling = await sup.start(TaskFunction(other, Json(int), Json(int)), value)
             return await sibling
         async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=100, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 21)
+            ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 21)
             refs.append(ref)
             release.set()
             await denied.wait()
@@ -323,10 +323,10 @@ def test_tasks__pid_barrier_original_error_temporary_exit_and_failure_containmen
         async def bad(value: int) -> int:
             raise original
         async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=4096, shutdown_ms=1000)) as sup:
-            good_ref = await sup.start(TaskFunction(good, TypeAdapter(int), TypeAdapter(int)), 21)
+            good_ref = await sup.start(TaskFunction(good, Json(int), Json(int)), 21)
             await entered.wait()
             assert not release.is_set()
-            bad_ref = await sup.start(TaskFunction(bad, TypeAdapter(int), TypeAdapter(int)), 0)
+            bad_ref = await sup.start(TaskFunction(bad, Json(int), Json(int)), 0)
             assert bad_ref.pid != good_ref.pid
             info = await async_call('_task_info', sup._group)
             assert good_ref.pid not in info['contexts']
@@ -358,7 +358,7 @@ def test_tasks__waiter_cancellation_does_not_cancel_job_or_release_credit(tmp_pa
             await release.wait()
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 7)
+            ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 7)
             await entered.wait()
             waiter = asyncio.create_task(ref.result())
             await asyncio.sleep(0)
@@ -370,7 +370,7 @@ def test_tasks__waiter_cancellation_does_not_cancel_job_or_release_credit(tmp_pa
             info = await async_call('_task_info', sup._group)
             assert info['gate']['count'] == 1
             try:
-                await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 9)
+                await sup.start(TaskFunction(job, Json(int), Json(int)), 9)
             except Overloaded:
                 pass
             else:
@@ -399,7 +399,7 @@ def test_tasks__cooperative_cancel_ack_waits_for_finally_and_pid_exit(tmp_path: 
                 cleaned.set()
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 1)
+            ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 1)
             await entered.wait()
             cancelling = asyncio.create_task(ref.cancel())
             await cleaning.wait()
@@ -438,7 +438,7 @@ def test_tasks__body_and_python_descendant_cannot_close_their_owner(tmp_path: Pa
                     assert sup._close_task is None
                     return 7
                 raise AssertionError('owned body closed its supervisor')
-            function = TaskFunction(job, TypeAdapter(bool), TypeAdapter(int))
+            function = TaskFunction(job, Json(bool), Json(int))
             for descendant in (False, True):
                 ref = await sup.start(function, descendant)
                 assert await ref == 7
@@ -468,9 +468,9 @@ def test_tasks__native_descendant_cannot_close_ancestor_and_external_nested_owne
                             assert outer._close_task is None
                             return request
                         raise AssertionError('descendant closed its ancestor')
-                    ref = await inner.start(TaskFunction(child, TypeAdapter(int), TypeAdapter(int)), value)
+                    ref = await inner.start(TaskFunction(child, Json(int), Json(int)), value)
                     return await ref
-            ref = await outer.start(TaskFunction(parent, TypeAdapter(int), TypeAdapter(int)), 7)
+            ref = await outer.start(TaskFunction(parent, Json(int), Json(int)), 7)
             assert await ref == 7
         assert outer._group is None
     """,
@@ -498,7 +498,7 @@ def test_tasks__external_close_does_not_cycle_when_body_finally_attempts_self_cl
                     denied.set()
             return value
         sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)).__aenter__()
-        await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 1)
+        await sup.start(TaskFunction(job, Json(int), Json(int)), 1)
         await entered.wait()
         await sup.close()
         assert denied.is_set()
@@ -522,7 +522,7 @@ def test_tasks__scope_shutdown_cancels_and_awaits_cleanup(tmp_path: Path) -> Non
                 cleaned.set()
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 1)
+            await sup.start(TaskFunction(job, Json(int), Json(int)), 1)
             await entered.wait()
         assert cleaned.is_set()
     """,
@@ -536,7 +536,7 @@ def test_tasks__temporary_slots_are_reusable_after_observed_completion(tmp_path:
         async def job(value: int) -> int:
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            function = TaskFunction(job, TypeAdapter(int), TypeAdapter(int))
+            function = TaskFunction(job, Json(int), Json(int))
             for value in range(20):
                 ref = await sup.start(function, value)
                 assert await ref == value
@@ -568,7 +568,7 @@ def test_tasks__cancel_deadline_is_uncertain_and_does_not_interrupt_finally_twic
                 cleaned.set()
             return value
         sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=300)).__aenter__()
-        ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 1)
+        ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 1)
         await entered.wait()
         try:
             await ref.cancel()
@@ -606,7 +606,7 @@ def test_tasks__native_encoded_request_bytes_are_enforced(tmp_path: Path) -> Non
             raise AssertionError('oversized request executed')
         async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=2, shutdown_ms=1000)) as sup:
             try:
-                await sup.start(TaskFunction(job, TypeAdapter(str), TypeAdapter(str)), 'large')
+                await sup.start(TaskFunction(job, Json(str), Json(str)), 'large')
             except RuntimeError:
                 pass
             else:
@@ -639,7 +639,7 @@ def test_tasks__litestar_response_then_handoff_and_application_shutdown(tmp_path
             finally:
                 cleaned.set()
             return value
-        callback = background_task(supervisor, TaskFunction(job, TypeAdapter(int), TypeAdapter(int)),
+        callback = background_task(supervisor, TaskFunction(job, Json(int), Json(int)),
                                    42, refs.append)
         @get('/', background=callback)
         async def route() -> str:
@@ -702,7 +702,7 @@ def test_tasks__uncertain_constructor_never_closes_a_live_coroutine(tmp_path: Pa
         sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)).__aenter__()
         loop.set_task_factory(factory)
         try:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 7)
+            ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 7)
             await injected.wait()
         finally:
             loop.set_task_factory(previous)
@@ -743,7 +743,7 @@ def test_tasks__cancellation_suppressed_by_job_returns_false_and_preserves_resul
                 return value
             return 0
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 7)
+            ref = await sup.start(TaskFunction(job, Json(int), Json(int)), 7)
             await entered.wait()
             assert await ref.cancel() is False
             assert await ref == 7
@@ -763,7 +763,7 @@ def test_tasks__unobserved_success_remains_available_after_scope_close(tmp_path:
             ended.set()
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 7)
+            await sup.start(TaskFunction(job, Json(int), Json(int)), 7)
             await ended.wait()
         assert len(sup.unobserved) == 1
         assert await sup.unobserved[0].result() == 7
@@ -782,7 +782,7 @@ def test_tasks__aggregate_native_bytes_and_reuse_after_completion(tmp_path: Path
             await release.wait()
             return value
         async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=16, shutdown_ms=1000)) as sup:
-            function = TaskFunction(echo, TypeAdapter(str), TypeAdapter(str))
+            function = TaskFunction(echo, Json(str), Json(str))
             first = await sup.start(function, 'abcdefghij')
             await entered.wait()
             try:
@@ -806,9 +806,9 @@ def test_tasks__request_is_decoded_data_not_the_original_object_graph(tmp_path: 
     task_program(
         tmp_path,
         """
-        from pydantic import BaseModel, ConfigDict
-        class Request(BaseModel):
-            model_config = ConfigDict(strict=True, extra='forbid')
+        from dataclasses import dataclass
+        @dataclass(kw_only=True)
+        class Request:
             value: int
         original = Request(value=21)
         entered = asyncio.Event()
@@ -819,7 +819,7 @@ def test_tasks__request_is_decoded_data_not_the_original_object_graph(tmp_path: 
             await release.wait()
             return request.value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(job, TypeAdapter(Request), TypeAdapter(int)), original)
+            ref = await sup.start(TaskFunction(job, Json(Request), Json(int)), original)
             await entered.wait()
             original.value = 99
             release.set()
@@ -835,7 +835,7 @@ def test_tasks__gather_and_unobserved_original_error_on_scope_close(tmp_path: Pa
         async def double(value: int) -> int:
             return value * 2
         async with TaskSupervisor(TaskLimits(capacity=2, max_bytes=4096, shutdown_ms=1000)) as sup:
-            function = TaskFunction(double, TypeAdapter(int), TypeAdapter(int))
+            function = TaskFunction(double, Json(int), Json(int))
             first = await sup.start(function, 2)
             second = await sup.start(function, 3)
             assert await asyncio.gather(first, second) == [4, 6]
@@ -846,7 +846,7 @@ def test_tasks__gather_and_unobserved_original_error_on_scope_close(tmp_path: Pa
             raise original
         try:
             async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-                await sup.start(TaskFunction(fail, TypeAdapter(int), TypeAdapter(int)), 0)
+                await sup.start(TaskFunction(fail, Json(int), Json(int)), 0)
                 await ended.wait()
         except ExceptionGroup as errors:
             assert errors.exceptions == (original,)
@@ -875,7 +875,7 @@ def test_tasks__cancelling_close_waiter_still_finishes_resource_cleanup(tmp_path
                 cleaned.set()
             return value
         sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)).__aenter__()
-        await sup.start(TaskFunction(job, TypeAdapter(int), TypeAdapter(int)), 1)
+        await sup.start(TaskFunction(job, Json(int), Json(int)), 1)
         await entered.wait()
         closing = asyncio.create_task(sup.close())
         await cleaning.wait()
@@ -919,7 +919,7 @@ def test_tasks__native_channel_worker_cancel_ack_drains_waiter_and_allows_replac
         async def replacement(value: int) -> int:
             return value * 2
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            ref = await sup.start(TaskFunction(worker, TypeAdapter(int), TypeAdapter(int)), 7)
+            ref = await sup.start(TaskFunction(worker, Json(int), Json(int)), 7)
             await entered.wait()
             assert channel.snapshot()[-1] == 1
             cancelling = asyncio.create_task(ref.cancel())
@@ -932,7 +932,7 @@ def test_tasks__native_channel_worker_cancel_ack_drains_waiter_and_allows_replac
             assert await cancelling is True
             assert cleaned.is_set()
             assert channel.snapshot() == (0, 0, 1, 32, True, 0)
-            fresh = await sup.start(TaskFunction(replacement, TypeAdapter(int), TypeAdapter(int)), 21)
+            fresh = await sup.start(TaskFunction(replacement, Json(int), Json(int)), 21)
             assert await fresh == 42
             assert isinstance(await ref.exception(), asyncio.CancelledError)
     """,
@@ -952,7 +952,7 @@ def test_tasks__litestar_after_response_handoff_returns_before_effect(tmp_path: 
             await release.wait()
             return value
         async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)) as sup:
-            callback = background_task(sup, TaskFunction(job, TypeAdapter(int), TypeAdapter(int)),
+            callback = background_task(sup, TaskFunction(job, Json(int), Json(int)),
                                        42, refs.append)
             await callback()
             assert len(refs) == 1

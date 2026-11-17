@@ -1,5 +1,8 @@
+from dataclasses import replace
+
 from examples.distributed.jobs import JobResult
 from examples.distributed.models import DemoProof, WalkthroughProof, sanitized
+from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, NodeEvent, Reply
 from pybeam.runtime.ownership import Identity, Registry
 
@@ -7,7 +10,7 @@ from pybeam.runtime.ownership import Identity, Registry
 def controlled_proof() -> DemoProof:
     a = HandlerIdentity(node="pybeam_a_01234567@127.0.0.1", pid="<0.10.0>", incarnation="A" * 32)
     b = HandlerIdentity(node="pybeam_b_01234567@127.0.0.1", pid="<0.20.0>", incarnation="B" * 32)
-    fresh = b.model_copy(update={"incarnation": "C" * 32})
+    fresh = replace(b, incarnation="C" * 32)
     epmd = Identity(pid=101, created=1.0)
     births = tuple(Identity(pid=pid, created=2.0) for pid in (201, 202, 203))
 
@@ -17,14 +20,14 @@ def controlled_proof() -> DemoProof:
             status="ok",
             identity=a,
             recipient=recipient,
-            receipt=recipient.model_copy(update={"message_id": message}),
-            reverse_ack=Reply(status="ok", receipt=a.model_copy(update={"message_id": message})),
+            receipt=replace(recipient, message_id=message),
+            reverse_ack=Reply(status="ok", receipt=replace(a, message_id=message)),
             worker="<0.99.0>",
             worker_kind="temporary_otp_task",
             worker_dead=True,
-            result=JobResult(
-                value=42, side_effect_count=1, python_version="3.14.10"
-            ).model_dump_json(),
+            result=Json(type(JobResult(value=42, side_effect_count=1, python_version="3.14.10")))
+            .encode(JobResult(value=42, side_effect_count=1, python_version="3.14.10"))
+            .decode(),
             token=private_data,
             payload="SECRET_PAYLOAD",
         )

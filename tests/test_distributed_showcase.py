@@ -1,10 +1,9 @@
 import asyncio
+import os
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 
-import psutil
 import pytest
-from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from benchmarks.contract import Budget, Config, Outcome
@@ -23,6 +22,7 @@ from examples.showcase import distributed
 from examples.showcase.app import create_app
 from examples.showcase.catalog import ROOT, catalog
 from examples.showcase.jobs import Job, Jobs
+from pybeam.codec import Json
 from pybeam.distribution import Distribution
 from pybeam.runtime.config import Config as RuntimeConfig
 from pybeam.runtime.guardian import AuthorizationError, GuardianEndpoint
@@ -54,8 +54,8 @@ def test_gate__does_not_accept_unreviewed_native_root(
 def test_projection__only_allowlisted_receipt_fields() -> None:
     proof = controlled_proof()
     public = sanitized(proof)
-    text = public.model_dump_json()
-    assert "SECRET" in proof.model_dump_json()
+    text = Json(type(public)).encode(public).decode()
+    assert "SECRET" in Json(type(proof)).encode(proof).decode()
     for forbidden in (
         "SECRET",
         "token",
@@ -66,8 +66,8 @@ def test_projection__only_allowlisted_receipt_fields() -> None:
         str(Path("/") / "tmp"),
     ):
         assert forbidden not in text
-    assert WalkthroughProof.model_validate_json(text) == public
-    with pytest.raises(ValidationError):
+    assert Json(WalkthroughProof).decode(text) == public
+    with pytest.raises(ValueError):
         OBSERVATION.validate_json('{"kind":"state","state":"fresh_empty","cookie":"secret"}')
 
 
@@ -76,12 +76,12 @@ def test_projection__rejects_private_paths_disguised_as_identity(field: str) -> 
     proof = controlled_proof()
     handler = proof.first.recipient
     assert handler is not None
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         NodeObserved(
             alias="b",
             birth=proof.vm_b,
             status="observed",
-            handler=handler.model_copy(update={field: "/private/secret-cookie"}),
+            handler=replace(handler, **{field: "/private/secret-cookie"}),
         )
 
 
@@ -89,11 +89,12 @@ def test_receipts__rejects_misrouted_ack_result_and_handler_as_task() -> None:
     proof = controlled_proof()
     assert proof.first.recipient is not None
     for broken in (
-        proof.first.model_copy(update={"worker": proof.first.recipient.pid}),
-        proof.first.model_copy(
-            update={"result": '{"value":42,"side_effect_count":2,"python_version":"3.14.10"}'}
+        replace(proof.first, worker=proof.first.recipient.pid),
+        replace(
+            proof.first,
+            **{"result": '{"value":42,"side_effect_count":2,"python_version":"3.14.10"}'},
         ),
-        proof.first.model_copy(update={"reverse_ack": proof.second.reverse_ack}),
+        replace(proof.first, reverse_ack=proof.second.reverse_ack),
     ):
         with pytest.raises(ValueError):
             exchange(broken)
@@ -102,18 +103,18 @@ def test_receipts__rejects_misrouted_ack_result_and_handler_as_task() -> None:
 def test_proof__requires_fresh_births_and_confirmed_cleanup() -> None:
     proof = controlled_proof()
     for broken in (
-        proof.model_copy(update={"restarted_b": proof.vm_b}),
-        proof.model_copy(update={"fresh": proof.first}),
-        proof.model_copy(
-            update={"cleanup": proof.cleanup.model_copy(update={"phase": "uncertain"})}
-        ),
+        replace(proof, restarted_b=proof.vm_b),
+        replace(proof, fresh=proof.first),
+        replace(proof, **{"cleanup": replace(proof.cleanup, phase="uncertain")}),
     ):
         with pytest.raises(ValueError):
             sanitized(broken)
 
 
 def test_runner__walkthrough_is_not_measurement(tmp_path: Path) -> None:
-    (tmp_path / "adapter.json").write_text(controlled_walkthrough().model_dump_json())
+    (tmp_path / "adapter.json").write_text(
+        Json(type(controlled_walkthrough())).encode(controlled_walkthrough()).decode()
+    )
     outcome = Outcome(
         status="walkthrough",
         reason=None,
@@ -130,9 +131,9 @@ def test_runner__walkthrough_is_not_measurement(tmp_path: Path) -> None:
     assert summary.latency_ns is None
     assert summary.simultaneous_tree_rss_peak_bytes is None
     with pytest.raises(ValueError, match="cannot satisfy a benchmark"):
-        summarize(0, tmp_path, config.model_copy(update={"purpose": "measurement"}), outcome)
+        summarize(0, tmp_path, replace(config, purpose="measurement"), outcome)
     with pytest.raises(ValueError, match="cannot satisfy a walkthrough"):
-        summarize(0, tmp_path, config, outcome.model_copy(update={"status": "passed"}))
+        summarize(0, tmp_path, config, replace(outcome, status="passed"))
 
 
 async def test_subscribers__bounded_coalesced_fresh_and_disconnect(tmp_path: Path) -> None:
@@ -176,7 +177,7 @@ def test_adapter__requires_live_borrowed_guardian_before_demo(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(distributed, "distributed_unavailable", lambda: None)
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     endpoint = GuardianEndpoint(
         directory=tmp_path, owner=current, guardian=Identity(pid=99999999, created=1.0)
     )
@@ -205,7 +206,7 @@ def test_demo__controlled_receipt_boundary_callback_and_cli_compatibility(
     path = tmp_path / "sanitized.json"
     full = demonstration(observe=observed.append, output=path)
     assert "first" in full and "cleanup" in full and "shutdowns" in full
-    assert WalkthroughProof.model_validate_json(path.read_text()).observations == tuple(observed)
+    assert Json(WalkthroughProof).decode(path.read_text()).observations == tuple(observed)
     assert cluster.starts == 1 and cluster.restarts == 1 and cluster.closed
     assert "SECRET" not in path.read_text()
 
@@ -225,12 +226,12 @@ def test_adapter__controlled_boundary_writes_typed_adapter_json(
         assert guardian is endpoint
         return cluster
 
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     endpoint = GuardianEndpoint(directory=tmp_path, owner=current, guardian=current)
     monkeypatch.setattr(demo, "LocalCluster", factory)
     monkeypatch.setattr(distributed, "distributed_unavailable", lambda: None)
     distributed.walkthrough(tmp_path, endpoint)
-    proof = WalkthroughProof.model_validate_json((tmp_path / "adapter.json").read_text())
+    proof = Json(WalkthroughProof).decode((tmp_path / "adapter.json").read_text())
     events = tuple(
         OBSERVATION.validate_json(line)
         for line in (tmp_path / "observations.jsonl").read_text().splitlines()

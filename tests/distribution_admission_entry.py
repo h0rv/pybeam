@@ -1,20 +1,18 @@
 import asyncio
 import os
+from dataclasses import dataclass, replace
 from pathlib import Path
-
-import psutil
-from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from examples.distributed.jobs import JobRequest, JobResult, serve
 from pybeam import run
+from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local, remote, reservation
 from pybeam.runtime.ownership import durable_write, identity
 from pybeam.tasks import TaskFunction, TaskLimits, TaskSupervisor
 
 
-class GateInfo(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GateInfo:
     capacity: int
     max_bytes: int
     count: int
@@ -23,9 +21,8 @@ class GateInfo(BaseModel):
     closed: bool
 
 
-class ScopeInfo(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ScopeInfo:
     gate: GateInfo
     children: list[object]
     contexts: list[object]
@@ -37,14 +34,14 @@ async def callback(name: str, *args: object) -> Reply:
 
     value: object = await async_call(name, *args)
     assert isinstance(value, str | bytes)
-    return Reply.model_validate_json(value)
+    return Json(Reply).decode(value)
 
 
 async def empty_scope(supervisor: TaskSupervisor) -> ScopeInfo:
     from erlang import async_call
 
     value: object = await async_call("_task_info", supervisor._group)
-    info = ScopeInfo.model_validate(value)
+    info = Json(ScopeInfo).load(value)
     assert info.children == info.contexts == []
     assert info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
     return info
@@ -55,7 +52,11 @@ async def binding_controls(directory: Path) -> None:
     assert state.identity is not None
     inc = state.identity.incarnation
     await local(Request(op="register", definition="double"))
-    payload = JobRequest(value=21, delay_ms=1000).model_dump_json()
+    payload = (
+        Json(type(JobRequest(value=21, delay_ms=1000)))
+        .encode(JobRequest(value=21, delay_ms=1000))
+        .decode()
+    )
     reserved = await local(reservation(inc, "scope-control", payload))
     assert reserved.token is not None
     token = reserved.token
@@ -71,7 +72,7 @@ async def binding_controls(directory: Path) -> None:
         finally:
             await asyncio.sleep(0.03)
 
-    spec = TaskFunction(body, TypeAdapter(int), TypeAdapter(int))
+    spec = TaskFunction(body, Json(int), Json(int))
     limits = TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=1000)
     async with TaskSupervisor(limits) as owner, TaskSupervisor(limits) as unrelated:
         assert (
@@ -104,8 +105,8 @@ async def binding_controls(directory: Path) -> None:
     assert result.worker_dead and result.worker_kind == "temporary_otp_task"
     assert (await local(Request(op="ack", incarnation=inc, token=token))).status == "ok"
     assert (await local(Request(op="snapshot"))).count == 0
-    durable_write(directory / "scope.json", own_info.model_dump_json())
-    durable_write(directory / "unrelated.json", other_info.model_dump_json())
+    durable_write(directory / "scope.json", Json(type(own_info)).encode(own_info).decode())
+    durable_write(directory / "unrelated.json", Json(type(other_info)).encode(other_info).decode())
 
 
 async def sender(directory: Path) -> None:
@@ -118,16 +119,20 @@ async def sender(directory: Path) -> None:
     own = await local(Request(op="snapshot"))
     assert peer.identity is not None and own.identity is not None
     inc = peer.identity.incarnation
-    payload = JobRequest(value=21, delay_ms=1000).model_dump_json()
+    payload = (
+        Json(type(JobRequest(value=21, delay_ms=1000)))
+        .encode(JobRequest(value=21, delay_ms=1000))
+        .decode()
+    )
     reserved = await remote("b", reservation(inc, "single", payload))
     assert reserved.status == "ok" and reserved.token is not None
     token = reserved.token
     submit = Request(op="submit", incarnation=inc, token=token, payload=payload)
 
     async def send(_: int) -> str:
-        return (await remote("b", submit)).model_dump_json()
+        return Json(type(await remote("b", submit))).encode(await remote("b", submit)).decode()
 
-    spec = TaskFunction(send, TypeAdapter(int), TypeAdapter(str))
+    spec = TaskFunction(send, Json(int), Json(str))
     async with asyncio.TaskGroup() as barrier:
         receipt = barrier.create_task(remote("b", Request(op="receipt", id="hold", ack_alias="b")))
         await asyncio.sleep(0.05)
@@ -136,10 +141,10 @@ async def sender(directory: Path) -> None:
             TaskLimits(capacity=3, max_bytes=100, shutdown_ms=1500)
         ) as handles:
             refs = [await handles.start(spec, index) for index in range(3)]
-            statuses = [Reply.model_validate_json(await ref).status for ref in refs]
+            statuses = [Json(Reply).decode(await ref).status for ref in refs]
             assert sorted(statuses) == ["invalid_phase", "invalid_phase", "ok"]
             info = await empty_scope(handles)
-            durable_write(directory / "sender-scope.json", info.model_dump_json())
+            durable_write(directory / "sender-scope.json", Json(type(info)).encode(info).decode())
     # All three persistent native caller Tasks and their contexts have now exited.
     running = await remote("b", Request(op="result", incarnation=inc, token=token))
     assert running.status == "pending" and running.worker is not None
@@ -158,13 +163,13 @@ async def sender(directory: Path) -> None:
     assert result.job_id == "single" and result.request_bytes == len(payload.encode())
     assert result.worker == running.worker and result.worker_dead
     assert result.result is not None
-    assert JobResult.model_validate_json(result.result) == JobResult(
+    assert Json(JobResult).decode(result.result) == JobResult(
         value=42, side_effect_count=1, python_version="3.14.10"
     )
     receipt = await remote("b", Request(op="receipt", id="terminal", ack_alias="a"))
-    assert receipt.receipt == peer.identity.model_copy(update={"message_id": "terminal"})
+    assert receipt.receipt == replace(peer.identity, message_id="terminal")
     assert receipt.reverse_ack is not None
-    assert receipt.reverse_ack.receipt == own.identity.model_copy(update={"message_id": "terminal"})
+    assert receipt.reverse_ack.receipt == replace(own.identity, message_id="terminal")
     assert (
         await remote("b", Request(op="ack", incarnation="0" * 32, token=token))
     ).status == "stale"
@@ -172,13 +177,16 @@ async def sender(directory: Path) -> None:
     assert (await remote("b", Request(op="ack", incarnation=inc, token=token))).status == "ok"
     assert (await remote("b", Request(op="snapshot"))).count == 0
     assert (await remote("b", submit)).status == "unknown_token"
-    durable_write(directory / "admission.json", result.model_dump_json())
+    durable_write(directory / "admission.json", Json(type(result)).encode(result).decode())
 
 
 async def main() -> None:
     directory = Path(os.environ["PYBEAM_CLUSTER_DIRECTORY"])
     alias = os.environ["PYBEAM_NODE_ALIAS"]
-    durable_write(directory / (alias + ".birth.json"), identity(psutil.Process()).model_dump_json())
+    durable_write(
+        directory / (alias + ".birth.json"),
+        Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+    )
     if alias == "b":
         await binding_controls(directory)
         await serve()

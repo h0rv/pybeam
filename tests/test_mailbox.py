@@ -1,10 +1,10 @@
+from dataclasses import FrozenInstanceError
 from dataclasses import replace
 from pathlib import Path
 from subprocess import run
 from sys import executable
 
 import pytest
-from pydantic import ValidationError
 
 from pybeam.mailbox import BoundedMailbox, MailboxOverloaded, UnboundedMailbox
 from tests.typechecking import TYPECHECK_CONFIG
@@ -32,9 +32,8 @@ def test_policy__requires_explicit_positive_limits() -> None:
 
 @pytest.mark.parametrize("capacity,max_bytes", [(0, 1), (-1, 1), (1, 0), (1, -1)])
 def test_policy__rejects_nonpositive_limits(capacity: int, max_bytes: int) -> None:
-    with pytest.raises(ValidationError) as caught:
+    with pytest.raises(ValueError) as caught:
         BoundedMailbox(capacity=capacity, max_bytes=max_bytes)
-    assert all(error["type"] == "greater_than" for error in caught.value.errors())
 
 
 @pytest.mark.parametrize("field", ["capacity", "max_bytes"])
@@ -43,13 +42,11 @@ def test_policy__rejects_untyped_invalid_values(field: str, value: str) -> None:
     arguments = {"capacity": "128", "max_bytes": "4096", field: value}
     script = (
         IMPORTS
-        + "from pydantic import ValidationError\n"
         + "try:\n    BoundedMailbox(capacity={}, max_bytes={})\n".format(
             arguments["capacity"], arguments["max_bytes"]
         )
-        + "except ValidationError as error:\n"
-        + "    assert error.errors()[0]['loc'] == ({!r},)\n".format(field)
-        + "    assert error.errors()[0]['type'] == 'int_type'\n"
+        + "except ValueError as error:\n"
+        + "    assert {!r} in str(error)\n".format(field)
         + "else:\n    raise AssertionError('invalid value accepted')"
     )
     result = run([executable, "-c", script], capture_output=True, text=True, check=False)
@@ -62,7 +59,7 @@ def test_policy__has_no_implicit_limits(constructor: str) -> None:
         [executable, "-c", IMPORTS + constructor], capture_output=True, text=True, check=False
     )
     assert result.returncode != 0
-    assert "ValidationError:" in result.stderr
+    assert "TypeError:" in result.stderr
     assert "missing" in result.stderr
 
 

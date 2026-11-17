@@ -13,13 +13,13 @@ from typing import Self, override
 
 import httpx
 import pytest
-from pydantic import ValidationError
 
 from examples.discord_demo import main as web
 from examples.discord_demo.domain import ROOMS, Action, Demo, Node, RoomHandle, View
 from examples.discord_simulation import Delivery, Event, Membership, Room, Snapshot
 from pybeam.actors import ActorGroup, ActorInfo
 from pybeam.actors.classes import Container, Route, definition
+from pybeam.codec import Json
 from pybeam.integrations.hornbeam import runtime as managed
 from pybeam.integrations.hornbeam.contracts import ByteStore
 from pybeam.runtime.loader import Entry
@@ -158,8 +158,8 @@ def test_session__signature_is_bound_to_runtime_and_csrf_purpose() -> None:
     ],
 )
 def test_command__rejects_unsafe_form_boundary(payload: dict[str, object]) -> None:
-    with pytest.raises(ValidationError):
-        web.Command.model_validate(
+    with pytest.raises(ValueError):
+        Json(web.Command).load(
             {
                 "action": "send",
                 "generation": "7",

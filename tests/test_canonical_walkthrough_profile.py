@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from examples.distributed import profile
+from pybeam.codec import Json
 
 
 @dataclass(frozen=True)
@@ -25,7 +26,7 @@ def prepared_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Prepared
         pytest.skip("Requires explicit read-only prepared profile and Native inputs; no VM is run")
     candidate = Path(selected).resolve(strict=True)
     native_source = Path(native).resolve(strict=True)
-    parsed = profile.PreparedProfile.model_validate_json(candidate.read_bytes())
+    parsed = Json(profile.PreparedProfile).decode(candidate.read_bytes())
     sdk = tmp_path / "sdk"
     for name in parsed.sdk_files:
         source = profile.contained(profile.ROOT, Path(name))

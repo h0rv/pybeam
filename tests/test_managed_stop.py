@@ -1,12 +1,12 @@
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from typing import override
 
-import psutil
 import pytest
-from pydantic import ValidationError
 
 from benchmarks import guardian
 from benchmarks.contract import Budget, Config, Outcome
@@ -25,6 +25,7 @@ from benchmarks.managed import (
 from benchmarks.runner import summarize
 from examples.distributed.policy import walkthrough_budget, walkthrough_stop
 from examples.showcase.catalog import ROOT
+from pybeam.codec import Json
 from pybeam.runtime.cluster import ManagedCleanupAck, NodeExit
 from pybeam.runtime.guardian import (
     GuardianEndpoint,
@@ -94,12 +95,12 @@ def test_managed_stop__only_nonmeasurement_profile_has_explicit_derived_grace() 
     assert policy.grace_seconds == 2 * (5 + 2) + 8 == 22
     assert policy.guardian_grace_seconds == 6
     assert isinstance(Config(python_source=str(ROOT)).stop_policy, ImmediateStop)
-    with pytest.raises(ValidationError, match="nonmeasurement"):
+    with pytest.raises(ValueError, match="nonmeasurement"):
         Config(python_source=str(ROOT), stop_policy=policy)
 
 
 def test_managed_stop__closed_admission_preserves_only_cleanup_lifetime(tmp_path: Path) -> None:
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     stop = tmp_path / "stop"
     endpoint = GuardianEndpoint(
         directory=tmp_path,
@@ -116,9 +117,17 @@ def test_managed_stop__closed_admission_preserves_only_cleanup_lifetime(tmp_path
             endpoint.require_active()
         registration = tmp_path / "register-denied.json"
         registration.write_text(
-            Registration(
-                process=current, owner=current, guardian=current, generation="1" * 32
-            ).model_dump_json()
+            Json(
+                type(
+                    Registration(
+                        process=current, owner=current, guardian=current, generation="1" * 32
+                    )
+                )
+            )
+            .encode(
+                Registration(process=current, owner=current, guardian=current, generation="1" * 32)
+            )
+            .decode()
         )
         with pytest.raises(StopRequested):
             acknowledge_registered(registration, {current}, endpoint)
@@ -129,10 +138,14 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     owner = Identity(pid=900001, created=1.0)
     ack = sample_ack(owner)
     owned = {owner, ack.guardian, *ack.cleanup.owned}
-    (tmp_path / "managed-cleanup.json").write_text(ack.model_dump_json())
-    (tmp_path / "managed-startup-census.json").write_text(sample_census(owner).model_dump_json())
+    (tmp_path / "managed-cleanup.json").write_text(Json(type(ack)).encode(ack).decode())
+    (tmp_path / "managed-startup-census.json").write_text(
+        Json(type(sample_census(owner))).encode(sample_census(owner)).decode()
+    )
     (tmp_path / "ownership.json").write_text(
-        Registry(phase="confirmed", owned=tuple(owned)).model_dump_json()
+        Json(type(Registry(phase="confirmed", owned=tuple(owned))))
+        .encode(Registry(phase="confirmed", owned=tuple(owned)))
+        .decode()
     )
     assert read_exit(tmp_path, owner, owned, 0) == AcknowledgedExit(ack)
     assert isinstance(read_exit(tmp_path, ack.guardian, owned, 0), UnacknowledgedExit)
@@ -143,8 +156,10 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
         {"shutdowns": ()},
         {"cleanup": Registry(phase="uncertain", owned=ack.cleanup.owned)},
     ):
-        with pytest.raises(ValidationError):
-            ManagedCleanupAck.model_validate_json(ack.model_copy(update=update).model_dump_json())
+        with pytest.raises(ValueError):
+            Json(ManagedCleanupAck).decode(
+                Json(type(replace(ack, **update))).encode(replace(ack, **update)).decode()
+            )
     outcome = Outcome(
         status="cancelled",
         reason="Managed stop acknowledged",
@@ -158,7 +173,7 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     summary = summarize(0, tmp_path, config, outcome)
     assert summary.completed is None and summary.throughput_per_second is None
     with pytest.raises(ValueError, match="cooperative"):
-        summarize(0, tmp_path, config, outcome.model_copy(update={"forced_cleanup_count": 1}))
+        summarize(0, tmp_path, config, replace(outcome, forced_cleanup_count=1))
     with pytest.raises(ValueError, match="cannot satisfy a benchmark"):
         summarize(0, tmp_path, Config(python_source=str(ROOT)), outcome)
 
@@ -211,11 +226,11 @@ def test_managed_stop__guardian_waits_only_for_a_managed_ack(
         budget=Budget() if case == "measurement" else walkthrough_budget(),
         adapter_command=(sys.executable, "-c", code),
     )
-    (tmp_path / "config.json").write_text(config.model_dump_json())
-    parent = identity(psutil.Process())
+    (tmp_path / "config.json").write_text(Json(type(config)).encode(config).decode())
+    parent = identity(os.getpid())
     if case == "dead_owner":
         parent = Identity(pid=99999999, created=1.0)
-    control = guardian.Control(owner=identity(psutil.Process()), stop_file=str(stop))
+    control = guardian.Control(owner=identity(os.getpid()), stop_file=str(stop))
     with ThreadPoolExecutor(max_workers=1) as executor:
         result = executor.submit(guardian.supervise, tmp_path, parent, control)
         if case != "dead_owner":

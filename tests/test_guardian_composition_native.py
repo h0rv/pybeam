@@ -4,12 +4,12 @@ import sys
 import time
 from pathlib import Path
 
-import psutil
 import pytest
 
 from benchmarks.contract import Budget, Config, Outcome
 from benchmarks.ownership import Control
 from examples.distributed.demo import wait_file
+from pybeam.codec import Json
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import BootstrapError, Distribution, PythonNode
 from pybeam.runtime.guardian import GuardianEndpoint, Registration
@@ -32,8 +32,8 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
         adapter_command=(sys.executable, str(ROOT / "tests/guardian_composition_probe.py")),
         budget=Budget(wall_seconds=25.0, processes=32, threads=128, sample_seconds=1.0),
     )
-    (tmp_path / "config.json").write_text(config.model_dump_json())
-    parent = identity(psutil.Process())
+    (tmp_path / "config.json").write_text(Json(type(config)).encode(config).decode())
+    parent = identity(os.getpid())
     control = Control(owner=parent, stop_file=str(tmp_path / "stop.request"))
     captured: set[Identity] = set()
     with (tmp_path / "guardian.log").open("wb") as log:
@@ -43,8 +43,8 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
                 "-m",
                 "benchmarks.guardian",
                 str(tmp_path),
-                parent.model_dump_json(),
-                control.model_dump_json(),
+                Json(type(parent)).encode(parent).decode(),
+                Json(type(control)).encode(control).decode(),
             ],
             cwd=ROOT,
             env=dict(os.environ),
@@ -53,20 +53,18 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
             start_new_session=True,
         )
         try:
-            nested = Registry.model_validate_json(wait_file(tmp_path / "nested.json"))
-            guard = Identity.model_validate_json(wait_file(tmp_path / "inner.birth.json"))
+            nested = Json(Registry).decode(wait_file(tmp_path / "nested.json"))
+            guard = Json(Identity).decode(wait_file(tmp_path / "inner.birth.json"))
             captured.update((*nested.owned, guard))
-            registry = Registry.model_validate_json((tmp_path / "ownership.json").read_text())
+            registry = Json(Registry).decode((tmp_path / "ownership.json").read_text())
             assert captured <= set(registry.owned)
             for alias in ("a", "b"):
-                birth = Identity.model_validate_json(wait_file(tmp_path / (alias + ".entry.json")))
+                birth = Json(Identity).decode(wait_file(tmp_path / (alias + ".entry.json")))
                 assert birth in registry.owned and birth in nested.owned
             if mode in {"adapter_death", "inner_death"}:
                 target = guard
                 if mode == "adapter_death":
-                    target = Identity.model_validate_json(
-                        (tmp_path / "adapter.birth.json").read_text()
-                    )
+                    target = Json(Identity).decode((tmp_path / "adapter.birth.json").read_text())
                 victim = resolve(target)
                 assert victim is not None
                 victim.kill()
@@ -76,16 +74,14 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
                 (tmp_path / "release").touch()
             process.wait(timeout=15)
             assert process.returncode == 0, (tmp_path / "guardian.log").read_text()
-            outcome = Outcome.model_validate_json((tmp_path / "outcome.json").read_text())
+            outcome = Json(Outcome).decode((tmp_path / "outcome.json").read_text())
             assert outcome.cleanup_state == "confirmed" and not outcome.cleanup_survivors
             assert all(resolve(birth) is None for birth in captured)
             assert (tmp_path / "registration.closed").is_file()
             if mode == "normal":
                 assert outcome.forced_cleanup_count == 0
                 assert (
-                    Registry.model_validate_json(
-                        (tmp_path / "inner-cleanup.json").read_text()
-                    ).phase
+                    Json(Registry).decode((tmp_path / "inner-cleanup.json").read_text()).phase
                     == "confirmed"
                 )
         finally:
@@ -107,7 +103,7 @@ def test_composition__missing_outer_ack_seals_every_native_entry(
     marker = tmp_path / "entry"
     entry = tmp_path / "node.py"
     entry.write_text("from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n")
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     endpoint = GuardianEndpoint(directory=tmp_path, owner=current, guardian=current)
     cluster = LocalCluster(
         Distribution(
@@ -127,6 +123,6 @@ def test_composition__missing_outer_ack_seals_every_native_entry(
     assert not cluster.identities
     registrations = tuple(tmp_path.glob("register-*.json"))
     assert len(registrations) == 1
-    pending = Registration.model_validate_json(registrations[0].read_text())
+    pending = Json(Registration).decode(registrations[0].read_text())
     assert pending.process == cluster._guardian_identity
     assert resolve(pending.process) is None

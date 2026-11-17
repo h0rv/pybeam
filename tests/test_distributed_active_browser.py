@@ -7,14 +7,13 @@ import time
 from pathlib import Path
 
 import httpx
-import psutil
 import pytest
 from playwright.sync_api import APIResponse, Route, expect, sync_playwright
-from pydantic import TypeAdapter
 
 from examples.distributed.policy import walkthrough_stop
 from examples.distributed.profile import verify_prepared
 from examples.showcase.catalog import ROOT
+from pybeam.codec import Json
 from pybeam.runtime.cluster import ManagedCleanupAck
 from pybeam.runtime.ownership import Registry, identity, resolve
 from tests.fixtures.distributed_native_hold import InnerCleanup, NativeReady
@@ -36,7 +35,7 @@ def created_job(audit: Audit, previous: frozenset[str]) -> JobAudit | None:
 def wait_created(path: Path, previous: frozenset[str]) -> JobAudit:
     deadline = time.monotonic() + 10
     while True:
-        job = created_job(Audit.model_validate_json(path.read_bytes()), previous)
+        job = created_job(Json(Audit).decode(path.read_bytes()), previous)
         if job is not None:
             return job
         assert time.monotonic() < deadline, "No new authoritative job ID"
@@ -49,9 +48,9 @@ def wait_ready(job: JobAudit) -> NativeReady:
     while not path.is_file():
         assert time.monotonic() < deadline, "No actual two-live-node observer barrier"
         time.sleep(0.01)
-    ready = NativeReady.model_validate_json(path.read_bytes())
+    ready = Json(NativeReady).decode(path.read_bytes())
     assert ready.job_id == job.id
-    current = Registry.model_validate_json(path.with_name("ownership.json").read_bytes())
+    current = Json(Registry).decode(path.with_name("ownership.json").read_bytes())
     assert {node.alias for node in ready.nodes} == {"a", "b"}
     assert ready.nodes[0].birth != ready.nodes[1].birth
     for node in ready.nodes:
@@ -75,9 +74,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
     ):
         listener.bind(("127.0.0.1", 0))
         listener.listen()
-        host, port = TypeAdapter(tuple[str, int]).validate_python(
-            listener.getsockname(), strict=True
-        )
+        host, port = Json(tuple[str, int]).validate_python(listener.getsockname(), strict=True)
         base = "http://" + host + ":" + str(port)
         (tmp_path / "private-url.txt").write_text(base)
         process = subprocess.Popen(
@@ -96,8 +93,10 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
             stdout=log,
             stderr=log,
         )
-        server_birth = identity(psutil.Process(process.pid))
-        (tmp_path / "server-identity.json").write_text(server_birth.model_dump_json())
+        server_birth = identity(process.pid)
+        (tmp_path / "server-identity.json").write_text(
+            Json(type(server_birth)).encode(server_birth).decode()
+        )
         try:
             deadline = time.monotonic() + 15
             with httpx.Client(base_url=base, timeout=1) as client:
@@ -134,7 +133,9 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                     expect(row_a).to_have_attribute("data-status", "running")
                     expect(row_b).to_have_attribute("data-status", "running")
                     ready = wait_ready(job)
-                    (tmp_path / "native-ready.json").write_text(ready.model_dump_json())
+                    (tmp_path / "native-ready.json").write_text(
+                        Json(type(ready)).encode(ready).decode()
+                    )
                     expect(row_a).to_contain_text(ready.nodes[0].handler.node)
                     expect(row_b).to_contain_text(ready.nodes[1].handler.node)
                     route, reply = held.pop()
@@ -158,7 +159,9 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         assert resolve(server_birth) is not None
                         assert all(resolve(node.birth) is not None for node in ready.nodes)
                         before = wait_audit(audit_path, subscribers=2)
-                        (tmp_path / "before-sigterm.json").write_text(before.model_dump_json())
+                        (tmp_path / "before-sigterm.json").write_text(
+                            Json(type(before)).encode(before).decode()
+                        )
                         started = time.monotonic()
                         process.terminate()
                         process.wait(timeout=ACK_DEADLINE)
@@ -167,7 +170,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         )
                         assert process.returncode in (0, -15)
                         assert resolve(server_birth) is None
-                    audit = Audit.model_validate_json(audit_path.read_bytes())
+                    audit = Json(Audit).decode(audit_path.read_bytes())
                     actual = next(item for item in audit.jobs if item.id == job.id)
                     assert actual.outcome is not None and actual.registry is not None
                     assert actual.outcome.status == "cancelled"
@@ -176,14 +179,14 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                     assert all(resolve(birth) is None for birth in actual.registry.owned)
                     assert all(resolve(birth) is None for birth in ready.outer.owned)
                     assert actual.outcome.forced_cleanup_count == 0
-                    ack = ManagedCleanupAck.model_validate_json(
+                    ack = Json(ManagedCleanupAck).decode(
                         (tmp_path / (job.id + ".managed-cleanup.json")).read_bytes()
                     )
                     assert ack.forced_cleanup_count == 0 and len(ack.shutdowns) == 2
                     assert all(item.clean for item in ack.shutdowns)
                     cleanup_path = tmp_path / (job.id + ".inner-cleanup.json")
                     assert cleanup_path.is_file(), "No real inner cleanup/VM shutdown ACK"
-                    inner = InnerCleanup.model_validate_json(cleanup_path.read_bytes())
+                    inner = Json(InnerCleanup).decode(cleanup_path.read_bytes())
                     assert inner.cleanup is not None and inner.cleanup.phase == "confirmed"
                     assert len(inner.shutdowns) == 2 and all(item.clean for item in inner.shutdowns)
                     assert all(resolve(birth) is None for birth in inner.cleanup.owned)

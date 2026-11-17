@@ -1,12 +1,13 @@
 import asyncio
 import socket
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 import pytest
 import uvicorn
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import field_validator
 
 from benchmarks.contract import Config as RunConfig
 from benchmarks.contract import Outcome, ResourceSample
@@ -15,12 +16,12 @@ from examples.showcase import app as showcase
 from examples.showcase import jobs as showcase_jobs
 from examples.showcase.app import Settings, create_app
 from examples.showcase.jobs import Job, Jobs
+from pybeam.codec import Json
 from pybeam.runtime.ownership import Registry, durable_write
 
 
-class JobAudit(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class JobAudit:
     id: str
     status: str
     directory: Path
@@ -31,9 +32,8 @@ class JobAudit(BaseModel):
     peak_sample: ResourceSample | None = None
 
 
-class Audit(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Audit:
     subscribers: int
     close_calls: int
     jobs: tuple[JobAudit, ...]
@@ -62,7 +62,7 @@ def serve(
                 resources = trial / "resources.jsonl"
                 samples = (
                     tuple(
-                        ResourceSample.model_validate_json(line)
+                        Json(ResourceSample).decode(line)
                         for line in resources.read_text().splitlines(keepends=True)
                         if line.endswith("\n")
                     )
@@ -94,10 +94,10 @@ def serve(
                         directory=job.directory,
                         observations=job.observations,
                         proof=job.proof,
-                        registry=Registry.model_validate_json(registry.read_bytes())
+                        registry=Json(Registry).decode(registry.read_bytes())
                         if registry.is_file()
                         else None,
-                        outcome=Outcome.model_validate_json(outcome.read_bytes())
+                        outcome=Json(Outcome).decode(outcome.read_bytes())
                         if outcome.is_file()
                         else None,
                         peak_sample=max(
@@ -109,11 +109,23 @@ def serve(
                 )
             durable_write(
                 audit,
-                Audit(
-                    subscribers=len(self.subscribers),
-                    close_calls=self.close_calls,
-                    jobs=tuple(jobs),
-                ).model_dump_json(),
+                Json(
+                    type(
+                        Audit(
+                            subscribers=len(self.subscribers),
+                            close_calls=self.close_calls,
+                            jobs=tuple(jobs),
+                        )
+                    )
+                )
+                .encode(
+                    Audit(
+                        subscribers=len(self.subscribers),
+                        close_calls=self.close_calls,
+                        jobs=tuple(jobs),
+                    )
+                )
+                .decode(),
             )
 
         @override

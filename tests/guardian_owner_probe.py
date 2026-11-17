@@ -4,21 +4,19 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 from unittest.mock import patch
 
-import psutil
-from pydantic import BaseModel, ConfigDict
-
+from pybeam.codec import Json
 from pybeam.runtime import guardian
 from pybeam.runtime.ownership import Identity, Registry, identity, resolve
 from pybeam.runtime.process import _stop_owned
 
 
-class RaceProof(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RaceProof:
     source: str
     boundary: str
     owner: Identity
@@ -40,16 +38,20 @@ def probe(boundary: str) -> RaceProof:
         owner = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(12)"], start_new_session=True
         )
-        owner_birth = identity(psutil.Process(owner.pid))
+        owner_birth = identity(owner.pid)
         entry = (
             "from pathlib import Path; from pybeam.runtime.ownership import Identity, resolve; "
-            "owner=Identity.model_validate_json(" + repr(owner_birth.model_dump_json()) + "); "
+            "owner=Json(Identity).decode("
+            + repr(Json(type(owner_birth)).encode(owner_birth).decode())
+            + "); "
             "Path("
             + repr(str(marker))
             + ").write_text('live' if resolve(owner) is not None else 'gone')"
         )
         request = guardian.SpawnRequest(argv=(sys.executable, "-c", entry))
-        guardian.durable_write(directory / "spawn.request.json", request.model_dump_json())
+        guardian.durable_write(
+            directory / "spawn.request.json", Json(type(request)).encode(request).decode()
+        )
         original_write = guardian.durable_write
         original_record = guardian.record
         owner_gone = False
@@ -95,7 +97,7 @@ def probe(boundary: str) -> RaceProof:
                     guardian.supervise(directory, owner_birth)
                 except RuntimeError as error:
                     failure = type(error).__name__
-            journal = Registry.model_validate_json((directory / "ownership.json").read_text())
+            journal = Json(Registry).decode((directory / "ownership.json").read_text())
             return RaceProof(
                 source=str(guardian.__file__),
                 boundary=boundary,
@@ -115,7 +117,7 @@ def probe(boundary: str) -> RaceProof:
 
 if __name__ == "__main__":
     result = probe(sys.argv[1])
-    Path(sys.argv[2]).write_text(result.model_dump_json(indent=2) + "\n")
+    Path(sys.argv[2]).write_text(json.dumps(Json(type(result)).dump(result), indent=2) + "\n")
     print(
         json.dumps(
             {

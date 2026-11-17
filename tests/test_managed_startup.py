@@ -1,9 +1,12 @@
+import os
+from dataclasses import replace
 from pathlib import Path
 
 import psutil
 import pytest
 
 from benchmarks.managed import AcknowledgedExit, Draining, FailedManagedShutdown, read_exit
+from pybeam.codec import Json
 from pybeam.runtime import guardian
 from pybeam.runtime.cluster import ManagedCleanupAck, NodeExit
 from pybeam.runtime.guardian import (
@@ -56,8 +59,8 @@ def two_node_census() -> ManagedStartupCensus:
 def write_records(
     path: Path, ack: ManagedCleanupAck, census: ManagedStartupCensus
 ) -> set[Identity]:
-    (path / "managed-cleanup.json").write_text(ack.model_dump_json())
-    (path / "managed-startup-census.json").write_text(census.model_dump_json())
+    (path / "managed-cleanup.json").write_text(Json(type(ack)).encode(ack).decode())
+    (path / "managed-startup-census.json").write_text(Json(type(census)).encode(census).decode())
     return {OWNER, census.guardian, *census.registry.owned}
 
 
@@ -86,32 +89,34 @@ def test_cleanup_parser__omissions_cannot_change_the_independent_census(
     assert isinstance(read_exit(tmp_path, OWNER, owned, 0), AcknowledgedExit)
     match omission:
         case "both_vm_acks":
-            changed = ack.model_copy(update={"launchers": (), "shutdowns": ()})
+            changed = replace(ack, launchers=(), shutdowns=())
         case "inner_journal":
-            changed = ack.model_copy(
-                update={
+            changed = replace(
+                ack,
+                **{
                     "launchers": (),
                     "shutdowns": (),
                     "cleanup": Registry(phase="confirmed", owned=()),
-                }
+                },
             )
         case "one_vm_ack":
-            changed = ack.model_copy(
-                update={"launchers": ack.launchers[:1], "shutdowns": ack.shutdowns[:1]}
+            changed = replace(
+                ack, **{"launchers": ack.launchers[:1], "shutdowns": ack.shutdowns[:1]}
             )
         case "alias":
-            changed = ack.model_copy(
-                update={
+            changed = replace(
+                ack,
+                **{
                     "shutdowns": (
-                        ack.shutdowns[0].model_copy(update={"alias": "wrong"}),
+                        replace(ack.shutdowns[0], **{"alias": "wrong"}),
                         ack.shutdowns[1],
                     )
-                }
+                },
             )
         case _:
             pytest.fail("Unknown omission control")
     # All controls remain structurally valid ACKs. Only independent completeness rejects them.
-    ManagedCleanupAck.model_validate_json(changed.model_dump_json())
+    Json(ManagedCleanupAck).decode(Json(type(changed)).encode(changed).decode())
     write_records(tmp_path, changed, census)
     rejected = read_exit(tmp_path, OWNER, owned, 0)
     assert isinstance(Draining(deadline=1).advance(now=0, adapter=rejected), FailedManagedShutdown)
@@ -201,7 +206,7 @@ def test_startup_observer__closed_admission_cannot_launch_an_early_cancel(tmp_pa
 def test_startup_observer__census_is_updated_before_registration_ack(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     parent = psutil.Process().parent()
     assert parent is not None
     launcher = identity(parent)
@@ -214,7 +219,7 @@ def test_startup_observer__census_is_updated_before_registration_ack(
         entry=VmEntry(alias="a", launcher=launcher),
     )
     path = tmp_path / "register.json"
-    path.write_text(registration.model_dump_json())
+    path.write_text(Json(type(registration)).encode(registration).decode())
     launches: list[LauncherBirth] = [PendingLauncher(alias="a", launcher=launcher)]
     events: list[str] = []
     original = guardian._acknowledge

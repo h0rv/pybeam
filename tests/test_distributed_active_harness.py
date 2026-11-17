@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ def test_active_harness__only_the_authoritative_new_identity_can_match() -> None
     before = frozenset({old.id})
     audit = Audit(subscribers=2, close_calls=0, jobs=(old, new))
     assert created_job(audit, before) is new
-    assert created_job(audit.model_copy(update={"jobs": (old,)}), before) is None
+    assert created_job(replace(audit, jobs=(old,)), before) is None
     with pytest.raises(ValueError, match="exactly one"):
         created_job(audit, frozenset())
 

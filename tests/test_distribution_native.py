@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import psutil
@@ -11,6 +12,7 @@ import pytest
 
 from examples.distributed.config import configuration
 from examples.distributed.demo import demonstration, wait_file
+from pybeam.codec import Json
 from pybeam.distribution import Reply
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import BootstrapError, Distribution, PythonNode
@@ -37,7 +39,7 @@ def clean(cluster: LocalCluster) -> None:
 def test_distribution__actual_nodes_handlers_tasks_loss_and_fresh_restart() -> None:
     proof = demonstration()
     for key in ("first", "second"):
-        result = Reply.model_validate_json(json.dumps(proof[key]))
+        result = Json(Reply).decode(json.dumps(proof[key]))
         assert result.worker_kind == "temporary_otp_task"
         assert result.worker_dead is True
         assert result.worker is not None and result.worker.startswith("<0.")
@@ -46,10 +48,10 @@ def test_distribution__actual_nodes_handlers_tasks_loss_and_fresh_restart() -> N
         assert result.otp_version == "29.1.2"
         assert result.erts_version == "17.1.1"
         assert result.private_home is True
-    assert Reply.model_validate_json(json.dumps(proof["inflight_loss"])).status == "uncertain"
-    assert Reply.model_validate_json(json.dumps(proof["controls"])).count == 2
-    assert Reply.model_validate_json(json.dumps(proof["stale_ack"])).status == "stale"
-    journal = Registry.model_validate_json(json.dumps(proof["cleanup"]))
+    assert Json(Reply).decode(json.dumps(proof["inflight_loss"])).status == "uncertain"
+    assert Json(Reply).decode(json.dumps(proof["controls"])).count == 2
+    assert Json(Reply).decode(json.dumps(proof["stale_ack"])).status == "stale"
+    journal = Json(Registry).decode(json.dumps(proof["cleanup"]))
     assert journal.phase == "confirmed"
     assert all(resolve(value) is None for value in journal.owned)
 
@@ -73,9 +75,7 @@ def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
             assert connection.laddr.ip in {"127.0.0.1", "::1"}
             assert connection.laddr.port == distribution.discovery_port
         for alias in ("a", "b"):
-            birth = Identity.model_validate_json(
-                (cluster.directory / (alias + ".birth.json")).read_text()
-            )
+            birth = Json(Identity).decode((cluster.directory / (alias + ".birth.json")).read_text())
             vm = resolve(birth)
             assert vm is not None and vm.exe().endswith("/beam.smp")
             listeners = [
@@ -97,7 +97,7 @@ def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
         with pytest.raises(RuntimeError, match="one restart"):
             cluster.restart("b")
         (cluster.directory / "try-join").touch()
-        refused = Reply.model_validate_json(wait_file(cluster.directory / "join-control.json"))
+        refused = Json(Reply).decode(wait_file(cluster.directory / "join-control.json"))
         assert refused.status == "uncertain"
         assert refused.receipt is None
     clean(cluster)
@@ -111,11 +111,11 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
         "import os, psutil\nfrom pathlib import Path\n"
         "from pybeam.runtime.ownership import identity, Registry\n"
         "directory = Path(os.environ['PYBEAM_OWNER_DIRECTORY'])\n"
-        "registry = Registry.model_validate_json((directory / 'ownership.json').read_text())\n"
-        "assert identity(psutil.Process()) in registry.owned\n"
+        "registry = Json(Registry).decode((directory / 'ownership.json').read_text())\n"
+        "assert identity(os.getpid()) in registry.owned\n"
         + "Path("
         + repr(str(marker))
-        + ").write_text(identity(psutil.Process()).model_dump_json())\n"
+        + ").write_text(Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode())\n"
         + "raise RuntimeError('finite controlled entry failure')\n"
     )
     idle = tmp_path / "idle.py"
@@ -131,10 +131,10 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
         capacity=2,
         max_bytes=4096,
     )
-    cluster = LocalCluster(distribution, config=config.model_copy(update={"startup_timeout": 3.0}))
+    cluster = LocalCluster(distribution, config=replace(config, startup_timeout=3.0))
     try:
         with cluster:
-            value = Identity.model_validate_json(wait_file(marker, seconds=5))
+            value = Json(Identity).decode(wait_file(marker, seconds=5))
             deadline = time.monotonic() + 5
             while resolve(value) is not None:
                 assert time.monotonic() < deadline
@@ -156,7 +156,7 @@ def test_distribution__registration_failure_seals_user_execution(tmp_path: Path)
         "-c",
         "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()",
     ]
-    owner = identity(psutil.Process()).model_dump_json()
+    owner = Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode()
     result = subprocess.run(
         command,
         env=dict(
@@ -197,7 +197,7 @@ def test_distribution__parent_exit_reaps_private_epmd_and_both_native_vms() -> N
     assert parent.returncode == 0, parent.stderr
     directory = Path(parent.stdout.strip())
     assert directory.name.startswith("pybeam-distribution-")
-    journal = Registry.model_validate_json((directory / "ownership.json").read_text())
+    journal = Json(Registry).decode((directory / "ownership.json").read_text())
     assert journal.phase == "confirmed"
     assert all(resolve(value) is None for value in journal.owned)
     assert not (directory / "home" / ".erlang.cookie").exists()
@@ -210,7 +210,7 @@ def test_distribution__guardian_exit_closes_live_vm_execution() -> None:
     with pytest.raises(BootstrapError), cluster:
         wait_file(cluster.directory / "first.json")
         births = [
-            Identity.model_validate_json((cluster.directory / (alias + ".birth.json")).read_text())
+            Json(Identity).decode((cluster.directory / (alias + ".birth.json")).read_text())
             for alias in ("a", "b")
         ]
         guardian = cluster._guardian

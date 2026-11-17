@@ -13,6 +13,7 @@ from playwright.sync_api import APIResponse, Route, expect, sync_playwright
 from examples.distributed.models import WalkthroughProof
 from examples.distributed.profile import verify_prepared
 from examples.showcase.catalog import ROOT
+from pybeam.codec import Json
 from pybeam.runtime.ownership import resolve
 from tests.fixtures.distributed_native_server import Audit
 
@@ -26,7 +27,7 @@ def wait_audit(path: Path, *, subscribers: int) -> Audit:
     deadline = time.monotonic() + 5
     while True:
         if path.is_file():
-            audit = Audit.model_validate_json(path.read_bytes())
+            audit = Json(Audit).decode(path.read_bytes())
             if audit.subscribers == subscribers:
                 return audit
         assert time.monotonic() < deadline
@@ -107,11 +108,11 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     with httpx.Client(base_url=BASE) as client:
                         download = client.get("/artifact/" + key.removeprefix("job-"))
                     assert download.status_code == 200
-                    proof = WalkthroughProof.model_validate_json(download.content)
+                    proof = Json(WalkthroughProof).decode(download.content)
                     (tmp_path / "download.json").write_bytes(download.content)
                     for forbidden in ("cookie", "token", "payload", "directory", str(ROOT)):
                         assert forbidden not in download.text
-                    audit = Audit.model_validate_json(audit_path.read_bytes())
+                    audit = Json(Audit).decode(audit_path.read_bytes())
                     run = audit.jobs[0]
                     assert run.proof == proof and run.outcome is not None
                     assert run.outcome.forced_cleanup_count == 0
@@ -134,7 +135,7 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     assert response.status == 204
                     route.fulfill(response=response)
                     expect(live).to_have_attribute("data-status", "stopped")
-                    audit = Audit.model_validate_json(audit_path.read_bytes())
+                    audit = Json(Audit).decode(audit_path.read_bytes())
                     cancelled = audit.jobs[-1]
                     assert cancelled.outcome is not None and cancelled.registry is not None
                     assert not cancelled.outcome.cleanup_survivors

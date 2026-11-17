@@ -11,13 +11,14 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from dataclasses import dataclass
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
-from pydantic import BaseModel, ConfigDict, ValidationError
 
 from examples.discord_simulation import Proof as DiscordProof
+from pybeam.codec import Json
 from pybeam.runtime.assets import (
     LinuxManifest,
     RuntimeAssets,
@@ -44,9 +45,8 @@ from tools.build_runtime import (
 from tools.runtime_wheel import runtime_tag
 
 
-class NativeState(BaseModel):
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NativeState:
     pid: int
     package: Path
     pydantic: Path
@@ -90,7 +90,7 @@ def linux_assets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_linux_manifest_and_host_library(linux_assets: Path) -> None:
-    manifest = RuntimeManifest.model_validate_json((linux_assets / "runtime.json").read_bytes())
+    manifest = Json(RuntimeManifest).decode((linux_assets / "runtime.json").read_bytes())
     assert isinstance(manifest.root, LinuxManifest)
     assets = packaged_assets(linux_assets)
     assert assets.python_library == linux_assets / "host/lib/libpython3.14.so.1.0"
@@ -114,8 +114,8 @@ def test_linux_manifest_rejects_mismatched_platform(
     payload: object = json.loads(file.read_bytes())
     assert isinstance(payload, dict)
     payload[key] = value
-    with pytest.raises(ValidationError):
-        RuntimeManifest.model_validate_json(json.dumps(payload))
+    with pytest.raises(ValueError):
+        Json(RuntimeManifest).decode(json.dumps(payload))
 
 
 def test_linux_assets_missing_host_library(linux_assets: Path) -> None:
@@ -814,7 +814,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     state_line = next(
         line for line in result.stdout.splitlines() if line.startswith("NATIVE_STATE ")
     )
-    state = NativeState.model_validate_json(state_line.removeprefix("NATIVE_STATE "))
+    state = Json(NativeState).decode(state_line.removeprefix("NATIVE_STATE "))
     assert state.libraries == (library,)
     assert state.package == moved / "lib/python3.14/site-packages/pybeam/__init__.py"
     assert state.pydantic == moved / "lib/python3.14/site-packages/pydantic/__init__.py"
@@ -845,7 +845,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
     cli_state_line = next(
         line for line in cli.stdout.splitlines() if line.startswith("NATIVE_STATE ")
     )
-    cli_state = NativeState.model_validate_json(cli_state_line.removeprefix("NATIVE_STATE "))
+    cli_state = Json(NativeState).decode(cli_state_line.removeprefix("NATIVE_STATE "))
     assert cli_state.libraries == (library,)
     root = Path(__file__).resolve().parents[1]
     for source, marker in (
@@ -869,7 +869,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
         assert "/Users/robby/projects" not in checked.stdout + checked.stderr
         if source.name == "discord_simulation.py":
             proof = next(
-                DiscordProof.model_validate_json(line)
+                Json(DiscordProof).decode(line)
                 for line in checked.stdout.splitlines()
                 if line.startswith("{")
             )

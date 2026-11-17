@@ -1,7 +1,6 @@
 from typing import Never
 
 import pytest
-from pydantic import ValidationError
 
 from examples.otp_host import library
 
@@ -35,7 +34,7 @@ async def test_analyze__rejects_invalid_input_before_native_resources(
         raise AssertionError("Invalid input must not open an actor group")
 
     monkeypatch.setattr(library.pybeam, "ActorGroup", unexpected_group)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         await library.analyze(payload)
 
 
