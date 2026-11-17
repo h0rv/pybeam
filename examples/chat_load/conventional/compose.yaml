@@ -1,0 +1,42 @@
+name: chat-conventional
+
+x-app: &app
+  build:
+    context: ../../..
+    dockerfile: examples/chat_load/conventional/Dockerfile
+  command: uvicorn examples.chat_load.conventional.app:app --host 0.0.0.0 --port 8000 --log-level warning
+  depends_on:
+    kv:
+      condition: service_healthy
+    broker:
+      condition: service_healthy
+
+services:
+  proxy:
+    image: nginx:1-alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - 127.0.0.1:8801:8801
+    depends_on: [app-1, app-2]
+
+  app-1: *app
+  app-2: *app
+
+  worker:
+    <<: *app
+    command: celery -A examples.chat_load.conventional.worker:queue worker --loglevel warning
+
+  kv:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 1s
+      retries: 30
+
+  broker:
+    image: rabbitmq:4-alpine
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 2s
+      retries: 60
