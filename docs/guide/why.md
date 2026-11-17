@@ -1,6 +1,6 @@
 # Why PyBEAM
 
-When concurrent requests share data, an async Python app usually needs locks, a Redis server for counters and pub/sub, and restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
+Run concurrent Python without the pain of managing locks, a Redis server for counters and pub/sub, or restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
 
 ## No locks
 
@@ -38,13 +38,18 @@ The difference is reach. Every task on an asyncio loop runs in one Python proces
 
 PyBEAM spends memory and call overhead on scheduling, supervision and distribution. That trade pays off when work spans connections, processes or machines: web apps with shared state, live updates, and services that must recover from failures. For local processing in one process, such as a script or a batch job, plain asyncio is cheaper and simpler.
 
+## How it works
+
+PyBEAM runs on the BEAM, Erlang's virtual machine, which preemptively schedules each actor and task's BEAM process across available scheduler cores. The BEAM is the shared scheduler, not a single asyncio loop spanning processes; Python execution still depends on the mode you choose. Your async code uses asyncio through erlang-python's `ErlangEventLoop`, which gets I/O readiness and timers from the BEAM. One loop runs one coroutine step at a time, so CPU-bound work blocks that loop, including other bodies on the default shared loop. See [How Python work runs](execution.md) for `dedicated_loop` and execution modes, including their parallelism limits.
+
+- Saša Jurić: [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE).
+- Erlang documentation: [Processes](https://www.erlang.org/doc/system/ref_man_processes.html).
+
 ## Limits
 
 - State and messages live in memory and do not survive a restart. Keep durable data in your database.
 - A timeout stops waiting; it does not undo the call. Retrying can repeat its effects.
 - A restarted actor starts from its constructor. The old state and any in-flight calls are lost.
-
-To learn how calls use threads and CPU cores, see [How Python work runs](execution.md).
 
 ## Try it
 
@@ -75,7 +80,3 @@ order-42
 ```
 
 Next, try [shared state](state.md) or [supervision](supervision.md).
-
-## Learn more
-
-PyBEAM uses the [BEAM runtime](https://www.erlang.org/) for scheduling and supervision; Saša Jurić's [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE) introduces the ideas behind it.
