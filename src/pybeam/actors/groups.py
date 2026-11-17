@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from itertools import count
+from pathlib import Path
 from types import TracebackType
 from typing import Protocol, Self, TypeIs, overload
 
@@ -16,6 +17,8 @@ from pybeam.actors.classes import (
     reference_route,
 )
 from pybeam.actors.codec import CONSTRUCTION_PROBE, ActorPayloadError, decode_reply
+from pybeam.actors.state import SnapshotSpec
+from pybeam.runtime.config import load_config
 
 
 class DataGroup(Protocol):
@@ -184,6 +187,7 @@ class ActorGroup:
         native: DataGroup,
         args: tuple[object, ...],
         kwargs: Mapping[str, object],
+        state_key: str | None = None,
     ) -> Started[T] | Failed:
         try:
             spec = definition(cls)
@@ -192,9 +196,14 @@ class ActorGroup:
             size = self._limits.max_bytes
             if len(payload) > size:
                 raise ActorPayloadError("Encoded actor constructor exceeds max_bytes")
+            snapshot = (
+                SnapshotSpec.build(cls, state_key, load_config(Path.cwd()).data_dir, size)
+                if state_key is not None
+                else None
+            )
             actor = await native.spawn(
                 cls.__qualname__ + "-" + str(next(self._ids)),
-                spec.factory(payload, max_bytes=size),
+                spec.factory(payload, max_bytes=size, snapshot=snapshot),
                 capacity=capacity,
                 max_bytes=size,
             )
@@ -228,6 +237,26 @@ class ActorGroup:
         if not is_actor_class(cls):
             raise TypeError("ActorGroup.spawn requires a decorated actor class")
         outcome = await self._starts.create_task(self._spawn(cls, self._native, args, kwargs))
+        if isinstance(outcome, Failed):
+            raise outcome.error
+        return outcome.reference
+
+    async def restore[T, **P](
+        self, key: str, cls: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs
+    ) -> T:
+        """Start from the last explicit write for this class and key, or constructor defaults.
+
+        All declared fields must be data supported by Json. The constructor runs
+        on each start, then saved fields replace its values before the first call.
+        Keep data_dir across launches. Snapshots survive local process crashes,
+        not disk loss; replication and cross-node restart are not provided.
+        Concurrent actors with one key conflict on writes, not on activation.
+        """
+        if self._closing or self._starts is None or self._native is None:
+            raise RuntimeError("ActorGroup is not open")
+        if not is_actor_class(cls):
+            raise TypeError("ActorGroup.restore requires a decorated actor class")
+        outcome = await self._starts.create_task(self._spawn(cls, self._native, args, kwargs, key))
         if isinstance(outcome, Failed):
             raise outcome.error
         return outcome.reference
