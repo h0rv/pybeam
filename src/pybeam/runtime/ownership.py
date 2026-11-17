@@ -1,8 +1,8 @@
 import contextlib
+import ctypes
 import math
 import os
 import signal
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -65,36 +65,80 @@ def _linux(pid: int) -> Process | None:
     return Process(pid, int(fields[1]), _linux_boot() + ticks, fields[0] in {"Z", "X"})
 
 
-def _ps(*selection: str) -> tuple[Process, ...]:
-    result = subprocess.run(  # noqa: S603
-        ["/bin/ps", *selection, "-o", "pid=,ppid=,stat=,lstart="],
-        capture_output=True,
-        text=True,
-        env={"LC_ALL": "C", "PATH": "/usr/bin:/bin"},
-        check=False,
+class _BsdInfo(ctypes.Structure):
+    _fields_ = (
+        ("flags", ctypes.c_uint32),
+        ("status", ctypes.c_uint32),
+        ("xstatus", ctypes.c_uint32),
+        ("pid", ctypes.c_uint32),
+        ("ppid", ctypes.c_uint32),
+        ("ids", ctypes.c_uint32 * 6),
+        ("rfu", ctypes.c_uint32),
+        ("comm", ctypes.c_char * 16),
+        ("name", ctypes.c_char * 32),
+        ("nfiles", ctypes.c_uint32),
+        ("pgid", ctypes.c_uint32),
+        ("pjobc", ctypes.c_uint32),
+        ("tdev", ctypes.c_uint32),
+        ("tpgid", ctypes.c_uint32),
+        ("nice", ctypes.c_int32),
+        ("start_sec", ctypes.c_uint64),
+        ("start_usec", ctypes.c_uint64),
     )
-    processes: list[Process] = []
-    for line in result.stdout.splitlines():
-        pid, parent, state, *started = line.split()
-        created = time.mktime(time.strptime(" ".join(started), "%a %b %d %H:%M:%S %Y"))
-        processes.append(Process(int(pid), int(parent), created, state.startswith("Z")))
-    return tuple(processes)
+
+
+_BSD_INFO = 3
+_ZOMBIE = 5
+
+
+def _darwin(pid: int) -> Process | None:
+    # libproc reads the kernel process table without spawning a child process.
+    info = _BsdInfo()
+    size = ctypes.sizeof(info)
+    if _LIBPROC.proc_pidinfo(pid, _BSD_INFO, 0, ctypes.byref(info), size) != size:
+        return None
+    created = info.start_sec + info.start_usec / 1_000_000
+    return Process(pid, info.ppid, created, info.status == _ZOMBIE)
+
+
+def _darwin_pids() -> tuple[int, ...]:
+    count = int(_LIBPROC.proc_listallpids(None, 0))
+    buffer = (ctypes.c_int * (count + 64))()
+    found = int(_LIBPROC.proc_listallpids(buffer, ctypes.sizeof(buffer)))
+    return tuple(int(pid) for pid in buffer[: max(found, 0)] if pid > 0)
+
+
+if sys.platform == "darwin":
+    _LIBPROC = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    _LIBPROC.proc_pidinfo.argtypes = (
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint64,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    )
+    _LIBPROC.proc_pidinfo.restype = ctypes.c_int
+    _LIBPROC.proc_listallpids.argtypes = (ctypes.c_void_p, ctypes.c_int)
+    _LIBPROC.proc_listallpids.restype = ctypes.c_int
 
 
 def _process(pid: int) -> Process | None:
     if sys.platform == "linux":
         return _linux(pid)
-    found = _ps("-p", str(pid))
-    return found[0] if found else None
+    if sys.platform == "darwin":
+        return _darwin(pid)
+    raise OSError("Process inspection supports Linux and macOS")
 
 
 def _table() -> tuple[Process, ...]:
     if sys.platform == "linux":
-        found = (
-            _linux(int(entry.name)) for entry in Path("/proc").iterdir() if entry.name.isdigit()
-        )
-        return tuple(item for item in found if item is not None)
-    return _ps("-A")
+        pids = tuple(int(entry.name) for entry in Path("/proc").iterdir() if entry.name.isdigit())
+    elif sys.platform == "darwin":
+        pids = _darwin_pids()
+    else:
+        raise OSError("Process inspection supports Linux and macOS")
+    found = (_process(pid) for pid in pids)
+    return tuple(item for item in found if item is not None)
 
 
 def identity(pid: int) -> Identity:
