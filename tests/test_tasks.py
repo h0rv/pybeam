@@ -41,14 +41,17 @@ def test_execution_mode__values() -> None:
 
 
 @pytest.mark.parametrize("dedicated_loop", [False, True])
-def test_task_function__worker_default_and_explicit(dedicated_loop: bool) -> None:
+@pytest.mark.parametrize("execution", [ExecutionMode.WORKER, "worker"])
+def test_task_function__worker_default_and_explicit(
+    dedicated_loop: bool, execution: ExecutionMode
+) -> None:
     default = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
     assert default.execution is ExecutionMode.WORKER
     explicit = TaskFunction(
         render,
         TypeAdapter(Request),
         TypeAdapter(str),
-        execution=ExecutionMode.WORKER,
+        execution=execution,
         dedicated_loop=dedicated_loop,
     )
     assert explicit.execution is ExecutionMode.WORKER
@@ -71,6 +74,8 @@ def test_task_function__worker_default_and_explicit(dedicated_loop: bool) -> Non
             "py_task hard-codes mode => worker.*main-interpreter objects; "
             "fork support.*bootstrap fix.*PR #5",
         ),
+        ("owngil", "py_task hard-codes mode => worker.*check_multi_interp_extensions"),
+        ("isolated", "py_task hard-codes mode => worker.*bootstrap fix.*PR #5"),
     ],
 )
 def test_task_function__unavailable_modes(
@@ -84,6 +89,12 @@ def test_task_function__unavailable_modes(
             execution=execution,
             dedicated_loop=dedicated_loop,
         )
+
+
+@pytest.mark.parametrize("execution", ["unknown"])
+def test_task_function__unknown_execution_mode(execution: ExecutionMode) -> None:
+    with pytest.raises(ValueError, match="'unknown' is not a valid ExecutionMode"):
+        TaskFunction(render, TypeAdapter(Request), TypeAdapter(str), execution=execution)
 
 
 def test_task_function__strict_request_and_result_boundaries() -> None:

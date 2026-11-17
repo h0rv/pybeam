@@ -76,7 +76,8 @@ class TaskFunction[Q, R]:
         execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
     ) -> None:
-        if execution is ExecutionMode.OWNGIL:
+        execution = ExecutionMode(execution)
+        if execution == ExecutionMode.OWNGIL:
             raise CapabilityUnavailable(
                 "owngil tasks are unavailable: py_task hard-codes mode => worker; "
                 "retained main-interpreter closures cannot cross interpreters. "
@@ -85,7 +86,7 @@ class TaskFunction[Q, R]:
                 "to the caller and pass raw bytes because subinterpreters with "
                 "check_multi_interp_extensions reject pydantic_core"
             )
-        if execution is ExecutionMode.ISOLATED:
+        if execution == ExecutionMode.ISOLATED:
             raise CapabilityUnavailable(
                 "isolated tasks are unavailable: erlang-python's py_task hard-codes "
                 "mode => worker and task bodies are main-interpreter objects; "
