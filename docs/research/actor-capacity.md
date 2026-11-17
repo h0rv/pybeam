@@ -156,6 +156,57 @@ The JSON rows ran on 3.14 only.
 - **Decoding and encoding the Python objects dominates the cost of moving state.** It grows with the state size on every path.
 - **At small sizes, the network adds most of the cost** on the conventional stack: 474 µs over HTTP and 131 µs through Redis, against 35–58 µs through ETS.
 
+## Pool probes
+
+These probes drive a minimal pool of worker contexts from Erlang on 3.14, the same shape the [worker design](worker-design.md) proposes.
+
+**In-flight calls.** [`pool/inflight.escript`](probes/capacity/pool/inflight.escript) starts N Erlang processes at once, each calling an empty function on one of 8 worker contexts, with no window. 10,000, 20,000, and 100,000 concurrent callers finished in 0.29, 0.57, and 5.2 s with no errors. The 8,192 cap applies to async calls from one asyncio loop, not to `py_context:call` from BEAM processes.
+
+**Growing the pool for blocked calls.** [`pool/growth.escript`](probes/capacity/pool/growth.escript) keeps 8 warm contexts, holds B of them with 200 ms `time.sleep` calls, and measures 200 sequential empty calls. A growing pool creates a context whenever none is free, up to the cap.
+
+| Pool | Blocked calls | Peak contexts | Empty call p50 / p99 / max |
+| --- | --- | --- | --- |
+| Fixed at 8 | 0 | 8 | 29 µs / 48 µs / 0.2 ms |
+| Fixed at 8 | 8 | 8 | 28 µs / 175 µs / 180 ms |
+| Fixed at 8 | 32 | 8 | 29 µs / 169 µs / 781 ms |
+| Grows to 64 | 8 | 9 | 29 µs / 96 µs / 1.5 ms |
+| Grows to 64 | 32 | 33 | 29 µs / 62 µs / 21.6 ms |
+
+In a fixed pool, a call waits behind blocked calls for up to several of their durations. Growing on demand cut that wait to the cost of creating contexts: 1.1 ms each, at under 0.1 MiB RSS. Retiring idle contexts was not measured.
+
+## State codecs and what state can hold
+
+[`state/codecs.py`](probes/capacity/state/codecs.py) decodes and re-encodes the same dict as in [moving actor state](#moving-actor-state). Each figure is the median of 200 round trips, on 3.14 and 3.14t.
+
+| Entries | `pickle` | `marshal` | `json` |
+| --- | --- | --- | --- |
+| 32 | 357 B, 4.4 / 5.4 µs | 405 B, 3.3 / 3.5 µs | 1.1 KB, 12.3 / 12.6 µs |
+| 3,300 | 38.5 KB, 0.41 / 0.46 ms | 45 KB, 0.29 / 0.31 ms | 114 KB, 0.88 / 0.99 ms |
+| 33,000 | 418 KB, 4.9 / 5.3 ms | 484 KB, 3.3 / 3.6 ms | 1.2 MB, 11.3 / 11.6 ms |
+
+| State holds | `pickle` | `marshal` | `json` |
+| --- | --- | --- | --- |
+| A dataclass instance | Works | `ValueError` | `TypeError` |
+| A lambda | `PicklingError` | `ValueError` | `TypeError` |
+| A `threading.Lock` | `TypeError` | `ValueError` | `TypeError` |
+| A socket | `TypeError` | `ValueError` | `TypeError` |
+| A generator | `TypeError` | `ValueError` | `TypeError` |
+
+`marshal` was about 30% faster than `pickle` but encodes only built-in types. Locks, sockets, lambdas, and generators cannot go into any durable copy; they can only live in pinned state.
+
+## A FastAPI request path on 3.14 and 3.14t
+
+[`web/request_path.py`](probes/capacity/web/request_path.py) calls a FastAPI 0.163.1 app in-process through ASGI. Each request is a `POST /orders` whose body Pydantic (pydantic-core 2.50.4) validates as a 50-item model, handled by a plain `def` route that returns a response model. Each thread runs its own asyncio loop and sends 2,000 requests. There is no network or server in the path. This was run once per build.
+
+| Threads | 3.14 | 3.14t |
+| --- | --- | --- |
+| 1 | 2,905 requests/s | 1,919 requests/s |
+| 2 | 2,108 requests/s | 3,519 requests/s |
+| 4 | 1,369 requests/s | 5,645 requests/s |
+| 8 | 1,241 requests/s | 10,760 requests/s |
+
+On this path, one 3.14t thread was 34% slower than one 3.14 thread. Eight 3.14t threads served 3.7 times the best 3.14 rate, and the GIL stayed disabled. On 3.14, more threads lowered throughput.
+
 ## What this measures and what it does not
 
 On this build, a PyBeam actor is not a cheap sequential process. It costs a native thread and about 50–60 KiB, and plain blocking or CPU-bound code in one actor stalls the rest on both 3.14 and 3.14t. A BEAM process costs 2.7 KB. On 3.14t, worker contexts called directly from BEAM processes ran Python in parallel on all 8 CPUs.
@@ -164,7 +215,8 @@ Not measured:
 
 - `ActorGroup(execution=ExecutionLimits(...))`. The locked erlang-python `DataActorGroup` accepts only `max_children`.
 - Memory or thread limits beyond 10,000 actors, or container cgroup limits below this VM's.
-- 3.14t speed on a web request path, and state codecs other than pickle and `json`.
+- A web request path through a real server and network, and codecs outside the standard library.
+- Retiring idle pool contexts.
 - The cause of the worker-context call rate limit of about 40,000 calls per second.
 
 ## Reproduce
