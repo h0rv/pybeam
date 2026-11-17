@@ -64,8 +64,6 @@ def _command(assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> li
     )
     return [
         str(assets.executable),
-        "+S",
-        "1:1",
         "+Bi",
         "-noshell",
         "-noinput",
