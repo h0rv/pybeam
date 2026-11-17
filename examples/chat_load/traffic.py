@@ -119,6 +119,10 @@ class Tally:
     jobs_rejected: int = 0
     jobs_failed: int = 0
     errors: Counter[str] = field(default_factory=Counter)
+    audience: Counter[str] = field(default_factory=Counter)
+    early: dict[str, tuple[int, bool]] = field(default_factory=dict)
+    finished: set[str] = field(default_factory=set)
+    due: int = 0
     stopped: bool = False
     settled: asyncio.Event = field(default_factory=asyncio.Event)
 
@@ -144,20 +148,47 @@ class Tally:
                 if started is None:
                     self.errors["unknown message"] += 1
                     return
+                self.due -= 1
                 self.fanout_ms.append(elapsed_ms(started))
             case JobDone(job=job, result=result):
                 pending = self.jobs.pop(job, None)
                 if pending is None:
+                    if job not in self.finished:
+                        self.early.setdefault(job, (time.perf_counter_ns(), result is None))
                     return
                 owner, started = pending
-                self.done[owner] += 1
-                self.job_ms.append(elapsed_ms(started))
-                if result is None:
-                    self.jobs_failed += 1
+                self.finish(job, owner, started, time.perf_counter_ns(), failed=result is None)
+
+    def finish(self, job: str, room: str, started: int, ended: int, *, failed: bool) -> None:
+        self.finished.add(job)
+        self.done[room] += 1
+        self.job_ms.append((ended - started) / 1e6)
+        self.jobs_failed += failed
+
+    def accept(self, job: str, room: str, started: int) -> None:
+        early = self.early.pop(job, None)
+        if early is None:
+            self.jobs[job] = room, started
+            return
+        ended, failed = early
+        self.finish(job, room, started, ended, failed=failed)
+        self.settle()
+
+    def send(self, key: tuple[str, str, int]) -> None:
+        self.sent[key] = time.perf_counter_ns()
+        self.due += self.audience[key[0]]
+
+    def unsend(self, key: tuple[str, str, int]) -> None:
+        del self.sent[key]
+        self.due -= self.audience[key[0]]
+
+    @property
+    def expected(self) -> int:
+        return sum(count * self.audience[room] for room, count in self.acked.items())
 
     @property
     def pending(self) -> int:
-        return len(self.sent) - self.acked.total() + len(self.jobs)
+        return len(self.sent) - self.acked.total() + self.due + len(self.jobs)
 
 
 @dataclass(slots=True)
@@ -184,14 +215,16 @@ async def listen(client: Client, tally: Tally) -> None:
 
 async def chat(client: Client, plan: Plan, tally: Tally, stop: float) -> None:
     text = "x" * plan.text_bytes
-    while time.monotonic() < stop:
+    while True:
         await asyncio.sleep(random.expovariate(plan.rate))
+        if time.monotonic() >= stop:
+            return
         key = (client.room, client.name, client.sent)
-        tally.sent[key] = time.perf_counter_ns()
+        tally.send(key)
         try:
             await client.socket.send(Send(id=client.sent, text=text).model_dump_json())
         except ConnectionClosed:
-            del tally.sent[key]
+            tally.unsend(key)
             tally.errors["send failed"] += 1
             return
         client.sent += 1
@@ -214,7 +247,7 @@ async def submit(http: httpx.AsyncClient, room: str, plan: Plan, tally: Tally) -
     if response.status_code != 202:
         tally.errors["job HTTP " + str(response.status_code)] += 1
         return
-    tally.jobs[JobAccepted.model_validate_json(response.content).job] = room, started
+    tally.accept(JobAccepted.model_validate_json(response.content).job, room, started)
 
 
 async def produce_jobs(
@@ -222,8 +255,10 @@ async def produce_jobs(
 ) -> int:
     submitted = 0
     async with asyncio.TaskGroup() as tasks:
-        while plan.jobs > 0 and time.monotonic() < stop:
+        while plan.jobs > 0:
             await asyncio.sleep(random.expovariate(plan.jobs))
+            if time.monotonic() >= stop:
+                break
             tasks.create_task(submit(http, rooms[submitted % len(rooms)], plan, tally))
             submitted += 1
     return submitted
@@ -297,13 +332,24 @@ async def simulate(plan: Plan, pids: Sequence[int]) -> Report:
     rooms = ["load-" + run + "-" + str(index) for index in range(plan.rooms)]
     async with httpx.AsyncClient(base_url=plan.url, timeout=30) as http:
         (await http.get("/health")).raise_for_status()
-        clients = await asyncio.gather(
+        joined = await asyncio.gather(
             *(
                 join(plan, room, "c" + str(index), tally)
                 for room in rooms
                 for index in range(plan.clients)
-            )
+            ),
+            return_exceptions=True,
         )
+        clients: list[Client] = []
+        for result in joined:
+            match result:
+                case Client():
+                    clients.append(result)
+                case Exception():
+                    tally.errors["connect " + type(result).__name__] += 1
+                case _:
+                    raise result
+        tally.audience.update(client.room for client in clients)
         done = asyncio.Event()
         try:
             async with asyncio.TaskGroup() as tasks:
@@ -342,7 +388,7 @@ async def simulate(plan: Plan, pids: Sequence[int]) -> Report:
         messages_acked=acked,
         messages_per_second=round(acked / active, 1),
         ack_ms=summarize(tally.ack_ms),
-        deliveries_expected=acked * plan.clients,
+        deliveries_expected=tally.expected,
         deliveries=len(tally.fanout_ms),
         fanout_ms=summarize(tally.fanout_ms),
         jobs_submitted=jobs.result(),

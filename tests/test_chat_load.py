@@ -21,17 +21,29 @@ def test_summarize__reports_percentiles_and_handles_small_samples() -> None:
 
 def test_tally__matches_acks_fanout_and_jobs_to_what_was_sent() -> None:
     tally = Tally()
-    tally.sent["room", "a", 0] = time.perf_counter_ns()
-    tally.jobs["job"] = "room", time.perf_counter_ns()
+    tally.audience["room"] = 2
+    tally.send(("room", "a", 0))
+    tally.accept("job", "room", time.perf_counter_ns())
     tally.receive("room", "a", Ack(id=0, count=1))
     tally.receive("room", "b", Message(sender="a", id=0, text="hi", count=1))
+    assert (tally.pending, tally.expected) == (2, 2)
+    tally.receive("room", "a", Message(sender="a", id=0, text="hi", count=1))
     tally.receive("room", "b", Message(sender="a", id=9, text="hi", count=2))
     tally.receive("room", "b", JobDone(job="job", result=None))
     tally.receive("room", "a", JobDone(job="job", result=None))
     assert tally.acked["room"] == 1
-    assert len(tally.fanout_ms) == 1
+    assert len(tally.fanout_ms) == 2
+    assert tally.early == {}
     assert (tally.done["room"], tally.jobs_failed, tally.pending) == (1, 1, 0)
     assert tally.errors == {"unknown message": 1}
+
+
+def test_tally__counts_a_job_that_finishes_before_its_submission_returns() -> None:
+    tally = Tally()
+    started = time.perf_counter_ns()
+    tally.receive("room", "a", JobDone(job="job", result=7))
+    tally.accept("job", "room", started)
+    assert (tally.done["room"], tally.jobs_failed, tally.pending, len(tally.job_ms)) == (1, 0, 0, 1)
 
 
 def test_usage__counts_this_process() -> None:
@@ -76,3 +88,17 @@ async def test_hub__shares_one_subscription_and_closes_slow_listeners() -> None:
                 await slow.get()
         await asyncio.sleep(0)
     assert (feed.opened, feed.closed, hub.rooms) == (1, 1, {})
+
+
+async def test_hub__a_failed_subscription_closes_only_its_room() -> None:
+    @asynccontextmanager
+    async def broken(topic: str) -> AsyncGenerator[AsyncIterable[bytes]]:
+        raise ConnectionError(topic)
+        yield Feed().read()
+
+    async with asyncio.TaskGroup() as tasks:
+        hub = Hub(broken, tasks)
+        async with hub.join("room") as listener:
+            with pytest.raises(asyncio.QueueShutDown):
+                await listener.get()
+    assert hub.rooms == {}
