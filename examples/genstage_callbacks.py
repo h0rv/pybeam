@@ -64,12 +64,8 @@ def process(payload: bytes) -> bytes:
     if len(payload) > PAYLOAD_LIMIT:
         raise ValueError("callback payload exceeds 1024 bytes")
     work = Json(Work).decode(payload)
-    result = (
-        Json(type(asyncio.run(execute(work))))
-        .encode(asyncio.run(execute(work)))
-        .decode()
-        .encode("utf-8")
-    )
+    outcome = asyncio.run(execute(work))
+    result = Json(type(outcome)).encode(outcome)
     if len(result) > PAYLOAD_LIMIT:
         raise ValueError("callback result exceeds 1024 bytes")
     return result

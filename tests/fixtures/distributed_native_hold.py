@@ -47,7 +47,7 @@ def held_demonstration(
             finally:
                 durable_write(
                     guardian.directory / "inner-cleanup.json",
-                    Json(type(InnerCleanup(cleanup=self.cleanup, shutdowns=tuple(self.shutdowns))))
+                    Json(InnerCleanup)
                     .encode(InnerCleanup(cleanup=self.cleanup, shutdowns=tuple(self.shutdowns)))
                     .decode(),
                 )

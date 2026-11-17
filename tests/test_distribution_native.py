@@ -109,13 +109,13 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
     bad = tmp_path / "bad.py"
     bad.write_text(
         "import os, psutil\nfrom pathlib import Path\n"
-        "from pybeam.runtime.ownership import identity, Registry\n"
+        "from pybeam.runtime.ownership import Identity, identity, Registry\n"
         "directory = Path(os.environ['PYBEAM_OWNER_DIRECTORY'])\n"
         "registry = Json(Registry).decode((directory / 'ownership.json').read_text())\n"
         "assert identity(os.getpid()) in registry.owned\n"
         + "Path("
         + repr(str(marker))
-        + ").write_text(Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode())\n"
+        + ").write_text(Json(Identity).encode(identity(os.getpid())).decode())\n"
         + "raise RuntimeError('finite controlled entry failure')\n"
     )
     idle = tmp_path / "idle.py"
@@ -156,7 +156,7 @@ def test_distribution__registration_failure_seals_user_execution(tmp_path: Path)
         "-c",
         "from pathlib import Path; Path(" + repr(str(marker)) + ").touch()",
     ]
-    owner = Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode()
+    owner = Json(Identity).encode(identity(os.getpid())).decode()
     result = subprocess.run(
         command,
         env=dict(

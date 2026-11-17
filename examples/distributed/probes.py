@@ -12,11 +12,7 @@ async def controls(directory: Path, incarnation: str) -> None:
     if unknown.status != "unknown_operation":
         raise RuntimeError("Unknown operation accepted")
     # Unsent reservations expire, but accepted body credits cannot expire.
-    payload = (
-        Json(type(JobRequest(value=7, delay_ms=1000)))
-        .encode(JobRequest(value=7, delay_ms=1000))
-        .decode()
-    )
+    payload = Json(JobRequest).encode(JobRequest(value=7, delay_ms=1000)).decode()
     first = await remote("b", reservation(incarnation, "unsent-one", payload))
     second = await remote("b", reservation(incarnation, "unsent-two", payload))
     full = await remote("b", reservation(incarnation, "unsent-full", payload))

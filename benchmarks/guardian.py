@@ -228,9 +228,7 @@ def supervise(directory: Path, parent: Identity, control: Control | None = None)
                         target.cpu_affinity(cpus[:1])
                     reply = directory / "spawn.reply.pending"
                     reply.write_text(
-                        Json(type(SpawnReply(identity=child_identity)))
-                        .encode(SpawnReply(identity=child_identity))
-                        .decode()
+                        Json(SpawnReply).encode(SpawnReply(identity=child_identity)).decode()
                     )
                     os.replace(reply, directory / "spawn.reply.json")
                     request_path.unlink()

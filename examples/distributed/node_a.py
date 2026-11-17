@@ -8,7 +8,7 @@ from examples.distributed.probes import controls
 from pybeam import run
 from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, Reply, Request, local, remote, reservation
-from pybeam.runtime.ownership import durable_write, identity
+from pybeam.runtime.ownership import Identity, durable_write, identity
 
 
 async def sample(directory: Path, stage: str) -> None:
@@ -31,11 +31,7 @@ async def sample(directory: Path, stage: str) -> None:
         or ack.receipt.node != own.identity.node
     ):
         raise RuntimeError("B did not receive the reverse OTP acknowledgment")
-    payload = (
-        Json(type(JobRequest(value=21, delay_ms=100)))
-        .encode(JobRequest(value=21, delay_ms=100))
-        .decode()
-    )
+    payload = Json(JobRequest).encode(JobRequest(value=21, delay_ms=100)).decode()
     reserved = await remote("b", reservation(peer.identity.incarnation, stage, payload))
     if reserved.status != "ok" or reserved.token is None:
         raise RuntimeError("Recipient reservation failed")
@@ -123,7 +119,7 @@ async def main() -> None:
     directory = Path(os.environ["PYBEAM_CLUSTER_DIRECTORY"])
     durable_write(
         directory / "a.birth.json",
-        Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+        Json(Identity).encode(identity(os.getpid())).decode(),
     )
     async with asyncio.timeout(10):
         while True:
@@ -145,11 +141,7 @@ async def main() -> None:
         durable_write(directory / "a.state.json", Json(type(state)).encode(state).decode())
         if (directory / "start-inflight").exists():
             (directory / "start-inflight").unlink()
-            payload = (
-                Json(type(JobRequest(value=99, delay_ms=2000)))
-                .encode(JobRequest(value=99, delay_ms=2000))
-                .decode()
-            )
+            payload = Json(JobRequest).encode(JobRequest(value=99, delay_ms=2000)).decode()
             claim = await remote("b", reservation(old_incarnation, "interrupted", payload))
             if claim.status != "ok" or claim.token is None:
                 raise RuntimeError("In-flight control reservation failed")

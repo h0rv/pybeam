@@ -7,7 +7,7 @@ from examples.distributed.jobs import JobRequest, JobResult, serve
 from pybeam import run
 from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local, remote, reservation
-from pybeam.runtime.ownership import durable_write, identity
+from pybeam.runtime.ownership import Identity, durable_write, identity
 from pybeam.tasks import TaskFunction, TaskLimits, TaskSupervisor
 
 
@@ -52,11 +52,7 @@ async def binding_controls(directory: Path) -> None:
     assert state.identity is not None
     inc = state.identity.incarnation
     await local(Request(op="register", definition="double"))
-    payload = (
-        Json(type(JobRequest(value=21, delay_ms=1000)))
-        .encode(JobRequest(value=21, delay_ms=1000))
-        .decode()
-    )
+    payload = Json(JobRequest).encode(JobRequest(value=21, delay_ms=1000)).decode()
     reserved = await local(reservation(inc, "scope-control", payload))
     assert reserved.token is not None
     token = reserved.token
@@ -119,18 +115,14 @@ async def sender(directory: Path) -> None:
     own = await local(Request(op="snapshot"))
     assert peer.identity is not None and own.identity is not None
     inc = peer.identity.incarnation
-    payload = (
-        Json(type(JobRequest(value=21, delay_ms=1000)))
-        .encode(JobRequest(value=21, delay_ms=1000))
-        .decode()
-    )
+    payload = Json(JobRequest).encode(JobRequest(value=21, delay_ms=1000)).decode()
     reserved = await remote("b", reservation(inc, "single", payload))
     assert reserved.status == "ok" and reserved.token is not None
     token = reserved.token
     submit = Request(op="submit", incarnation=inc, token=token, payload=payload)
 
     async def send(_: int) -> str:
-        return Json(type(await remote("b", submit))).encode(await remote("b", submit)).decode()
+        return Json(Reply).encode(await remote("b", submit)).decode()
 
     spec = TaskFunction(send, Json(int), Json(str))
     async with asyncio.TaskGroup() as barrier:
@@ -185,7 +177,7 @@ async def main() -> None:
     alias = os.environ["PYBEAM_NODE_ALIAS"]
     durable_write(
         directory / (alias + ".birth.json"),
-        Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+        Json(Identity).encode(identity(os.getpid())).decode(),
     )
     if alias == "b":
         await binding_controls(directory)

@@ -140,12 +140,10 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     owned = {owner, ack.guardian, *ack.cleanup.owned}
     (tmp_path / "managed-cleanup.json").write_text(Json(type(ack)).encode(ack).decode())
     (tmp_path / "managed-startup-census.json").write_text(
-        Json(type(sample_census(owner))).encode(sample_census(owner)).decode()
+        Json(ManagedStartupCensus).encode(sample_census(owner)).decode()
     )
     (tmp_path / "ownership.json").write_text(
-        Json(type(Registry(phase="confirmed", owned=tuple(owned))))
-        .encode(Registry(phase="confirmed", owned=tuple(owned)))
-        .decode()
+        Json(Registry).encode(Registry(phase="confirmed", owned=tuple(owned))).decode()
     )
     assert read_exit(tmp_path, owner, owned, 0) == AcknowledgedExit(ack)
     assert isinstance(read_exit(tmp_path, ack.guardian, owned, 0), UnacknowledgedExit)
@@ -158,7 +156,7 @@ def test_managed_stop__ack_binds_owner_guardian_launchers_and_clean_vm_ack(tmp_p
     ):
         with pytest.raises(ValueError):
             Json(ManagedCleanupAck).decode(
-                Json(type(replace(ack, **update))).encode(replace(ack, **update)).decode()
+                Json(ManagedCleanupAck).encode(replace(ack, **update)).decode()
             )
     outcome = Outcome(
         status="cancelled",

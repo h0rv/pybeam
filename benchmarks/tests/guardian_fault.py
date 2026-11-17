@@ -25,13 +25,11 @@ def main() -> None:
         if phase == "spawning" and len(owned) == (0 if mode == "adapter_start" else 1):
             durable_write(
                 directory / "startup-guardian.json",
-                Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+                Json(Identity).encode(identity(os.getpid())).decode(),
             )
             durable_write(
                 directory / "startup-owned.json",
-                Json(type(Registry(phase=phase, owned=tuple(owned))))
-                .encode(Registry(phase=phase, owned=tuple(owned)))
-                .decode(),
+                Json(Registry).encode(Registry(phase=phase, owned=tuple(owned))).decode(),
             )
             time.sleep(30)
 

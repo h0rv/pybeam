@@ -25,7 +25,7 @@ def controlled_proof() -> DemoProof:
             worker="<0.99.0>",
             worker_kind="temporary_otp_task",
             worker_dead=True,
-            result=Json(type(JobResult(value=42, side_effect_count=1, python_version="3.14.10")))
+            result=Json(JobResult)
             .encode(JobResult(value=42, side_effect_count=1, python_version="3.14.10"))
             .decode(),
             token=private_data,

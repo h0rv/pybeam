@@ -9,7 +9,7 @@ from pybeam.codec import Json
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import Distribution, PythonNode
 from pybeam.runtime.guardian import GuardianEndpoint
-from pybeam.runtime.ownership import Registry, durable_write, identity
+from pybeam.runtime.ownership import Identity, Registry, durable_write, identity
 
 
 def node() -> None:
@@ -45,7 +45,7 @@ def adapter(directory: Path) -> None:
     cluster = LocalCluster(distribution, guardian=endpoint)
     durable_write(
         directory / "adapter.birth.json",
-        Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode(),
+        Json(Identity).encode(identity(os.getpid())).decode(),
     )
     with cluster:
         guard = cluster._guardian_identity
@@ -54,7 +54,7 @@ def adapter(directory: Path) -> None:
         durable_write(directory / "inner.birth.json", Json(type(guard)).encode(guard).decode())
         durable_write(
             directory / "nested.json",
-            Json(type(Registry(phase="tracking", owned=tuple(cluster.identities))))
+            Json(Registry)
             .encode(Registry(phase="tracking", owned=tuple(cluster.identities)))
             .decode(),
         )

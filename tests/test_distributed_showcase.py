@@ -112,9 +112,8 @@ def test_proof__requires_fresh_births_and_confirmed_cleanup() -> None:
 
 
 def test_runner__walkthrough_is_not_measurement(tmp_path: Path) -> None:
-    (tmp_path / "adapter.json").write_text(
-        Json(type(controlled_walkthrough())).encode(controlled_walkthrough()).decode()
-    )
+    walkthrough = controlled_walkthrough()
+    (tmp_path / "adapter.json").write_text(Json(type(walkthrough)).encode(walkthrough).decode())
     outcome = Outcome(
         status="walkthrough",
         reason=None,

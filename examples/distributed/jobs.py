@@ -7,7 +7,7 @@ from typing import Literal
 
 from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local
-from pybeam.runtime.ownership import identity
+from pybeam.runtime.ownership import Identity, identity
 from pybeam.tasks import TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 
 
@@ -73,7 +73,7 @@ async def serve() -> None:
             raise RuntimeError("Recipient definition registration failed")
         (directory / "b.identity.json").write_text(Json(type(handler)).encode(handler).decode())
         (directory / "b.birth.json").write_text(
-            Json(type(identity(os.getpid()))).encode(identity(os.getpid())).decode()
+            Json(Identity).encode(identity(os.getpid())).decode()
         )
         async with asyncio.TaskGroup() as observers:
 
@@ -113,7 +113,8 @@ async def serve() -> None:
                         raise RuntimeError("Cannot prove request-owned local Task PID")
                     active[token] = ref
                     try:
-                        result = Json(type(await ref)).encode(await ref).decode()
+                        value = await ref
+                        result = Json(type(value)).encode(value).decode()
                     except asyncio.CancelledError:
                         current = asyncio.current_task()
                         if current is None or current.cancelling():
