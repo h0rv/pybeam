@@ -24,3 +24,14 @@ test("development checkout follows the runtime entry in the lock", () => {
     rmSync(directory, { recursive: true });
   }
 });
+
+test("the documented checkout resolves the configured runtime revision", () => {
+  const markdown = readFileSync(join(repositoryRoot, "docs/development.md"), "utf8");
+  const assignment = markdown.match(/^runtime_ref=\$\(.+\)$/m)?.[0];
+  assert.ok(assignment);
+  const config = readFileSync(join(repositoryRoot, "rebar.config"), "utf8");
+  const revision = config.match(/\{ref, "([a-f0-9]{40})"\}/)?.[1];
+  assert.ok(revision);
+  assert.equal(execFileSync("sh", ["-ec", `${assignment}\nprintf '%s' "$runtime_ref"`],
+    { cwd: repositoryRoot, encoding: "utf8" }), revision);
+});
