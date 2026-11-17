@@ -1,10 +1,10 @@
 # Debug a running app from another terminal
 
-A running PyBeam app can already show every Python stack and asyncio task to a second terminal, through BEAM distribution and without root. With an erlang-python change, stock `pdb -p` and the Python 3.15 sampling profiler attach too. A spiked `pybeam debug` command hides the BEAM steps from Python users.
+A running PyBEAM app can already show every Python stack and asyncio task to a second terminal, through BEAM distribution and without root. With an erlang-python change, stock `pdb -p` and the Python 3.15 sampling profiler attach too. A spiked `pybeam debug` command hides the BEAM steps from Python users.
 
 ## Evidence boundary
 
-Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBeam `90c9aaa`, and erlang-python `c007eb5` (the runtime pinned for this experiment). The app was a single `@pybeam.actor` called from three `asyncio.TaskGroup` workers; after 20 calls the actor method spins in `while True: pass`. Only worker mode was tested. Own-GIL and isolated contexts were not tested. `ptrace_scope` was `1`.
+Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBEAM `90c9aaa`, and erlang-python `c007eb5` (the runtime pinned for this experiment). The app was a single `@pybeam.actor` called from three `asyncio.TaskGroup` workers; after 20 calls the actor method spins in `while True: pass`. Only worker mode was tested. Own-GIL and isolated contexts were not tested. `ptrace_scope` was `1`.
 
 These stacks predate the node-wide actor worker pool in erlang-python `0f833ae`. Current bounded actors lease workers and run bodies on worker-local loops. The context ownership and interrupt observations below are historical, not a verification of pooled actor interruption.
 
@@ -66,7 +66,7 @@ The output named the spinning frame (`main.py`, `place`) and the waiting workers
 
 ### Stock Python debuggers
 
-CPython's remote debuggers attach to the interpreter's main thread. Only `Py_RunMain` records that thread, so in an embedded interpreter `pdb -p` first failed with "Can't find the main thread". erlang-python now records the thread that runs a context's event loop while the loop runs ([erlang-python#9](https://github.com/h0rv/erlang-python/pull/9)). In PyBeam that thread runs the entry loop and, in worker mode, actor methods.
+CPython's remote debuggers attach to the interpreter's main thread. Only `Py_RunMain` records that thread, so in an embedded interpreter `pdb -p` first failed with "Can't find the main thread". erlang-python now records the thread that runs a context's event loop while the loop runs ([erlang-python#9](https://github.com/h0rv/erlang-python/pull/9)). In PyBEAM that thread runs the entry loop and, in worker mode, actor methods.
 
 With that change, these commands attach to the PID that `pybeam ps` prints:
 
@@ -80,7 +80,7 @@ sudo python -m profiling.sampling dump PID         # 3.15+: one stack dump
 - They need `ptrace` rights: `sudo`, or `kernel.yama.ptrace_scope` set to 0.
 - On the probe app, `pdb -p` stopped in the spinning `Orders.place` frame and `p self.seen` returned its state. `sys.remote_exec` ran on the loop thread and listed every task. The 3.15 profiler took 1000 samples per second with no errors. Without the erlang-python change, the profiler got no samples and `pdb -p` could not attach.
 - While `pdb` is stopped, the loop does not run. Every task on that loop, including actor methods that run on it, waits until you continue.
-- PyBeam pins CPython 3.14.10, so the 3.15 run used a local 3.15.2 build of the runtime. Own-GIL and isolated contexts are not marked. These tools reach only the main interpreter.
+- PyBEAM pins CPython 3.14.10, so the 3.15 run used a local 3.15.2 build of the runtime. Own-GIL and isolated contexts are not marked. These tools reach only the main interpreter.
 
 ### Why interrupt missed the actor
 

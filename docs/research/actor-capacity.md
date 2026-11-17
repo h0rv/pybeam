@@ -1,6 +1,6 @@
 # Actor capacity: plain sync code versus async
 
-How many actors fit in one PyBeam process, what each costs, what happens when an actor method runs blocking code, and how each Python execution mode behaves under the same load. All numbers are measured; nothing here is a production limit.
+How many actors fit in one PyBEAM process, what each costs, what happens when an actor method runs blocking code, and how each Python execution mode behaves under the same load. All numbers are measured; nothing here is a production limit.
 
 ## Setup
 
@@ -35,7 +35,7 @@ For comparison, plain Python on the same machine:
 
 | 10,000 of | RSS added | OS threads | Start time |
 | --- | --- | --- | --- |
-| PyBeam actors | ~584 MiB | 10,000 | ~24 s |
+| PyBEAM actors | ~584 MiB | 10,000 | ~24 s |
 | `threading.Thread` blocked on an `Event` | 206 MiB | 10,000 | 1.2 s |
 | `asyncio` tasks blocked on an `Event` | 8.5 MiB | 0 | 0.03 s |
 
@@ -103,7 +103,7 @@ Shared-loop tasks serialize like actors. Dedicated-loop tasks overlap blocking c
 | Isolated | 61–132 ms | 21.3–22.3 / 25.7–26.8 MiB | 52–401 µs | Other 3 survive; replacement in 64–134 ms |
 
 - **On 3.14t, worker contexts run Python on all 8 CPUs.** Eight CPU jobs took as long as one, and 64 took 8 rounds. On 3.14 they serialize.
-- **The actor slowdown comes from the shared loop, not the GIL.** The same worker contexts that parallelize here serialize when PyBeam actors dispatch through one asyncio loop.
+- **The actor slowdown comes from the shared loop, not the GIL.** The same worker contexts that parallelize here serialize when PyBEAM actors dispatch through one asyncio loop.
 - **This integer loop ran at the same speed on 3.14 and 3.14t** (0.33–0.34 s alone). That says nothing about a web request path, which was not measured.
 - **Blocking calls overlap in every mode on both builds**, because each context has its own thread.
 
@@ -209,7 +209,7 @@ On this path, one 3.14t thread was 34% slower than one 3.14 thread. Eight 3.14t 
 
 ## What this measures and what it does not
 
-On this build, a PyBeam actor is not a cheap sequential process. It costs a native thread and about 50–60 KiB, and plain blocking or CPU-bound code in one actor stalls the rest on both 3.14 and 3.14t. A BEAM process costs 2.7 KB. On 3.14t, worker contexts called directly from BEAM processes ran Python in parallel on all 8 CPUs.
+On this build, a PyBEAM actor is not a cheap sequential process. It costs a native thread and about 50–60 KiB, and plain blocking or CPU-bound code in one actor stalls the rest on both 3.14 and 3.14t. A BEAM process costs 2.7 KB. On 3.14t, worker contexts called directly from BEAM processes ran Python in parallel on all 8 CPUs.
 
 Not measured:
 
@@ -232,7 +232,7 @@ PROBE_PORT=38999 mise exec -- uv run --locked python docs/research/probes/capaci
 
 Run the last command from a directory whose `pyproject.toml` sets `development_runtime`.
 
-The PyBeam probe prints one row per spawn checkpoint and one `RESULT` JSON line, and takes about a minute.
+The PyBEAM probe prints one row per spawn checkpoint and one `RESULT` JSON line, and takes about a minute.
 
 The mode grid and the state probe take the erlang-python application directory, for example `_build/default/lib/erlang_python`. `py_nif.so` there must be built for the Python you are measuring:
 

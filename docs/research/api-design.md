@@ -38,7 +38,7 @@ The probes compare these proposed call sites.
 
 `ActorRef[T].call` uses `Callable[Concatenate[T, P], Awaitable[R]]`, with `**P` as a ParamSpec. Both checkers preserve the receiver, positional arguments, keyword arguments, and awaited result in the tested signature. Both reject a bound method where an unbound method is required.
 
-The runtime binding must own serialization and reply validation. PyBeam should call that typed interface, not add a transport or decode envelopes.
+The runtime binding must own serialization and reply validation. PyBEAM should call that typed interface, not add a transport or decode envelopes.
 
 Neither checker proves that a compatible function is an actor member. The positive probe deliberately passes a free function. Likewise, structural compatibility with `CounterRef` does not prove remote identity. Explicit wrappers cost repeated declarations, but make ownership and transport visible without fabricated proxy typing.
 

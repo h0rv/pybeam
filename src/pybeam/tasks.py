@@ -84,7 +84,7 @@ class TaskFunction[Q, R]:
     Owngil and isolated require a plain top-level async byte function. Owngil
     entry modules must avoid incompatible native extensions.
     The caller encodes requests and decodes results; entries receive and return
-    bytes, not Q/R objects. Nested PyBeam supervisors are not supported inside
+    bytes, not Q/R objects. Nested PyBEAM supervisors are not supported inside
     named entries. Cancellation is cooperative and CPU/native-blocked entry
     loops delay it.
     """

@@ -324,7 +324,7 @@ async def perform(run: Run) -> None:
 
 
 templates = Jinja2Templates(directory=HERE)
-app = FastAPI(title="PyBeam execution modes")
+app = FastAPI(title="PyBEAM execution modes")
 app.mount("/static", StaticFiles(directory=ROOT / "examples/static"), name="static")
 app.mount("/lab", StaticFiles(directory=HERE / "static"), name="lab")
 

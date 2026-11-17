@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PyBeam | Where your Python runs</title>
+  <title>PyBEAM | Where your Python runs</title>
   <link rel="stylesheet" href="/lab/lab.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
 <main>
   <h1>Where your Python actually runs</h1>
-  <p class="muted">One CPU-bound function, run live on this machine the way Python does it today and in each PyBeam execution mode. You choose the mode; each one buys something and costs something.</p>
+  <p class="muted">One CPU-bound function, run live on this machine the way Python does it today and in each PyBEAM execution mode. You choose the mode; each one buys something and costs something.</p>
 
   <h2>One call, end to end</h2>
   <ol class="path">
@@ -32,7 +32,7 @@
       <tr><td>separate nodes</td><td>another BEAM VM, here or on another machine</td><td>scale past one box; whole-VM failure isolation</td><td>a VM's start time and memory per node; network latency; you run more machines</td></tr>
     </tbody>
   </table></div>
-  <p class="muted">Free-threaded or not is the interpreter you install (CPython 3.14 vs 3.14t), not a PyBeam option. The <code>ExecutionMode</code> setting from <a href="https://github.com/h0rv/pybeam/pull/16">pybeam#16</a>: tasks accept <code>WORKER</code> today, <code>OWNGIL</code> and <code>ISOLATED</code> raise <code>CapabilityUnavailable</code> until erlang-python accepts a per-task mode. This lab drives erlang-python contexts directly so every mode can be measured now.</p>
+  <p class="muted">Free-threaded or not is the interpreter you install (CPython 3.14 vs 3.14t), not a PyBEAM option. The <code>ExecutionMode</code> setting from <a href="https://github.com/h0rv/pybeam/pull/16">pybeam#16</a>: tasks accept <code>WORKER</code> today, <code>OWNGIL</code> and <code>ISOLATED</code> raise <code>CapabilityUnavailable</code> until erlang-python accepts a per-task mode. This lab drives erlang-python contexts directly so every mode can be measured now.</p>
 
   <h2>Run it</h2>
   <form class="controls" hx-post="/runs" hx-target="#run" hx-swap="outerHTML">
@@ -59,7 +59,7 @@
   <ul>
     <li>Everything runs on one shared {{ cores }}-core VM. "Separate nodes" are extra BEAM VMs on the same host, so they show the start and memory cost of a node, not a network.</li>
     <li>The prefork pool is <code>ProcessPoolExecutor</code>, the model behind Celery's default worker, without a broker. When one of its workers dies the whole pool is marked broken.</li>
-    <li>Supervision restarts code, not work: PyBeam jobs are not persisted, so a job running in a crashed worker is lost unless your app retries it.</li>
+    <li>Supervision restarts code, not work: PyBEAM jobs are not persisted, so a job running in a crashed worker is lost unless your app retries it.</li>
     <li>asyncio is just as cheap as BEAM processes for waiting callers. What it cannot do is run CPU work in parallel, preempt a coroutine that never yields, or survive a crash in one of them.</li>
   </ul>
 </main>

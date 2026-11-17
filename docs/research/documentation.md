@@ -19,7 +19,7 @@ Open `http://127.0.0.1:8642/` in two browser sessions. Change the counter and ex
 
 ## Runtime model
 
-Show who owns each resource before teaching abstractions. erlang-python owns execution and environments. Hornbeam owns current shared services and ASGI. PyBeam owns typed handles and framework lifecycle integration. A Python object is not a BEAM process. Worker contexts share imported modules. ETS state is volatile and node-local. Owner restart does not restore state, and embedded native failure can terminate the VM.
+Show who owns each resource before teaching abstractions. erlang-python owns execution and environments. Hornbeam owns current shared services and ASGI. PyBEAM owns typed handles and framework lifecycle integration. A Python object is not a BEAM process. Worker contexts share imported modules. ETS state is volatile and node-local. Owner restart does not restore state, and embedded native failure can terminate the VM.
 
 ## Primitives
 

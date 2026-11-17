@@ -35,10 +35,10 @@ The watchdog settings were 15 seconds per repeat, 512 MiB of observed workload-t
 | Backend | Status | Comparable measurements |
 | --- | --- | --- |
 | Python asyncio smoke | Three correctness repeats passed | The local raw evidence above, with uncontrolled diagnostics only. |
-| Actual PyBeam native actors | Not run | None. Native ownership and loaded build evidence still need validation. Finite actor admission remains unsupported. |
+| Actual PyBEAM native actors | Not run | None. Native ownership and loaded build evidence still need validation. Finite actor admission remains unsupported. |
 | Native Erlang or Elixir | Not run | None. An independent adapter is still needed. |
 
-There is no evidence here that PyBeam, Python, Erlang, or Elixir is faster. Other workload families and execution modes have not been measured. No native crash probe, two-node test, long run, integration pipeline, or canonical MVP runtime gate was run in this experiment.
+There is no evidence here that PyBEAM, Python, Erlang, or Elixir is faster. Other workload families and execution modes have not been measured. No native crash probe, two-node test, long run, integration pipeline, or canonical MVP runtime gate was run in this experiment.
 
 ## Checks
 

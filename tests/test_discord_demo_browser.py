@@ -102,7 +102,7 @@ async def miniapp(
     assert "Application shutdown complete" in text, text
     assert "Application shutdown failed" not in text, text
     assert "Traceback" not in text or "Slow SSE peer exceeded" in text, text
-    assert "PyBeam cleanup failed" not in text, text
+    assert "PyBEAM cleanup failed" not in text, text
     assert "cleanup was not acknowledged" not in text, text
 
 

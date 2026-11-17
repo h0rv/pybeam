@@ -6,9 +6,9 @@ Historical research note: own-GIL subinterpreter mode is unsupported because com
 
 Bring BEAM capabilities to Python developers through familiar Python/asyncio APIs and framework integrations. Ordinary use should not require learning Erlang, Elixir, or BEAM operations. Hide integration plumbing, not ownership, overload, cancellation, restart, or durability guarantees. This is not a proposal for another Python scheduler, web framework, ORM, task queue, or workflow engine.
 
-Target modern Python 3.14+ and evaluate newer releases, including 3.15+, when runtime and dependency contracts permit. Free-threaded Python became an officially supported CPython build in 3.14.[C1] Its availability is not proof that every PyBeam primitive supports it. Conversely, today's conventional-GIL baseline is not a permanent limit on the architecture.
+Target modern Python 3.14+ and evaluate newer releases, including 3.15+, when runtime and dependency contracts permit. Free-threaded Python became an officially supported CPython build in 3.14.[C1] Its availability is not proof that every PyBEAM primitive supports it. Conversely, today's conventional-GIL baseline is not a permanent limit on the architecture.
 
-The task and raw-context observations below refer to [PyBeam d5bdc9e][P0] and [erlang-python d227c0d][R0]; the builder reference includes the subsequent free-threaded opt-in. Bounded data actors now use the node-wide pool in pinned erlang-python `f893508`. Recheck these constraints when the dependency or build changes. Source inspection is not native-runtime certification. See [measured execution modes](execution-modes.md) for the development-build matrix, task probes and remaining integration failures. Alternative backends are not shipped per-actor/task configuration switches.
+The task and raw-context observations below refer to [PyBEAM d5bdc9e][P0] and [erlang-python d227c0d][R0]; the builder reference includes the subsequent free-threaded opt-in. Bounded data actors now use the node-wide pool in pinned erlang-python `f893508`. Recheck these constraints when the dependency or build changes. Source inspection is not native-runtime certification. See [measured execution modes](execution-modes.md) for the development-build matrix, task probes and remaining integration failures. Alternative backends are not shipped per-actor/task configuration switches.
 
 ## Separate the boundaries
 
@@ -23,7 +23,7 @@ The task and raw-context observations below refer to [PyBeam d5bdc9e][P0] and [e
 | BEAM node | One VM/OS process with its local Python execution resources | Replicated state, persisted work, or a separate host |
 | Durable backing store | Persists intent/state according to its storage and recovery contract | Automatic rollback or exactly-once external effects |
 
-In this document, **runtime** means the managed BEAM VM plus the Python execution contexts and event-loop drivers integrated by erlang-python. Use the specific boundary when discussing a guarantee. erlang-python owns execution, contexts, embedding and interpreter safety; Hornbeam owns web/ASGI and its service implementations; PyBeam owns typed Python-facing ergonomics and lifecycle integration.
+In this document, **runtime** means the managed BEAM VM plus the Python execution contexts and event-loop drivers integrated by erlang-python. Use the specific boundary when discussing a guarantee. erlang-python owns execution, contexts, embedding and interpreter safety; Hornbeam owns web/ASGI and its service implementations; PyBEAM owns typed Python-facing ergonomics and lifecycle integration.
 
 ## BEAM-backed asyncio is local
 
@@ -71,7 +71,7 @@ Data actors now follow **many logical actors → per-actor admission → finite 
 | Conventional CPython workers | One Python bytecode lane under the main interpreter's shared GIL; I/O and native libraries that release it can overlap | Shared module/native state; CPU-bound Python threads do not execute bytecode in parallel there | Conventional CPython 3.14.10 remains the builder default and packaged-wheel ABI; `workers` is limited to one. The launcher leaves the BEAM scheduler count at its runtime default, independently of the Python GIL.[P2][P3][P4] |
 | Free-threaded CPython | Multiple actual threads can execute Python in parallel in one interpreter | Shared-state synchronization, extension compatibility, memory and single-thread overhead; one loop still runs one coroutine step at a time | Builder accepts CPython 3.14.10t with `PYBEAM_ALLOW_FREE_THREADED=1`. Dedicated-loop task CPU parallelism was measured; shared-loop tasks do not parallelize. Packaged wheels remain conventional and full integration acceptance is incomplete.[P2][R9] |
 | Own-GIL subinterpreters | Separate interpreter state and GIL per lane, with one pthread per context; parallel execution across lanes | Interpreter/import overhead, extension compatibility and data transfer; shared address space/native-crash fate | Fork constructs `PyInterpreterConfig_OWN_GIL`; retained in code but unsupported because common native extensions reject subinterpreters. Actor object references require the main interpreter.[R10][R11][R12] |
-| Isolated Python processes | Independent process/interpreter execution; stronger containment of a Python/native child crash | Startup, memory, framing/serialization and IPC; not automatically a sandbox | Fork's `isolated` context runs a Python child through a port and Unix socket. This is not a PyBeam actor-backend switch.[R13] |
+| Isolated Python processes | Independent process/interpreter execution; stronger containment of a Python/native child crash | Startup, memory, framing/serialization and IPC; not automatically a sandbox | Fork's `isolated` context runs a Python child through a port and Unix socket. This is not a PyBEAM actor-backend switch.[R13] |
 | Multiple BEAM nodes | Independent VMs/OS processes with local Python execution resources; can combine with execution strategies above | Placement, deployment, data transfer and partial failure; local nodes share host-failure risk | Experimental `LocalCluster` owns exactly two trusted local VMs, not a general cluster/deployment product.[P5] |
 
 Free-threading and interpreter isolation are different choices; do not assume their benefits stack. Follow CPython's [free-threading][C2] and [multiple-interpreter][C3] contracts and verify the exact dependencies.
@@ -99,7 +99,7 @@ A free-threaded build may still enable the GIL through configuration or an unsup
 
 BEAM mailboxes, Python tasks, in-memory queues and state are ephemeral on VM/node loss. The fork's shared-state implementation uses ETS: supervisor ownership can preserve a table across some worker crashes, not loss of the VM.[R17] More nodes, pub/sub, a cache, or supervision alone do not create a durable-work contract.
 
-Separate responsibility does not necessarily mean a separate service. Durable local storage may satisfy process-restart recovery; surviving host loss requires storage and recovery that cover that failure domain. Choose the guarantee before choosing an adapter. Reuse established implementations; storage policy belongs to applications, not a new PyBeam queue/workflow engine.
+Separate responsibility does not necessarily mean a separate service. Durable local storage may satisfy process-restart recovery; surviving host loss requires storage and recovery that cover that failure domain. Choose the guarantee before choosing an adapter. Reuse established implementations; storage policy belongs to applications, not a new PyBEAM queue/workflow engine.
 
 For production work, specify:
 

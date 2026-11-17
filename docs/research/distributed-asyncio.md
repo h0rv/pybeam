@@ -8,13 +8,13 @@ asyncio's programming model can extend across a cluster, but its loop cannot. A 
 
 1. **A cluster task group.** Start a named `async def` on any node, await its result, and cancel it, with `asyncio.TaskGroup` failure semantics. The task's state lives in memory, and a node crash fails it.
 2. **A durable queue.** `put()` returns only after the store has synced the item to disk. A consumer leases the item and acknowledges it when done. If the consumer's node dies, the lease expires and another consumer retries the item. Delivery is at least once.
-3. **Durable execution** (Temporal-style replay of a coroutine's steps). This is out of scope. It needs deterministic replay and versioned code, so it would turn PyBeam into a workflow engine.
+3. **Durable execution** (Temporal-style replay of a coroutine's steps). This is out of scope. It needs deterministic replay and versioned code, so it would turn PyBEAM into a workflow engine.
 
 Recommend built-in Mnesia as the default store, starting with one node. Log syncing stays on by default: a per-node group-commit process batches writers, calls `mnesia:sync_log()`, then replies. A write returns only after every active replica has synced. Both synced variants retained acknowledged jobs and states in the crash probes below; unsynced Mnesia regressed states.
 
 Keep one Python API, with the storage backend hidden behind it. Khepri/Ra is a later backend for deployments that need consensus and partition safety on three or more nodes. Oban remains an option for applications that already use Postgres.
 
-None of this is implemented. PyBeam makes no durability claim today.
+None of this is implemented. PyBEAM makes no durability claim today.
 
 ## What asyncio is missing
 
@@ -31,7 +31,7 @@ Celery, RQ, Dramatiq and Temporal cover the last two rows with a separate broker
 
 ## Current boundaries
 
-These constraints come from the [execution model](execution-model.md), the [measured execution modes](execution-modes.md) and the source at PyBeam `57c256e` and erlang-python `7658e2f`:
+These constraints come from the [execution model](execution-model.md), the [measured execution modes](execution-modes.md) and the source at PyBEAM `57c256e` and erlang-python `7658e2f`:
 
 - `ErlangEventLoop` is a local asyncio loop. Its tasks do not become OTP processes and cannot migrate.
 - `TaskSupervisor` starts each task as a temporary OTP child of a local `py_task_group` (`src/py_task_group.erl`). Failure does not cancel siblings, and nothing restarts.
@@ -75,7 +75,7 @@ async def main(images: list[bytes]) -> list[bytes]:
 
 - erlang-python: start a named entry through `py_task_group` on a remote node through `erpc`, and monitor the remote task across nodes. OTP monitors already report `noconnection` when a node goes down.
 - erlang-python: named entries in worker mode. They are accepted only for owngil today.
-- PyBeam: a typed `TaskGroup` over those calls, where `create_task` reads the function's `__module__` and `__name__` and rejects nested functions and lambdas.
+- PyBEAM: a typed `TaskGroup` over those calls, where `create_task` reads the function's `__module__` and `__name__` and rejects nested functions and lambdas.
 
 OTP `pg` groups and `erpc` cover placement and transport, so a distributed registry such as Horde or Swarm is not needed.
 
@@ -125,7 +125,7 @@ With the proposed default store, `put()` returns after the transaction and a log
 | Mnesia `disc_copies`, with group-commit log sync | None; ships with OTP | Synchronous replication, no consensus | Recommended default, single-node first. Retained acknowledged states in the tested single and symmetric non-majority configurations |
 | [Khepri](https://github.com/rabbitmq/khepri) on [Ra](https://github.com/rabbitmq/ra) | None; embedded in each node | Raft, majority commit, fsync'd WAL | Later backend for 3+ node consensus and partition safety. RabbitMQ's metadata store; Apache-2.0/MPL-2.0. Lost nothing in these probes |
 | [Oban](https://github.com/oban-bg/oban) (Elixir) | Postgres | Postgres | Mature queue with retries, uniqueness, cron. Requires Postgres and an Elixir build in the runtime |
-| [oban](https://pypi.org/project/oban/) 0.8.0 (Python) | Postgres | Postgres | Requires psycopg, psycopg-pool, orjson, click and uvloop (uvloop is used only by its CLI), which conflicts with a standard-library-only PyBeam. Not run on `ErlangEventLoop` |
+| [oban](https://pypi.org/project/oban/) 0.8.0 (Python) | Postgres | Postgres | Requires psycopg, psycopg-pool, orjson, click and uvloop (uvloop is used only by its CLI), which conflicts with a standard-library-only PyBEAM. Not run on `ErlangEventLoop` |
 | [procrastinate](https://pypi.org/project/procrastinate/) | Postgres | Postgres | Same dependency conflict |
 | DETS or `disk_log` | None | None | Single node only; no replication |
 | Horde, `pg`, `global` | None | Memory only | Placement and discovery, not durability |
@@ -194,9 +194,9 @@ Environment: Erlang/OTP 29.1.2 (ERTS 17.1.1), Mnesia 4.27.1, Khepri 0.19.3, Ra 3
 
 ## Ownership and open decisions
 
-[AGENTS.md](../../AGENTS.md) keeps queue and workflow engines outside PyBeam's ownership. Mnesia supplies the proposed default storage, not leases, retry policy, fencing, or dead-letter handling. The prototype must settle ownership of those semantics and test lease expiry, uniqueness, and uncertain outcomes before making a product durability claim.
+[AGENTS.md](../../AGENTS.md) keeps queue and workflow engines outside PyBEAM's ownership. Mnesia supplies the proposed default storage, not leases, retry policy, fencing, or dead-letter handling. The prototype must settle ownership of those semantics and test lease expiry, uniqueness, and uncertain outcomes before making a product durability claim.
 
-Recommend one Python API over a single-node Mnesia store with batched syncing enabled by default. Keep backend selection in deployment configuration. Add Khepri/Ra later for three-or-more-node consensus and partition safety, and leave Oban as an optional integration for Postgres users. None of these queue APIs or store bindings is implemented in PyBeam today.
+Recommend one Python API over a single-node Mnesia store with batched syncing enabled by default. Keep backend selection in deployment configuration. Add Khepri/Ra later for three-or-more-node consensus and partition safety, and leave Oban as an optional integration for Postgres users. None of these queue APIs or store bindings is implemented in PyBEAM today.
 
 ## Reproduce
 
