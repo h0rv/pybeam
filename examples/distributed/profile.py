@@ -30,7 +30,7 @@ class PreparedProfile:
     runtime_files: dict[str, str]
     origin_receipt_sha256: str
     compiler_jobs: Literal[0]
-    budget: Budget
+    budget: dict[str, object]
     stop_policy: ManagedStop
 
 
@@ -51,7 +51,10 @@ def verify_prepared() -> None:
     if digest(PROFILE) != PROFILE_SHA256:
         raise ValueError("Prepared distribution profile pin differs")
     profile = Json(PreparedProfile).decode(PROFILE.read_bytes())
-    if profile.budget != walkthrough_budget() or profile.stop_policy != walkthrough_stop():
+    if (
+        Budget.model_validate(profile.budget) != walkthrough_budget()
+        or profile.stop_policy != walkthrough_stop()
+    ):
         raise ValueError("Prepared walkthrough resource policy differs")
     native = profile.native_source
     git = shutil.which("git")
