@@ -3,6 +3,7 @@ import asyncio
 import http.client
 import json
 import os
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +22,13 @@ PORT = int(os.environ.get("PROBE_PORT", "0"))
 def status() -> tuple[int, int]:
     fields = dict(line.split(":", 1) for line in Path("/proc/self/status").read_text().splitlines())
     return int(fields["VmRSS"].split()[0]), int(fields["Threads"])
+
+
+def spin(count: int) -> int:
+    total = 0
+    for value in range(count):
+        total += value * value
+    return total
 
 
 def fetch() -> int:
@@ -54,6 +62,12 @@ class Worker:
     async def offload(self, seconds: float) -> float:
         await asyncio.to_thread(time.sleep, seconds)
         return seconds
+
+    async def cpu(self, count: int) -> int:
+        return spin(count)
+
+    async def cpu_to_thread(self, count: int) -> int:
+        return await asyncio.to_thread(spin, count)
 
     async def fetch_serial(self, count: int) -> int:
         return sum(fetch() for _ in range(count))
@@ -134,6 +148,15 @@ async def main() -> None:
             start = time.perf_counter()
             await asyncio.gather(*(a.offload(0.05) for a in actors[:n]))
             io["to_thread_50ms_x" + str(n)] = round(time.perf_counter() - start, 3)
+        work = int(os.environ.get("PROBE_SPIN", "2000000"))
+        start = time.perf_counter()
+        spin(work)
+        io["cpu_one_inline"] = round(time.perf_counter() - start, 3)
+        for name in ("cpu", "cpu_to_thread"):
+            for n in (1, 8):
+                start = time.perf_counter()
+                await asyncio.gather(*(getattr(a, name)(work) for a in actors[:n]))
+                io[name + "_x" + str(n)] = round(time.perf_counter() - start, 3)
         start = time.perf_counter()
         await asyncio.gather(actors[0].block(0.3), actors[1].wait(0.01))
         io["wait_10ms_beside_block_300ms"] = round(time.perf_counter() - start, 3)
@@ -165,6 +188,7 @@ async def main() -> None:
                 key = ("dedicated" if dedicated else "shared") + "_block_50ms_x" + str(n)
                 tasks[key] = round(time.perf_counter() - start, 3)
     results["tasks_s"] = tasks
+    results["python"] = sys.version.split()[0] + ("" if sys._is_gil_enabled() else "t")
     print("RESULT " + json.dumps(results), flush=True)
 
 
