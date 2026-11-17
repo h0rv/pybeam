@@ -1,13 +1,13 @@
 import hashlib
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
-
 from benchmarks.contract import Budget
 from examples.distributed.policy import walkthrough_budget, walkthrough_stop
+from pybeam.codec import Json
 from pybeam.runtime.assets import packaged_assets
 from pybeam.runtime.guardian import ManagedStop
 from pybeam.runtime.optional_manifest import contained, verify_manifest
@@ -17,9 +17,8 @@ PROFILE = ROOT / "build/distribution-ready-profile.json"
 PROFILE_SHA256 = "e39fba2a6ec71f862c22aaaabee7b77c45cddf727591c7560386bdd2a144276b"
 
 
-class PreparedProfile(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PreparedProfile:
     sdk_base: Literal["0766a38b4b2523e439ce5de3e755932de2cc36de"]
     native_head: Literal["d227c0de29fa3f748610352bf8a808a235bcd5c3"]
     native_c_tree: Literal["5af0fa2d8286302d153a386947587802e7ff0465"]
@@ -31,7 +30,7 @@ class PreparedProfile(BaseModel):
     runtime_files: dict[str, str]
     origin_receipt_sha256: str
     compiler_jobs: Literal[0]
-    budget: Budget
+    budget: dict[str, object]
     stop_policy: ManagedStop
 
 
@@ -51,8 +50,11 @@ def verify_files(root: Path, files: dict[str, str]) -> None:
 def verify_prepared() -> None:
     if digest(PROFILE) != PROFILE_SHA256:
         raise ValueError("Prepared distribution profile pin differs")
-    profile = PreparedProfile.model_validate_json(PROFILE.read_bytes())
-    if profile.budget != walkthrough_budget() or profile.stop_policy != walkthrough_stop():
+    profile = Json(PreparedProfile).decode(PROFILE.read_bytes())
+    if (
+        Budget.model_validate(profile.budget) != walkthrough_budget()
+        or profile.stop_policy != walkthrough_stop()
+    ):
         raise ValueError("Prepared walkthrough resource policy differs")
     native = profile.native_source
     git = shutil.which("git")

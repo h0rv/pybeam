@@ -1,22 +1,23 @@
 import statistics
-from typing import Annotated
-
-from pydantic import BaseModel, ConfigDict, Field
+from dataclasses import dataclass
 
 import pybeam
-
-type Sample = Annotated[float, Field(ge=-1e100, le=1e100)]
-
-
-class Batch(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid", allow_inf_nan=False)
-
-    values: Annotated[tuple[Sample, ...], Field(min_length=1, max_length=512)]
+from pybeam.codec import Json
 
 
-class Summary(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid", allow_inf_nan=False)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Batch:
+    values: tuple[float, ...]
 
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.values) <= 512:
+            raise ValueError("values must have 1 to 512 samples")
+        if any(not -1e100 <= value <= 1e100 for value in self.values):
+            raise ValueError("values must be between -1e100 and 1e100")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Summary:
     count: int
     mean: float
     deviation: float
@@ -46,11 +47,11 @@ async def analyze(payload: str | bytes) -> str:
     encoded = payload.encode("utf-8") if isinstance(payload, str) else payload
     if len(encoded) > 65_536:
         raise ValueError("Batch JSON exceeds 65536 bytes")
-    batch = Batch.model_validate_json(encoded)
+    batch = Json(Batch).decode(encoded)
     async with pybeam.ActorGroup(max_children=1, max_pending=4, max_bytes=65_536) as group:
         analyzer = await group.spawn(Analyzer)
         result = await analyzer.summarize(batch)
-    return result.model_dump_json()
+    return Json(type(result)).encode(result).decode()
 
 
 async def main() -> None:

@@ -1,10 +1,11 @@
 -module(store_mnesia).
--export([start/1, setup/1, put/2, get/1, change/3, leader/0]).
+-export([start/1, setup/1, setup/2, put/2, get/1, change/3, leader/0]).
 start(Dir) ->
     application:set_env(mnesia, dir, Dir),
     mnesia:create_schema([node()]),
     ok = application:start(mnesia), ok.
-setup([First | Rest] = Nodes) ->
+setup(Nodes) -> setup(Nodes, true).
+setup([First | Rest] = Nodes, Majority) ->
     [begin
          stopped = rpc:call(N, mnesia, stop, []),
          ok = rpc:call(N, mnesia, delete_schema, [[N]]),
@@ -13,7 +14,7 @@ setup([First | Rest] = Nodes) ->
          {atomic, ok} = rpc:call(First, mnesia, change_table_copy_type, [schema, N, disc_copies])
      end || N <- Rest],
     {atomic, ok} = rpc:call(First, mnesia, create_table,
-                          [jobs, [{attributes, [id, value]}, {disc_copies, Nodes}, {majority, true}]]),
+                          [jobs, [{attributes, [id, value]}, {disc_copies, Nodes}, {majority, Majority}]]),
     [ok = rpc:call(N, mnesia, wait_for_tables, [[jobs], 30000]) || N <- Nodes], ok.
 put(Id, Job) -> {atomic, ok} = mnesia:sync_transaction(fun() -> mnesia:write({jobs, Id, Job}) end), ok.
 get(Id) -> case mnesia:dirty_read(jobs, Id) of [{jobs, Id, J}] -> {ok, J}; [] -> missing end.

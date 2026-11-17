@@ -1,19 +1,16 @@
 import re
-from typing import Annotated, Literal, Self
-
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from dataclasses import dataclass
+from typing import Literal
 
 from examples.distributed.jobs import JobResult
+from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, Reply
 from pybeam.runtime.cluster import NodeExit
 from pybeam.runtime.ownership import Identity, Registry
 
 
-class StrictModel(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-
-class DemoProof(StrictModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DemoProof:
     epmd: Identity
     vm_a: Identity
     vm_b: Identity
@@ -45,30 +42,39 @@ def safe_handler(value: HandlerIdentity) -> HandlerIdentity:
     return value
 
 
-type SafeHandler = Annotated[HandlerIdentity, AfterValidator(safe_handler)]
-type TaskPID = Annotated[str, Field(pattern=r"^<[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}>$")]
+def task_pid(value: str) -> str:
+    if re.fullmatch(r"<[0-9]{1,10}\.[0-9]{1,10}\.[0-9]{1,10}>", value) is None:
+        raise ValueError("Task PID is outside the local walkthrough format")
+    return value
 
 
-class NodeObserved(StrictModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NodeObserved:
     kind: Literal["node"] = "node"
     alias: Literal["a", "b"]
     birth: Identity
-    handler: SafeHandler
+    handler: HandlerIdentity
     status: Literal["observed", "fresh"]
 
+    def __post_init__(self) -> None:
+        safe_handler(self.handler)
 
-class ExchangeObserved(StrictModel):
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExchangeObserved:
     kind: Literal["exchange"] = "exchange"
-    sender: SafeHandler
-    recipient: SafeHandler
-    receipt: SafeHandler
-    reverse_ack: SafeHandler
-    worker: TaskPID
+    sender: HandlerIdentity
+    recipient: HandlerIdentity
+    receipt: HandlerIdentity
+    reverse_ack: HandlerIdentity
+    worker: str
     worker_dead: Literal[True]
     result: JobResult
 
-    @model_validator(mode="after")
-    def identities_agree(self) -> Self:
+    def __post_init__(self) -> None:
+        for handler in (self.sender, self.recipient, self.receipt, self.reverse_ack):
+            safe_handler(handler)
+        task_pid(self.worker)
         if self.receipt.message_id is None or self.reverse_ack.message_id is None:
             raise ValueError("Missing handler-derived message identity")
         if (self.receipt.node, self.receipt.pid, self.receipt.incarnation) != (
@@ -87,7 +93,6 @@ class ExchangeObserved(StrictModel):
             value=42, side_effect_count=1, python_version="3.14.10"
         ):
             raise ValueError("Result is not an independently completed temporary Task")
-        return self
 
 
 def exchange(reply: Reply) -> ExchangeObserved:
@@ -113,36 +118,43 @@ def exchange(reply: Reply) -> ExchangeObserved:
         reverse_ack=ack.receipt,
         worker=reply.worker,
         worker_dead=True,
-        result=JobResult.model_validate_json(reply.result),
+        result=Json(JobResult).decode(reply.result),
     )
 
 
-class StateObserved(StrictModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StateObserved:
     kind: Literal["state"] = "state"
     state: Literal["task_pending", "nodedown_uncertain", "fresh_empty", "stale_ack_rejected"]
-    handler: SafeHandler | None = None
-    worker: TaskPID | None = None
+    handler: HandlerIdentity | None = None
+    worker: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.handler is not None:
+            safe_handler(self.handler)
+        if self.worker is not None:
+            task_pid(self.worker)
 
 
-class CleanupObserved(StrictModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CleanupObserved:
     kind: Literal["cleanup"] = "cleanup"
     state: Literal["confirmed", "uncertain"]
     owned: tuple[Identity, ...]
 
 
-type Observation = Annotated[
-    NodeObserved | ExchangeObserved | StateObserved | CleanupObserved,
-    Field(discriminator="kind"),
-]
-OBSERVATION = TypeAdapter(Observation)
+type Observation = NodeObserved | ExchangeObserved | StateObserved | CleanupObserved
+OBSERVATION = Json(Observation)
 
 
-class WalkthroughProof(StrictModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class WalkthroughProof:
     kind: Literal["walkthrough"] = "walkthrough"
-    observations: Annotated[tuple[Observation, ...], Field(min_length=1, max_length=16)]
+    observations: tuple[Observation, ...]
 
-    @model_validator(mode="after")
-    def complete(self) -> Self:
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.observations) <= 16:
+            raise ValueError("Walkthrough must have 1 to 16 observations")
         births = tuple(item for item in self.observations if isinstance(item, NodeObserved))
         exchanges = tuple(item for item in self.observations if isinstance(item, ExchangeObserved))
         states = tuple(item.state for item in self.observations if isinstance(item, StateObserved))
@@ -165,7 +177,6 @@ class WalkthroughProof(StrictModel):
             or exchanges[1].recipient != births[2].handler
         ):
             raise ValueError("Exchange recipient differs from observed node incarnation")
-        return self
 
 
 def sanitized(proof: DemoProof) -> WalkthroughProof:

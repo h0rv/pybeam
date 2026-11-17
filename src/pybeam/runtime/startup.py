@@ -1,76 +1,87 @@
-from typing import Annotated, Literal, Self, assert_never
+from dataclasses import dataclass
+from typing import Literal, assert_never
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from pybeam.codec import Json
 from pybeam.runtime.ownership import Identity, Registry
 
 
-class StartupRecord(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-
-class ServiceEntry(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ServiceEntry:
     kind: Literal["service"] = "service"
 
 
-class LauncherEntry(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class LauncherEntry:
     kind: Literal["launcher"] = "launcher"
     alias: str
 
 
-class VmEntry(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class VmEntry:
     kind: Literal["vm"] = "vm"
     alias: str
     launcher: Identity
 
 
-type SpawnEntry = Annotated[ServiceEntry | LauncherEntry, Field(discriminator="kind")]
-type RegisteredEntry = Annotated[ServiceEntry | VmEntry, Field(discriminator="kind")]
+type SpawnEntry = ServiceEntry | LauncherEntry
+type RegisteredEntry = ServiceEntry | VmEntry
 
 
-class StartupPlan(StartupRecord):
-    aliases: Annotated[tuple[str, ...], Field(min_length=1, max_length=2)]
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StartupPlan:
+    aliases: tuple[str, ...]
 
-    @model_validator(mode="after")
-    def distinct(self) -> Self:
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.aliases) <= 2:
+            raise ValueError("Startup plan needs one or two aliases")
         if len(set(self.aliases)) != len(self.aliases):
             raise ValueError("Startup plan has duplicate aliases")
-        return self
 
 
-class PendingLauncher(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PendingLauncher:
     kind: Literal["pending"] = "pending"
     alias: str
     launcher: Identity
 
 
-class RegisteredLauncher(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RegisteredLauncher:
     kind: Literal["registered"] = "registered"
     alias: str
     launcher: Identity
     vm: Identity
 
 
-type LauncherBirth = Annotated[PendingLauncher | RegisteredLauncher, Field(discriminator="kind")]
+type LauncherBirth = PendingLauncher | RegisteredLauncher
 
 
-class NoVmStarted(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NoVmStarted:
     kind: Literal["not_started"] = "not_started"
 
 
-class PartialStartup(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PartialStartup:
     kind: Literal["partial"] = "partial"
-    launches: Annotated[tuple[LauncherBirth, ...], Field(min_length=1)]
+    launches: tuple[LauncherBirth, ...]
+
+    def __post_init__(self) -> None:
+        if not self.launches:
+            raise ValueError("Partial startup needs a launch")
 
 
-class CompleteStartup(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CompleteStartup:
     kind: Literal["complete"] = "complete"
-    launches: Annotated[tuple[RegisteredLauncher, ...], Field(min_length=1)]
+    launches: tuple[RegisteredLauncher, ...]
+
+    def __post_init__(self) -> None:
+        if not self.launches:
+            raise ValueError("Complete startup needs a launch")
 
 
-type StartupProgress = Annotated[
-    NoVmStarted | PartialStartup | CompleteStartup, Field(discriminator="kind")
-]
+type StartupProgress = NoVmStarted | PartialStartup | CompleteStartup
 
 
 def progress(plan: StartupPlan, launches: tuple[LauncherBirth, ...]) -> StartupProgress:
@@ -84,13 +95,14 @@ def progress(plan: StartupPlan, launches: tuple[LauncherBirth, ...]) -> StartupP
     return PartialStartup(launches=launches)
 
 
-class ManagedStartupCensus(StartupRecord):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ManagedStartupCensus:
     owner: Identity
     guardian: Identity
     plan: StartupPlan
     startup: StartupProgress
     registry: Registry
-    forced_cleanup_count: Annotated[int, Field(ge=0)]
+    forced_cleanup_count: int
 
     @property
     def launches(self) -> tuple[LauncherBirth, ...]:
@@ -102,8 +114,9 @@ class ManagedStartupCensus(StartupRecord):
             case other:
                 assert_never(other)
 
-    @model_validator(mode="after")
-    def observed_births(self) -> Self:
+    def __post_init__(self) -> None:
+        if self.forced_cleanup_count < 0:
+            raise ValueError("forced_cleanup_count must not be negative")
         launches = self.launches
         if progress(self.plan, launches) != self.startup:
             raise ValueError("Startup state disagrees with independently observed launches")
@@ -119,4 +132,7 @@ class ManagedStartupCensus(StartupRecord):
             self.registry.owned
         ):
             raise ValueError("Startup census mixes owner, guardian and child births")
-        return self
+
+
+STARTUP_PLAN = Json(StartupPlan)
+CENSUS = Json(ManagedStartupCensus)

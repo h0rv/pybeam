@@ -1,10 +1,11 @@
 from collections.abc import Callable
+from dataclasses import FrozenInstanceError
 
 import pytest
-from pydantic import ValidationError
 
 import pybeam
 from pybeam.actors import ExecutionLimits, groups
+from pybeam.codec import Json
 
 
 def construct_group(
@@ -44,9 +45,9 @@ def test_actor_group_limits__reject_invalid_values_before_native_allocation(
 
     monkeypatch.setattr(groups, "open_group", open_group)
     # Exercise the runtime object boundary without weakening the public signature.
-    with pytest.raises(ValidationError) as raised:
+    with pytest.raises(ValueError) as raised:
         construct_group(pybeam.ActorGroup, {limit: invalid})
-    assert raised.value.errors()[0]["loc"] == (limit,)
+    assert limit in str(raised.value)
     assert allocations == []
 
 
@@ -66,16 +67,18 @@ def test_actor_group_limits__preserve_defaults_and_positive_integer_kwargs() -> 
 def test_execution_limits__reject_invalid_values(limit: str, invalid: object) -> None:
     options: dict[str, object] = {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
     options[limit] = invalid
-    with pytest.raises(ValidationError) as raised:
-        ExecutionLimits.model_validate(options)
-    assert raised.value.errors()[0]["loc"] == (limit,)
+    with pytest.raises(ValueError) as raised:
+        Json(ExecutionLimits).load(options)
+    assert limit in str(raised.value)
 
 
 def test_execution_limits__immutable_strict_value_and_public_exports() -> None:
     limits = pybeam.ExecutionLimits(workers=4, capacity=32, max_bytes=1_048_576)
     assert type(limits) is ExecutionLimits
-    assert limits.model_dump() == {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
-    with pytest.raises(ValidationError, match="frozen"):
+    assert Json(type(limits)).dump(limits) == {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
+    with pytest.raises(FrozenInstanceError):
         limits.__setattr__("workers", 8)
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        ExecutionLimits.model_validate({**limits.model_dump(), "unexpected": 1})
+    with pytest.raises(ValueError, match="unexpected fields"):
+        Json(ExecutionLimits).load(
+            {"workers": 4, "capacity": 32, "max_bytes": 1_048_576, "unexpected": 1}
+        )

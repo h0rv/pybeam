@@ -12,6 +12,7 @@ from zipfile import ZipFile
 
 import pytest
 
+from pybeam.codec import Json
 from pybeam.runtime.config import BootstrapError
 from pybeam.runtime.optional import OptionalManifest, read_manifest
 from tests.readiness import ProcessOutput, wait_ready
@@ -131,8 +132,8 @@ def test_installed_genstage_without_developer_environment(
         return
     with ZipFile(wheel) as archive:
         manifest_path = "pybeam/runtime/_assets/optional/genstage/manifest.json"
-        manifest = OptionalManifest.model_validate_json(archive.read(manifest_path))
-        approved = OptionalManifest.model_validate_json(
+        manifest = Json(OptionalManifest).decode(archive.read(manifest_path))
+        approved = Json(OptionalManifest).decode(
             archive.read("pybeam/runtime/optional_specs/genstage.json")
         )
         assert manifest == approved
