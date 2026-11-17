@@ -1,17 +1,17 @@
 # genstage_transform.py
+from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pybeam.codec import Json
 
 
-class Work(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Work:
     id: int
     action: Literal["ok"]
     text: str
 
 
 def uppercase(payload: bytes) -> bytes:
-    work = Work.model_validate_json(payload)
+    work = Json(Work).decode(payload)
     return work.text.upper().encode("utf-8")

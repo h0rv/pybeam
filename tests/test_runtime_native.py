@@ -2,33 +2,34 @@ import asyncio
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from uuid import uuid4
 
 import httpx
 import pytest
-from pydantic import BaseModel, ConfigDict
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as async_connect
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect
 
+from pybeam.codec import Json
 from tests.conftest import RunningServer
 
 pytestmark = pytest.mark.runtime
 
 
-class CounterReply(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CounterReply:
     count: int
 
 
-class TickReply(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TickReply:
     ticks: int
 
 
-class OutputReply(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OutputReply:
     active: int
     completed: int
     disconnected: int
@@ -38,7 +39,7 @@ class OutputReply(BaseModel):
 def read_output_state(client: httpx.Client, timeout: float = 1) -> OutputReply:
     response = client.get("/output-state", timeout=timeout)
     response.raise_for_status()
-    return OutputReply.model_validate_json(response.content)
+    return Json(OutputReply).decode(response.content)
 
 
 def test_native__nonreading_output_peer_closes_and_releases_subscription(
@@ -49,10 +50,10 @@ def test_native__nonreading_output_peer_closes_and_releases_subscription(
         assert before.active == 0
         response = http.get("/subscriptions")
         response.raise_for_status()
-        baseline = CounterReply.model_validate_json(response.content).count
+        baseline = Json(CounterReply).decode(response.content).count
         response = http.get("/ticks")
         response.raise_for_status()
-        ticks_before = TickReply.model_validate_json(response.content).ticks
+        ticks_before = Json(TickReply).decode(response.content).ticks
         url = "ws://127.0.0.1:{}/slow-output".format(service_server.port)
         with connect(
             url,
@@ -74,10 +75,10 @@ def test_native__nonreading_output_peer_closes_and_releases_subscription(
             assert state.sent > before.sent
             response = http.get("/subscriptions")
             response.raise_for_status()
-            assert CounterReply.model_validate_json(response.content).count == baseline
+            assert Json(CounterReply).decode(response.content).count == baseline
             response = http.get("/ticks")
             response.raise_for_status()
-            assert TickReply.model_validate_json(response.content).ticks > ticks_before
+            assert Json(TickReply).decode(response.content).ticks > ticks_before
 
             deadline = time.monotonic() + 5
             with pytest.raises(ConnectionClosed):
@@ -91,21 +92,21 @@ def test_native__nonreading_output_peer_closes_and_releases_subscription(
 
 def test_native__lifespan_worker_continues_after_startup(service_server: RunningServer) -> None:
     first = httpx.get(service_server.base_url + "/ticks")
-    before = TickReply.model_validate_json(first.content).ticks
+    before = Json(TickReply).decode(first.content).ticks
     time.sleep(0.1)
     second = httpx.get(service_server.base_url + "/ticks")
-    assert TickReply.model_validate_json(second.content).ticks > before
+    assert Json(TickReply).decode(second.content).ticks > before
 
 
 def test_native__counter_updates_are_atomic(service_server: RunningServer) -> None:
-    before = CounterReply.model_validate_json(
-        httpx.get(service_server.base_url + "/counter").content
-    ).count
+    before = (
+        Json(CounterReply).decode(httpx.get(service_server.base_url + "/counter").content).count
+    )
 
     def increment(_index: int) -> int:
         response = httpx.post(service_server.base_url + "/counter", timeout=10)
         response.raise_for_status()
-        return CounterReply.model_validate_json(response.content).count
+        return Json(CounterReply).decode(response.content).count
 
     updates = 32
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -142,7 +143,7 @@ async def subscription_count(server: RunningServer) -> int:
     async with httpx.AsyncClient(timeout=5) as client:
         response = await client.get(server.base_url + "/subscriptions")
         response.raise_for_status()
-        return CounterReply.model_validate_json(response.content).count
+        return Json(CounterReply).decode(response.content).count
 
 
 async def wait_subscription_count(server: RunningServer, expected: int) -> None:
@@ -155,7 +156,7 @@ async def receive_until(connection: ClientConnection, target: int) -> list[int]:
     counts: list[int] = []
     async with asyncio.timeout(10):
         while not counts or counts[-1] < target:
-            reply = CounterReply.model_validate_json(await connection.recv())
+            reply = Json(CounterReply).decode(await connection.recv())
             counts.append(reply.count)
     assert counts == sorted(counts)
     return counts
@@ -167,8 +168,8 @@ async def test_native__two_websocket_clients_share_state_and_pubsub(
     await wait_subscription_count(service_server, 0)
     url = "ws://127.0.0.1:{}/shared".format(service_server.port)
     async with async_connect(url) as first, async_connect(url) as second:
-        initial = CounterReply.model_validate_json(await first.recv()).count
-        assert CounterReply.model_validate_json(await second.recv()).count == initial
+        initial = Json(CounterReply).decode(await first.recv()).count
+        assert Json(CounterReply).decode(await second.recv()).count == initial
         await wait_subscription_count(service_server, 2)
         updates_per_client = 20
         target = initial + updates_per_client * 2
@@ -189,10 +190,10 @@ async def test_native__two_websocket_clients_share_state_and_pubsub(
             await first.wait_closed()
         await wait_subscription_count(service_server, 1)
         await second.send(json.dumps({"action": "snapshot"}))
-        assert CounterReply.model_validate_json(await second.recv()).count == target
+        assert Json(CounterReply).decode(await second.recv()).count == target
     await wait_subscription_count(service_server, 0)
     async with async_connect(url) as reconnected:
-        assert CounterReply.model_validate_json(await reconnected.recv()).count == target
+        assert Json(CounterReply).decode(await reconnected.recv()).count == target
     await wait_subscription_count(service_server, 0)
 
 
@@ -202,7 +203,7 @@ async def test_native__slow_subscriber_overflows_without_retaining_runtime_owner
     await wait_subscription_count(service_server, 0)
     url = "ws://127.0.0.1:{}/shared?slow=1".format(service_server.port)
     async with async_connect(url) as slow:
-        CounterReply.model_validate_json(await slow.recv())
+        Json(CounterReply).decode(await slow.recv())
         await wait_subscription_count(service_server, 1)
         async with httpx.AsyncClient(timeout=10) as client:
             for _ in range(96):

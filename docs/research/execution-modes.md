@@ -18,7 +18,7 @@ Costs are single-trial raw-context measurements below, not task guarantees. PR #
 
 ### Owngil byte-entry contract
 
-Define a plain module-level `async def entry(payload: bytes) -> bytes`; no decorator or `erlang` import is needed. Keep that module independent of PyBeam and Pydantic, including its transitive imports. Import the function inside your managed async main, then pass it to `TaskFunction(entry, TypeAdapter(Request), TypeAdapter(Reply), execution=ExecutionMode.OWNGIL)`. Modules beside the user's entry script are available to new contexts. Nested functions, lambdas, synchronous functions, bound methods and callable objects are rejected.
+Define a plain module-level `async def entry(payload: bytes) -> bytes`; no decorator or `erlang` import is needed. Keep that module independent of PyBeam and incompatible extensions such as pydantic_core, including its transitive imports. Import the function inside your managed async main, then pass it to `TaskFunction(entry, Json(Request), Json(Reply), execution=ExecutionMode.OWNGIL)`. Modules beside the user's entry script are available to new contexts. Nested functions, lambdas, synchronous functions, bound methods and callable objects are rejected.
 
 The caller validates and encodes the request to JSON bytes; the entry receives those bytes and must return JSON bytes. The caller validates and decodes the result. An empty string or byte value is valid encoded JSON; a zero-length result is not valid JSON and raises caller-side `ValidationError`. Worker callables still receive and return typed Python values; selecting owngil changes that contract to JSON bytes.
 

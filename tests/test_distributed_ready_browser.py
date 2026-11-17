@@ -13,6 +13,7 @@ from playwright.sync_api import APIResponse, Route, expect, sync_playwright
 from examples.distributed.models import WalkthroughProof
 from examples.distributed.profile import verify_prepared
 from examples.showcase.catalog import ROOT
+from pybeam.codec import Json
 from pybeam.runtime.ownership import resolve
 from tests.fixtures.distributed_native_server import Audit
 
@@ -107,7 +108,7 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     with httpx.Client(base_url=BASE) as client:
                         download = client.get("/artifact/" + key.removeprefix("job-"))
                     assert download.status_code == 200
-                    proof = WalkthroughProof.model_validate_json(download.content)
+                    proof = Json(WalkthroughProof).decode(download.content)
                     (tmp_path / "download.json").write_bytes(download.content)
                     for forbidden in ("cookie", "token", "payload", "directory", str(ROOT)):
                         assert forbidden not in download.text

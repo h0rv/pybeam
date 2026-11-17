@@ -2,13 +2,13 @@ import asyncio
 import hashlib
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
-
 import pybeam
 from pybeam.actors import ActorGroup, context_counts
+from pybeam.codec import Json
 
 
 @pybeam.actor
@@ -20,9 +20,8 @@ class Counter:
         return self.value
 
 
-class RuntimeProof(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RuntimeProof:
     genstage: Literal["1.3.2"]
     elixir: Literal["1.20.0"]
     otp: Literal["29.1.2"]
@@ -31,9 +30,8 @@ class RuntimeProof(BaseModel):
     module_md5: str
 
 
-class OwnershipProof(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OwnershipProof:
     before: Literal[1]
     after: Literal[1]
     idle: Literal[16]
@@ -74,10 +72,10 @@ async def main() -> None:
     from pybeam.integrations.genstage.pipeline import stream
 
     async with stream(16, process) as events:
-        results = [Outcome.model_validate_json(event) async for event in events]
+        results = [Json(Outcome).decode(event) async for event in events]
     assert [item.id for item in results] == list(range(16))
     assert all(item.detail == "HÉLLO" for item in results)
-    proof = RuntimeProof.model_validate(await erlang.async_call("pybeam_genstage", b"runtime"))
+    proof = Json(RuntimeProof).load(await erlang.async_call("pybeam_genstage", b"runtime"))
     module = Path(proof.module)
     assert module.is_relative_to(root)
     declared = next(item for item in manifest.files if item.path == module.relative_to(root))
@@ -122,17 +120,17 @@ async def main() -> None:
                 assert not demand.done()
             finally:
                 assert await erlang.async_call("genstage_coexist_release") == "ok"
-            assert Outcome.model_validate_json(await demand).id == 0
+            assert Json(Outcome).decode(await demand).id == 0
     assert (await context_counts()).live == baseline.live
     print("CURRENT_CORE_COEXISTENCE Counter/Room controls with blocked GenStage demand drained")
-    owned = OwnershipProof.model_validate(await erlang.async_call("genstage_owned_probe"))
+    owned = Json(OwnershipProof).load(await erlang.async_call("genstage_owned_probe"))
     print(
         "INSTALLED_PROOF",
         json.dumps(
             {
-                "runtime": proof.model_dump(),
+                "runtime": Json(type(proof)).dump(proof),
                 "sha256": declared.sha256,
-                "ownership": owned.model_dump(),
+                "ownership": Json(type(owned)).dump(owned),
                 "package": pybeam.__file__,
             }
         ),

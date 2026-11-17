@@ -7,9 +7,9 @@ from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.websockets import WebSocketDisconnect
 
+from pybeam.codec import Json
 from pybeam.integrations.fastapi.dependencies import BeamProvider
 from pybeam.integrations.hornbeam import Services
 from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
@@ -145,8 +145,8 @@ async def events(topic: str, beam: BeamDependency) -> AsyncGenerator[ServerSentE
             yield ServerSentEvent(event="message", raw_data=b64encode(payload).decode("ascii"))
 
 
-class OutputState(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OutputState:
     active: int
     completed: int
     disconnected: int
@@ -197,14 +197,18 @@ async def idle(socket: WebSocket, beam: BeamDependency) -> None:
     await socket.close()
 
 
-class Command(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Command:
     action: Literal["increment", "snapshot", "cancel"]
-    amount: Annotated[int, Field(ge=1, le=10)] = 1
+    amount: int = 1
+
+    def __post_init__(self) -> None:
+        if type(self.amount) is not int or not 1 <= self.amount <= 10:
+            raise ValueError("amount must be an integer from 1 to 10")
 
 
-class Snapshot(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Snapshot:
     count: int
 
 
@@ -237,13 +241,13 @@ async def shared(socket: WebSocket, beam: BeamDependency) -> None:
         while True:
             state = await outbound.get()
             if state.count >= previous:
-                await socket.send_text(state.model_dump_json())
+                await socket.send_text(Json(type(state)).encode(state).decode())
                 previous = state.count
 
     async def requests() -> None:
         try:
             while True:
-                command = Command.model_validate_json(await socket.receive_text())
+                command = Json(Command).decode(await socket.receive_text())
                 match command.action:
                     case "increment":
                         await beam.incr("shared", command.amount, namespace="vertical")
@@ -252,7 +256,7 @@ async def shared(socket: WebSocket, beam: BeamDependency) -> None:
                         await outbound.put(await snapshot())
                     case "cancel":
                         raise StopConnection
-        except (WebSocketDisconnect, ValidationError) as exc:
+        except (WebSocketDisconnect, ValueError) as exc:
             raise StopConnection from exc
 
     await socket.accept()

@@ -2,12 +2,13 @@ import hashlib
 import json
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
 
 from examples.genstage_callbacks import process
+from pybeam.codec import Json
 from pybeam.integrations.genstage.pipeline import stream
 from pybeam.runtime import optional, optional_manifest
 from pybeam.runtime.config import BootstrapError
@@ -152,8 +153,9 @@ def test_undeclared_code_fails_closed(artifact: Artifact) -> None:
 def test_hash_declared_extra_module_is_not_approval(artifact: Artifact) -> None:
     extra = artifact.root / "lib/example-1.0/ebin/erl_eval.beam"
     extra.write_bytes(b"not approved")
-    manifest = artifact.approved.model_copy(
-        update={
+    manifest = replace(
+        artifact.approved,
+        **{
             "files": (
                 *artifact.approved.files,
                 AssetFile(
@@ -161,7 +163,7 @@ def test_hash_declared_extra_module_is_not_approval(artifact: Artifact) -> None:
                     sha256=hashlib.sha256(extra.read_bytes()).hexdigest(),
                 ),
             )
-        }
+        },
     )
     write_manifest(artifact.root, manifest)
     rejected(artifact.root)
@@ -188,11 +190,12 @@ def test_hash_declared_extra_application_is_not_approval(artifact: Artifact) -> 
         )
         for path in (app, beam)
     )
-    candidate = artifact.approved.model_copy(
-        update={
+    candidate = replace(
+        artifact.approved,
+        **{
             "applications": (*artifact.approved.applications, extra),
             "files": (*artifact.approved.files, *files),
-        }
+        },
     )
     write_manifest(artifact.root, candidate)
     rejected(artifact.root)
@@ -240,7 +243,7 @@ async def test_external_manifest_is_rejected_before_activation(
 def test_fabricated_or_ill_typed_metadata_fails_both_readers(
     artifact: Artifact, field: str, value: object
 ) -> None:
-    payload: object = json.loads(artifact.approved.model_dump_json())
+    payload: object = json.loads(Json(type(artifact.approved)).encode(artifact.approved).decode())
     assert isinstance(payload, dict)
     payload[field] = value
     (artifact.root / "manifest.json").write_text(json.dumps(payload))
@@ -266,7 +269,7 @@ def test_fabricated_or_ill_typed_metadata_fails_both_readers(
 def test_application_contract_is_approved_not_self_declared(
     artifact: Artifact, field: str, value: object
 ) -> None:
-    payload: object = json.loads(artifact.approved.model_dump_json())
+    payload: object = json.loads(Json(type(artifact.approved)).encode(artifact.approved).decode())
     assert isinstance(payload, dict)
     apps: object = payload["applications"]
     assert isinstance(apps, list)

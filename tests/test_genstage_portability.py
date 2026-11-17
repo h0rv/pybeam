@@ -1,9 +1,10 @@
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel, TypeAdapter
 
+from pybeam.codec import Json
 from tools.genstage_assets import stage
 from tools.genstage_fixtures import FIXTURES, SOURCES
 
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_typing__uses_checkout_local_contracts() -> None:
-    paths = TypeAdapter(list[str]).validate_python(
+    paths = Json(list[str]).load(
         tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["ty"]["environment"][
             "extra-paths"
         ]
@@ -27,14 +28,17 @@ def test_typing__uses_checkout_local_contracts() -> None:
     assert (ROOT / "typings/_erlang_impl/_supervision.pyi").is_file()
 
 
-class Task(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Task:
     run: str | list[str]
 
 
 def test_genstage_commands__do_not_require_private_checkout_inputs() -> None:
-    tasks = TypeAdapter(dict[str, Task]).validate_python(
+    raw = Json(dict[str, dict[str, object]]).load(
         tomllib.loads((ROOT / "mise.toml").read_text())["tasks"]
     )
+    run = Json(str | list[str])
+    tasks = {name: Task(run=run.load(value["run"])) for name, value in raw.items()}
     assert "tools.build_genstage" in tasks["build:optional-genstage"].run
     for name, task in tasks.items():
         if "genstage" in name:

@@ -1,11 +1,21 @@
 import hashlib
+import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pybeam.codec import Json
 
 MAX_MANIFEST_BYTES = 262_144
 MAX_FILES = 1024
+
+_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
+_VERSION = re.compile(r"[0-9]+(?:\.[0-9]+)*")
+_MODULE = re.compile(r"[A-Za-z_][A-Za-z0-9_.@]{0,254}")
+_MD5 = re.compile(r"[0-9a-f]{32}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+_REVISION = re.compile(r"[0-9a-f]{40}")
 
 
 def relative_path(path: Path) -> Path:
@@ -14,48 +24,89 @@ def relative_path(path: Path) -> Path:
     return path
 
 
-type AssetPath = Annotated[Path, AfterValidator(relative_path)]
-type Name = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=64)]
-type Version = Annotated[str, Field(pattern=r"^[0-9]+(?:\.[0-9]+)*$", max_length=32)]
-type SHA256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-type Revision = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
+def _match(pattern: re.Pattern[str], value: str, name: str) -> None:
+    if pattern.fullmatch(value) is None:
+        raise ValueError(name + " has an invalid format")
 
 
-class FrozenModel(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+def _version(value: str, name: str) -> None:
+    if len(value) > 32:
+        raise ValueError(name + " is too long")
+    _match(_VERSION, value, name)
 
 
-class ModuleIdentity(FrozenModel):
-    name: Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_.@]*$", max_length=255)]
-    md5: Annotated[str, Field(pattern=r"^[0-9a-f]{32}$")]
+def _count(items: tuple[object, ...], low: int, high: int, name: str) -> None:
+    if not low <= len(items) <= high:
+        raise ValueError(name + " must have " + str(low) + " to " + str(high) + " items")
 
 
-class ApplicationAsset(FrozenModel):
-    name: Name
-    version: Version
-    code_path: AssetPath
-    dependencies: Annotated[tuple[Name, ...], Field(max_length=16)]
-    modules: Annotated[tuple[ModuleIdentity, ...], Field(min_length=1, max_length=512)]
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ModuleIdentity:
+    name: str
+    md5: str
+
+    def __post_init__(self) -> None:
+        _match(_MODULE, self.name, "module name")
+        _match(_MD5, self.md5, "md5")
 
 
-class AssetFile(FrozenModel):
-    path: AssetPath
-    sha256: SHA256
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ApplicationAsset:
+    name: str
+    version: str
+    code_path: Path
+    dependencies: tuple[str, ...]
+    modules: tuple[ModuleIdentity, ...]
+
+    def __post_init__(self) -> None:
+        _match(_NAME, self.name, "name")
+        _version(self.version, "version")
+        relative_path(self.code_path)
+        _count(self.dependencies, 0, 16, "dependencies")
+        for dependency in self.dependencies:
+            _match(_NAME, dependency, "dependency")
+        _count(self.modules, 1, 512, "modules")
 
 
-class Sources(FrozenModel):
-    elixir: Revision
-    gen_stage: Revision
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AssetFile:
+    path: Path
+    sha256: str
+
+    def __post_init__(self) -> None:
+        relative_path(self.path)
+        _match(_SHA256, self.sha256, "sha256")
 
 
-class OptionalManifest(FrozenModel):
-    format_version: Annotated[int, Field(ge=1, le=1)]
-    name: Name
-    otp_version: Version
-    erts_version: Version
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Sources:
+    elixir: str
+    gen_stage: str
+
+    def __post_init__(self) -> None:
+        _match(_REVISION, self.elixir, "elixir revision")
+        _match(_REVISION, self.gen_stage, "gen_stage revision")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OptionalManifest:
+    format_version: Literal[1]
+    name: str
+    otp_version: str
+    erts_version: str
     sources: Sources
-    applications: Annotated[tuple[ApplicationAsset, ...], Field(min_length=1, max_length=8)]
-    files: Annotated[tuple[AssetFile, ...], Field(min_length=1, max_length=MAX_FILES)]
+    applications: tuple[ApplicationAsset, ...]
+    files: tuple[AssetFile, ...]
+
+    def __post_init__(self) -> None:
+        _match(_NAME, self.name, "name")
+        _version(self.otp_version, "otp_version")
+        _version(self.erts_version, "erts_version")
+        _count(self.applications, 1, 8, "applications")
+        _count(self.files, 1, MAX_FILES, "files")
+
+
+MANIFEST = Json(OptionalManifest)
 
 
 def contained(root: Path, relative: Path) -> Path:
@@ -73,7 +124,7 @@ def contained(root: Path, relative: Path) -> Path:
 def parse_manifest(path: Path) -> OptionalManifest:
     if path.stat().st_size > MAX_MANIFEST_BYTES:
         raise ValueError("Optional manifest exceeds its supported size")
-    return OptionalManifest.model_validate_json(path.read_bytes())
+    return MANIFEST.decode(path.read_bytes())
 
 
 def approved_manifest(name: str) -> OptionalManifest:
@@ -109,4 +160,4 @@ def verify_manifest(root: Path) -> OptionalManifest:
 
 
 def write_manifest(root: Path, manifest: OptionalManifest) -> None:
-    (root / "manifest.json").write_text(manifest.model_dump_json(indent=2) + "\n")
+    (root / "manifest.json").write_text(json.dumps(MANIFEST.dump(manifest), indent=2) + "\n")

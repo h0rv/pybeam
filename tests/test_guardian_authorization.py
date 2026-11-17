@@ -3,13 +3,13 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
-import psutil
 import pytest
 
+from pybeam.codec import Json
 from pybeam.runtime import guardian
 from pybeam.runtime.ownership import Identity, identity, resolve
 from pybeam.runtime.process import _stop_owned
@@ -32,7 +32,7 @@ class Owned:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        birth = identity(psutil.Process(process.pid))
+        birth = identity(process.pid)
         self.processes.append((process, birth))
         return process, birth
 
@@ -101,8 +101,8 @@ def start_gate(
     environment = dict(
         os.environ,
         PYBEAM_OWNER_DIRECTORY=str(directory),
-        PYBEAM_OWNER_IDENTITY=owner.model_dump_json(),
-        PYBEAM_GUARDIAN_IDENTITY=guard.model_dump_json(),
+        PYBEAM_OWNER_IDENTITY=Json(type(owner)).encode(owner).decode(),
+        PYBEAM_GUARDIAN_IDENTITY=Json(type(guard)).encode(guard).decode(),
     )
     if omit_owner:
         environment.pop("PYBEAM_OWNER_IDENTITY")
@@ -114,29 +114,30 @@ def start_gate(
 
 def acknowledge(gate: Gate, *, change: str | None = None) -> guardian.Registration:
     wait_for(gate.registration, gate)
-    registration = guardian.Registration.model_validate_json(gate.registration.read_text())
+    registration = Json(guardian.Registration).decode(gate.registration.read_text())
     assert registration.process == gate.birth
     updated = registration
     match change:
         case "owner":
-            updated = registration.model_copy(update={"owner": identity(psutil.Process())})
+            updated = replace(registration, owner=identity(os.getpid()))
         case "guardian":
-            updated = registration.model_copy(update={"guardian": registration.owner})
+            updated = replace(registration, guardian=registration.owner)
         case "process":
-            updated = registration.model_copy(
-                update={
-                    "process": gate.birth.model_copy(update={"created": gate.birth.created + 1})
-                }
+            updated = replace(
+                registration, **{"process": replace(gate.birth, created=gate.birth.created + 1)}
             )
         case "generation":
-            updated = registration.model_copy(
-                update={"generation": "0" * 32 if registration.generation != "0" * 32 else "1" * 32}
+            updated = replace(
+                registration,
+                **{"generation": "0" * 32 if registration.generation != "0" * 32 else "1" * 32},
             )
         case None:
             pass
         case _:
             raise ValueError("Unknown acknowledgment mutation")
-    guardian.durable_write(gate.registration.with_suffix(".ack"), updated.model_dump_json())
+    guardian.durable_write(
+        gate.registration.with_suffix(".ack"), Json(type(updated)).encode(updated).decode()
+    )
     return registration
 
 
@@ -154,14 +155,12 @@ def test_guardian__wrong_registration_scope_never_receives_ack(
     _, owner_birth = owned.sleeper()
     _, guard_birth = owned.sleeper()
     registration = guardian.Registration(
-        process=identity(psutil.Process()),
+        process=identity(os.getpid()),
         owner=owner_birth,
         guardian=guard_birth,
         generation="0" * 32,
     )
-    forged = registration.model_copy(
-        update={subject: guard_birth if subject == "owner" else owner_birth}
-    )
+    forged = replace(registration, **{subject: guard_birth if subject == "owner" else owner_birth})
     ack = tmp_path / "registration.ack"
     with pytest.raises(guardian.AuthorizationError, match="different owner or guardian"):
         guardian._acknowledge(ack, forged, owner_birth, guard_birth)
@@ -170,7 +169,7 @@ def test_guardian__wrong_registration_scope_never_receives_ack(
 
 def test_guardian__confirmed_owner_gone_never_receives_ack(owned: Owned, tmp_path: Path) -> None:
     owner, owner_birth = owned.sleeper()
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     registration = guardian.Registration(
         process=current, owner=owner_birth, guardian=current, generation="0" * 32
     )
@@ -204,7 +203,7 @@ def test_guardian__real_owner_sigterm_at_exact_ack_boundary(tmp_path: Path, base
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    proof = RaceProof.model_validate_json(output.read_text())
+    proof = Json(RaceProof).decode(output.read_text())
     assert proof.source == str(source / "src/pybeam/runtime/guardian.py")
     assert proof.owner_gone_before_resume
     assert proof.executed is baseline
@@ -230,7 +229,7 @@ def test_guardian__owner_dead_after_registration_cannot_receive_ack(tmp_path: Pa
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    proof = RaceProof.model_validate_json(output.read_text())
+    proof = Json(RaceProof).decode(output.read_text())
     assert proof.owner_gone_before_resume
     assert not proof.executed
     assert not proof.acknowledgment_left
@@ -253,10 +252,10 @@ def test_gate__early_identity_failures_never_register_or_execute(
     elif failure == "guardian_gone":
         stop(guard, guard_birth)
     elif failure == "owner_wrong_birth":
-        owner_claim = owner_birth.model_copy(update={"created": owner_birth.created + 1})
+        owner_claim = replace(owner_birth, created=owner_birth.created + 1)
         assert resolve(owner_birth) is not None
     elif failure == "guardian_wrong_birth":
-        guard_claim = guard_birth.model_copy(update={"created": guard_birth.created + 1})
+        guard_claim = replace(guard_birth, created=guard_birth.created + 1)
         assert resolve(guard_birth) is not None
     gate = start_gate(
         owned, tmp_path, owner_claim, guard_claim, omit_owner=failure == "missing_owner"

@@ -3,8 +3,6 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from pydantic import TypeAdapter
-
 from examples.distributed.config import configuration
 from examples.distributed.models import (
     CleanupObserved,
@@ -15,6 +13,7 @@ from examples.distributed.models import (
     exchange,
     sanitized,
 )
+from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, LocalCluster, Reply
 from pybeam.runtime.guardian import GuardianEndpoint
 from pybeam.runtime.ownership import Identity, durable_write
@@ -63,17 +62,17 @@ def demonstration(
 
     active()
     with cluster:
-        first = Reply.model_validate_json(read("first.json"))
-        a = Identity.model_validate_json(read("a.birth.json"))
-        b = Identity.model_validate_json(read("b.birth.json"))
-        old = HandlerIdentity.model_validate_json(read("b.identity.json"))
+        first = Json(Reply).decode(read("first.json"))
+        a = Json(Identity).decode(read("a.birth.json"))
+        b = Json(Identity).decode(read("b.birth.json"))
+        old = Json(HandlerIdentity).decode(read("b.identity.json"))
         if a == b or a.pid == b.pid or first.identity is None:
             raise RuntimeError("Expected distinct native VM OS identities and sender handler")
         emit(NodeObserved(alias="a", birth=a, handler=first.identity, status="observed"))
         emit(NodeObserved(alias="b", birth=b, handler=old, status="observed"))
         emit(exchange(first))
         (cluster.directory / "start-inflight").touch()
-        inflight = Reply.model_validate_json(read("inflight.json"))
+        inflight = Json(Reply).decode(read("inflight.json"))
         if inflight.worker is None or inflight.status != "pending":
             raise RuntimeError("No actual recipient task was running before stop")
         emit(StateObserved(state="task_pending", handler=inflight.identity, worker=inflight.worker))
@@ -81,7 +80,7 @@ def demonstration(
         cluster.stop("b")
         deadline = time.monotonic() + 5
         while True:
-            down = Reply.model_validate_json(read("a.state.json"))
+            down = Json(Reply).decode(read("a.state.json"))
             if (
                 old.node not in down.nodes
                 and down.events
@@ -93,8 +92,8 @@ def demonstration(
                 raise TimeoutError("A did not observe monitor_node DOWN")
             time.sleep(0.02)
         (cluster.directory / "observe-absent").touch()
-        absent = Reply.model_validate_json(read("absent.json"))
-        loss = Reply.model_validate_json(read("inflight-loss.json"))
+        absent = Json(Reply).decode(read("absent.json"))
+        loss = Json(Reply).decode(read("inflight-loss.json"))
         if loss.status != "uncertain":
             raise RuntimeError("Lost in-flight outcome was reported as certain")
         if absent.status != "uncertain" or absent.receipt is not None:
@@ -104,23 +103,23 @@ def demonstration(
         (cluster.directory / "b.birth.json").unlink()
         active()
         cluster.restart("b")
-        new = HandlerIdentity.model_validate_json(read("b.identity.json"))
-        restarted = Identity.model_validate_json(read("b.birth.json"))
+        new = Json(HandlerIdentity).decode(read("b.identity.json"))
+        restarted = Json(Identity).decode(read("b.birth.json"))
         if new.incarnation == old.incarnation or restarted == b:
             raise RuntimeError("Restart reused recipient incarnation or OS birth identity")
         emit(NodeObserved(alias="b", birth=restarted, handler=new, status="fresh"))
         (cluster.directory / "rejoin").touch()
-        fresh = Reply.model_validate_json(read("fresh.json"))
+        fresh = Json(Reply).decode(read("fresh.json"))
         if fresh.identity != new or fresh.count != 0 or fresh.completed != 0:
             raise RuntimeError("Explicit rejoin did not observe empty fresh state")
         emit(StateObserved(state="fresh_empty", handler=fresh.identity))
-        stale = Reply.model_validate_json(read("stale.json"))
+        stale = Json(Reply).decode(read("stale.json"))
         if stale.status != "stale":
             raise RuntimeError("Delayed old-generation ACK was accepted")
         emit(StateObserved(state="stale_ack_rejected", handler=stale.identity))
-        second = Reply.model_validate_json(read("second.json"))
+        second = Json(Reply).decode(read("second.json"))
         emit(exchange(second))
-        controls = Reply.model_validate_json(read("controls.json"))
+        controls = Json(Reply).decode(read("controls.json"))
         epmd = cluster.identities[0]
     if cluster.cleanup is None:
         raise RuntimeError("No guardian cleanup journal")
@@ -151,8 +150,8 @@ def demonstration(
     if projected.observations != tuple(observations):
         raise RuntimeError("Final proof differs from actual observation history")
     if output is not None:
-        durable_write(output, projected.model_dump_json())
-    return TypeAdapter(dict[str, object]).validate_json(proof.model_dump_json())
+        durable_write(output, Json(type(projected)).encode(projected).decode())
+    return Json(dict[str, object]).decode(Json(type(proof)).encode(proof).decode())
 
 
 def main() -> None:

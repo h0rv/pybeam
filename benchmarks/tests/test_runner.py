@@ -1,10 +1,13 @@
 import contextlib
+import os
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from pybeam.codec import Json
 
 from benchmarks.contract import Budget, Config, Identity, Outcome, ResourceSample
 from benchmarks.ownership import resolve
@@ -81,7 +84,7 @@ def test_adapter_death__reaps_broker_owned_detached_child(config: Config, tmp_pa
     selected = probe(config, "child_exit", Budget())
     with measurement_lock() as descriptor:
         outcome = trial(selected, tmp_path / "trial", descriptor)
-    child = Identity.model_validate_json((tmp_path / "trial/test-child.json").read_text())
+    child = Json(Identity).decode((tmp_path / "trial/test-child.json").read_text())
     assert outcome.status == "failed"
     assert not outcome.cleanup_survivors
     assert resolve(child) is None
@@ -96,7 +99,7 @@ def test_runner__rejects_false_success(config: Config, tmp_path: Path, mode: str
     assert not outcome.cleanup_survivors
     if mode == "false_cleanup":
         assert outcome.forced_cleanup_count > 0
-        child = Identity.model_validate_json((tmp_path / "trial/test-child.json").read_text())
+        child = Json(Identity).decode((tmp_path / "trial/test-child.json").read_text())
         assert resolve(child) is None
 
 
@@ -136,7 +139,7 @@ def test_harness_death__guardian_keeps_lock_and_reaps_vm(config: Config, tmp_pat
             try:
                 child_path = output / "trial-0/test-child.json"
                 wait_for(child_path)
-                child = Identity.model_validate_json(child_path.read_text())
+                child = Json(Identity).decode(child_path.read_text())
                 with pytest.raises(RuntimeError, match="shared load lock"), measurement_lock():
                     pass
                 host.kill()
@@ -153,9 +156,8 @@ def test_harness_death__guardian_keeps_lock_and_reaps_vm(config: Config, tmp_pat
 
 
 def test_identity__does_not_resolve_reused_pid() -> None:
-    import psutil
 
     from benchmarks.ownership import identity
 
-    actual = identity(psutil.Process())
-    assert resolve(actual.model_copy(update={"created": actual.created - 1})) is None
+    actual = identity(os.getpid())
+    assert resolve(replace(actual, created=actual.created - 1)) is None

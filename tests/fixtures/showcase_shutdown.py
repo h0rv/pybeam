@@ -1,27 +1,25 @@
 import asyncio
 import sys
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 from unittest.mock import patch
 
-import psutil
-from pydantic import BaseModel, ConfigDict
-
 from examples.showcase.__main__ import main
 from examples.showcase.jobs import Job, Jobs
+from pybeam.codec import Json
 from pybeam.runtime.ownership import Identity, identity
 
 
-class CloseEvidence(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CloseEvidence:
     closing: bool
     subscribers: int
     stop_requests: tuple[bool, ...]
 
 
-class JobEvidence(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class JobEvidence:
     status: Literal["stopped", "uncertain"]
     birth: Identity
     cleanup_acknowledged: bool
@@ -57,7 +55,7 @@ def run() -> None:
                 (job.directory / "stop.request").exists() for job in self.items.values()
             ),
         )
-        (directory / "close.json").write_text(evidence.model_dump_json())
+        (directory / "close.json").write_text(Json(type(evidence)).encode(evidence).decode())
 
     def unsubscribe(self: Jobs, queue: asyncio.Queue[int]) -> None:
         original_unsubscribe(self, queue)
@@ -77,11 +75,11 @@ def run() -> None:
                 str(ack),
                 stdout=asyncio.subprocess.PIPE,
             )
-            birth = identity(psutil.Process(process.pid))
+            birth = identity(process.pid)
             if process.stdout is None or await process.stdout.readline() != b"READY\n":
                 raise RuntimeError("Controlled owned Python child did not start")
             self.update(replace(self.items[job.id], status="running"))
-            (directory / "child-ready.txt").write_text(birth.model_dump_json())
+            (directory / "child-ready.txt").write_text(Json(type(birth)).encode(birth).decode())
             returncode = await process.wait()
             acknowledged = ack.is_file() and ack.read_text() == "cleanup acknowledged"
             status = (
@@ -94,7 +92,9 @@ def run() -> None:
                 cleanup_acknowledged=acknowledged,
                 returncode=returncode,
             )
-            (directory / "job-finished.json").write_text(evidence.model_dump_json())
+            (directory / "job-finished.json").write_text(
+                Json(type(evidence)).encode(evidence).decode()
+            )
 
     with (
         patch.object(Jobs, "close", close),

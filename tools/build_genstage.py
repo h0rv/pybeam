@@ -9,9 +9,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import TypeAdapter
-
-from pybeam.runtime.assets import RuntimeManifest
+from pybeam.codec import Json
+from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import (
     ApplicationAsset,
     AssetFile,
@@ -120,7 +119,7 @@ def build_manifest(root: Path, otp: Path, erts: str, sources: Sources) -> Option
         "modules=>Modules} end || Dir<-" + json.dumps(paths) + "], "
         "io:put_chars(json:encode(Apps)),halt()."
     )
-    applications = TypeAdapter(tuple[ApplicationAsset, ...]).validate_json(
+    applications = Json(tuple[ApplicationAsset, ...]).decode(
         run([str(otp / "bin/erl"), "+S", "2:2", "-noshell", "-eval", expression])
     )
     files = tuple(
@@ -181,11 +180,13 @@ def stage_genstage(otp: Path, runtime: Path, workspace: Path, derived: Path | No
         shutil.copytree(elixir / "LICENSES", notices / "Elixir-LICENSES")
         shutil.copyfile(genstage / "README.md", notices / "GenStage-NOTICE.md")
         shutil.copyfile(runtime / "notices/OTP-LICENSE.txt", notices / "OTP-LICENSE.txt")
-        core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes()).root
+        core = MANIFEST.decode((runtime / "runtime.json").read_bytes())
         manifest = build_manifest(root, otp, core.erts_version, approved.sources)
         if manifest != approved:
             if derived is not None:
-                derived.write_text(manifest.model_dump_json(indent=2) + "\n")
+                derived.write_text(
+                    json.dumps(Json(OptionalManifest).dump(manifest), indent=2) + "\n"
+                )
             raise ValueError("Built optional assets differ from the approved pinned specification")
         write_manifest(root, manifest)
         verify_manifest(root)

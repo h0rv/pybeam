@@ -1,5 +1,6 @@
 import contextlib
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -8,14 +9,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Literal, assert_never
+from typing import Literal, assert_never
 
-import psutil
-from pydantic import BaseModel, ConfigDict, Field
-
+from pybeam.codec import Json
 from pybeam.runtime.ownership import (
+    IDENTITY,
+    REGISTRY,
     Identity,
     Registry,
+    ancestors,
     cleanup,
     discover,
     durable_write,
@@ -24,6 +26,8 @@ from pybeam.runtime.ownership import (
     resolve,
 )
 from pybeam.runtime.startup import (
+    CENSUS,
+    STARTUP_PLAN,
     LauncherBirth,
     LauncherEntry,
     ManagedStartupCensus,
@@ -38,6 +42,7 @@ from pybeam.runtime.startup import (
 )
 
 _SERVICE_ENTRY = ServiceEntry()
+_GENERATION = re.compile(r"[0-9a-f]{32}")
 
 
 class RegistrationPhase(StrEnum):
@@ -45,16 +50,18 @@ class RegistrationPhase(StrEnum):
     SEALED = "sealed"
 
 
-class SpawnRequest(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SpawnRequest:
+    argv: tuple[str, ...]
+    entry: SpawnEntry = _SERVICE_ENTRY
 
-    argv: tuple[str, ...] = Field(min_length=1)
-    entry: SpawnEntry = ServiceEntry()
+    def __post_init__(self) -> None:
+        if not self.argv:
+            raise ValueError("Spawn request needs a command")
 
 
-class SpawnReply(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SpawnReply:
     identity: Identity
 
 
@@ -66,18 +73,20 @@ class StopRequested(AuthorizationError):
     pass
 
 
-class ImmediateStop(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ImmediateStop:
     kind: Literal["immediate"] = "immediate"
 
 
-class ManagedStop(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ManagedStop:
     kind: Literal["managed"] = "managed"
-    node_shutdown_seconds: Annotated[float, Field(gt=0, le=5, allow_inf_nan=False)] = 5.0
+    node_shutdown_seconds: float = 5.0
     guardian_seconds: Literal[8] = 8
+
+    def __post_init__(self) -> None:
+        if not 0 < self.node_shutdown_seconds <= 5:
+            raise ValueError("node_shutdown_seconds must be greater than 0 and at most 5")
 
     @property
     def grace_seconds(self) -> float:
@@ -88,41 +97,47 @@ class ManagedStop(BaseModel):
         return self.guardian_seconds - 2
 
 
-type StopPolicy = Annotated[ImmediateStop | ManagedStop, Field(discriminator="kind")]
+type StopPolicy = ImmediateStop | ManagedStop
+_IMMEDIATE = ImmediateStop()
 
 
-class GuardianExit(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GuardianExit:
     registry: Registry
-    forced_cleanup_count: Annotated[int, Field(ge=0)]
+    forced_cleanup_count: int
+
+    def __post_init__(self) -> None:
+        if self.forced_cleanup_count < 0:
+            raise ValueError("forced_cleanup_count must not be negative")
 
 
-class Registration(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Registration:
     process: Identity
     owner: Identity
     guardian: Identity
-    generation: Annotated[str, Field(min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$")]
-    entry: RegisteredEntry = ServiceEntry()
+    generation: str
+    entry: RegisteredEntry = _SERVICE_ENTRY
+
+    def __post_init__(self) -> None:
+        if _GENERATION.fullmatch(self.generation) is None:
+            raise ValueError("generation must be 32 lowercase hexadecimal digits")
 
 
-class GuardianEndpoint(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class GuardianEndpoint:
     """Borrow an existing local guardian's registration directory and lifetime.
 
     The borrower never starts or stops this guardian. Its owner must durably
     record and acknowledge each birth before any nested entry is authorized.
     """
 
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
     directory: Path
     owner: Identity
     guardian: Identity
     stop_file: Path | None = None
     control_owner: Identity | None = None
-    stop_policy: StopPolicy = ImmediateStop()
+    stop_policy: StopPolicy = _IMMEDIATE
 
     def require_lifetime(self) -> None:
         _require_live(self.owner, "Outer owner exited before execution authorization")
@@ -139,6 +154,13 @@ class GuardianEndpoint(BaseModel):
         self.require_lifetime()
         if self.stopping():
             raise StopRequested("Outer owner cancelled execution authorization")
+
+
+_REGISTRATION = Json(Registration)
+_SPAWN_REQUEST = Json(SpawnRequest)
+_SPAWN_REPLY = Json(SpawnReply)
+ENDPOINT = Json(GuardianEndpoint)
+GUARDIAN_EXIT = Json(GuardianExit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,7 +206,7 @@ def register_borrowed(endpoint: GuardianEndpoint, local: Registration) -> None:
         generation=secrets.token_hex(16),
     )
     path = endpoint.directory / ("register-" + str(local.process.pid) + ".json")
-    durable_write(path, registration.model_dump_json())
+    durable_write(path, _REGISTRATION.encode(registration).decode())
     ack = path.with_suffix(".ack")
     deadline = time.monotonic() + 5
     while not ack.exists():
@@ -193,7 +215,7 @@ def register_borrowed(endpoint: GuardianEndpoint, local: Registration) -> None:
         if time.monotonic() > deadline:
             raise AuthorizationError("No outer guardian acknowledgment; entry is sealed")
         time.sleep(0.01)
-    if Registration.model_validate_json(ack.read_text()) != registration:
+    if _REGISTRATION.decode(ack.read_text()) != registration:
         raise AuthorizationError("Outer acknowledgment has a different identity or generation")
     ack.unlink()
     endpoint.require_active()
@@ -217,7 +239,7 @@ def _acknowledge(
         raise AuthorizationError("Registration belongs to a different owner or guardian")
     _require_live(registration.process, "Registered process exited before acknowledgment")
     _require_live(owner, "Owner exited before registration acknowledgment")
-    durable_write(path, registration.model_dump_json())
+    durable_write(path, _REGISTRATION.encode(registration).decode())
     try:
         _require_live(owner, "Owner exited during registration acknowledgment")
     except AuthorizationError:
@@ -232,7 +254,7 @@ def acknowledge_registered(
     *,
     before_ack: Callable[[Registration], None] = _ignore_registration,
 ) -> None:
-    registration = Registration.model_validate_json(path.read_text())
+    registration = _REGISTRATION.decode(path.read_text())
     if registration.owner != endpoint.owner or registration.guardian != endpoint.guardian:
         raise AuthorizationError("Registration belongs to a different owner or guardian")
     endpoint.require_active()
@@ -240,11 +262,11 @@ def acknowledge_registered(
     if process is None:
         raise AuthorizationError("Cannot register an exited native process")
     if isinstance(registration.entry, VmEntry):
-        parent = process.parent()
-        if parent is None or identity(parent) != registration.entry.launcher:
+        launchers = ancestors(process.pid)[:1]
+        if not launchers or launchers[0] != registration.entry.launcher:
             raise AuthorizationError("VM registration has a different actual launcher parent")
-    ancestors = {identity(parent) for parent in process.parents() if parent.pid > 0}
-    if registration.process not in owned and not ancestors.intersection(owned):
+    parents = set(ancestors(process.pid))
+    if registration.process not in owned and not parents.intersection(owned):
         raise AuthorizationError("Native process has no registered owner")
     owned.add(registration.process)
     record(endpoint.directory, owned, "tracking")
@@ -282,7 +304,8 @@ def spawn_owned(
     reply = directory / "spawn.reply.json"
     reply.unlink(missing_ok=True)
     durable_write(
-        directory / "spawn.request.json", SpawnRequest(argv=argv, entry=entry).model_dump_json()
+        directory / "spawn.request.json",
+        _SPAWN_REQUEST.encode(SpawnRequest(argv=argv, entry=entry)).decode(),
     )
     deadline = time.monotonic() + timeout
     while not reply.exists():
@@ -291,19 +314,19 @@ def spawn_owned(
         if time.monotonic() >= deadline:
             raise TimeoutError("Guardian did not acknowledge owned process startup")
         time.sleep(0.01)
-    return SpawnReply.model_validate_json(reply.read_text()).identity
+    return _SPAWN_REPLY.decode(reply.read_text()).identity
 
 
 def supervise(directory: Path, owner: Identity) -> None:
     owned: set[Identity] = set()
-    guardian = identity(psutil.Process())
+    guardian = identity(os.getpid())
     external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
-    endpoint = None if external is None else GuardianEndpoint.model_validate_json(external)
+    endpoint = None if external is None else ENDPOINT.decode(external)
     launches: list[LauncherBirth] = []
     target = (
         _CensusTarget(
             endpoint,
-            StartupPlan.model_validate_json((directory / "startup-plan.json").read_bytes()),
+            STARTUP_PLAN.decode((directory / "startup-plan.json").read_bytes()),
         )
         if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop)
         else _NoCensus()
@@ -316,14 +339,16 @@ def supervise(directory: Path, owner: Identity) -> None:
             case _CensusTarget(endpoint=borrowed, plan=plan):
                 durable_write(
                     borrowed.directory / "managed-startup-census.json",
-                    ManagedStartupCensus(
-                        owner=owner,
-                        guardian=guardian,
-                        plan=plan,
-                        startup=progress(plan, tuple(launches)),
-                        registry=registry,
-                        forced_cleanup_count=forced,
-                    ).model_dump_json(),
+                    CENSUS.encode(
+                        ManagedStartupCensus(
+                            owner=owner,
+                            guardian=guardian,
+                            plan=plan,
+                            startup=progress(plan, tuple(launches)),
+                            registry=registry,
+                            forced_cleanup_count=forced,
+                        )
+                    ).decode(),
                 )
             case other:
                 assert_never(other)
@@ -342,8 +367,8 @@ def supervise(directory: Path, owner: Identity) -> None:
         )
     environment = dict(
         os.environ,
-        PYBEAM_GUARDIAN_IDENTITY=guardian.model_dump_json(),
-        PYBEAM_OWNER_IDENTITY=owner.model_dump_json(),
+        PYBEAM_GUARDIAN_IDENTITY=IDENTITY.encode(guardian).decode(),
+        PYBEAM_OWNER_IDENTITY=IDENTITY.encode(owner).decode(),
         PYBEAM_OWNER_DIRECTORY=str(directory),
     )
     children: list[subprocess.Popen[bytes]] = []
@@ -368,7 +393,7 @@ def supervise(directory: Path, owner: Identity) -> None:
                 raise TimeoutError("Local cluster lifetime exceeded")
             request = directory / "spawn.request.json"
             if request.exists() and admission is RegistrationPhase.OPEN:
-                command = SpawnRequest.model_validate_json(request.read_text())
+                command = _SPAWN_REQUEST.decode(request.read_text())
                 _require_live(owner, "Owner exited before owned process startup")
                 record(directory, owned, "spawning")
                 index = str(len(children))
@@ -382,14 +407,15 @@ def supervise(directory: Path, owner: Identity) -> None:
                     env=environment,
                 )
                 children.append(child)
-                value = identity(psutil.Process(child.pid))
+                value = identity(child.pid)
                 owned.add(value)
                 if isinstance(target, _CensusTarget) and isinstance(command.entry, LauncherEntry):
                     launches.append(PendingLauncher(alias=command.entry.alias, launcher=value))
                     write_census(Registry(phase="tracking", owned=tuple(owned)))
                 record(directory, owned, "tracking")
                 durable_write(
-                    directory / "spawn.reply.json", SpawnReply(identity=value).model_dump_json()
+                    directory / "spawn.reply.json",
+                    _SPAWN_REPLY.encode(SpawnReply(identity=value)).decode(),
                 )
                 request.unlink()
             for path in (
@@ -443,45 +469,44 @@ def supervise(directory: Path, owner: Identity) -> None:
         streams.close()
         (directory / "home" / ".erlang.cookie").unlink(missing_ok=True)
         record(directory, owned, "uncertain" if survivors else "confirmed")
-        write_census(
-            Registry.model_validate_json((directory / "ownership.json").read_bytes()), forced
-        )
+        write_census(REGISTRY.decode((directory / "ownership.json").read_bytes()), forced)
         if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
             durable_write(
                 directory / "guardian-exit.json",
-                GuardianExit(
-                    registry=Registry.model_validate_json(
-                        (directory / "ownership.json").read_bytes()
-                    ),
-                    forced_cleanup_count=forced,
-                ).model_dump_json(),
+                GUARDIAN_EXIT.encode(
+                    GuardianExit(
+                        registry=REGISTRY.decode((directory / "ownership.json").read_bytes()),
+                        forced_cleanup_count=forced,
+                    )
+                ).decode(),
             )
 
 
 def gate(command: list[str]) -> None:
     directory = Path(os.environ["PYBEAM_OWNER_DIRECTORY"])
-    value = identity(psutil.Process())
+    value = identity(os.getpid())
     owner_text = os.environ.get("PYBEAM_OWNER_IDENTITY")
     if owner_text is None:
         raise AuthorizationError("Missing owner identity; entry is sealed")
-    owner = Identity.model_validate_json(owner_text)
-    guardian = Identity.model_validate_json(os.environ["PYBEAM_GUARDIAN_IDENTITY"])
+    owner = IDENTITY.decode(owner_text)
+    guardian = IDENTITY.decode(os.environ["PYBEAM_GUARDIAN_IDENTITY"])
     external = os.environ.get("PYBEAM_OUTER_GUARDIAN")
-    endpoint = None if external is None else GuardianEndpoint.model_validate_json(external)
+    endpoint = None if external is None else ENDPOINT.decode(external)
     alias = os.environ.get("PYBEAM_NODE_ALIAS")
     entry: RegisteredEntry = ServiceEntry()
     if alias is not None and endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
-        parent = psutil.Process().parent()
-        if parent is None:
-            raise AuthorizationError("VM registration has no launcher parent")
-        entry = VmEntry(alias=alias, launcher=identity(parent))
+        try:
+            launcher = identity(os.getppid())
+        except ProcessLookupError as error:
+            raise AuthorizationError("VM registration has no launcher parent") from error
+        entry = VmEntry(alias=alias, launcher=launcher)
     authorization = Registration(
         process=value, owner=owner, guardian=guardian, generation=secrets.token_hex(16), entry=entry
     )
     _require_live(owner, "Owner exited before process registration")
     _require_live(guardian, "Guardian exited before ownership transfer")
     registration = directory / ("register-" + str(value.pid) + ".json")
-    durable_write(registration, authorization.model_dump_json())
+    durable_write(registration, _REGISTRATION.encode(authorization).decode())
     deadline = time.monotonic() + 5
     ack = registration.with_suffix(".ack")
     while not ack.exists():
@@ -490,7 +515,7 @@ def gate(command: list[str]) -> None:
         if time.monotonic() > deadline:
             raise TimeoutError("No guardian ownership acknowledgment; entry is sealed")
         time.sleep(0.01)
-    if Registration.model_validate_json(ack.read_text()) != authorization:
+    if _REGISTRATION.decode(ack.read_text()) != authorization:
         raise AuthorizationError("Ownership acknowledgment has a different identity or generation")
     ack.unlink()
     if endpoint is not None:
@@ -503,4 +528,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "gate":
         gate(sys.argv[2:])
     else:
-        supervise(Path(sys.argv[1]), Identity.model_validate_json(sys.argv[2]))
+        supervise(Path(sys.argv[1]), IDENTITY.decode(sys.argv[2]))

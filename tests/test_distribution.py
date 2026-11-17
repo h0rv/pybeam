@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import assert_type
 
 import pytest
-from pydantic import ValidationError
 
+from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, RequestTooLarge, remote, reservation
 from pybeam.runtime.cluster import LocalCluster
 from pybeam.runtime.config import Config, Distribution, PythonNode, parse_config
@@ -17,8 +17,8 @@ def test_configuration__strict_opt_in_and_round_trip(tmp_path: Path) -> None:
     entry = tmp_path / "entry.py"
     entry.write_text("raise RuntimeError('must not execute on import')\n")
     assert Config().distribution is False
-    with pytest.raises(ValidationError):
-        Config.model_validate({"distribution": True})
+    with pytest.raises(ValueError):
+        Json(Config).load({"distribution": True})
     config = parse_config(
         {
             "distribution": {
@@ -35,9 +35,9 @@ def test_configuration__strict_opt_in_and_round_trip(tmp_path: Path) -> None:
     )
     assert isinstance(config.distribution, Distribution)
     assert config.distribution.nodes[0].entry == entry
-    assert Config.model_validate_json(config.model_dump_json()) == config
+    assert Json(Config).decode(Json(type(config)).encode(config).decode()) == config
     config = Config(development_runtime=tmp_path)
-    assert Config.model_validate_json(config.model_dump_json()) == config
+    assert Json(Config).decode(Json(type(config)).encode(config).decode()) == config
 
 
 @pytest.mark.parametrize(
@@ -66,18 +66,18 @@ def test_distribution__bounded_private_configuration(
         "capacity": 2,
         "max_bytes": 4096,
     }
-    with pytest.raises(ValidationError):
-        Distribution.model_validate(base | patch)
+    with pytest.raises(ValueError):
+        Json(Distribution).load(base | patch)
 
 
 def test_data_boundary__encoded_size_and_malformed_replies() -> None:
     claim = reservation("A" * 32, "id", "é")
     assert claim.size == 2
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         reservation("A" * 32, "id", "x" * 4097)
-    with pytest.raises(ValidationError):
-        Reply.model_validate_json('{"status":"pretend_success"}')
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
+        Json(Reply).decode('{"status":"pretend_success"}')
+    with pytest.raises(ValueError):
         Request(op="submit", payload="x" * 4097)
     with pytest.raises(RequestTooLarge):
         Request(op="submit", payload="\u6f22" * 4096).encode()
