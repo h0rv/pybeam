@@ -6,11 +6,9 @@ Tasks share one event loop by default. While one of them runs a blocking call or
 - Give a CPU-bound task its own loop with `dedicated_loop=True`.
 - Run code that might crash the process, such as an unreliable C extension, with `execution=ExecutionMode.ISOLATED`. A crash then fails only that task. Isolated tasks run in separate Python processes: each takes up to about 130 ms to start, uses about 25 MiB, and its function must be a top-level `async def` that takes and returns `bytes`.
 
-Actors have no `dedicated_loop` option and need none: each call already runs on a pooled worker. Don't keep loop-bound objects such as `asyncio.Lock` in actor state across calls, because the next call may run on another worker.
+Actors have no `dedicated_loop` option and need none: each call already runs on a pooled worker. Parallel Python CPU work requires free-threaded Python. Don't keep loop-bound objects such as `asyncio.Lock` in actor state across calls, because the next call may run on another worker. Create and finalize those resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
 This example runs four CPU-bound tasks, each on its own loop:
-
-Actor calls use worker-local loops. Blocking calls on different workers can overlap; pure-Python CPU work still needs a GIL-free build for parallel execution. Workers are shared across all actor groups, and a later call can use a different worker and loop. Create and finalize loop-bound resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
 ```python
 # execution.py
