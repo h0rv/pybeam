@@ -4,12 +4,12 @@ import json
 import shutil
 import stat
 import tempfile
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
-from pydantic import BaseModel, ConfigDict
-
-from pybeam.runtime.assets import RuntimeManifest
+from pybeam.codec import Json
+from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import contained
 from tools.runtime_wheel import runtime_tag
 
@@ -21,9 +21,8 @@ NIF_SHA256 = "4a106fb8c6cf562cef7bfd884b0656fcbb5aba338014d0fcafab1e7d1033381a"
 PREFIX = "pybeam/runtime/_assets/"
 
 
-class Provenance(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Provenance:
     artifact_sdk_revision: str
     artifact_native_revision: str
     wheel_sha256: str
@@ -37,7 +36,7 @@ def digest(path: Path) -> str:
 
 
 def preserve_hornbeam(source: Path, runtime: Path) -> dict[str, str]:
-    manifest = RuntimeManifest.model_validate_json((source / "runtime.json").read_bytes()).root
+    manifest = MANIFEST.decode((source / "runtime.json").read_bytes())
     code_path = Path("lib/hornbeam-1.4.1/ebin")
     if code_path not in manifest.code_paths:
         raise ValueError("The explicitly selected runtime must contain Hornbeam 1.4.1")
@@ -52,9 +51,9 @@ def preserve_hornbeam(source: Path, runtime: Path) -> dict[str, str]:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, destination)
             hashes[str(relative)] = digest(destination)
-    core = RuntimeManifest.model_validate_json((runtime / "runtime.json").read_bytes()).root
-    merged = core.model_copy(update={"code_paths": (*core.code_paths, code_path)})
-    (runtime / "runtime.json").write_text(merged.model_dump_json(indent=2) + "\n")
+    core = MANIFEST.decode((runtime / "runtime.json").read_bytes())
+    merged = replace(core, code_paths=(*core.code_paths, code_path))
+    (runtime / "runtime.json").write_bytes(MANIFEST.encode(merged) + b"\n")
     return hashes
 
 
@@ -123,7 +122,7 @@ def stage(wheel: Path, output: Path, *, hornbeam_runtime: Path | None = None) ->
             },
             preserved_hornbeam_payloads=preserved,
         )
-        (generation / "provenance.json").write_text(provenance.model_dump_json(indent=2) + "\n")
+        (generation / "provenance.json").write_bytes(Json(Provenance).encode(provenance) + b"\n")
         if output.exists() or output.is_symlink():
             raise FileExistsError("Output appeared during preparation: " + str(output))
         generation.rename(output)

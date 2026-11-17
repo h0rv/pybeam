@@ -1,8 +1,10 @@
+import os
+from dataclasses import replace
 from pathlib import Path
 
-import psutil
 import pytest
 
+from pybeam.codec import Json
 from pybeam.runtime import guardian
 from pybeam.runtime.guardian import (
     AuthorizationError,
@@ -17,19 +19,19 @@ from pybeam.runtime.ownership import Registry, durable_write, identity
 def test_composition__outer_ack_requires_durable_birth_and_revokes_cancelled_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    current = identity(psutil.Process())
+    current = identity(os.getpid())
     stop = tmp_path / "stop"
     endpoint = GuardianEndpoint(directory=tmp_path, owner=current, guardian=current, stop_file=stop)
     registration = Registration(
         process=current, owner=current, guardian=current, generation="1" * 32
     )
     path = tmp_path / ("register-" + str(current.pid) + ".json")
-    durable_write(path, registration.model_dump_json())
+    durable_write(path, Json(type(registration)).encode(registration).decode())
 
     def write(destination: Path, text: str) -> None:
         durable_write(destination, text)
         if destination.suffix == ".ack":
-            registry = Registry.model_validate_json((tmp_path / "ownership.json").read_text())
+            registry = Json(Registry).decode((tmp_path / "ownership.json").read_text())
             assert current in registry.owned
             stop.touch()
 
@@ -44,8 +46,8 @@ def test_composition__outer_ack_requires_durable_birth_and_revokes_cancelled_pub
 def test_composition__inactive_borrowed_endpoint_never_publishes_registration(
     tmp_path: Path, failure: str
 ) -> None:
-    current = identity(psutil.Process())
-    stale = current.model_copy(update={"created": current.created + 1})
+    current = identity(os.getpid())
+    stale = replace(current, created=current.created + 1)
     stop = tmp_path / "stop"
     endpoint = GuardianEndpoint(
         directory=tmp_path,

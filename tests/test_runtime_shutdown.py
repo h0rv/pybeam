@@ -5,6 +5,7 @@ import pytest
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect
 
+from pybeam.codec import Json
 from tests.conftest import ServerFactory
 from tests.test_runtime_native import CounterReply
 
@@ -23,10 +24,10 @@ def test_native__shutdown_runs_lifespan_and_closes_live_connection(
                     close_timeout=1,
                 )
             )
-            CounterReply.model_validate_json(peer.recv(timeout=3))
+            Json(CounterReply).decode(peer.recv(timeout=3))
             response = httpx.get(server.base_url + "/subscriptions", timeout=3)
             response.raise_for_status()
-            assert CounterReply.model_validate_json(response.content).count == 1
+            assert Json(CounterReply).decode(response.content).count == 1
         assert server.process.returncode == 0
         assert "LIFESPAN_STOPPED" in server.log_path.read_text()
         with pytest.raises(ConnectionClosed):

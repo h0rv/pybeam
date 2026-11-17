@@ -1,9 +1,8 @@
+import os
 import sys
 from pathlib import Path
 
-import psutil
 import pytest
-from pydantic import ValidationError
 
 from benchmarks import guardian
 from benchmarks.contract import Budget, Config, ProcessSample
@@ -35,9 +34,9 @@ def test_walkthrough_policy__accounts_for_two_fixed_vm_thread_sets() -> None:
     assert budget.threads == THREAD_LIMIT == 2 * 19 + 2 * 2 + 14 == 56
     assert Budget().threads == 32
     assert budget.wall_seconds == 120.0
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Budget(threads=129)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Budget(processes=33)
 
 
@@ -77,7 +76,7 @@ def test_walkthrough_policy__excess_still_triggers_the_existing_watchdog(
     (tmp_path / "config.json").write_text(config.model_dump_json())
     stop = tmp_path / "stop.request"
     stop.touch()
-    owner = identity(psutil.Process())
+    owner = identity(os.getpid())
     outcome = guardian.supervise(
         tmp_path, owner, guardian.Control(owner=owner, stop_file=str(stop))
     )

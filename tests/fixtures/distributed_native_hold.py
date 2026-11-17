@@ -1,29 +1,28 @@
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 import pytest
-from pydantic import BaseModel, ConfigDict
 
 from examples.distributed import demo
 from examples.distributed.demo import continue_cli, demonstration
 from examples.distributed.models import ExchangeObserved, NodeObserved, Observation
+from pybeam.codec import Json
 from pybeam.runtime.cluster import LocalCluster, NodeExit
 from pybeam.runtime.guardian import GuardianEndpoint
 from pybeam.runtime.ownership import Registry, durable_write, resolve
 
 
-class InnerCleanup(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InnerCleanup:
     cleanup: Registry | None
     shutdowns: tuple[NodeExit, ...]
 
 
-class NativeReady(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NativeReady:
     job_id: str
     nodes: tuple[NodeObserved, NodeObserved]
     exchange: ExchangeObserved
@@ -48,9 +47,9 @@ def held_demonstration(
             finally:
                 durable_write(
                     guardian.directory / "inner-cleanup.json",
-                    InnerCleanup(
-                        cleanup=self.cleanup, shutdowns=tuple(self.shutdowns)
-                    ).model_dump_json(),
+                    Json(InnerCleanup)
+                    .encode(InnerCleanup(cleanup=self.cleanup, shutdowns=tuple(self.shutdowns)))
+                    .decode(),
                 )
 
     nodes: list[NodeObserved] = []
@@ -65,20 +64,31 @@ def held_demonstration(
         if isinstance(event, ExchangeObserved) and not held:
             if len(nodes) != 2 or {node.alias for node in nodes} != {"a", "b"}:
                 raise ValueError("No actual two-node receiver-ready observation")
-            outer = Registry.model_validate_json(
-                (guardian.directory / "ownership.json").read_bytes()
-            )
+            outer = Json(Registry).decode((guardian.directory / "ownership.json").read_bytes())
             if any(resolve(node.birth) is None or node.birth not in outer.owned for node in nodes):
                 raise ValueError("Native hold requires two live outer-acknowledged VM births")
             held = True
             durable_write(
                 guardian.directory / "native-ready.json",
-                NativeReady(
-                    job_id=guardian.directory.parents[1].name,
-                    nodes=(nodes[0], nodes[1]),
-                    exchange=event,
-                    outer=outer,
-                ).model_dump_json(),
+                Json(
+                    type(
+                        NativeReady(
+                            job_id=guardian.directory.parents[1].name,
+                            nodes=(nodes[0], nodes[1]),
+                            exchange=event,
+                            outer=outer,
+                        )
+                    )
+                )
+                .encode(
+                    NativeReady(
+                        job_id=guardian.directory.parents[1].name,
+                        nodes=(nodes[0], nodes[1]),
+                        exchange=event,
+                        outer=outer,
+                    )
+                )
+                .decode(),
             )
             deadline = time.monotonic() + 15
             while not (guardian.directory / "native-release").exists():

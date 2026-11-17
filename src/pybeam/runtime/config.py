@@ -1,18 +1,11 @@
+import math
 import tomllib
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Literal, Self
+from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    TypeAdapter,
-    ValidationError,
-    ValidationInfo,
-    field_validator,
-    model_validator,
-)
+from pybeam.codec import CodecError, Json
 
 
 class BootstrapError(RuntimeError):
@@ -32,101 +25,71 @@ class Mode(StrEnum):
     CUSTOM = "custom"
 
 
-type Timeout = Annotated[float, Field(strict=True, gt=0, allow_inf_nan=False)]
-type RuntimePath = Annotated[str, Field(strict=True, min_length=1)]
-_PATH_TEXT = TypeAdapter(RuntimePath)
+def _port(value: int, name: str) -> None:
+    if type(value) is not int or not 20000 <= value <= 60000:
+        raise ValueError(name + " must be an integer from 20000 to 60000")
 
 
-type PrivatePort = Annotated[int, Field(strict=True, ge=20000, le=60000)]
+def _timeout(value: float, name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value < math.inf:
+        raise ValueError(name + " must be a positive finite number")
 
 
-class PythonNode(BaseModel):
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PythonNode:
     alias: Literal["a", "b"]
     entry: Path
-    port: PrivatePort
+    port: int
 
-    @field_validator("entry", mode="plain")
-    @classmethod
-    def resolve_entry(cls, value: object, info: ValidationInfo) -> Path:
-        if isinstance(value, Path):
-            return value.resolve()
-        text = _PATH_TEXT.validate_python(value)
-        directory: object = info.context
-        return ((directory if isinstance(directory, Path) else Path.cwd()) / text).resolve()
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "entry", self.entry.resolve())
+        _port(self.port, "port")
 
 
-class Distribution(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Distribution:
     """Two trusted local nodes. No remote hosts, implicit retries, or callable transfer."""
 
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid")
-
     nodes: tuple[PythonNode, PythonNode]
-    discovery_port: PrivatePort
-    capacity: Annotated[int, Field(strict=True, ge=1, le=8)]
-    max_bytes: Annotated[int, Field(strict=True, ge=1, le=16384)]
+    discovery_port: int
+    capacity: int
+    max_bytes: int
 
-    @field_validator("nodes", mode="before")
-    @classmethod
-    def parse_nodes(cls, value: object) -> object:
-        return tuple(value) if isinstance(value, list) else value
-
-    @model_validator(mode="after")
-    def distinct_nodes(self) -> Self:
+    def __post_init__(self) -> None:
+        _port(self.discovery_port, "discovery_port")
+        if type(self.capacity) is not int or not 1 <= self.capacity <= 8:
+            raise ValueError("capacity must be an integer from 1 to 8")
+        if type(self.max_bytes) is not int or not 1 <= self.max_bytes <= 16384:
+            raise ValueError("max_bytes must be an integer from 1 to 16384")
         if {node.alias for node in self.nodes} != {"a", "b"}:
             raise ValueError("Declare exactly aliases a and b")
         if len({self.discovery_port, *(node.port for node in self.nodes)}) != 3:
             raise ValueError("Discovery and node ports must be distinct")
         if not all(node.entry.is_file() for node in self.nodes):
             raise ValueError("Every node must have an existing Python entry file")
-        return self
 
 
-class Config(BaseModel):
-    model_config = ConfigDict(frozen=True, strict=True, extra="forbid", validate_default=True)
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Config:
     development_runtime: Path | None = None
     data_dir: Path = Path(".pybeam/data")
-    startup_timeout: Timeout = 30.0
-    shutdown_timeout: Timeout = 5.0
+    startup_timeout: float = 30.0
+    shutdown_timeout: float = 5.0
     mode: Mode = Mode.MANAGED
-    workers: Annotated[int, Field(ge=1, le=1)] = 1
+    workers: Literal[1] = 1
     distribution: Literal[False] | Distribution = False
     listeners: bool = False
 
-    @field_validator("data_dir", mode="plain")
-    @classmethod
-    def resolve_data_dir(cls, value: object, info: ValidationInfo) -> Path:
-        path = value if isinstance(value, Path) else Path(_PATH_TEXT.validate_python(value))
-        directory: object = info.context
-        return ((directory if isinstance(directory, Path) else Path.cwd()) / path).resolve()
-
-    @field_validator("distribution", mode="before")
-    @classmethod
-    def parse_distribution(cls, value: object) -> object:
-        if value is False or isinstance(value, Distribution | dict):
-            return value
-        raise ValueError("distribution must be false or an explicit two-node configuration")
-
-    @field_validator("mode", mode="before")
-    @classmethod
-    def parse_mode(cls, value: object) -> Mode:
-        return Mode(TypeAdapter(str, config=ConfigDict(strict=True)).validate_python(value))
-
-    @field_validator("development_runtime", mode="plain")
-    @classmethod
-    def resolve_runtime(cls, value: object, info: ValidationInfo) -> Path | None:
-        if value is None or isinstance(value, Path):
-            return value
-        text = _PATH_TEXT.validate_python(value)
-        directory: object = info.context
-        if isinstance(directory, Path):
-            return (directory / text).resolve()
-        return Path(text).resolve()
-
-    @model_validator(mode="after")
-    def supported_capabilities(self) -> Self:
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "data_dir", self.data_dir.resolve())
+        if self.development_runtime is not None:
+            object.__setattr__(self, "development_runtime", self.development_runtime.resolve())
+        _timeout(self.startup_timeout, "startup_timeout")
+        _timeout(self.shutdown_timeout, "shutdown_timeout")
+        if self.workers != 1:
+            raise ValueError("workers must be 1")
+        if self.distribution is not False and not isinstance(self.distribution, Distribution):
+            raise ValueError("distribution must be false or an explicit two-node configuration")
         if self.mode is not Mode.MANAGED:
             raise ValueError(
                 "Runtime mode '{}' is not implemented; only owned managed runtimes are supported".format(
@@ -135,25 +98,53 @@ class Config(BaseModel):
             )
         if self.listeners:
             raise ValueError("listeners must be false; managed bootstrap opens no listeners")
-        return self
 
 
-class _Tool(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    pybeam: Config = Field(default_factory=Config)
+CONFIG = Json(Config)
 
 
-class _Project(BaseModel):
-    model_config = ConfigDict(strict=True)
+def _path(value: object, directory: Path) -> object:
+    if not isinstance(value, str):
+        return value
+    if not value:
+        raise BootstrapError("Invalid tool.pybeam configuration: paths must not be empty")
+    return str(directory / value)
 
-    tool: _Tool = Field(default_factory=_Tool)
+
+def _anchor(value: object, directory: Path) -> object:
+    """Resolve relative paths against the configuration file's directory."""
+    if not isinstance(value, dict):
+        return value
+    document = dict(value)
+    distribution = document.get("distribution", False)
+    if distribution is not False and not isinstance(distribution, dict):
+        raise BootstrapError(
+            "Invalid tool.pybeam configuration: distribution must be false or an explicit "
+            "two-node configuration"
+        )
+    if "development_runtime" in document:
+        document["development_runtime"] = _path(document["development_runtime"], directory)
+    data_dir = document.get("data_dir", ".pybeam/data")
+    document["data_dir"] = _path(
+        str(data_dir) if isinstance(data_dir, Path) else data_dir, directory
+    )
+    distribution = document.get("distribution")
+    if isinstance(distribution, dict) and isinstance(distribution.get("nodes"), list):
+        distribution = dict(distribution)
+        distribution["nodes"] = [
+            {**node, "entry": _path(node.get("entry"), directory)}
+            if isinstance(node, dict) and "entry" in node
+            else node
+            for node in distribution["nodes"]
+        ]
+        document["distribution"] = distribution
+    return document
 
 
 def parse_config(value: object, directory: Path) -> Config:
     try:
-        return Config.model_validate(value, context=directory)
-    except ValidationError as error:
+        return CONFIG.load(_anchor(value, directory))
+    except CodecError as error:
         raise BootstrapError("Invalid tool.pybeam configuration: " + str(error)) from error
 
 
@@ -164,9 +155,10 @@ def load_config(directory: Path) -> Config:
             try:
                 with project.open("rb") as source:
                     document = tomllib.load(source)
-                return _Project.model_validate(document, context=parent).tool.pybeam
-            except ValidationError as error:
-                raise BootstrapError("Invalid tool.pybeam configuration: " + str(error)) from error
             except (OSError, tomllib.TOMLDecodeError) as error:
                 raise BootstrapError("Cannot read configuration: " + str(project)) from error
-    return Config.model_validate({}, context=directory)
+            tool = document.get("tool", {})
+            if not isinstance(tool, dict):
+                raise BootstrapError("Invalid tool.pybeam configuration: tool must be a table")
+            return parse_config(tool.get("pybeam", {}), parent)
+    return parse_config({}, directory)

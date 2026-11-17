@@ -15,6 +15,7 @@ from examples.showcase import app as showcase
 from examples.showcase import jobs as showcase_jobs
 from examples.showcase.app import Settings, create_app
 from examples.showcase.jobs import Job, Jobs
+from pybeam.codec import Json
 from pybeam.runtime.ownership import Registry, durable_write
 
 
@@ -94,7 +95,7 @@ def serve(
                         directory=job.directory,
                         observations=job.observations,
                         proof=job.proof,
-                        registry=Registry.model_validate_json(registry.read_bytes())
+                        registry=Json(Registry).decode(registry.read_bytes())
                         if registry.is_file()
                         else None,
                         outcome=Outcome.model_validate_json(outcome.read_bytes())

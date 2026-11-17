@@ -1,12 +1,11 @@
 import asyncio
+import os
 import sys
 import tempfile
 import uuid
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, assert_never
-
-import psutil
 
 from benchmarks.contract import AdapterResult, Budget, Config, Workload
 from benchmarks.ownership import Control, Registry, identity
@@ -24,6 +23,7 @@ from examples.distributed.models import (
 )
 from examples.distributed.policy import walkthrough_budget, walkthrough_stop
 from examples.showcase.catalog import ROOT, Card, distributed_unavailable
+from pybeam.codec import Json
 
 
 @dataclass(frozen=True)
@@ -196,7 +196,7 @@ class Jobs:
                 )
             (job.directory / "config.json").write_text(config.model_dump_json())
             control = Control(
-                owner=identity(psutil.Process()), stop_file=str(job.directory / "stop.request")
+                owner=identity(os.getpid()), stop_file=str(job.directory / "stop.request")
             )
             command = (
                 sys.executable
@@ -258,7 +258,7 @@ class Jobs:
                     ),
                 )
                 if any(t.outcome.status == "walkthrough" for t in job.trials):
-                    proof = WalkthroughProof.model_validate_json(
+                    proof = Json(WalkthroughProof).decode(
                         (job.directory / "result/trial-0/adapter.json").read_text()
                     )
                     if proof.observations != job.observations:
@@ -267,7 +267,7 @@ class Jobs:
                 registry_path = job.directory / "result/trial-0/ownership.json"
                 uncertain = (
                     registry_path.exists()
-                    and Registry.model_validate_json(registry_path.read_text()).phase != "confirmed"
+                    and Json(Registry).decode(registry_path.read_text()).phase != "confirmed"
                 )
                 status = (
                     "uncertain"
@@ -307,7 +307,7 @@ class Jobs:
                     if len(lines) > 16 or lines[: len(consumed)] != consumed:
                         raise ValueError("Observation count or append-only contract violated")
                     for line in lines[len(consumed) :]:
-                        event = OBSERVATION.validate_json(line)
+                        event = OBSERVATION.decode(line)
                         current = self.items[job.id]
                         self.update(replace(current, observations=(*current.observations, event)))
                         consumed.append(line)

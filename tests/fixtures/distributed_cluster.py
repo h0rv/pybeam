@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Self, override
 
+from pybeam.codec import Json
 from pybeam.distribution import Distribution, HandlerIdentity, LocalCluster
 from pybeam.runtime.config import Config
 from pybeam.runtime.guardian import GuardianEndpoint
@@ -38,12 +39,12 @@ class ControlledCluster(LocalCluster):
         if handler is None:
             raise ValueError("Controlled fixture has no recipient")
         for name, text in (
-            ("first.json", proof.first.model_dump_json()),
-            ("a.birth.json", proof.vm_a.model_dump_json()),
-            ("b.birth.json", proof.vm_b.model_dump_json()),
-            ("b.identity.json", handler.model_dump_json()),
-            ("inflight.json", proof.inflight.model_dump_json()),
-            ("controls.json", proof.controls.model_dump_json()),
+            ("first.json", Json(type(proof.first)).encode(proof.first).decode()),
+            ("a.birth.json", Json(type(proof.vm_a)).encode(proof.vm_a).decode()),
+            ("b.birth.json", Json(type(proof.vm_b)).encode(proof.vm_b).decode()),
+            ("b.identity.json", Json(type(handler)).encode(handler).decode()),
+            ("inflight.json", Json(type(proof.inflight)).encode(proof.inflight).decode()),
+            ("controls.json", Json(type(proof.controls)).encode(proof.controls).decode()),
         ):
             (self.directory / name).write_text(text)
         return self
@@ -57,7 +58,7 @@ class ControlledCluster(LocalCluster):
             ("absent.json", self.proof.absent),
             ("inflight-loss.json", self.proof.inflight_loss),
         ):
-            (self.directory / name).write_text(reply.model_dump_json())
+            (self.directory / name).write_text(Json(type(reply)).encode(reply).decode())
 
     @override
     def restart(self, alias: str) -> Identity:
@@ -68,11 +69,14 @@ class ControlledCluster(LocalCluster):
         if handler is None:
             raise ValueError("Controlled fixture has no fresh recipient")
         for name, text in (
-            ("b.identity.json", handler.model_dump_json()),
-            ("b.birth.json", self.proof.restarted_b.model_dump_json()),
-            ("fresh.json", self.proof.fresh.model_dump_json()),
-            ("stale.json", self.proof.stale_ack.model_dump_json()),
-            ("second.json", self.proof.second.model_dump_json()),
+            ("b.identity.json", Json(type(handler)).encode(handler).decode()),
+            (
+                "b.birth.json",
+                Json(type(self.proof.restarted_b)).encode(self.proof.restarted_b).decode(),
+            ),
+            ("fresh.json", Json(type(self.proof.fresh)).encode(self.proof.fresh).decode()),
+            ("stale.json", Json(type(self.proof.stale_ack)).encode(self.proof.stale_ack).decode()),
+            ("second.json", Json(type(self.proof.second)).encode(self.proof.second).decode()),
         ):
             (self.directory / name).write_text(text)
         return self.proof.restarted_b

@@ -8,18 +8,26 @@ import sys
 import tempfile
 import threading
 import time
+from contextlib import suppress
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
-from typing import Annotated, Self
+from typing import Self
 
-import psutil
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from pybeam.codec import Json
 from pybeam.runtime.assets import RuntimeAssets, discover_assets
 from pybeam.runtime.config import BootstrapError, Config, Distribution
-from pybeam.runtime.guardian import GuardianEndpoint, GuardianExit, ManagedStop, spawn_owned
+from pybeam.runtime.guardian import (
+    ENDPOINT,
+    GUARDIAN_EXIT,
+    GuardianEndpoint,
+    ManagedStop,
+    spawn_owned,
+)
 from pybeam.runtime.ownership import (
+    IDENTITY,
+    REGISTRY,
     Identity,
     Registry,
     cleanup,
@@ -29,39 +37,35 @@ from pybeam.runtime.ownership import (
     resolve,
 )
 from pybeam.runtime.process import launch
-from pybeam.runtime.startup import LauncherEntry, StartupPlan
+from pybeam.runtime.startup import STARTUP_PLAN, LauncherEntry, StartupPlan
 
 
-class _NodeLaunch(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _NodeLaunch:
     entry: Path
     config: Config
     options: tuple[str, ...]
     environment: dict[str, str]
 
 
-class NodeExit(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NodeExit:
     alias: str
     launcher: Identity
     clean: bool
     status: int
 
 
-class ManagedCleanupAck(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ManagedCleanupAck:
     owner: Identity
     guardian: Identity
     cleanup: Registry
     launchers: tuple[Identity, ...]
     shutdowns: tuple[NodeExit, ...]
-    forced_cleanup_count: Annotated[int, Field(ge=0)]
+    forced_cleanup_count: int
 
-    @model_validator(mode="after")
-    def acknowledged(self) -> Self:
+    def __post_init__(self) -> None:
         if self.owner == self.guardian:
             raise ValueError("Managed cleanup requires distinct owner and guardian births")
         if self.cleanup.phase != "confirmed" or self.forced_cleanup_count != 0:
@@ -74,7 +78,11 @@ class ManagedCleanupAck(BaseModel):
             or not set(self.launchers).issubset(self.cleanup.owned)
         ):
             raise ValueError("Managed cleanup lacks an exact launcher/VM ACK")
-        return self
+
+
+_NODE_LAUNCH = Json(_NodeLaunch)
+NODE_EXIT = Json(NodeExit)
+CLEANUP_ACK = Json(ManagedCleanupAck)
 
 
 class _Phase(StrEnum):
@@ -107,7 +115,7 @@ class LocalCluster:
             and self.config.shutdown_timeout != guardian.stop_policy.node_shutdown_seconds
         ):
             raise BootstrapError("Managed stop policy differs from the node cleanup budget")
-        self._owner_identity = identity(psutil.Process())
+        self._owner_identity = identity(os.getpid())
         self._launcher_history: list[Identity] = []
         self._forced_cleanup_count = 0
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -167,7 +175,9 @@ class LocalCluster:
             environment.pop("PYBEAM_OUTER_GUARDIAN", None)
             if self._external_guardian is not None:
                 self._external_guardian.require_active()
-                environment["PYBEAM_OUTER_GUARDIAN"] = self._external_guardian.model_dump_json()
+                environment["PYBEAM_OUTER_GUARDIAN"] = ENDPOINT.encode(
+                    self._external_guardian
+                ).decode()
             environment.update(
                 HOME=str(home),
                 ERL_EPMD_PORT=str(self.distribution.discovery_port),
@@ -179,9 +189,9 @@ class LocalCluster:
                 environment.pop(key, None)
             durable_write(
                 self.directory / "startup-plan.json",
-                StartupPlan(
-                    aliases=tuple(node.alias for node in self.distribution.nodes)
-                ).model_dump_json(),
+                STARTUP_PLAN.encode(
+                    StartupPlan(aliases=tuple(node.alias for node in self.distribution.nodes))
+                ).decode(),
             )
             self._guardian = subprocess.Popen(  # noqa: S603
                 [
@@ -189,12 +199,12 @@ class LocalCluster:
                     "-m",
                     "pybeam.runtime.guardian",
                     str(self.directory),
-                    identity(psutil.Process()).model_dump_json(),
+                    IDENTITY.encode(identity(os.getpid())).decode(),
                 ],
                 env=environment,
                 start_new_session=True,
             )
-            self._guardian_identity = identity(psutil.Process(self._guardian.pid))
+            self._guardian_identity = identity(self._guardian.pid)
             deadline = time.monotonic() + 5
             while not (self.directory / "ownership.json").exists():
                 if self._guardian.poll() is not None or time.monotonic() > deadline:
@@ -230,7 +240,7 @@ class LocalCluster:
             for node in self.distribution.nodes:
                 descriptor = _NodeLaunch(
                     entry=node.entry.resolve(),
-                    config=self.config.model_copy(update={"distribution": False}),
+                    config=replace(self.config, distribution=False),
                     options=(
                         "-name",
                         self.names[node.alias],
@@ -256,7 +266,7 @@ class LocalCluster:
                     },
                 )
                 (self.directory / (node.alias + ".launch.json")).write_text(
-                    descriptor.model_dump_json()
+                    _NODE_LAUNCH.encode(descriptor).decode()
                 )
                 self.restart(node.alias)
             self._phase = _Phase.ACTIVE
@@ -297,7 +307,7 @@ class LocalCluster:
             if resolve(value) is None or time.monotonic() > deadline:
                 raise BootstrapError("Owned node did not acknowledge managed startup: " + alias)
             time.sleep(0.02)
-        self.nodes[alias] = Identity.model_validate_json(ready.read_text())
+        self.nodes[alias] = IDENTITY.decode(ready.read_text())
         self.identities.append(self.nodes[alias])
         return self.nodes[alias]
 
@@ -307,9 +317,9 @@ class LocalCluster:
         value = self._launchers.get(alias)
         if value is None:
             raise ValueError("Unknown started node alias")
-        process = resolve(value)
-        if process is not None:
-            process.send_signal(signal.SIGTERM)
+        if resolve(value) is not None:
+            with suppress(ProcessLookupError):
+                os.kill(value.pid, signal.SIGTERM)
             deadline = time.monotonic() + self.config.shutdown_timeout + 2
             while resolve(value) is not None:
                 if time.monotonic() > deadline:
@@ -318,7 +328,7 @@ class LocalCluster:
         marker = self.directory / (alias + ".stopped.json")
         if not marker.exists():
             raise BootstrapError("Owned launcher did not acknowledge VM cleanup: " + alias)
-        outcome = NodeExit.model_validate_json(marker.read_text())
+        outcome = NODE_EXIT.decode(marker.read_text())
         if outcome.alias != alias or outcome.launcher != value or not outcome.clean:
             raise BootstrapError("Owned VM cleanup failed: " + alias)
         if outcome not in self.shutdowns:
@@ -360,7 +370,9 @@ class LocalCluster:
                 shutdowns=tuple(self.shutdowns),
                 forced_cleanup_count=self._forced_cleanup_count,
             )
-            durable_write(endpoint.directory / "managed-cleanup.json", ack.model_dump_json())
+            durable_write(
+                endpoint.directory / "managed-cleanup.json", CLEANUP_ACK.encode(ack).decode()
+            )
 
     def _finish_guardian(self) -> None:
         guardian = self._guardian
@@ -374,7 +386,7 @@ class LocalCluster:
             timed_out = True
         journal = self.directory / "ownership.json"
         registry = (
-            Registry.model_validate_json(journal.read_text())
+            REGISTRY.decode(journal.read_text())
             if journal.exists()
             else Registry(phase="spawning" if self.identities else "tracking", owned=())
         )
@@ -395,14 +407,12 @@ class LocalCluster:
                 owned,
                 "spawning" if unknown_spawn else "uncertain" if survivors else "confirmed",
             )
-        self.cleanup = Registry.model_validate_json(journal.read_text())
+        self.cleanup = REGISTRY.decode(journal.read_text())
         if self.cleanup.phase != "confirmed":
             raise BootstrapError("Cluster ownership cleanup is uncertain")
         endpoint = self._external_guardian
         if endpoint is not None and isinstance(endpoint.stop_policy, ManagedStop):
-            report = GuardianExit.model_validate_json(
-                (self.directory / "guardian-exit.json").read_bytes()
-            )
+            report = GUARDIAN_EXIT.decode((self.directory / "guardian-exit.json").read_bytes())
             if report.registry != self.cleanup:
                 raise BootstrapError("Managed guardian cleanup journal differs")
             self._forced_cleanup_count += report.forced_cleanup_count
@@ -418,10 +428,10 @@ class LocalCluster:
 
 
 def _node(path: Path) -> None:
-    descriptor = _NodeLaunch.model_validate_json(path.read_text())
+    descriptor = _NODE_LAUNCH.decode(path.read_text())
     directory = Path(descriptor.environment["PYBEAM_CLUSTER_DIRECTORY"])
     alias = descriptor.environment["PYBEAM_NODE_ALIAS"]
-    launcher = identity(psutil.Process())
+    launcher = identity(os.getpid())
     try:
         status = launch(
             descriptor.entry,
@@ -434,12 +444,16 @@ def _node(path: Path) -> None:
     except BootstrapError:
         durable_write(
             directory / (alias + ".stopped.json"),
-            NodeExit(alias=alias, launcher=launcher, clean=False, status=1).model_dump_json(),
+            NODE_EXIT.encode(
+                NodeExit(alias=alias, launcher=launcher, clean=False, status=1)
+            ).decode(),
         )
         raise
     durable_write(
         directory / (alias + ".stopped.json"),
-        NodeExit(alias=alias, launcher=launcher, clean=True, status=status).model_dump_json(),
+        NODE_EXIT.encode(
+            NodeExit(alias=alias, launcher=launcher, clean=True, status=status)
+        ).decode(),
     )
     raise SystemExit(status)
 

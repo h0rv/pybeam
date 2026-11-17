@@ -2,12 +2,13 @@ import os
 import subprocess
 import sys
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, assert_type
 
 import pytest
-from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
+from pybeam.codec import CodecError, Json
 from pybeam.submissions import CapabilityUnavailable
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
@@ -22,8 +23,8 @@ def entry() -> Callable[[bytes], Awaitable[bytes]]:
     return byte_entry
 
 
-class Request(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True)
+class Request:
     value: int
 
 
@@ -32,7 +33,7 @@ async def render(request: Request) -> str:
 
 
 async def checked(supervisor: TaskSupervisor) -> None:
-    function = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    function = TaskFunction(render, Json(Request), Json(str))
     ref = await supervisor.start(function, Request(value=21))
     assert_type(ref, TaskRef[str])
     assert_type(function.execution, ExecutionMode)
@@ -45,9 +46,7 @@ async def checked(supervisor: TaskSupervisor) -> None:
 async def checked_owngil(
     supervisor: TaskSupervisor, entry: Callable[[bytes], Awaitable[bytes]]
 ) -> None:
-    function = TaskFunction(
-        entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL
-    )
+    function = TaskFunction(entry, Json(Request), Json(str), execution=ExecutionMode.OWNGIL)
     assert_type(function, TaskFunction[Request, str])
     assert_type(await supervisor.start(function, Request(value=1)), TaskRef[str])
 
@@ -65,12 +64,12 @@ def test_execution_mode__values() -> None:
 def test_task_function__worker_default_and_explicit(
     dedicated_loop: bool, execution: ExecutionMode
 ) -> None:
-    default = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    default = TaskFunction(render, Json(Request), Json(str))
     assert default.execution is ExecutionMode.WORKER
     explicit = TaskFunction(
         render,
-        TypeAdapter(Request),
-        TypeAdapter(str),
+        Json(Request),
+        Json(str),
         execution=execution,
         dedicated_loop=dedicated_loop,
     )
@@ -94,8 +93,8 @@ def test_task_function__unavailable_modes(
     with pytest.raises(CapabilityUnavailable, match=reason):
         TaskFunction(
             render,
-            TypeAdapter(Request),
-            TypeAdapter(str),
+            Json(Request),
+            Json(str),
             execution=execution,
             dedicated_loop=dedicated_loop,
         )
@@ -112,18 +111,18 @@ def test_task_function__owngil_requires_async_function(execution: ExecutionMode)
 
     for function in (not_async, CallableEntry(), CallableEntry().__call__):
         with pytest.raises(TypeError, match="owngil tasks require a plain async Python function"):
-            TaskFunction(function, TypeAdapter(bytes), TypeAdapter(bytes), execution=execution)
+            TaskFunction(function, Json(bytes), Json(bytes), execution=execution)
 
 
 @pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
 def test_task_function__owngil_entry_codecs(
     entry: Callable[[bytes], Awaitable[bytes]], execution: Literal[ExecutionMode.OWNGIL]
 ) -> None:
-    function = TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+    function = TaskFunction(entry, Json(Request), Json(str), execution=execution)
     assert function.execution is ExecutionMode.OWNGIL
     assert function.encode(Request(value=3)) == b'{"value":3}'
     assert function.decode(b'"result"') == "result"
-    with pytest.raises(ValidationError):
+    with pytest.raises(CodecError):
         function.decode(b"")
 
 
@@ -133,15 +132,15 @@ def test_task_function__owngil_rejects_dedicated_loop(
     with pytest.raises(ValueError, match="dedicated_loop is worker-only"):
         TaskFunction(
             entry,
-            TypeAdapter(Request),
-            TypeAdapter(str),
+            Json(Request),
+            Json(str),
             execution=ExecutionMode.OWNGIL,
             dedicated_loop=True,
         )
 
 
 def test_task_function__worker_accepts_byte_function() -> None:
-    function = TaskFunction(byte_entry, TypeAdapter(bytes), TypeAdapter(bytes))
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes))
     assert function.execution is ExecutionMode.WORKER
 
 
@@ -154,25 +153,23 @@ def test_task_function__owngil_rejects_nonimportable_entry(
     monkeypatch.setattr(byte_entry, "__module__", module)
     monkeypatch.setattr(byte_entry, "__qualname__", name)
     with pytest.raises(TypeError, match="importable top-level functions"):
-        TaskFunction(
-            byte_entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL
-        )
+        TaskFunction(byte_entry, Json(Request), Json(str), execution=ExecutionMode.OWNGIL)
 
 
 @pytest.mark.parametrize("execution", ["unknown"])
 def test_task_function__unknown_execution_mode(execution: ExecutionMode) -> None:
     with pytest.raises(ValueError, match="'unknown' is not a valid ExecutionMode"):
-        TaskFunction(render, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+        TaskFunction(render, Json(Request), Json(str), execution=execution)
 
 
 def test_task_function__strict_request_and_result_boundaries() -> None:
-    function = TaskFunction(render, TypeAdapter(Request), TypeAdapter(str))
+    function = TaskFunction(render, Json(Request), Json(str))
     assert function.encode(Request(value=21)) == b'{"value":21}'
     assert function.decode(b'"result"') == "result"
-    with pytest.raises(ValidationError):
+    with pytest.raises(CodecError):
         function.decode(b"21")
-    with pytest.raises(ValidationError):
-        TaskLimits.model_validate({"capacity": "1", "max_bytes": 100, "shutdown_ms": 100})
+    with pytest.raises(CodecError):
+        Json(TaskLimits).load({"capacity": "1", "max_bytes": 100, "shutdown_ms": 100})
 
 
 def test_tasks__core_import_does_not_require_native_or_frameworks() -> None:
@@ -195,15 +192,15 @@ def test_tasks__core_import_does_not_require_native_or_frameworks() -> None:
 def test_tasks__negative_request_and_result_probes(tmp_path: Path) -> None:
     source = tmp_path / "negative.py"
     source.write_text(
-        "from pydantic import TypeAdapter\n"
+        "from pybeam.codec import Json\n"
         "from pybeam.tasks import TaskFunction, TaskSupervisor\n"
         "async def render(value: int) -> str:\n"
         "    return str(value)\n"
         "async def bad(sup: TaskSupervisor) -> None:\n"
-        "    function = TaskFunction(render, TypeAdapter(int), TypeAdapter(str))\n"
+        "    function = TaskFunction(render, Json(int), Json(str))\n"
         "    await sup.start(function, 'wrong')\n"
         "    value: int = await (await sup.start(function, 1))\n"
-        "    TaskFunction(render, TypeAdapter(int), TypeAdapter(str), execution='worker')\n"
+        "    TaskFunction(render, Json(int), Json(str), execution='worker')\n"
     )
     root = Path(__file__).resolve().parents[1]
     result = subprocess.run(
