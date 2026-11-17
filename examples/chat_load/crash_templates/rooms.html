@@ -1,7 +1,7 @@
 {% include 'scenario.html' %}
 <div class="conversation-label">
   <h2>Room {{ live.focus_room + 1 }} · user {{ live.focus_client + 1 }}</h2>
-  <p>{% if live.phase in ('observe', 'recovery', 'done') %}{{ live.focus_reason }}{% else %}The same user on both stacks, outside the faulted room.{% endif %}</p>
+  <p>The same user on both stacks, outside Room 1.</p>
 </div>
 <div class="columns">
 {% for key, side in live.sides.items() %}
@@ -21,10 +21,12 @@
       </li>
     {% else %}<li class="empty">Waiting for this user's first message…</li>{% endfor %}
     </ol>
-    <div class="outcome {{ 'affected' if impact and impact.dropped else '' }}" role="status" aria-live="polite">
+    {% if impact %}
+    <div class="outcome {{ 'affected' if impact.dropped else '' }}" role="status" aria-live="polite">
       <h4>{% if impact and impact.dropped %}{{ impact.dropped }} {{ 'user' if impact.dropped == 1 else 'users' }} in other rooms disconnected.{% elif impact and impact.pending_ms >= 500 %}Replies in other rooms stalled for {{ '%.1f' | format(impact.pending_ms / 1000) }} s.{% elif impact and impact.replies %}No users in other rooms disconnected{% if live.phase == 'observe' %} so far{% endif %}.{% elif impact %}Watching for replies in other rooms…{% else %}Other rooms{% endif %}</h4>
       <p>{% if impact %}{{ impact.replies }} sends confirmed. {{ impact.lost }} unconfirmed at disconnect. Longest observed reply wait: {{ '%.2f' | format(impact.pending_ms / 1000) }} s.{% else %}Rooms 2–{{ live.settings.rooms }}. Results appear here after the crash.{% endif %}</p>
     </div>
+    {% endif %}
     <div class="room-list" aria-label="{{ side.title }} other room connections">
     {% for other in side.rooms[1:] %}<span class="{{ 'problem' if other.status(now) != 'healthy' else '' }}">Room {{ loop.index + 1 }}: {% if other.oldest_ms(now) >= 500 and other.connected == other.clients | length %}waiting{% else %}{{ other.connected }}/{{ other.clients | length }}{% endif %}</span>{% endfor %}
     </div>

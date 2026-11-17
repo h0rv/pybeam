@@ -76,8 +76,8 @@ details p { color: var(--muted); margin-top: 12px; max-width: 80ch; }
   .chat-panel { padding-right: 12px; }
   .chat-panel + .chat-panel { padding-left: 12px; }
   .side-heading { flex-direction: column; gap: 0; }
-  .connection-event { min-height: 86px; }
+  .connection-event { min-height: 64px; }
   .messages { height: 320px; }
   .message { max-width: 100%; padding: 8px; }
-  .outcome { min-height: 216px; }
+  .outcome { min-height: 0; }
 }
