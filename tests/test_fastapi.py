@@ -6,7 +6,8 @@ from typing import Annotated
 import pytest
 from anyio import BrokenResourceError
 from fastapi import APIRouter, Depends, FastAPI, WebSocket
-from hornbeam.api.errors import RuntimeUnavailable
+from hornbeam.api.errors import RuntimeProtocolError, RuntimeUnavailable
+from hornbeam.services.client import Beam as NativeBeam
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import HTTPConnection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -15,7 +16,7 @@ from examples.fastapi.main import app as example_app
 from examples.fastapi.main import counter_events, counter_subscription
 from examples.fastapi.main import provider as example_provider
 from pybeam.integrations.fastapi.dependencies import BeamProvider
-from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.hornbeam import Beam, Services
 from tests.fakes import FakeServices, ServiceState
 
 
@@ -178,15 +179,37 @@ async def test_fastapi__cancelled_receive_releases_subscription() -> None:
     assert not state.channels
 
 
-async def test_fastapi__missing_scope_owner_is_an_error() -> None:
+async def test_fastapi__unowned_requests_use_lifespan_services() -> None:
     state = ServiceState()
     app = fake_app(state)
     async with (
         app.router.lifespan_context(app),
         AsyncClient(transport=ASGITransport(app), base_url="http://testserver") as client,
     ):
-        with pytest.raises(RuntimeError, match="Hornbeam"):
-            await client.get("/counter")
+        assert (await client.get("/counter")).text == '<output id="count">0</output>'
+
+
+@pytest.mark.parametrize("extensions", [None, {}, {"hornbeam.owner": None}])
+async def test_fastapi__unowned_subscription_raises_native_error(
+    extensions: dict[str, object] | None,
+) -> None:
+    beam = Beam(NativeBeam(owner="application-owner"))
+
+    async def connect() -> Services:
+        return beam
+
+    provider = BeamProvider(connect)
+    scope = event_scope()
+    if extensions is None:
+        del scope["extensions"]
+    else:
+        scope["extensions"] = extensions
+    connection = HTTPConnection(scope)
+    async with provider.lifespan(object()):
+        assert await provider(connection) is beam
+        async with aclosing(provider.subscription("demo:counter")(connection)) as stream:
+            with pytest.raises(RuntimeProtocolError, match="scope has no"):
+                await anext(stream)
 
 
 async def test_fastapi__connects_once_and_keeps_scope_owners_independent() -> None:
@@ -220,6 +243,8 @@ async def test_fastapi__connects_once_and_keeps_scope_owners_independent() -> No
     dependency = provider.subscription("demo:counter", max_bytes=1024)
     async with app.router.lifespan_context(app):
         assert lifecycle == ["starting", "ready"]
+        assert await provider(first) is provider.services
+        assert await provider(second) is provider.services
         with pytest.raises(RuntimeError, match="already running"):
             async with provider.lifespan(app):
                 pytest.fail("Nested provider lifespan must be rejected")
@@ -271,7 +296,9 @@ async def test_fastapi__websocket_dependency_uses_actual_connection_scope() -> N
         assert connection is socket
         assert connection.scope is scope
         await socket.accept()
-        async with beam.subscribe("demo:counter"):
+        assert beam is provider.services
+        async with aclosing(provider.subscription("demo:counter")(connection)) as stream:
+            await anext(stream)
             await socket.send_text("subscribed")
         await socket.close()
 
