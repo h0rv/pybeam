@@ -45,7 +45,7 @@ async def empty_scope(supervisor: TaskSupervisor) -> ScopeInfo:
     info = Json(ScopeInfo).load(value)
     assert info.children == info.contexts == []
     assert (
-        info.jobs == info.starting == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
+        info.starting == info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
     )
     return info
 
