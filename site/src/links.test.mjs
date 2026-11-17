@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "messaging/", "background/", "web/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "messaging/", "background/", "execution/", "web/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -109,7 +109,7 @@ test("state and supervision teach distinct operations without another introducti
 
 test("distinct concept tasks replace grouped capability navigation", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Web integration",
+    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "How Python work runs", "Web integration",
   ]);
   assert.ok(navigation.every((page) => !("group" in page)));
   assert.ok(!navigation.some(({ path }) => path === "genstage/"));
