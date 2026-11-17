@@ -213,11 +213,13 @@ dev = [
     { name = "hypothesis", specifier = ">=6,<7" },
     { name = "patchelf", marker = "sys_platform == 'linux'", specifier = "==0.19.3.0" },
     { name = "playwright", specifier = ">=1.58,<2" },
+    { name = "psutil", specifier = ">=7,<8" },
     { name = "pydantic", specifier = "==2.14.3" },
     { name = "pytest", specifier = ">=9,<10" },
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.14,<1" },
     { name = "ty", specifier = ">=0.0.104" },
+    { name = "types-psutil", specifier = ">=7,<8" },
     { name = "typing-extensions", specifier = ">=4.14.1,<5" },
     { name = "websockets", specifier = ">=15,<17" },
 ]
