@@ -1,9 +1,11 @@
 import asyncio
 import math
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from inspect import iscoroutinefunction
 from pathlib import Path
+from types import FunctionType
 
 from pybeam.runtime.config import load_config
 
@@ -101,26 +103,52 @@ async def _settle(task: asyncio.Task[object]) -> None:
         raise QueueStoreError("Invalid write response")
 
 
+def _lease_ms(lease: float) -> int:
+    if isinstance(lease, bool) or not math.isfinite(lease) or not 0 < lease <= 4_294_967:
+        raise ValueError("lease must be finite and positive, at most 4294967 seconds")
+    return max(1, math.ceil(lease * 1000))
+
+
+def _stored(result: object) -> bool:
+    if result == ("ok", "stored"):
+        return True
+    if result == ("ok", "duplicate"):
+        return False
+    raise QueueStoreError("Invalid put response")
+
+
 class DurableQueue:
-    """Single-node, at-least-once prototype; same-host crash tested.
+    """At-least-once prototype; same-host process-crash tested.
 
     Keys are retained until ack, not forever. Keep the data directory across
-    restarts. This is not partition-safe or production-ready.
+    restarts. Empty replicas means this node only. Replicated Mnesia without
+    majority is not partition-safe. This is not production-ready.
     """
 
-    def __init__(self, name: str, *, max_items: int = 10_000) -> None:
+    def __init__(self, name: str, *, max_items: int = 10_000, replicas: Sequence[str] = ()) -> None:
         if not isinstance(name, str) or not name:
             raise ValueError("Queue name must be nonempty text")
         if type(max_items) is not int or max_items < 1:
             raise ValueError("max_items must be a positive integer")
+        if isinstance(replicas, str | bytes) or any(
+            not node or "\x00" in node for node in replicas
+        ):
+            raise ValueError("replicas must contain nonempty node names")
         self._name = name.encode()
         self._max_items = max_items
+        self._replicas = tuple(node.encode() for node in replicas)
         self._directory = load_config(Path.cwd()).data_dir
         self._opened = False
 
     async def _open(self) -> None:
         if not self._opened:
-            result = await _call("_queue_open", str(self._directory), self._name, self._max_items)
+            result = await _call(
+                "_queue_open",
+                str(self._directory),
+                self._name,
+                self._max_items,
+                list(self._replicas),
+            )
             if result != "ok":
                 raise QueueStoreError("Invalid open response")
             self._opened = True
@@ -141,11 +169,7 @@ class DurableQueue:
         result = await _call(
             "_queue_put", self._name, None if key is None else key.encode(), payload
         )
-        if result == ("ok", "stored"):
-            return True
-        if result == ("ok", "duplicate"):
-            return False
-        raise QueueStoreError("Invalid put response")
+        return _stored(result)
 
     async def _receive(self, lease_ms: int) -> _Claim:
         while True:
@@ -171,9 +195,7 @@ class DurableQueue:
         Expired acks raise LeaseExpired. Cancellation while waiting releases
         late claims before returning and may take a further 250 ms plus sync.
         """
-        if isinstance(lease, bool) or not math.isfinite(lease) or not 0 < lease <= 4_294_967:
-            raise ValueError("lease must be finite and positive, at most 4294967 seconds")
-        lease_ms = max(1, math.ceil(lease * 1000))
+        lease_ms = _lease_ms(lease)
         await self._open()
         delivery = await self._receive(lease_ms)
         try:
@@ -186,3 +208,87 @@ class DurableQueue:
             raise
         else:
             await _settle(asyncio.create_task(_call("_queue_ack", delivery.id, delivery.token)))
+
+
+class DurableTasks:
+    """At-least-once task prototype, not production-ready.
+
+    Bodies rerun from the start on another serving replica after node loss
+    or lease expiry. Leases are not renewed; longer bodies may run twice.
+    Results are discarded. Bodies must be idempotent or use application
+    idempotency keys; submit keys deduplicate only until acknowledgement.
+    There is no dead-letter queue or attempt cap. Replicated Mnesia without
+    majority is not partition-safe. Only same-host process crashes are tested.
+    """
+
+    def __init__(self, name: str, *, max_items: int = 10_000, replicas: Sequence[str] = ()) -> None:
+        self._queue = DurableQueue(name, max_items=max_items, replicas=replicas)
+
+    async def submit(
+        self,
+        function: Callable[[bytes], Awaitable[bytes]],
+        payload: bytes,
+        *,
+        key: str | None = None,
+    ) -> bool:
+        """Sync intent before returning True; False means a retained duplicate key.
+
+        A plain importable top-level async byte function is required. Resolution
+        uses its module and name in the native runtime, not a transferred callable.
+        The 1 MiB limit includes the stored module/function/payload record.
+        Cancellation is uncertain: the task may be stored. Retry with the same
+        key while it is retained; keys are removed on acknowledgement.
+        """
+        if not isinstance(function, FunctionType) or not iscoroutinefunction(function):
+            raise TypeError("Durable tasks require a plain async Python function")
+        if (
+            not isinstance(function.__module__, str)
+            or not function.__qualname__.isidentifier()
+            or not all(part.isidentifier() for part in function.__module__.split("."))
+        ):
+            raise TypeError("Durable tasks require importable top-level functions")
+        if not isinstance(payload, bytes):
+            raise TypeError("payload must be bytes")
+        if len(payload) > 1_048_576:
+            raise PayloadTooLarge("Stored task record exceeds 1 MiB")
+        if key is not None and not isinstance(key, str):
+            raise TypeError("key must be text or None")
+        await self._queue._open()
+        result = await _call(
+            "_tasks_submit",
+            self._queue._name,
+            None if key is None else key.encode(),
+            function.__module__.encode(),
+            function.__qualname__.encode(),
+            payload,
+        )
+        return _stored(result)
+
+    @asynccontextmanager
+    async def serve(self, *, concurrency: int = 4, lease: float = 60.0) -> AsyncGenerator[None]:
+        """Own this node's BEAM workers until exit, including error or cancellation.
+
+        Each worker owns a Python execution context. Exit stops the workers and
+        releases in-flight claims when possible; otherwise leases expire.
+        Enter cancellation waits for startup to settle, then stops owned workers.
+        """
+        if type(concurrency) is not int or not 1 <= concurrency <= 1024:
+            raise ValueError("concurrency must be an integer from 1 to 1024")
+        lease_ms = _lease_ms(lease)
+        await self._queue._open()
+        pending = asyncio.create_task(
+            _call("_tasks_serve", self._queue._name, concurrency, lease_ms)
+        )
+        try:
+            result = await asyncio.shield(pending)
+        except asyncio.CancelledError:
+            result = await _finish(pending)
+            if result == "ok":
+                await _settle(asyncio.create_task(_call("_tasks_stop", self._queue._name)))
+            raise
+        if result != "ok":
+            raise QueueStoreError("Invalid serve response")
+        try:
+            yield
+        finally:
+            await _settle(asyncio.create_task(_call("_tasks_stop", self._queue._name)))

@@ -70,7 +70,7 @@ async def test_put(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     stored = False
     assert not await queue.put(b"", key="key")
     assert calls == [
-        ("_queue_open", (str(tmp_path / ".pybeam/data"), b"q", 2)),
+        ("_queue_open", (str(tmp_path / ".pybeam/data"), b"q", 2, [])),
         ("_queue_put", (b"q", b"key", b"")),
         ("_queue_put", (b"q", b"key", b"")),
     ]

@@ -14,6 +14,7 @@ export const pages = [
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/execution.md", path: "execution/", label: "How Python work runs", examples: ["examples/docs/execution.py"] },
+  { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_body.py", "examples/docs/durable_tasks.py"] },
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
@@ -23,8 +24,8 @@ export const pages = [
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 2) },
-  { label: "Guides", pages: navigation.slice(2, 8) },
-  { label: "Integrations", pages: navigation.slice(8) },
+  { label: "Guides", pages: navigation.slice(2, 9) },
+  { label: "Integrations", pages: navigation.slice(9) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",
