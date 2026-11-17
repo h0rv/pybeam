@@ -30,9 +30,8 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 Tasks and actors run in `worker` mode; `owngil` and `isolated` are not yet available to them. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
-from pydantic import TypeAdapter
-
 from pybeam import run
+from pybeam.codec import Json
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskSupervisor
 
 
@@ -46,8 +45,8 @@ async def checksum(iterations: int) -> int:
 async def main() -> None:
     job = TaskFunction(
         checksum,
-        TypeAdapter(int),
-        TypeAdapter(int),
+        Json(int),
+        Json(int),
         execution=ExecutionMode.WORKER,
         dedicated_loop=True,
     )
