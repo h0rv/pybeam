@@ -1,0 +1,21 @@
+<div class="columns">
+{% for side in live.sides.values() %}
+  <section aria-label="{{ side.title }} live room metrics" class="room-panel">
+    <div class="table-heading"><span>ROOM / STATUS</span><span>P99 / 2 S</span><span>HISTORY</span><span>SOCKETS</span></div>
+    {% for room in side.rooms %}
+    {% set status = room.status(now) %}
+    <article class="room {{ 'affected' if status != 'healthy' else '' }}" data-room="{{ side.key }}-{{ room.name }}">
+      <div class="identity"><strong>{{ room.name }}</strong><span class="status">{{ status }}</span></div>
+      <div class="latency"><strong>{% if room.p99 is not none %}{{ '%.1f' | format(room.p99) }}<small> ms</small>{% else %}—{% endif %}</strong><span>{{ room.sample_count }} acks</span></div>
+      <svg class="spark" viewBox="0 0 120 28" role="img" aria-label="{{ room.name }} p99 history, 100 millisecond ceiling">
+        <path class="baseline" d="M0 24H120"></path>
+        {% for points in room.lines %}<polyline points="{{ points }}"></polyline>{% endfor %}
+      </svg>
+      <div class="sockets"><strong>{{ room.connected }}<small> / {{ room.clients | length }}</small></strong><span>{{ room.reconnects }} retries</span></div>
+      <div class="room-detail"><span>{{ room.pending }} pending · oldest {{ '%.0f' | format(room.oldest_ms(now)) }} ms · {{ room.lost }} lost</span><span title="{{ room.last_fault }}">{{ room.last_fault }}</span></div>
+    </article>
+    {% endfor %}
+    <p class="endpoint">{{ side.url }}{% if side.running %}<strong> · injecting into room-1…</strong>{% endif %}</p>
+  </section>
+{% endfor %}
+</div>

@@ -5,9 +5,8 @@ traffic simulator:
 
 - `app.py`: one PyBEAM process. Room counters, room pub/sub, and background
   jobs use PyBEAM services and `TaskSupervisor`.
-- `conventional/`: the usual multi-service layout. Two app replicas behind a
-  reverse proxy with sticky WebSocket sessions, a KV cache for counters and
-  pub/sub, a message broker, and a task queue worker.
+- `conventional/`: eight web workers, a KV cache for counters and pub/sub,
+  a message broker, and a task-queue worker.
 
 Both servers share `protocol.py`, `rooms.py` and `jobs.py`. Each room keeps one
 subscription per server process and fans pushes out to its local WebSockets.
@@ -50,11 +49,33 @@ values only:
 Use `--json report.json` to keep the full report. Run `--help` for the load
 options.
 
+## Open the crash-test dashboard
+
+With both servers running, start the dashboard:
+
+```console
+$ uv run --locked --extra fastapi python -m examples.chat_load.crash_test
+```
+
+Open `http://127.0.0.1:8802`. The same command is available as
+`mise run example:crash-test`. Override server addresses with `--usual-url`
+and `--pybeam-url`; use `--rooms`, `--clients`, and `--rate` to set the load.
+The rate is messages per second per socket. Traffic runs once per dashboard
+process, regardless of how many browser tabs are open.
+
+Each side's buttons inject into `room-1`. Rolling p99 uses acknowledgements
+received in the last two seconds, not messages still waiting for a reply.
+Watch pending age and socket counts alongside p99. Disconnects trigger
+reconnection, not message retries; unacknowledged messages count as lost.
+An aborted request loses its response, so the dashboard reports a lost
+connection rather than assuming the worker died. Keep this local fault demo
+off public networks.
+
 ## Differences that affect the numbers
 
 - PyBEAM admits at most 64 running jobs and rejects more with HTTP 503. The
   task queue accepts every job and lets the broker queue grow.
-- PyBEAM jobs run in their own interpreter (`ExecutionMode.OWNGIL`). Queue
-  workers are separate processes.
+- PyBEAM jobs use dedicated-loop worker tasks. Task-queue workers are
+  separate processes.
 - Neither stack persists room counters or retries jobs. A job lost to a crash
   stays lost in both. Counters in PyBEAM disappear when the process stops.

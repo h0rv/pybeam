@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
+  <title>Room crash test</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/dashboard.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/sse.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <div><p class="eyebrow">LIVE CHAT / FAULT INJECTION</p><h1>Room crash test</h1></div>
+    <p class="load">{{ live.settings.rooms }} rooms × {{ live.settings.clients }} sockets per side<br>{{ live.settings.rate | round(1) }} messages / socket / second</p>
+  </header>
+  <div class="columns controls">
+    {% for side in live.sides.values() %}
+    <section aria-labelledby="heading-{{ side.key }}">
+      <div class="side-heading"><h2 id="heading-{{ side.key }}">{{ side.title }}</h2><span class="target">Target: room-1</span></div>
+      <p class="stack">{% if side.key == 'usual' %}8 web workers · KV cache · message broker · task-queue worker{% else %}1 process{% endif %}</p>
+      <div class="buttons" aria-label="{{ side.title }} faults">
+        {% for kind, label in [('raise', 'Raise in room'), ('hog', 'CPU hog room'), ('abort', 'os.abort() in room')] %}
+        <button type="button" hx-post="/faults/{{ side.key }}/{{ kind }}"
+                hx-target="#result-{{ side.key }}" hx-swap="innerHTML"
+                hx-disabled-elt="this" aria-label="{{ side.title }}: {{ label }}">{{ label }}</button>
+        {% endfor %}
+      </div>
+      <p class="result" id="result-{{ side.key }}" role="status">{% include 'result.html' %}</p>
+    </section>
+    {% endfor %}
+  </div>
+  <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
+       hx-config='{"sse":{"pauseOnBackground":false}}'>
+    {% include 'rooms.html' %}
+  </div>
+  <footer>
+    <p><strong>Rolling p99</strong> · received acknowledgements in the last 2 s. Pending age exposes stalls; — means no samples.<br>
+    History: last 20 s, fixed 0–100 ms scale (clipped). Disconnected clients retry automatically; retries count successful reconnects.</p>
+    <p>CPU hog: 3 s. Fault status holds for 6 s, then returns to healthy if connected. Lost counts unacknowledged messages at disconnect.<br>
+    Worker assignment is not room-affine. A lost request does not prove a worker died. Local demo only.</p>
+  </footer>
+</main>
+</body>
+</html>
