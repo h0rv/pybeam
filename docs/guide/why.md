@@ -23,6 +23,10 @@ Two WebSocket clients connect to your app and need to see the same count.
 
 ## Compared with plain asyncio
 
+Asyncio tasks are fast and cheap. A million sleeping tasks took about 2.2 GB on Python 3.10 ([2023 benchmark](https://pkolaczk.github.io/memory-consumption-of-async/)) and 1.3 GB on Python 3.13 ([2024 rerun](https://hez2010.github.io/async-runtimes-benchmarks-2024)), and Textual measured about 260,000 tasks created, run and finished per second ([Textual](https://textual.textualize.io/blog/2023/03/08/overhead-of-python-asyncio-tasks/)). A BEAM process is not smaller: it starts at 338 words, about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), and a million idle processes peaked near 2.6 GiB ([measurement](https://hauleth.dev/post/beam-process-memory-usage/)).
+
+The difference is reach. Every task on an asyncio loop runs in one Python process, so the tasks share its memory and fail with it. PyBEAM runs your actors and tasks as BEAM processes, which are preemptively scheduled, supervised, and can run on another machine.
+
 | Need | Plain asyncio | PyBEAM |
 | --- | --- | --- |
 | Mutable state shared by tasks | Locks around every access | Actor methods run one at a time |
