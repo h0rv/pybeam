@@ -1,5 +1,5 @@
 from pybeam import ActorGroup
-from tests.test_actor_state import Progress
+from tests.fixtures.persistent_actor import Progress
 
 
 async def actor_restart() -> bool:

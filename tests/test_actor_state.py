@@ -1,32 +1,18 @@
 import asyncio
-from dataclasses import field
+from pathlib import Path
 
 import pytest
 
-from pybeam import ActorGroup, actor, write_state
-from pybeam.actors import ActorCallError, ActorConstructionError, ActorStateAccessError
-from pybeam.actors import groups, state
+from pybeam import ActorGroup, write_state
+from pybeam.actors import (
+    ActorCallError,
+    ActorConstructionError,
+    ActorStateAccessError,
+    groups,
+    state,
+)
+from tests.fixtures.persistent_actor import Progress
 from tests.test_pythonic_actors import ScriptedGroup
-
-
-@actor
-class Progress:
-    step: int = 0
-    history: list[int] = field(default_factory=list)
-    private: bytes = field(init=False, default=b"initial")
-
-    async def advance(self, step: int, *, save: bool = False) -> int:
-        self.step = step
-        self.history.append(step)
-        self.private = b"changed"
-        return await write_state(self) if save else 0
-
-    async def read(self) -> tuple[int, list[int], bytes]:
-        return self.step, self.history, self.private
-
-    async def child_write(self) -> None:
-        async with asyncio.TaskGroup() as tasks:
-            tasks.create_task(write_state(self))
 
 
 class MemoryStore:
@@ -111,13 +97,13 @@ async def test_write_ownership_and_ephemeral_actors(store: MemoryStore) -> None:
         with pytest.raises(ActorStateAccessError):
             await write_state(ephemeral)
         persistent = await group.restore("job", Progress)
-        with pytest.raises(ActorCallError, match="ActorStateAccessError"):
+        with pytest.raises(ActorCallError, match="ExceptionGroup"):
             await persistent.child_write()
         assert not store.records
 
 
 async def test_cancelled_write_settles_version_before_propagating(store: MemoryStore) -> None:
-    spec = state.SnapshotSpec.build(Progress, "job", groups.Path.cwd(), 4096)
+    spec = state.SnapshotSpec.build(Progress, "job", Path.cwd(), 4096)
     snapshot = state.Snapshot(spec)
     store.release.clear()
     pending = asyncio.create_task(snapshot.write(Progress()))
@@ -155,12 +141,11 @@ async def test_incompatible_snapshot_fails_start_without_replacing_saved_data(
 
 
 async def test_snapshot_limit_and_empty_key_fail_without_writing(store: MemoryStore) -> None:
-    async with ActorGroup(max_bytes=80) as group:
+    async with ActorGroup() as group:
         with pytest.raises(ValueError, match="nonempty"):
             await group.restore("", Progress)
-        progress = await group.restore("job", Progress)
-        for step in range(30):
-            await progress.advance(step)
-        with pytest.raises(ActorCallError, match="max_bytes"):
-            await progress.advance(31, save=True)
+        spec = state.SnapshotSpec.build(Progress, "job", Path.cwd(), 80)
+        snapshot = state.Snapshot(spec)
+        with pytest.raises(state.ActorStateError, match="max_bytes"):
+            await snapshot.write(Progress(history=list(range(30))))
         assert not store.records

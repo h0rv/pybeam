@@ -3,7 +3,6 @@ import os
 import selectors
 import site
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -18,12 +17,18 @@ ROOT = Path(__file__).resolve().parents[1]
 def assets(request: pytest.FixtureRequest) -> RuntimeAssets:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and staged native actor assets")
-    return discover_assets(Config())
+    runtime: object = request.config.getoption("hornbeam_runtime")
+    if not isinstance(runtime, str):
+        raise TypeError("runtime path must be text")
+    return discover_assets(Config(development_runtime=Path(runtime)))
 
 
-def command(assets: RuntimeAssets, directory: Path, method: str, *, wait: bool = False) -> list[str]:
+def command(
+    assets: RuntimeAssets, directory: Path, method: str, *, wait: bool = False
+) -> list[str]:
     paths = json.dumps([str(ROOT / "src"), str(ROOT), *site.getsitepackages()])
-    expression = """
+    expression = (
+        """
         application:load(erlang_python),
         application:set_env(erlang_python, num_contexts, 1),
         application:set_env(erlang_python, event_loop_pool_size, 1),
@@ -35,8 +40,9 @@ def command(assets: RuntimeAssets, directory: Path, method: str, *, wait: bool =
             METHOD, [], #{}, 20000),
         io:format("actor-state-ok~n"),
         FINISH
-    """.replace("PATHS", paths).replace("METHOD", method).replace(
-        "FINISH", "receive never -> ok end." if wait else "halt(0)."
+    """.replace("PATHS", paths)
+        .replace("METHOD", method)
+        .replace("FINISH", "receive never -> ok end." if wait else "halt(0).")
     )
     # The managed configuration resolves data_dir relative to the working directory.
     (directory / "pyproject.toml").write_text('[tool.pybeam]\ndata_dir = "data"\n')
@@ -50,8 +56,13 @@ def command(assets: RuntimeAssets, directory: Path, method: str, *, wait: bool =
 def test_state_survives_actor_restart(assets: RuntimeAssets, tmp_path: Path) -> None:
     environment = dict(os.environ, **assets.environment)
     result = subprocess.run(
-        command(assets, tmp_path, "actor_restart"), cwd=tmp_path, env=environment,
-        capture_output=True, text=True, timeout=40, check=False,
+        command(assets, tmp_path, "actor_restart"),
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=40,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "actor-state-ok" in result.stdout
@@ -63,8 +74,11 @@ def test_acknowledged_state_survives_sigkill_of_whole_vm(
 ) -> None:
     environment = dict(os.environ, **assets.environment)
     with subprocess.Popen(
-        command(assets, tmp_path, "prepare_crash", wait=True), cwd=tmp_path, env=environment,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        command(assets, tmp_path, "prepare_crash", wait=True),
+        cwd=tmp_path,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     ) as process:
         assert process.stdout is not None
         try:
@@ -80,8 +94,13 @@ def test_acknowledged_state_survives_sigkill_of_whole_vm(
             process.kill()
             process.wait(timeout=10)
     result = subprocess.run(
-        command(assets, tmp_path, "verify_crash"), cwd=tmp_path, env=environment,
-        capture_output=True, text=True, timeout=40, check=False,
+        command(assets, tmp_path, "verify_crash"),
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=40,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "actor-state-ok" in result.stdout

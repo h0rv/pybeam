@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 from typing import get_type_hints
 
@@ -32,12 +32,14 @@ class SnapshotSpec:
     max_bytes: int
 
     @classmethod
-    def build(
-        cls, actor: type[object], key: str, directory: Path, max_bytes: int
-    ) -> SnapshotSpec:
-        if not key:
+    def build(cls, actor: type[object], key: str, directory: Path, max_bytes: int) -> SnapshotSpec:
+        if not isinstance(key, str) or not key:
             raise ValueError("Actor state key must be nonempty")
-        identity = _OBJECT.encode({"actor": actor.__module__ + "." + actor.__qualname__, "key": key})
+        if not is_dataclass(actor):
+            raise TypeError("Persistent actor state must be a dataclass")
+        identity = _OBJECT.encode(
+            {"actor": actor.__module__ + "." + actor.__qualname__, "key": key}
+        )
         if len(identity) > 4096:
             raise ValueError("Encoded actor state key exceeds 4096 bytes")
         hints = get_type_hints(actor)
@@ -94,7 +96,12 @@ class Snapshot:
             return
         if isinstance(result, tuple) and len(result) == 3:
             status, version, payload = result
-            if status == "ok" and type(version) is int and version > 0 and isinstance(payload, bytes):
+            if (
+                status == "ok"
+                and type(version) is int
+                and version > 0
+                and isinstance(payload, bytes)
+            ):
                 values = self.spec.decode(payload)
                 for name, value in values.items():
                     object.__setattr__(state, name, value)
