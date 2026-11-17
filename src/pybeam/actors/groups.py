@@ -193,7 +193,7 @@ class ActorGroup:
             if len(payload) > size:
                 raise ActorPayloadError("Encoded actor constructor exceeds max_bytes")
             actor = await native.spawn(
-                str(next(self._ids)),
+                cls.__qualname__ + "-" + str(next(self._ids)),
                 spec.factory(payload, max_bytes=size),
                 capacity=capacity,
                 max_bytes=size,

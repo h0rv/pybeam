@@ -1,35 +1,15 @@
 import argparse
-import code
-import codeop
 import sys
 from pathlib import Path
-from typing import override
 
 from pybeam.runtime.assets import discover_assets
-from pybeam.runtime.attach import App, Connection, connect, running
+from pybeam.runtime.attach import App, connect, running
 from pybeam.runtime.config import BootstrapError, load_config
+from pybeam.runtime.console import Console
 from pybeam.runtime.entrypoint import run_file
+from pybeam.runtime.tui import run as run_tui
 
 MENU = "[s] stacks and tasks  [p] Python shell  [q] quit"
-
-
-class _Console(code.InteractiveConsole):
-    def __init__(self, connection: Connection) -> None:
-        super().__init__()
-        self.connection = connection
-
-    @override
-    def runsource(self, source: str, filename: str = "<input>", symbol: str = "single") -> bool:
-        try:
-            if codeop.compile_command(source, filename, symbol) is None:
-                return True
-        except SyntaxError, OverflowError, ValueError:
-            self.showsyntaxerror(filename)
-            return False
-        result = self.connection.request("evaluate", source)
-        if result:
-            self.write(result if result.endswith("\n") else result + "\n")
-        return False
 
 
 def _ps() -> None:
@@ -75,7 +55,7 @@ def _debug(name: str | None) -> None:
                 case "s":
                     print(connection.request("snapshot", ""), end="")
                 case "p":
-                    _Console(connection).interact(
+                    Console(connection).interact(
                         banner="Python in " + app.name + ". Ctrl-D returns to the menu.",
                         exitmsg="",
                     )
@@ -95,6 +75,8 @@ def main() -> None:
     commands.add_parser("ps", help="List apps started with --debug")
     attach = commands.add_parser("debug", help="Inspect a running app started with --debug")
     attach.add_argument("name", nargs="?")
+    tui = commands.add_parser("tui", help="Monitor Python actors, tasks and queues")
+    tui.add_argument("name", nargs="?")
     options = parser.parse_args()
     command: object = options.command
     try:
@@ -102,11 +84,14 @@ def main() -> None:
             case "ps":
                 _ps()
                 return
-            case "debug":
+            case "debug" | "tui":
                 name: object = options.name
                 if name is not None and not isinstance(name, str):
                     parser.error("Expected an app name")
-                _debug(name)
+                if command == "tui":
+                    run_tui(name)
+                else:
+                    _debug(name)
                 return
             case _:
                 pass

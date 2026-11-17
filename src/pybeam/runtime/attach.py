@@ -2,9 +2,11 @@ import base64
 import json
 import os
 import re
+import select
 import stat
 import subprocess
 import tempfile
+import time
 from collections.abc import Generator
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
@@ -13,8 +15,9 @@ from typing import Literal
 
 from pybeam.runtime.assets import RuntimeAssets
 from pybeam.runtime.config import BootstrapError
+from pybeam.runtime.inspector import NATIVE_INSPECT
 
-type Operation = Literal["snapshot", "evaluate"]
+type Operation = Literal["snapshot", "evaluate", "inspect"]
 
 LOOPBACK = ["-kernel", "inet_dist_use_interface", "{127,0,0,1}"]
 EPMD = {"ERL_EPMD_ADDRESS": "127.0.0.1"}
@@ -28,8 +31,12 @@ Client = self(),
 Owner = spawn(Target, fun() ->
     erlang:monitor(process, Client),
     {ok, Ctx} = py_context:new(#{mode => worker}),
+""" + NATIVE_INSPECT + """
     Serve = fun Serve() ->
         receive
+            {request, inspect, _} ->
+                Client ! {reply, {ok, Inspect()}},
+                Serve();
             {request, Op, Arg} ->
                 Client ! {reply, py_context:call(Ctx, <<"pybeam.runtime.debug">>, Op, [Arg])},
                 Serve();
@@ -136,18 +143,34 @@ def running() -> list[App]:
 class Connection:
     process: subprocess.Popen[bytes]
 
-    def request(self, operation: Operation, payload: str) -> str:
+    def request(self, operation: Operation, payload: str, *, timeout: float | None = None) -> str:
         stdin, stdout = self.process.stdin, self.process.stdout
         if stdin is None or stdout is None:
             raise BootstrapError("Debug client has no pipes")
-        stdin.write(operation.encode() + b" " + base64.b64encode(payload.encode()) + b"\n")
-        stdin.flush()
-        line = stdout.readline()
+        try:
+            stdin.write(operation.encode() + b" " + base64.b64encode(payload.encode()) + b"\n")
+            stdin.flush()
+        except OSError as error:
+            raise BootstrapError("Debug connection closed") from error
+        if timeout is None:
+            line = stdout.readline()
+        else:
+            deadline = time.monotonic() + timeout
+            line = b""
+            while not line.endswith(b"\n"):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not select.select([stdout], [], [], remaining)[0]:
+                    self.process.terminate()
+                    raise BootstrapError("Debug request timed out; reconnect to try again")
+                chunk = os.read(stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                line += chunk
         if not line:
             raise BootstrapError("Debug connection closed")
         try:
             return base64.b64decode(line.strip(), validate=True).decode()
-        except ValueError as error:
+        except ValueError, UnicodeError as error:
             raise BootstrapError("Debug client failed: " + line.decode().strip()) from error
 
 
