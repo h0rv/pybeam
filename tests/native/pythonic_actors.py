@@ -243,7 +243,6 @@ async def verify() -> None:
 
 
 async def restart() -> bool:
-    from erlang import async_call
     from erlang.actors import ActorGenerationChanged, DataActorRef
 
     async with pybeam.ActorGroup() as actors:
@@ -252,7 +251,7 @@ async def restart() -> bool:
         assert isinstance(counter, Reference)
         native = reference_route(counter).native
         assert isinstance(native, DataActorRef)
-        await async_call("pythonic_kill", native.pid)
+        await native.crash()
         try:
             await counter.add(100)
         except ActorGenerationChanged:
