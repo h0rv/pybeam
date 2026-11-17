@@ -16,6 +16,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from benchmarks.metrics import percentile
+from benchmarks.runner import measurement_lock
 from benchmarks.web.ws import Command, Reply
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -314,6 +315,11 @@ class HttpResult(BaseModel):
 
 
 def run(settings: Settings) -> None:
+    with measurement_lock():
+        run_locked(settings)
+
+
+def run_locked(settings: Settings) -> None:
     settings.output.mkdir(parents=True, exist_ok=False)
     rates: list[float] = []
     for repeat in range(settings.repeats):

@@ -4,7 +4,9 @@ import resource
 import socket
 import subprocess
 import sys
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
+from contextlib import contextmanager
+from pathlib import Path
 
 import httpx
 import pytest
@@ -13,8 +15,17 @@ from pydantic import ValidationError
 from uvicorn import Config, Server
 from websockets.asyncio.client import ClientConnection
 
+from benchmarks.runner import measurement_lock
 from benchmarks.web.app import app
-from benchmarks.web.run import container_command, memory, memory_delta, stop_worker
+from benchmarks.web.run import (
+    Settings,
+    Variant,
+    container_command,
+    memory,
+    memory_delta,
+    run,
+    stop_worker,
+)
 from benchmarks.web.ws import Command, Pool, ensure_client_fds
 
 
@@ -219,3 +230,63 @@ async def test_worker_cancellation_is_reaped() -> None:
         if process.returncode is None:
             process.kill()
             await process.wait()
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_web_measurements_hold_shared_load_lock(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fail: bool
+) -> None:
+    monkeypatch.setattr("benchmarks.runner.LOAD_LOCK", tmp_path / "load.lock")
+    measurements: list[str] = []
+
+    def assert_locked() -> None:
+        with (
+            pytest.raises(RuntimeError, match="Another benchmark owns the shared load lock"),
+            measurement_lock(),
+        ):
+            pytest.fail("timed measurement did not hold the shared load lock")
+
+    @contextmanager
+    def server(variant: Variant, name: str, output: Path) -> Generator[None]:
+        assert_locked()
+        try:
+            yield
+        finally:
+            assert_locked()
+
+    def http_load(path: Path, seconds: int, concurrency: int, rate: int | None = None) -> None:
+        assert_locked()
+        if fail:
+            raise RuntimeError("load failed")
+        measurements.append(path.name)
+        path.write_text('{"summary":{"requestsPerSec":100}}')
+
+    async def websocket_load(name: str, settings: Settings, path: Path) -> None:
+        assert_locked()
+        measurements.append(name)
+
+    monkeypatch.setattr("benchmarks.web.run.server", server)
+    monkeypatch.setattr("benchmarks.web.run.http_load", http_load)
+    monkeypatch.setattr("benchmarks.web.run.websocket_load", websocket_load)
+    settings = Settings(tmp_path / "results", 30, 1, (1000, 5000))
+    if fail:
+        with pytest.raises(RuntimeError, match="load failed"):
+            run(settings)
+    else:
+        run(settings)
+        assert len(measurements) == 20
+        assert sum(name.startswith("web-fixed-") for name in measurements) == 4
+        assert sum(name.startswith("web-ws-") for name in measurements) == 4
+    with measurement_lock():
+        pass
+
+
+def test_busy_load_lock_prevents_web_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("benchmarks.runner.LOAD_LOCK", tmp_path / "load.lock")
+    settings = Settings(tmp_path / "results", 30, 1, (1000,))
+    with (
+        measurement_lock(),
+        pytest.raises(RuntimeError, match="Another benchmark owns the shared load lock"),
+    ):
+        run(settings)
+    assert not settings.output.exists()
