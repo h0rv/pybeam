@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
-import { pages, navigation, redirects, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
+import { pages, navigation, navigationSections, redirects, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
 import { join } from "node:path";
 
 test("root and project hosting paths preserve trailing slashes", () => {
@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "messaging/", "background/", "execution/", "web/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "messaging/", "background/", "execution/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -80,6 +80,9 @@ test("each concept has complete source-associated Python examples", () => {
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);
+      for (const line of snippet.trimEnd().split("\n")) {
+        assert.ok(line.length <= 79, `${source}: Python line exceeds 79 characters: ${line}`);
+      }
       assert.ok(snippet.startsWith(`# ${examples[index].split("/").at(-1)}\n`), source);
       if (!["background_body.py", "genstage_transform.py"].includes(examples[index].split("/").at(-1))) {
         assert.ok(markdown.includes(`\n\n\`\`\`console\n$ uv run ${examples[index].split("/").at(-1)}\n`), source);
@@ -91,7 +94,7 @@ test("each concept has complete source-associated Python examples", () => {
 
 test("the homepage puts Python before explanations and links to the first actions", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/index.md"), "utf8");
-  assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 25);
+  assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 45);
   assert.equal(navigation.filter(({ label }) => label === "Get started").length, 1);
   assert.equal(redirects["quickstart/"], "");
   assert.doesNotMatch(markdown, /quickstart|Overview/);
@@ -111,11 +114,14 @@ test("state and supervision teach distinct operations without another introducti
   }
 });
 
-test("distinct concept tasks replace grouped capability navigation", () => {
+test("navigation groups getting started, guides and integrations", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "How Python work runs", "Web integration",
+    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "How Python work runs", "FastAPI", "Litestar", "PyView",
   ]);
-  assert.ok(navigation.every((page) => !("group" in page)));
+  assert.deepEqual(navigationSections.map(({ label }) => label), ["Get started", "Guides", "Integrations"]);
+  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 6, 3]);
+  assert.deepEqual(navigationSections.flatMap(({ pages }) => pages), navigation);
+  assert.equal(redirects["web/"], "integrations/fastapi/");
   assert.ok(!navigation.some(({ path }) => path === "genstage/"));
-  assert.deepEqual(Object.keys(redirects), ["quickstart/", "runtime/", "subscriptions/", "limits/"]);
+  assert.deepEqual(Object.keys(redirects), ["web/", "quickstart/", "runtime/", "subscriptions/", "limits/"]);
 });

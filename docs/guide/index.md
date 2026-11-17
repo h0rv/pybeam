@@ -1,6 +1,6 @@
 # Get started
 
-Add actors, shared state and messaging to async Python.
+PyBEAM adds actors, shared state and messaging to async Python, without locks or extra infrastructure. Keep your existing web framework and write ordinary async functions.
 
 ```sh
 uv add python-beam
@@ -33,6 +33,6 @@ Hello from Python
 - [Shared state](state.md): store values and count across requests.
 - [Messaging](messaging.md): notify subscribers.
 - [Background services](background.md): run a long-lived loop and stop it cleanly.
-- [Web integration](web.md): use these from FastAPI, Litestar or PyView.
+- Integrations: [FastAPI](integrations/fastapi.md), [Litestar](integrations/litestar.md) or [PyView](integrations/pyview.md).
 
 To see why you would use these, read [Why PyBEAM](why.md).

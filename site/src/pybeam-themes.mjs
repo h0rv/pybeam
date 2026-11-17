@@ -22,7 +22,7 @@ export const pybeamLight = theme("pybeam-light", "light", {
   function: "#18529a", number: "#8a3416", type: "#704015",
 });
 export const pybeamDark = theme("pybeam-dark", "dark", {
-  text: "#edf1f7", background: "#10151f", keyword: "#c9b1ff",
-  string: "#83dec1", builtin: "#91c2ff", comment: "#a6b0bf",
+  text: "#f0f3f9", background: "#1d2430", keyword: "#c9b1ff",
+  string: "#83dec1", builtin: "#91c2ff", comment: "#b7c3d4",
   function: "#91c2ff", number: "#ffba98", type: "#efd18c",
 });
