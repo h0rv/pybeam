@@ -88,9 +88,16 @@ def shutdown(
             tail, _ = child.communicate(timeout=10)
             output.extend(tail)
             assert child.returncode == 143, output.decode()
-            assert b"SHUTDOWN_CONTEXTS 1" in output, output.decode()
+            baseline = next(
+                line.removeprefix(b"PHASE owner_context_baseline ")
+                for line in output.splitlines()
+                if line.startswith(b"PHASE owner_context_baseline ")
+            )
+            assert b"SHUTDOWN_CONTEXTS " + baseline in output.splitlines(), output.decode()
             assert b"COUNTER_ACK 42" in output, output.decode()
-            assert b"PHASE owner_context_drained 1" in output, output.decode()
+            assert b"PHASE owner_context_drained " + baseline in output.splitlines(), (
+                output.decode()
+            )
             if before_activation:
                 assert b"PHASE stop phase=activation_pending" in output, output.decode()
                 assert b"PHASE graph_created" not in output, output.decode()

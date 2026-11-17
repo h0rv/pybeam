@@ -134,7 +134,7 @@ Each room retains six messages and at most eight member identities, including of
 ## What this does not do
 
 - Run across machines: these actors live on one node; this API cannot place them on other machines.
-- Isolate Python memory or parallelize CPU work: arguments and results are copied as JSON, but actors run in one Python process and their async methods share one event loop.
+- Isolate Python memory: arguments and results are copied as JSON, but actors run in one Python process. Each call runs on a pooled worker with its own loop; parallel Python CPU work requires free-threaded Python 3.14t.
 - Roll back failed methods: a method that raises keeps changes made before the raise.
 - Restore saved state: a crashed room restarts from its constructor, empty here. There is no automatic restore. [Supervision](supervision.md) is not storage; Hornbeam's [shared store](state.md) is in-memory too.
 - Implement typing indicators or WebSockets. For notifications, see [Messaging](messaging.md).

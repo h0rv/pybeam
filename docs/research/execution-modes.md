@@ -62,7 +62,7 @@ Choose the Python build when installing the interpreter: conventional **3.14** o
 
 The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task. The current runtime includes the merged PR #5 bootstrap fix.
 
-A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context currently costs one pthread; isolated contexts instead cost a child process. This is **not actor pooling**: actors allocate worker contexts per native child and tasks allocate contexts in their selected mode, so a million Python actors would still imply roughly a million context pthreads plus other overhead.
+A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context costs one pthread; isolated contexts instead cost a child process. Bounded data actors now lease workers from a separate node-wide pool in pinned erlang-python `f893508`. Each worker reuses a thread-local loop, so different actors need not share one execution loop. Actor count no longer determines thread count. Tasks still allocate contexts in their selected mode; their shared-loop measurements below do not describe pooled actor dispatch. Actor state and queued work still consume memory, and no million-actor capacity has been verified.
 
 ## Raw context matrix
 

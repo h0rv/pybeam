@@ -12,13 +12,14 @@ checkouts or native build are needed for these commands. Hornbeam is not on
 PyPI; its optional extra locks a commit from `h0rv/hornbeam`'s
 `main` branch. Local stubs in `typings` cover the native
 erlang-python interfaces needed for checking; they do not provide a runtime.
-Keep them aligned with `h0rv/erlang-python`'s `main` branch.
+Keep them aligned with the erlang-python commit pinned in `rebar.lock`.
 
 For runtime development, clone those branches next to this checkout:
 
 ```sh
 git clone --branch main https://github.com/h0rv/hornbeam.git ../hornbeam
 git clone --branch main https://github.com/h0rv/erlang-python.git ../erlang-python
+git -C ../erlang-python checkout f8935081563212719b32d2925a65a7ff8d03b6fa
 uv add --optional hornbeam --editable ../hornbeam
 uv sync --locked --all-extras
 uv run --locked --all-extras ty check --error-on-warning
@@ -89,9 +90,12 @@ Darwin wheels do.
 
 ### Pooled actor execution
 
-`ActorGroup(execution=ExecutionLimits(workers=..., capacity=..., max_bytes=...))`
-requests pooled actor execution. It needs native support that is still under
-development and fails rather than falling back when that support is missing.
+All `ActorGroup` instances use erlang-python's node-wide worker pool. Groups
+bound actor count and per-actor admitted work; they do not own execution threads.
+The native `worker_pool_max` application environment caps the shared pool, which
+starts at the available logical CPU count and grows on demand. Calls queue FIFO
+when every worker is busy at the cap. Closing a group releases its actors, not
+the pool contexts.
 
 ## Releases
 

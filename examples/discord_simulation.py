@@ -346,8 +346,8 @@ async def simulate(config: Config) -> Proof:
         )
         contexts_with_rooms = await context_counts()
         require(
-            contexts_with_rooms.live == contexts_before.live + config.rooms,
-            "Each room must own one native context",
+            contexts_before.live <= contexts_with_rooms.live <= contexts_before.live + config.rooms,
+            "Shared worker growth exceeded room concurrency",
         )
         before = identities[0]
         require(
@@ -391,7 +391,7 @@ async def simulate(config: Config) -> Proof:
                 config.history,
             )
     contexts_after = await context_counts()
-    require(contexts_after.live == contexts_before.live, "Native owned contexts did not drain")
+    require(contexts_after == contexts_with_rooms, "Drained groups changed the shared worker pool")
     return Proof(
         room_processes=config.rooms,
         client_task_limit=config.max_inflight,

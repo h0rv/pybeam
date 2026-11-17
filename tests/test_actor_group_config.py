@@ -1,11 +1,9 @@
 from collections.abc import Callable
-from dataclasses import FrozenInstanceError
 
 import pytest
 
 import pybeam
-from pybeam.actors import ExecutionLimits, groups
-from pybeam.codec import Json
+from pybeam.actors import groups
 
 
 def construct_group(
@@ -60,25 +58,3 @@ def test_actor_group_limits__preserve_defaults_and_positive_integer_kwargs() -> 
     )
     configured = pybeam.ActorGroup(max_children=1, max_pending=2, max_bytes=3)._limits
     assert (configured.max_children, configured.max_pending, configured.max_bytes) == (1, 2, 3)
-
-
-@pytest.mark.parametrize("limit", ["workers", "capacity", "max_bytes"])
-@pytest.mark.parametrize("invalid", [True, False, 0, -1, "1", 1.0, float("inf"), float("nan")])
-def test_execution_limits__reject_invalid_values(limit: str, invalid: object) -> None:
-    options: dict[str, object] = {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
-    options[limit] = invalid
-    with pytest.raises(ValueError) as raised:
-        Json(ExecutionLimits).load(options)
-    assert limit in str(raised.value)
-
-
-def test_execution_limits__immutable_strict_value_and_public_exports() -> None:
-    limits = pybeam.ExecutionLimits(workers=4, capacity=32, max_bytes=1_048_576)
-    assert type(limits) is ExecutionLimits
-    assert Json(type(limits)).dump(limits) == {"workers": 4, "capacity": 32, "max_bytes": 1_048_576}
-    with pytest.raises(FrozenInstanceError):
-        limits.__setattr__("workers", 8)
-    with pytest.raises(ValueError, match="unexpected fields"):
-        Json(ExecutionLimits).load(
-            {"workers": 4, "capacity": 32, "max_bytes": 1_048_576, "unexpected": 1}
-        )

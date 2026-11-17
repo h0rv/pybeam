@@ -91,4 +91,4 @@ One million waiting BEAM processes used about 2.7 GB. Worker calls completed at 
 
 - Throughput of a web request path on 3.14t.
 - Actors beyond 10,000, or memory limits set by a container.
-- Actor groups with `ExecutionLimits`.
+- Actor throughput and memory on the worker pool.

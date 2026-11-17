@@ -21,10 +21,10 @@ Worker contexts share the main interpreter, so module globals, imported modules 
 
 ## Blocking calls
 
-Every actor method body, and every worker task without `dedicated_loop=True`, runs on one event loop thread. A blocking call or a CPU loop there stops all of them until it returns, on 3.14 and 3.14t alike. In the probes, 32 actors that each slept 50 ms with `time.sleep` took 1.62 s, and a 10 ms async call waited behind another actor's 300 ms `time.sleep`.
+Every worker task without `dedicated_loop=True` runs on one event loop thread. A blocking call or a CPU loop there stops all of them until it returns, on 3.14 and 3.14t alike. Actor calls run on pooled workers instead: a blocking actor method holds only its own worker, and when every worker up to the pool cap is busy, further calls queue.
 
 - Wrap blocking calls in `await asyncio.to_thread(...)`. A `ThreadPoolExecutor` used synchronously inside the method still blocks the loop until all its work finishes.
-- Give CPU-bound tasks `dedicated_loop=True`. Actors have no such option.
+- Give CPU-bound tasks `dedicated_loop=True`. Actors don't need it.
 - One caller loop can have at most about 8,000 calls in flight. Past that, calls raise `RuntimeError: Native callback queue full`.
 
 ## Boundary copies

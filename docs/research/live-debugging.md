@@ -4,7 +4,9 @@ A running PyBeam app can already show every Python stack and asyncio task to a s
 
 ## Evidence boundary
 
-Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBeam `90c9aaa`, and erlang-python `c007eb5` (the pinned runtime). The app was a single `@pybeam.actor` called from three `asyncio.TaskGroup` workers; after 20 calls the actor method spins in `while True: pass`. Only worker mode was tested. Own-GIL and isolated contexts were not tested. `ptrace_scope` was `1`.
+Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBeam `90c9aaa`, and erlang-python `c007eb5` (the runtime pinned for this experiment). The app was a single `@pybeam.actor` called from three `asyncio.TaskGroup` workers; after 20 calls the actor method spins in `while True: pass`. Only worker mode was tested. Own-GIL and isolated contexts were not tested. `ptrace_scope` was `1`.
+
+These stacks predate the node-wide actor worker pool in erlang-python `0f833ae`. Current bounded actors lease workers and run bodies on worker-local loops. The context ownership and interrupt observations below are historical, not a verification of pooled actor interruption.
 
 ## What works today
 

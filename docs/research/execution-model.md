@@ -8,7 +8,7 @@ Bring BEAM capabilities to Python developers through familiar Python/asyncio API
 
 Target modern Python 3.14+ and evaluate newer releases, including 3.15+, when runtime and dependency contracts permit. Free-threaded Python became an officially supported CPython build in 3.14.[C1] Its availability is not proof that every PyBeam primitive supports it. Conversely, today's conventional-GIL baseline is not a permanent limit on the architecture.
 
-The architecture observations below refer to [PyBeam d5bdc9e][P0] and [erlang-python d227c0d][R0]; the builder reference includes the subsequent free-threaded opt-in. Runtime links pin a snapshot because PyBeam's dependency follows a moving branch. Recheck these constraints when the dependency or build changes. This document is source inspection, not native-runtime certification. See [measured execution modes](execution-modes.md) for the development-build matrix, task probes and remaining integration failures. Alternative backends are not shipped per-actor/task configuration switches.
+The task and raw-context observations below refer to [PyBeam d5bdc9e][P0] and [erlang-python d227c0d][R0]; the builder reference includes the subsequent free-threaded opt-in. Bounded data actors now use the node-wide pool in pinned erlang-python `f893508`. Recheck these constraints when the dependency or build changes. Source inspection is not native-runtime certification. See [measured execution modes](execution-modes.md) for the development-build matrix, task probes and remaining integration failures. Alternative backends are not shipped per-actor/task configuration switches.
 
 ## Separate the boundaries
 
@@ -35,10 +35,10 @@ An `asyncio.Task` stays on its local loop and interpreter. It does not automatic
 
 Many BEAM callers can share a finite pool of Python execution resources. The fork's generic context router already chooses from a finite context pool using scheduler ID.[R3] That generic call path is distinct from the current actor/task implementations:
 
-1. Both the bounded data-actor and raw object-actor paths create a `worker` context.[R4][R5]
+1. Bounded data actors lease contexts from a node-wide worker pool during construction and each call. The pool starts at available logical CPU count, grows when busy up to `worker_pool_max` (default four times that count), and queues checkouts FIFO at the cap. It prefers the actor's previous worker only when free.[W1][W2] The raw object-actor path still creates its own `worker` context.[R5]
 2. Each worker context allocates a dedicated pthread and a namespace in the **main interpreter**. Conventional workers acquire the same GIL; a namespace is not separate module state or a native-crash boundary.[R6]
-3. For an async actor call, the context calls the Python function to obtain its coroutine. When the interpreter driver is running, `local_object_apply` submits the coroutine with `asyncio.run_coroutine_threadsafe` and waits for the future, releasing the GIL while waiting. The OTP actor retains its serialized turn and input references.[R7]
-4. Async bodies can overlap I/O on that shared driver. Pure-Python CPU work there delays the driver's other coroutines. Removing the GIL alone does not turn this one loop thread into multicore execution.
+3. A bounded data actor calls a synchronous dispatch wrapper, which runs its coroutine on a thread-local loop reused by that worker. The actor retains its serialized turn while it waits. Different actors on different workers can overlap blocking methods; GIL-free Python permits CPU parallelism across those threads.[W2][W3]
+4. Other async local-object callers still use the shared interpreter driver when it is running. Pure-Python CPU work there delays the driver's other coroutines. Removing the GIL alone does not turn that one loop thread into multicore execution.[R7]
 
 Tasks also allocate a worker context per native task child. `TaskFunction` defaults to `dedicated_loop=False`, taking the shared path; `dedicated_loop=True` runs the body on its context-owned loop. Both still use the main interpreter. Construct and finalize loop-bound resources within their owning body/loop.[P1][R8]
 
@@ -52,20 +52,17 @@ flowchart TB
       B["Actor B"]
     end
     subgraph PY["Main interpreter: conventional build, one shared GIL"]
-      CA["Context A / pthread"]
-      CB["Context B / pthread"]
-      L["Shared asyncio loop / driver thread"]
-      CA -->|async body| L
-      CB -->|async body| L
+      CA["Pool worker A / pthread / local loop"]
+      CB["Pool worker B / pthread / local loop"]
     end
-    A -->|serialized request| CA
-    B -->|serialized request| CB
+    A -->|lease for one serialized call| CA
+    B -->|lease for one serialized call| CB
   end
 ```
 
-Thus a million current Python actors would mean roughly a million context pthreads, not a million interpreters, plus runtime/control overhead. Do not infer cheap million-actor scale from BEAM process counts. No measured actor-count or throughput limit is established here.
+Actor count no longer determines worker-thread count. Actor state, admission tickets and waiting callers still consume memory. Do not infer cheap million-actor scale from BEAM process counts. No measured actor-count or throughput limit is established here.
 
-A scalable direction is **many logical jobs → bounded admission → finite native execution lanes**. This is not implemented actor pooling: persistent Python objects, per-actor serialization, interpreter/thread affinity, loop-bound resources, cancellation and teardown need a native ownership design. Reuse erlang-python/OTP rather than building another scheduler in Python. Bound waiting producers and retained state as well as active execution slots.
+Data actors now follow **many logical actors → per-actor admission → finite native execution lanes**. A later turn can use another worker and loop: create and finalize loop-bound resources within a turn. Group shutdown releases actor state without destroying pool workers. Restart waits for the old body's native completion, not worker death. The pool does not provide native-crash isolation or bound all retained actor state and waiting producers.[W1][W2][W3]
 
 ## Choose an execution boundary
 
@@ -90,7 +87,7 @@ A free-threaded build may still enable the GIL through configuration or an unsup
 | Python exception | Can be returned as a call/task error; not every exception kills or restarts its OTP owner. |
 | Timeout | Execution or its side effects may already have happened. Abandoning a reply is not rollback; blind retry can duplicate effects. |
 | Cancellation | A local, cooperative request. The body records its loop and asks that loop to cancel its asyncio task; native calls and external effects may not stop or roll back.[R15] |
-| Context PID dies | Not proof its native worker stopped. Actor restart waits for native completion as well as the context's `DOWN`.[R16] |
+| Actor PID dies | The pool worker can still be running the old body. Actor restart waits for the gate's native completion; it does not destroy or wait for the worker to die.[W2][W4] |
 | Embedded native crash | A C-extension segfault can terminate the entire BEAM OS process, including its subinterpreters. Own-GIL is not native-crash or security isolation. |
 | Actor restart | Fresh state unless the application restores it; supervision is not business-state storage. |
 | Node/network failure | A request can execute before its acknowledgment is lost. Preserve uncertainty instead of silently declaring failure or replaying.[R2] |
@@ -150,3 +147,7 @@ This shows data/work recovery, not persistence or migration of Python coroutine 
 [C1]: https://docs.python.org/3.14/whatsnew/3.14.html#pep-779-free-threaded-python-is-officially-supported
 [C2]: https://docs.python.org/3.14/howto/free-threading-python.html
 [C3]: https://docs.python.org/3.14/library/concurrent.interpreters.html
+[W1]: https://github.com/h0rv/erlang-python/blob/f8935081563212719b32d2925a65a7ff8d03b6fa/src/py_worker_pool.erl
+[W2]: https://github.com/h0rv/erlang-python/blob/f8935081563212719b32d2925a65a7ff8d03b6fa/src/py_data_actor.erl
+[W3]: https://github.com/h0rv/erlang-python/blob/f8935081563212719b32d2925a65a7ff8d03b6fa/priv/_erlang_impl/_actor_data.py
+[W4]: https://github.com/h0rv/erlang-python/blob/f8935081563212719b32d2925a65a7ff8d03b6fa/src/py_actor_group.erl

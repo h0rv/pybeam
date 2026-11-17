@@ -1,12 +1,12 @@
 # Blocking and CPU work
 
-Actor methods and tasks share one event loop by default. While one of them runs a blocking call or a long CPU loop, every other actor and task waits, just as in plain asyncio.
+Tasks share one event loop by default. While one of them runs a blocking call or a long CPU loop, every other task on that loop waits, just as in plain asyncio. Actor calls run on a node-wide pool of Python workers, each with its own loop, so a blocking actor method does not hold up other actors.
 
 - Wrap a blocking call in `await asyncio.to_thread(...)`. The default executor runs a few calls at once, so many blocking calls still queue.
 - Give a CPU-bound task its own loop with `dedicated_loop=True`.
 - Run code that might crash the process, such as an unreliable C extension, with `execution=ExecutionMode.ISOLATED`. A crash then fails only that task. Isolated tasks run in separate Python processes: each takes up to about 130 ms to start, uses about 25 MiB, and its function must be a top-level `async def` that takes and returns `bytes`.
 
-Actors have no `dedicated_loop` option. Move blocking and CPU work in an actor method into `asyncio.to_thread`.
+Actors have no `dedicated_loop` option and need none: each call already runs on a pooled worker. Parallel Python CPU work requires free-threaded Python. Don't keep loop-bound objects such as `asyncio.Lock` in actor state across calls, because the next call may run on another worker. Create and finalize those resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
 This example runs four CPU-bound tasks, each on its own loop:
 

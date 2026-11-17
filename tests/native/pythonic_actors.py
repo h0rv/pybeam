@@ -197,7 +197,7 @@ async def verify() -> None:
         else:
             raise AssertionError("Native group child count was unbounded")
         assert await resource.descriptor() == descriptor
-    assert FILES[-1]() is None, "Native context retained its private resource"
+    assert FILES[-1]() is None, "Stopped actor retained its private resource"
     try:
         os.fstat(descriptor)
     except OSError:

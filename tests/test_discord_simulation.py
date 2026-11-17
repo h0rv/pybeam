@@ -75,11 +75,15 @@ def test_simulation__managed_native_proof(request: pytest.FixtureRequest, entry:
         assert proof.events_before_fault == 6
         assert proof.fanout_receipts_before_fault == 18
         assert len({info.pid for info in proof.room_identities}) == 2
-        assert proof.contexts_with_rooms.live == proof.contexts_before.live + 2
+        assert (
+            proof.contexts_before.live
+            <= proof.contexts_with_rooms.live
+            <= proof.contexts_before.live + 2
+        )
         assert proof.before.pid != proof.after.pid
         assert proof.before.generation != proof.after.generation
         assert proof.fresh.members == () and proof.fresh.event_ids == ()
-        assert proof.contexts_before.live == proof.contexts_after.live
+        assert proof.contexts_with_rooms == proof.contexts_after
         assert proof.count_overload_rejections == proof.byte_overload_rejections == 1
     else:
         marker = (
@@ -132,4 +136,4 @@ def test_simulation__installed_wheel_without_source_or_developer_tools(
     )
     assert proof.fanout_receipts_before_fault == 8
     assert proof.before.pid != proof.after.pid
-    assert proof.contexts_before.live == proof.contexts_after.live
+    assert proof.contexts_with_rooms == proof.contexts_after

@@ -6,7 +6,7 @@ PyBEAM embeds CPython in the BEAM, Erlang's virtual machine, through [erlang-pyt
 
 ## The stack
 
-![One OS process runs the BEAM VM with one scheduler and many BEAM processes. Worker contexts, each with its own OS thread, run in the main Python interpreter; actor methods share one event loop thread. Isolated tasks run in a child OS process outside the VM.](../assets/stack.svg)
+![One OS process runs the BEAM VM with one scheduler and many BEAM processes. Worker contexts, each with its own OS thread, run in the main Python interpreter; actor calls lease a worker from a node-wide pool and run on that worker's own loop. Isolated tasks run in a child OS process outside the VM.](../assets/stack.svg)
 
 | Layer | What it is | Measured cost |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ Distinguish these layers when you reason about a change. A BEAM process is not a
 - **Worker contexts called directly run in parallel on 3.14t.** When each BEAM process calls its own context with no loop in between, eight CPU jobs took as long as one on 8 CPUs. On 3.14 the GIL serialized them.
 - **Dedicated-loop tasks** run on their own thread, so they overlap on 3.14t and take turns on 3.14.
 - **Isolated tasks** run in separate OS processes, so they overlap on either build.
-- **`asyncio.to_thread`** inside an actor method moves the work off the shared loop. It overlaps blocking calls on both builds and CPU work on 3.14t, up to the default executor's size.
+- **Actor calls** run on pooled workers, each with its own loop, so blocking calls in different actors overlap on both builds and CPU work overlaps on 3.14t.
 
 [Measurements](measurements.md) has the numbers, and [what to watch for](watch-for.md) covers the failure modes.
 

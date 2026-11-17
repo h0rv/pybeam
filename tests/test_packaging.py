@@ -939,7 +939,7 @@ def test_installed_wheel__runs_from_moved_venv_without_developer_tools(tmp_path:
             assert proof.before.pid != proof.after.pid
             assert proof.before.generation != proof.after.generation
             assert proof.fresh.members == () and proof.fresh.event_ids == ()
-            assert proof.contexts_before.live == proof.contexts_after.live
+            assert proof.contexts_with_rooms == proof.contexts_after
     with pytest.raises(ProcessLookupError):
         os.killpg(cli_state.pid, 0)
     manifest = moved / "lib/python3.14/site-packages/pybeam/runtime/_assets/runtime.json"

@@ -40,7 +40,7 @@ PyBEAM spends memory and call overhead on scheduling, supervision and distributi
 
 ## How it works
 
-PyBEAM runs your program on Erlang's virtual machine, which provides the actors, supervision and messaging. You write ordinary asyncio code and need no Erlang. Actor methods share one event loop, so a blocking call in one delays the others; [Blocking and CPU work](execution.md) shows what to do instead. [How PyBEAM works](internals/index.md) explains the runtime in depth.
+PyBEAM runs your program on Erlang's virtual machine, which provides the actors, supervision and messaging. You write ordinary asyncio code and need no Erlang. Actor calls run on a pool of Python workers, so a blocking call in one actor does not hold up the others; tasks share one loop by default, and [Blocking and CPU work](execution.md) shows what to do there. [How PyBEAM works](internals/index.md) explains the runtime in depth.
 
 ## Limits
 

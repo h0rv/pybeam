@@ -26,6 +26,7 @@ def assets(request: pytest.FixtureRequest) -> RuntimeAssets:
     [
         ("examples/actors/main.py", "[1, 1, 1, 1, 1]"),
         ("tests/native/pythonic_actors.py", "pythonic-native-ok"),
+        ("tests/native/actor_worker_pool.py", "actor-worker-pool-ok"),
         ("tests/fixtures/actor_inheritance.py", "pythonic-inheritance-ok"),
     ],
 )
