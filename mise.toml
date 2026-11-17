@@ -274,9 +274,16 @@ run = 'uv run --locked python -m tools.genstage_fixtures "${usage_wheel}" "${usa
 
 [tasks."build:optional-genstage"]
 wait_for = ["build"]
-description = "Compile the pinned GenStage sources into the staged runtime and build the wheel"
+description = "Stage the runtime, compile the pinned GenStage sources into it, and build the wheel"
 run = '''
 set -eu
+mkdir -p build
+curl -fL https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt -o build/OTP-LICENSE.txt
+uv run --locked python tools/build_runtime.py \
+  --otp-root "$(mise where erlang)" \
+  --native-app _build/hornbeam/checkouts/erlang_python \
+  --otp-license build/OTP-LICENSE.txt \
+  --native-license _checkouts/erlang_python/LICENSE
 uv run --locked python -m tools.build_genstage --otp "$(mise where erlang)"
 uv build --wheel
 '''
