@@ -39,7 +39,9 @@ Distinguish these layers when you reason about a change. A BEAM process is not a
 - **Dedicated-loop tasks** run on their own thread, so they overlap on 3.14t and take turns on 3.14.
 - **Isolated tasks** run in separate OS processes, so they overlap on either build.
 
-If an actor's preferred worker is busy, its next call takes another worker immediately. Do not keep loop-bound objects across calls. A background asyncio task started during a call is not guaranteed to progress while that worker is idle.
+If an actor's preferred worker is busy, its next call waits up to 100 ms for it before becoming eligible for another worker; it stays queued if none is available. Fallback can change the loop, so do not retain loop-bound objects such as Futures across calls.
+
+Background asyncio tasks continue between calls. When an actor stops or its group closes, teardown cancels and awaits its descendant tasks before releasing the actor's state, including tasks on workers it previously used. A task that ignores cancellation keeps teardown waiting. Blocking code pauses other tasks on the same worker, not on other workers.
 
 [Measurements](measurements.md) records the earlier execution-mode probes, including the pre-pool actor path; those actor costs and timings do not describe the pooled runtime. [What to watch for](watch-for.md) covers the failure modes.
 
@@ -52,4 +54,4 @@ erlang-python also offers own-GIL contexts, one subinterpreter per context. PyBE
 - [Execution model](../../research/execution-model.md): each boundary from BEAM process to node.
 - [Execution modes](../../research/execution-modes.md): the mode probes and their method.
 - [Actor capacity](../../research/actor-capacity.md): actor cost, call timing and state movement.
-- [Worker design](../../research/worker-design.md): the broader proposal, including durable state migration and wait-then-fallback routing. The current pool reuses in-memory actor objects and falls back immediately when a preferred worker is busy.
+- [Worker design](../../research/worker-design.md): the broader proposal, including durable state migration. The current pool waits briefly for a busy preferred worker, then falls back while reusing the in-memory actor object; fallback does not load a durable copy.
