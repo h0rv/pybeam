@@ -1,32 +1,31 @@
 import hashlib
-from typing import Annotated, Literal
+import json
+import re
+from dataclasses import dataclass
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from pybeam.codec import Json
 from pybeam.runtime.cluster import LocalCluster as LocalCluster
 from pybeam.runtime.config import Distribution as Distribution
 from pybeam.runtime.config import PythonNode as PythonNode
 
 
-class HandlerIdentity(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HandlerIdentity:
     node: str
     pid: str
     incarnation: str
     message_id: str | None = None
 
 
-class NodeEvent(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class NodeEvent:
     event: Literal["nodeup", "nodedown"]
     node: str
 
 
-class Reply(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Reply:
     status: Literal[
         "ok",
         "uncertain",
@@ -70,31 +69,59 @@ class Reply(BaseModel):
     cancel: bool = False
 
 
+_HEX32 = re.compile(r"[0-9A-F]{32}")
+_REPLY = Json(Reply)
+
+
 class RequestTooLarge(ValueError):
     pass
 
 
-class Request(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-    op: Annotated[str, Field(min_length=1, max_length=32)]
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Request:
+    op: str
     alias: Literal["a", "b"] | None = None
     ack_alias: Literal["a", "b"] | None = None
-    id: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    incarnation: Annotated[str, Field(pattern=r"^[0-9A-F]{32}$")] | None = None
-    token: Annotated[str, Field(pattern=r"^[0-9A-F]{32}$")] | None = None
+    id: str | None = None
+    incarnation: str | None = None
+    token: str | None = None
     definition: Literal["double"] | None = None
-    size: Annotated[int, Field(gt=0, le=4096)] | None = None
+    size: int | None = None
     digest: str | None = None
-    payload: Annotated[str, Field(max_length=4096)] | None = None
-    result: Annotated[str, Field(max_length=4096)] | None = None
-    worker: Annotated[str, Field(max_length=64)] | None = None
+    payload: str | None = None
+    result: str | None = None
+    worker: str | None = None
+
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.op) <= 32:
+            raise ValueError("op must have 1 to 32 characters")
+        if self.id is not None and not 1 <= len(self.id) <= 64:
+            raise ValueError("id must have 1 to 64 characters")
+        for name, value in (("incarnation", self.incarnation), ("token", self.token)):
+            if value is not None and _HEX32.fullmatch(value) is None:
+                raise ValueError(name + " must be 32 uppercase hexadecimal digits")
+        if self.size is not None and not 0 < self.size <= 4096:
+            raise ValueError("size must be from 1 to 4096")
+        for name, value, limit in (
+            ("payload", self.payload, 4096),
+            ("result", self.result, 4096),
+            ("worker", self.worker, 64),
+        ):
+            if value is not None and len(value) > limit:
+                raise ValueError(name + " must have at most " + str(limit) + " characters")
 
     def encode(self) -> bytes:
-        data = self.model_dump_json(exclude_none=True).encode()
+        fields = _REQUEST.dump(self)
+        if not isinstance(fields, dict):
+            raise TypeError("Request did not encode as an object")
+        present = {key: value for key, value in fields.items() if value is not None}
+        data = json.dumps(present, ensure_ascii=False, separators=(",", ":")).encode()
         if len(data) > 8192:
             raise RequestTooLarge("Encoded demonstration request exceeds 8192 bytes")
         return data
+
+
+_REQUEST = Json(Request)
 
 
 async def local(request: Request) -> Reply:
@@ -105,7 +132,7 @@ async def local(request: Request) -> Reply:
     value: object = await async_call("pybeam_dist_local", data)
     if not isinstance(value, str | bytes):
         raise RuntimeError("Distribution binding returned non-data")
-    return Reply.model_validate_json(value)
+    return _REPLY.decode(value)
 
 
 async def remote(alias: Literal["a", "b"], request: Request) -> Reply:
@@ -116,7 +143,7 @@ async def remote(alias: Literal["a", "b"], request: Request) -> Reply:
     value: object = await async_call("pybeam_dist_remote", alias.encode(), data)
     if not isinstance(value, str | bytes):
         raise RuntimeError("Distribution binding returned non-data")
-    return Reply.model_validate_json(value)
+    return _REPLY.decode(value)
 
 
 def reservation(incarnation: str, message_id: str, payload: str) -> Request:

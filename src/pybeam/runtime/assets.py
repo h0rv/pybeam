@@ -6,10 +6,9 @@ import sys
 import sysconfig
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, RootModel, ValidationError
-
+from pybeam.codec import CodecError, Json
 from pybeam.runtime.config import BootstrapError, Config
 
 
@@ -41,35 +40,51 @@ class RuntimeAssets:
         return result
 
 
-def _relative(path: Path) -> Path:
+def _relative(path: Path) -> None:
     if path.is_absolute() or ".." in path.parts:
         raise ValueError("Packaged runtime paths must stay inside their asset directory")
-    return path
 
 
-type AssetPath = Annotated[Path, AfterValidator(_relative)]
+_ERTS_VERSION = re.compile(r"[0-9.]+")
+_MACOS_WHEEL = re.compile(r"cp314-cp314-macosx_\d+_\d+_arm64")
 
 
-class ManifestBase(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-
+@dataclass(frozen=True, kw_only=True)
+class ManifestBase:
     python_version: Literal["3.14"]
     implementation: Literal["cpython"]
-    executable: AssetPath
+    executable: Path
     root_dir: Literal["."]
-    bindir: AssetPath
-    code_paths: Annotated[tuple[AssetPath, ...], Field(min_length=1)]
-    erts_version: Annotated[str, Field(pattern=r"^[0-9.]+$")]
+    bindir: Path
+    code_paths: tuple[Path, ...]
+    erts_version: str
+
+    def __post_init__(self) -> None:
+        if not self.code_paths:
+            raise ValueError("Packaged runtime needs a code path")
+        for path in (self.executable, self.bindir, *self.code_paths):
+            _relative(path)
+        if _ERTS_VERSION.fullmatch(self.erts_version) is None:
+            raise ValueError("erts_version must contain only digits and dots")
 
 
+@dataclass(frozen=True, kw_only=True)
 class DarwinManifest(ManifestBase):
     architecture: Literal["arm64"]
     system: Literal["Darwin"]
-    minimum_macos: tuple[Annotated[int, Field(ge=0)], Annotated[int, Field(ge=0)]]
-    wheel_tag: Annotated[str, Field(pattern=r"^cp314-cp314-macosx_\d+_\d+_arm64$")]
+    minimum_macos: tuple[int, int]
+    wheel_tag: str
     python_library: Literal["libpython3.14.dylib"]
 
+    def __post_init__(self) -> None:
+        ManifestBase.__post_init__(self)
+        if min(self.minimum_macos) < 0:
+            raise ValueError("minimum_macos must not be negative")
+        if _MACOS_WHEEL.fullmatch(self.wheel_tag) is None:
+            raise ValueError("wheel_tag must be a CPython 3.14 macOS arm64 tag")
 
+
+@dataclass(frozen=True, kw_only=True)
 class LinuxManifest(ManifestBase):
     architecture: Literal["x86_64"]
     system: Literal["Linux"]
@@ -77,10 +92,8 @@ class LinuxManifest(ManifestBase):
     python_library: Literal["libpython3.14.so.1.0"]
 
 
-class RuntimeManifest(
-    RootModel[Annotated[DarwinManifest | LinuxManifest, Field(discriminator="system")]]
-):
-    model_config = ConfigDict(frozen=True)
+type RuntimeManifest = DarwinManifest | LinuxManifest
+MANIFEST = Json(RuntimeManifest)
 
 
 def _version() -> str:
@@ -111,10 +124,10 @@ def _host_python_library(name: str) -> Path:
 
 def packaged_assets(root: Path) -> RuntimeAssets:
     try:
-        manifest = RuntimeManifest.model_validate_json((root / "runtime.json").read_text()).root
+        manifest = MANIFEST.decode((root / "runtime.json").read_bytes())
     except OSError as error:
         raise BootstrapError("Cannot read packaged runtime manifest") from error
-    except ValidationError as error:
+    except CodecError as error:
         raise BootstrapError(
             "Packaged runtime is not compatible with Python "
             + _version()
