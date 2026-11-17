@@ -49,12 +49,22 @@ $ uv run --locked --extra fastapi python -m examples.chat_load.crash_test
 Open `http://127.0.0.1:8802`; servers use ports 8800/8801. The dashboard also
 starts with `mise run example:crash-test`. Flags: `--usual-url`, `--pybeam-url`,
 `--rooms`, `--clients`, `--rate` (messages/s/socket). Traffic runs once per
-dashboard process, not per tab. Choose **Start crash test** for a narrated run:
-an 8 s baseline, then raise, CPU hog and native abort in room-1 on both stacks
-together. Each fault gets 10 s of observation and 5 s of recovery. Watch rooms
-2–8; the results retain each side's actual request outcome, worst rolling p99,
-pending age, socket drops and lost messages. Expectations are separate from
-measurements; **Run again** repeats the sequence. Keep this local.
+dashboard process, not per tab. Choose **Crash Room 1 on both**. After a 4 s
+countdown, the same native crash runs on both stacks concurrently. Watch the
+chat messages in the other rooms: does a user lose their connection, or keep
+getting replies? Each test watches 10 s of traffic, then allows 5 s for recovery.
+The default rate is one message per second per user so the conversation is
+readable. The button waits for live replies from every user on both stacks.
+
+The view selects a user who actually disconnected or waited for a reply, then
+shows the matching user on both sides. It retains the interruption and other-room
+disconnect counts after connections recover. “Confirmed” means the server
+acknowledged a send. An unconfirmed send might have reached the server; clients
+do not replay it. A run with no disconnects does not establish zero latency impact.
+
+Open **How this works** to try a CPU stall or raised exception on both stacks.
+Each is a separate paired test; only the latest result is retained. A run already
+in progress rejects another start. Keep this local.
 
 The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 
@@ -64,11 +74,12 @@ The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 | `hog` | Tight loop blocks one web worker for 3 s | Dedicated-loop task runs the same loop; completed notice |
 | `abort` | Worker dies; request loses its response; replacement worker starts | Isolated child dies; HTTP 200 and contained notice |
 
-Status moves healthy → injecting → outcome for six seconds → healthy if
-connected. Socket loss overrides it with disconnected/reconnecting; clients
-reconnect without replaying messages. Dashboard p99 covers replies received
-in the last two seconds: watch pending age too. A lost request alone does not
-prove a worker died.
+The fault target is separate from the other-room conversation. Its request
+outcome is not a measurement of other users' experience. A lost fault request
+alone does not prove a worker died. Results depend on worker assignment and
+this machine. The usual stack runs faults in its web workers; PyBeam runs native
+crashes in isolated child processes. This compares those failure boundaries,
+not maximum throughput. The measurements below used a separate load runner.
 
 ### Measured limits
 

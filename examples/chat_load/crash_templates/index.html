@@ -13,16 +13,27 @@
 <body>
 <main>
   <header>
-    <h1>Same chat app, same traffic, two architectures.</h1>
+    <p class="eyebrow">LIVE CRASH TEST</p>
+    <h1>Break one room.<br>Watch the other conversations.</h1>
+    <p class="intro">Crash a process in Room 1 on both stacks at once. Do users in the other rooms get disconnected?</p>
   </header>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
        hx-config='{"sse":{"pauseOnBackground":false}}'>
     {% include 'rooms.html' %}
   </div>
-  <footer>
-    <p>p99: replies received in the last 2 s; — means no samples. Watch pending age and lost messages too.<br>
-    History: 20 s, clipped at 100 ms. Clients reconnect without replay. Worker assignment varies. Local demo only.</p>
-  </footer>
+  <details>
+    <summary>How this works · try two other failures</summary>
+    <p>These are scripted messages over real connections, not an animation. “Confirmed” means the server acknowledged the send, not that another user read it. Both sides use the same messages and sending rate.</p>
+    <p>The usual stack has 8 web workers, a KV cache, a message broker and a task-queue worker. Its fault runs in a web worker. PyBeam runs the crash in an isolated child process; CPU work and exceptions use separate worker tasks. The configurations have different failure boundaries by design. This is not a throughput comparison.</p>
+    <p>Each test waits 4 s, injects the same fault on both sides concurrently, watches the other rooms for 10 s, then allows 5 s for recovery. The displayed user switches to an actually affected user, matched across both sides. Connections retry without replay. “Unconfirmed” means a pending send was discarded at disconnect; it might have reached the server.</p>
+    <p>Worker assignment and this machine affect the result. Zero disconnects does not mean zero latency impact. A lost fault request alone does not prove a process died. Keep this demo local.</p>
+    <div class="alternatives">
+      <button type="button" hx-post="/run/hog" hx-target="#live" hx-swap="innerHTML">Block one worker for 3 s · both stacks</button>
+      <button type="button" hx-post="/run/raise" hx-target="#live" hx-swap="innerHTML">Raise an exception · both stacks</button>
+    </div>
+    <p>Wait for a test to finish before starting another. Results describe the latest test only.</p>
+  </details>
+  <footer><p>Live simulated users. Real requests and failures. No prerecorded results.</p></footer>
 </main>
 </body>
 </html>

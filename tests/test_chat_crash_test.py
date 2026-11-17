@@ -8,7 +8,6 @@ from websockets.asyncio.server import ServerConnection, serve
 
 from examples.chat_load import crash_test
 from examples.chat_load.crash_test import (
-    STEPS,
     Client,
     Dashboard,
     Observation,
@@ -22,21 +21,30 @@ from examples.chat_load.faults import FaultKind
 from examples.chat_load.protocol import Ack, Fault, Send
 
 
-def test_room__empty_window_pending_age_outcomes_and_history() -> None:
+def live_clients(live: Dashboard) -> None:
+    for side in live.sides.values():
+        for room in side.rooms:
+            for client in room.clients:
+                client.state = "connected"
+                client.replies = 1
+                client.last_reply = time.monotonic()
+
+
+def test_room__pending_messages_are_not_healthy() -> None:
     client = Client("test", state="connected")
     room = Room("room-1", [client])
     room.sample(10)
     assert room.p99 is None
-    assert room.lines == []
     assert room.status(10) == "healthy"
     client.pending[1] = 9
     assert room.pending == 1
     assert room.oldest_ms(10) == 1000
+    assert room.status(10) == "waiting"
+    client.pending.clear()
     room.samples.extend([(9, 1), (10, 100)])
     room.sample(10)
     assert room.p99 == 99.01
     assert room.sample_count == 2
-    assert room.lines
     room.mark("raise", "contained", 10)
     assert room.status(11) == "contained"
     assert room.status(17) == "healthy"
@@ -47,13 +55,10 @@ def test_room__empty_window_pending_age_outcomes_and_history() -> None:
     room.sample(13)
     assert room.p99 is None
     assert room.sample_count == 0
-    for tick in range(500):
-        room.sample(tick)
-    assert len(room.history) == 40
 
 
 @pytest.mark.parametrize(
-    "values", [{"rooms": 0}, {"rate": 100}, {"usual_url": "file:///etc/hosts"}]
+    "values", [{"rooms": 1}, {"rate": 100}, {"usual_url": "file:///etc/hosts"}]
 )
 def test_settings__reject_invalid_load_or_targets(values: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
@@ -75,7 +80,7 @@ async def test_inject__reports_responses(
     body: str,
     expected: Status,
 ) -> None:
-    live = Dashboard(Settings(rooms=1, clients=1))
+    live = Dashboard(Settings(rooms=2, clients=1))
     side = live.sides["usual"]
 
     async def respond(request: httpx.Request) -> httpx.Response:
@@ -90,7 +95,7 @@ async def test_inject__reports_responses(
 
 @pytest.mark.parametrize("timed_out", [True, False])
 async def test_inject__distinguishes_unknown_timeout_from_lost_connection(timed_out: bool) -> None:
-    live = Dashboard(Settings(rooms=1, clients=1))
+    live = Dashboard(Settings(rooms=2, clients=1))
 
     async def fail(request: httpx.Request) -> httpx.Response:
         if timed_out:
@@ -127,7 +132,9 @@ async def test_routes__single_run_is_owned_by_group_and_rejects_cross_origin(
             assert page.status_code == 200
             assert 'hx-sse:connect="/events"' in page.text
             assert "Usual stack" in page.text and "PyBeam" in page.text
-            assert "Start crash test" in page.text
+            assert "Waiting for both stacks" in page.text
+            assert (await client.post("/run")).status_code == 503
+            live_clients(live)
             assert "/faults/usual/" not in page.text
             assert (await client.post("/faults/pybeam/raise")).status_code == 404
             assert (
@@ -136,7 +143,7 @@ async def test_routes__single_run_is_owned_by_group_and_rejects_cross_origin(
             assert not calls
             result = await client.post("/run")
             assert result.status_code == 200
-            assert "STEP 1 OF 7" in result.text
+            assert "BEFORE THE FAULT" in result.text
             assert "disabled" in result.text
             assert live.running
             assert (await client.post("/run", headers={"origin": "http://test"})).status_code == 409
@@ -185,14 +192,16 @@ def test_observation__only_other_rooms_and_window_peaks_count() -> None:
     assert observation.measurement.pending_ms == 2000
 
 
+@pytest.mark.parametrize("kind", ["abort", "hog", "raise"])
 async def test_scenario__concurrent_faults_transitions_results_and_rerun(
     monkeypatch: pytest.MonkeyPatch,
+    kind: FaultKind,
 ) -> None:
     monkeypatch.setattr(crash_test, "BASELINE_SECONDS", 0.01)
     monkeypatch.setattr(crash_test, "OBSERVE_SECONDS", 0.04)
     monkeypatch.setattr(crash_test, "RECOVERY_SECONDS", 0.01)
-    arrivals: dict[str, set[str]] = {step.kind: set() for step in STEPS}
-    paired = {step.kind: asyncio.Event() for step in STEPS}
+    arrivals: set[str] = set()
+    paired = asyncio.Event()
     transitions: list[tuple[str, int]] = []
     pause = Dashboard.pause
 
@@ -205,12 +214,12 @@ async def test_scenario__concurrent_faults_transitions_results_and_rerun(
     async def respond(request: httpx.Request) -> httpx.Response:
         assert live.phase == "observe"
         assert live.current is not None
-        kind = live.current.kind
+        assert live.current.kind == kind
         assert request.url.path.endswith("/" + kind)
-        arrivals[kind].add(request.url.host)
-        if len(arrivals[kind]) == 2:
-            paired[kind].set()
-        await paired[kind].wait()
+        arrivals.add(request.url.host)
+        if len(arrivals) == 2:
+            paired.set()
+        await paired.wait()
         now = time.monotonic()
         for side in live.sides.values():
             side.rooms[0].samples.append((now, 9000))
@@ -222,12 +231,13 @@ async def test_scenario__concurrent_faults_transitions_results_and_rerun(
         usual_url=HttpUrl("http://usual"), pybeam_url=HttpUrl("http://pybeam"), rooms=2, clients=1
     )
     live = Dashboard(settings)
+    live_clients(live)
     async with (
         httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http,
         asyncio.TaskGroup() as group,
     ):
         live.group, live.http = group, http
-        live.start_run()
+        live.start_run(kind)
         assert live.phase == "baseline"
         assert live.step_number == 1
         assert live.run_task is not None
@@ -235,21 +245,17 @@ async def test_scenario__concurrent_faults_transitions_results_and_rerun(
             await live.run_task
         assert live.phase == "done"
         assert not live.running
-        assert live.step_number == 7
-        assert [result.step.kind for result in live.results] == ["raise", "hog", "abort"]
+        assert live.step_number == 3
+        assert [result.step.kind for result in live.results] == [kind]
         assert transitions == [
             ("baseline", 1),
             ("observe", 2),
             ("recovery", 3),
-            ("observe", 4),
-            ("recovery", 5),
-            ("observe", 6),
-            ("recovery", 7),
         ]
         for result in live.results:
             assert all(item.p99 == 7 for item in result.measurements.values())
             assert all("HTTP 500" in outcome for outcome in result.outcomes.values())
-        assert live.total("usual").p99 == 7
+        assert live.impact("usual") is live.results[0].measurements["usual"]
         live.start_run()
         assert not live.results
         assert live.run_task is not None
@@ -261,6 +267,66 @@ async def test_scenario__missing_runner_is_unavailable() -> None:
     with pytest.raises(crash_test.HTTPException) as error:
         live.start_run()
     assert error.value.status_code == 503
+
+
+async def test_scenario__lost_readiness_during_countdown_sends_no_fault(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live = Dashboard(Settings(rooms=2, clients=1))
+    live_clients(live)
+
+    async def disconnect(self: Dashboard) -> None:
+        self.sides["usual"].rooms[1].clients[0].state = "disconnected"
+
+    async def unexpected(request: httpx.Request) -> httpx.Response:
+        pytest.fail("Fault sent without live bystander connections")
+
+    monkeypatch.setattr(Dashboard, "pause", disconnect)
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(unexpected)) as http,
+        asyncio.TaskGroup() as group,
+    ):
+        live.group, live.http = group, http
+        live.start_run()
+        assert live.run_task is not None
+        await live.run_task
+    assert live.phase == "interrupted"
+    assert not live.results
+
+
+def test_focus__real_bystander_impact_is_matched_and_retained() -> None:
+    live = Dashboard(Settings(rooms=3, clients=2))
+    live_clients(live)
+    for key, side in live.sides.items():
+        live.observations[key] = Observation(
+            [(client, client.drops, client.lost) for room in side.rooms[1:] for client in room.clients]
+        )
+    side = live.sides["usual"]
+    side.rooms[0].clients[0].drops += 1
+    live.select_focus(10)
+    assert (live.focus_room, live.focus_client) == (1, 0)
+    delayed = side.rooms[2].clients[1]
+    delayed.pending[0] = 8
+    live.select_focus(10)
+    assert (live.focus_room, live.focus_client) == (2, 1)
+    delayed.pending.clear()
+    disconnected = side.rooms[1].clients[1]
+    disconnected.drops += 1
+    live.select_focus(11)
+    assert (live.focus_room, live.focus_client) == (1, 1)
+    assert live.focus_interrupted("usual")
+    assert not live.focus_interrupted("pybeam")
+    side.rooms[2].clients[0].pending[0] = 1
+    live.select_focus(12)
+    assert (live.focus_room, live.focus_client) == (1, 1)
+
+
+def test_readiness__stale_replies_do_not_enable_a_run() -> None:
+    live = Dashboard(Settings())
+    live_clients(live)
+    assert live.ready
+    live.sides["usual"].rooms[1].clients[0].last_reply = time.monotonic() - 10
+    assert not live.ready
 
 
 async def test_traffic__reconnects_counts_lost_and_records_acknowledgements() -> None:
@@ -282,7 +348,7 @@ async def test_traffic__reconnects_counts_lost_and_records_acknowledgements() ->
     async with serve(echo, "127.0.0.1", 0) as server:
         port = server.sockets[0].getsockname()[1]
         live = Dashboard(
-            Settings(usual_url=HttpUrl("http://127.0.0.1:" + str(port)), rooms=1, clients=1)
+            Settings(usual_url=HttpUrl("http://127.0.0.1:" + str(port)), rooms=2, clients=1)
         )
         side = live.sides["usual"]
         room = side.rooms[0]
@@ -296,6 +362,9 @@ async def test_traffic__reconnects_counts_lost_and_records_acknowledgements() ->
                 assert client.lost == 1
                 assert room.connected == 1
                 assert room.samples
+                assert client.replies > 0
+                assert client.messages[0].state == "unconfirmed"
+                assert any(message.state == "confirmed" for message in client.messages)
             finally:
                 task.cancel()
         assert room.connected == 0
