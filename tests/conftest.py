@@ -22,6 +22,7 @@ FRAMEWORK_TESTS = frozenset(
         "test_discord_demo.py",
         "test_discord_demo_browser.py",
         "test_fastapi.py",
+        "test_modes_lab.py",
         "test_hornbeam_boundary.py",
         "test_litestar.py",
         "test_pyview_subscription.py",

@@ -315,6 +315,11 @@ timeout 120 java -jar "$PYBEAM_ALLOY_JAR" exec -t none -o "$output/solutions" "$
 description = "Private finite distribution and ownership checks; never part of default VM-free tests"
 run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_distribution_native.py tests/test_distribution_state_native.py tests/test_distribution_admission_native.py tests/test_guardian_authorization.py tests/test_guardian_authorization_model.py tests/test_guardian_composition.py tests/test_guardian_composition_model.py tests/test_guardian_composition_native.py --run-runtime -q"
 
+[tasks."modes-lab"]
+description = "Run one CPU job live in every execution mode next to asyncio, threads and process pools"
+usage = 'flag "--port <port>" default="38941"'
+run = 'exec uv run --locked --extra showcase --extra fastapi python -m examples.modes_lab --port "${usage_port}"'
+
 [tasks."showcase:private"]
 hide = true
 description = "Source-only local UI; the unreviewed distributed runtime remains unavailable"

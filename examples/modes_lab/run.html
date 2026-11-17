@@ -1,0 +1,58 @@
+{% if run is none %}
+<section id="run"><p class="muted">No run yet. Pick an experiment above; every lane runs the same Python on this machine.</p></section>
+{% else %}
+<section id="run" {% if not run.finished %}hx-get="/runs/{{ run.key }}" hx-trigger="load delay:1s" hx-swap="outerHTML"{% endif %}>
+  <h2>
+    {% if run.experiment == "fanout" %}{{ run.count }} CPU jobs at once, {{ "{:,}".format(run.size) }} loop iterations each
+    {% elif run.experiment == "crash" %}{{ run.count }} workers, one calls <code>os.abort()</code>
+    {% else %}{{ "{:,}".format(run.count) }} concurrent callers{% endif %}
+    {% if not run.finished %}<small>running…</small>{% endif %}
+  </h2>
+  {% if run.experiment == "fanout" %}<p class="muted">Each bar is one job, from when its Python code started to when it finished, on a shared time axis. Same colour = same OS thread. Speedup = jobs × one job alone ÷ wall time.</p>{% endif %}
+  {% for lane in run.lanes %}
+  <div class="lane">
+    <div>
+      <div class="family">{{ "PyBeam" if lane.lane.engine == "beam" else "Python today" }} · {{ lane.lane.runtime }}</div>
+      <h3>{{ lane.lane.label }}</h3>
+      <small><code>{{ lane.lane.setting }}</code></small>
+    </div>
+    <div>
+      {% if lane.status == "queued" %}<span class="muted">queued</span>
+      {% elif lane.status == "running" %}<span class="muted">running…</span>
+      {% elif lane.status == "failed" %}<span class="bad">failed: {{ lane.detail }}</span>
+      {% elif run.experiment == "fanout" %}
+        {% set bars = lane.bars(run.scale_ns) %}
+        <svg class="timeline" viewBox="0 0 100 {{ bars|length * 6 + 2 }}" preserveAspectRatio="none" height="{{ bars|length * 9 + 4 }}" role="img" aria-label="job timeline">
+          {% for bar in bars %}<rect class="tone-{{ bar.tone }}" x="{{ '%.3f'|format(bar.left) }}" y="{{ bar.row * 6 + 1 }}" width="{{ '%.3f'|format(bar.width) }}" height="5"></rect>{% endfor %}
+        </svg>
+        <div class="metrics">
+          <span>wall <b>{{ '%.0f'|format(lane.wall_ms) }} ms</b></span>
+          <span>speedup <b class="{{ 'good' if lane.speedup > 1.5 else '' }}">{{ '%.1f'|format(lane.speedup) }}×</b></span>
+          <span>{{ lane.topology }}</span>
+          {% if lane.kept_gil %}<span class="bad">the child processes started a GIL-enabled interpreter</span>{% endif %}
+          {% if lane.outcome.create_us %}<span>start <b>{{ '%.1f'|format(lane.create_ms) }} ms</b>/worker</span>{% endif %}
+          {% if lane.outcome.rss_kib > 0 %}<span>memory <b>{{ '%.1f'|format(lane.rss_per_worker) }} MiB</b>/worker</span>{% endif %}
+          {% if lane.outcome.latency_p50_us %}<span>empty call <b>{{ lane.outcome.latency_p50_us }}/{{ lane.outcome.latency_p99_us }} µs</b> p50/p99</span>{% endif %}
+        </div>
+      {% elif run.experiment == "crash" %}
+        <div class="cells" aria-hidden="true">
+          <span class="victim">×</span>
+          {% for index in range(run.count - 1) %}<span class="{{ 'alive' if not lane.aborted and index < (lane.outcome.others_alive or 0) else 'dead' }}"></span>{% endfor %}
+        </div>
+        {% if lane.aborted %}<span class="bad">The whole OS process died: 0 of {{ run.count - 1 }} other workers survived{% if lane.lane.engine == "beam" %}, and the BEAM VM went with them{% else %}, nor did the app around them{% endif %}.</span>
+        {% else %}<span class="{{ 'good' if lane.outcome.others_alive == run.count - 1 else 'bad' }}">{{ lane.outcome.others_alive }} of {{ run.count - 1 }} other workers kept running.</span>
+          <span class="muted">Victim saw <code>{{ lane.outcome.victim_result }}</code>; a replacement took {{ '%.0f'|format(lane.outcome.replacement_us / 1000) }} ms.</span>{% endif %}
+      {% else %}
+        <div class="metrics">
+          <span>spawned in <b>{{ '%.2f'|format(lane.outcome.spawn_us / 1000000) }} s</b></span>
+          <span><b>{{ "{:,}".format(lane.outcome.bytes_per_process) }} B</b> per waiting caller</span>
+          <span>{{ lane.outcome.contexts }} Python context{{ "" if lane.outcome.contexts == 1 else "s" }}, at most {{ "{:,}".format(lane.outcome.window) }} calls in flight</span>
+          <span>all done in <b>{{ '%.1f'|format(lane.outcome.wall_us / 1000000) }} s</b> ({{ "{:,}".format(lane.calls_per_second) }} calls/s)</span>
+          <span>RSS <b>{{ "{:,}".format(lane.outcome.rss_kib // 1024) }} MiB</b></span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
