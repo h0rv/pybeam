@@ -55,12 +55,12 @@ def test_pythonic_actors__restart_requires_explicit_typed_rejoin(
         application:set_env(erlang_python, event_loop_pool_size, 1),
         {ok, _} = application:ensure_all_started(erlang_python),
         py_callback:register(pythonic_kill, fun([Pid]) ->
-            [{{Group, Id}, Pid, Old, _, _}] = ets:match_object(py_actor_generations,
-                {{'_', '_'}, Pid, '_', '_', '_'}),
+            [{{Group, Id}, Pid, Old, _, _, _}] = ets:match_object(py_actor_generations,
+                {{'_', '_'}, Pid, '_', '_', '_', '_'}),
             exit(Pid, kill),
             Wait = fun Retry(0) -> error(restart_timeout);
                 Retry(N) -> case ets:lookup(py_actor_generations, {Group, Id}) of
-                    [{_, New, Generation, _, _}] when New =/= Pid, Generation =/= Old -> true;
+                    [{_, New, Generation, _, _, _}] when New =/= Pid, Generation =/= Old -> true;
                     _ -> receive after 1 -> Retry(N - 1) end
                 end
             end,
