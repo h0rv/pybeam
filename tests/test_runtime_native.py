@@ -82,6 +82,9 @@ def test_native__nonreading_output_peer_closes_and_releases_subscription(
 
             deadline = time.monotonic() + 5
             with pytest.raises(ConnectionClosed):
+                # The nonreading peer may not observe the abortive close until it writes;
+                # the closed server socket then resets it. An open one would pong.
+                peer.ping()
                 while True:
                     remaining = deadline - time.monotonic()
                     assert remaining > 0, (
