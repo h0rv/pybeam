@@ -2,6 +2,7 @@ import asyncio
 import json
 import marshal
 import os
+import runpy
 import sys
 import traceback
 from collections.abc import Awaitable, Callable
@@ -81,9 +82,12 @@ def _run_entry(path: Path) -> None:
     # compile() keeps code constants mortal on free-threaded builds, so threads
     # running the same function contend on their reference counts. Loading
     # through marshal immortalizes them, as running a script with python does.
+    if path.suffix != ".py":
+        runpy.run_path(str(path), run_name="__main__")
+        return
     code = marshal.loads(marshal.dumps(compile(path.read_bytes(), path, "exec")))  # noqa: S302
     module = ModuleType("__main__")
-    module.__file__ = str(path)
+    vars(module).update(__file__=str(path), __cached__=None, __package__="")
     previous = sys.modules.get("__main__")
     sys.modules["__main__"] = module
     try:
