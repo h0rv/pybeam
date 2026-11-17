@@ -1,11 +1,15 @@
 import asyncio
 import json
 import os
+import py_compile
 import signal
 import subprocess
 import sys
+import sysconfig
 import time
+import zipfile
 from pathlib import Path
+from types import FunctionType
 
 import pytest
 
@@ -327,6 +331,84 @@ async def test_loader__registers_and_invokes_once(
     calls.unlink()
     assert await loader.invoke() == (exit_code or 0)
     assert not calls.exists()
+
+
+@pytest.mark.skipif(
+    not sysconfig.get_config_var("Py_GIL_DISABLED"),
+    reason="Only free-threaded builds immortalize code constants",
+)
+def test_loader__entry_constants_are_immortal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(loader, "_state", loader._Loader())
+    entry = tmp_path / "entry.py"
+    entry.write_text(
+        "from pybeam import run\nasync def main() -> None:\n    mask = 0xFFFFFFFF\nrun(main)\n"
+    )
+    monkeypatch.setenv(
+        "PYBEAM_BOOTSTRAP",
+        json.dumps(
+            {
+                "argv": [str(entry)],
+                "ready": str(tmp_path / "ready"),
+                "completed": str(tmp_path / "completed"),
+            }
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    loader.load()
+    session = loader._state.session
+    assert session is not None and isinstance(session.entry, FunctionType)
+    mask = next(value for value in session.entry.__code__.co_consts if value == 0xFFFFFFFF)
+    assert sys._is_immortal(mask)
+
+
+@pytest.mark.parametrize("kind", ["py", "pyc", "pyz"])
+async def test_loader__runs_source_bytecode_and_zip_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    monkeypatch.setattr(loader, "_state", loader._Loader())
+    marker = tmp_path / "marker.txt"
+    source = (
+        "from pathlib import Path\nfrom pybeam import run\n"
+        "async def main() -> None:\n"
+        + "    Path({!r}).write_text(repr((__cached__, __package__)))\n".format(str(marker))
+        + "run(main)\n"
+    )
+    script = tmp_path / "app.py"
+    script.write_text(source)
+    match kind:
+        case "py":
+            entry = script
+        case "pyc":
+            entry = tmp_path / "app.pyc"
+            py_compile.compile(str(script), cfile=str(entry), doraise=True)
+        case _:
+            entry = tmp_path / "app.pyz"
+            with zipfile.ZipFile(entry, "w") as archive:
+                archive.writestr("__main__.py", source)
+    monkeypatch.setenv(
+        "PYBEAM_BOOTSTRAP",
+        json.dumps(
+            {
+                "argv": [str(entry)],
+                "ready": str(tmp_path / "ready"),
+                "completed": str(tmp_path / "completed"),
+            }
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    loader.load()
+    assert await loader.invoke() == 0
+    if kind == "pyz":
+        assert marker.is_file()
+    else:
+        assert marker.read_text() == repr((None, ""))
 
 
 async def test_loader__reports_missing_entrypoint(
