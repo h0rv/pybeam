@@ -1,12 +1,15 @@
-from dataclasses import dataclass as plain_dataclass
+from dataclasses import dataclass
 from typing import final
 
-from pydantic import ConfigDict, PositiveInt
-from pydantic.dataclasses import dataclass
+
+def _require(value: int, name: str, low: int = 1, high: int | None = None) -> None:
+    if type(value) is not int or value < low or (high is not None and value > high):
+        bound = "at least " + str(low) if high is None else "from " + str(low) + " to " + str(high)
+        raise ValueError(name + " must be an integer " + bound)
 
 
 @final
-@dataclass(frozen=True, slots=True, kw_only=True, config=ConfigDict(strict=True, extra="forbid"))
+@dataclass(frozen=True, slots=True, kw_only=True)
 class BoundedMailbox:
     """Declare limits, without installing runtime admission control.
 
@@ -18,12 +21,16 @@ class BoundedMailbox:
     enqueue, without dropping, retrying, or accumulating waiting callers.
     """
 
-    capacity: PositiveInt
-    max_bytes: PositiveInt
+    capacity: int
+    max_bytes: int
+
+    def __post_init__(self) -> None:
+        _require(self.capacity, "capacity")
+        _require(self.max_bytes, "max_bytes")
 
 
 @final
-@plain_dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class UnboundedMailbox:
     """Explicitly accept no invocation-count or encoded-payload admission limit."""
 

@@ -6,8 +6,6 @@ from itertools import count
 from types import TracebackType
 from typing import Protocol, Self, TypeIs, overload
 
-from pydantic import BaseModel, ConfigDict, PositiveInt
-
 from pybeam.actors.classes import (
     ActorStoppedError,
     Container,
@@ -34,14 +32,24 @@ class DataGroup(Protocol):
     async def close(self) -> None: ...
 
 
-class ExecutionLimits(BaseModel):
+def _require(value: int, name: str, low: int = 1, high: int | None = None) -> None:
+    if type(value) is not int or value < low or (high is not None and value > high):
+        bound = "at least " + str(low) if high is None else "from " + str(low) + " to " + str(high)
+        raise ValueError(name + " must be an integer " + bound)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ExecutionLimits:
     """Bound physical execution contexts and aggregate admitted pool work."""
 
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+    workers: int
+    capacity: int
+    max_bytes: int
 
-    workers: PositiveInt
-    capacity: PositiveInt
-    max_bytes: PositiveInt
+    def __post_init__(self) -> None:
+        _require(self.workers, "workers")
+        _require(self.capacity, "capacity")
+        _require(self.max_bytes, "max_bytes")
 
 
 async def open_group(*, max_children: int, execution: ExecutionLimits | None = None) -> DataGroup:
@@ -108,12 +116,16 @@ def is_actor_class[T](value: Callable[..., T]) -> TypeIs[type[T]]:
     return isinstance(value, type)
 
 
-class _ActorGroupConfig(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ActorGroupConfig:
+    max_children: int
+    max_pending: int
+    max_bytes: int
 
-    max_children: PositiveInt
-    max_pending: PositiveInt
-    max_bytes: PositiveInt
+    def __post_init__(self) -> None:
+        _require(self.max_children, "max_children")
+        _require(self.max_pending, "max_pending")
+        _require(self.max_bytes, "max_bytes")
 
 
 class ActorGroup:

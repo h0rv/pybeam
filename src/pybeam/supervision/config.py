@@ -1,15 +1,13 @@
-from dataclasses import dataclass as plain_dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Annotated
-
-from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt, TypeAdapter
-from pydantic.dataclasses import dataclass
 
 from pybeam.mailbox import MailboxPolicy
 
-type MaxChildren = Annotated[PositiveInt, Field(strict=True)] | None
-_MAX_CHILDREN = TypeAdapter(MaxChildren)
+
+def _require(value: int, name: str, low: int = 1, high: int | None = None) -> None:
+    if type(value) is not int or value < low or (high is not None and value > high):
+        bound = "at least " + str(low) if high is None else "from " + str(low) + " to " + str(high)
+        raise ValueError(name + " must be an integer " + bound)
 
 
 class Strategy(StrEnum):
@@ -24,30 +22,43 @@ class Restart(StrEnum):
     TEMPORARY = "temporary"
 
 
-@dataclass(frozen=True, slots=True, config=ConfigDict(strict=True, extra="forbid"))
+@dataclass(frozen=True, slots=True)
 class RestartBudget:
-    max_restarts: NonNegativeInt = 3
-    window_seconds: PositiveInt = 5
+    max_restarts: int = 3
+    window_seconds: int = 5
+
+    def __post_init__(self) -> None:
+        _require(self.max_restarts, "max_restarts", 0)
+        _require(self.window_seconds, "window_seconds")
 
 
-@dataclass(frozen=True, slots=True, config=ConfigDict(strict=True, extra="forbid"))
+@dataclass(frozen=True, slots=True)
 class Shutdown:
-    grace_ms: Annotated[int, Field(ge=0, le=4294967295)] = 5000
+    grace_ms: int = 5000
+
+    def __post_init__(self) -> None:
+        _require(self.grace_ms, "grace_ms", 0, 4294967295)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True, config=ConfigDict(strict=True, extra="forbid"))
+@dataclass(frozen=True, slots=True, kw_only=True)
 class SupervisorConfig:
     mailbox: MailboxPolicy
-    max_children: MaxChildren
+    max_children: int | None
     strategy: Strategy = Strategy.ONE_FOR_ONE
     budget: RestartBudget = field(default_factory=RestartBudget)
 
+    def __post_init__(self) -> None:
+        validate_max_children(self.max_children)
+        if not isinstance(self.strategy, Strategy) or not isinstance(self.budget, RestartBudget):
+            raise TypeError("strategy and budget must be Strategy and RestartBudget values")
+
 
 def validate_max_children(value: int | None) -> None:
-    _MAX_CHILDREN.validate_python(value)
+    if value is not None:
+        _require(value, "max_children")
 
 
-@plain_dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True)
 class NativeChildSpec:
     """The MFA must start and link one OTP worker, not an asyncio task.
 
