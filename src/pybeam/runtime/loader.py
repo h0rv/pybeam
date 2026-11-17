@@ -106,11 +106,12 @@ def _run_entry(path: Path) -> Mapping[str, object]:
     sys.modules["__main__"] = module
     try:
         exec(code, module.__dict__)  # noqa: S102
-    finally:
+    except BaseException:
         if previous is None:
             del sys.modules["__main__"]
         else:
             sys.modules["__main__"] = previous
+        raise
     return module.__dict__
 
 
