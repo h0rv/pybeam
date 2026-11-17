@@ -25,7 +25,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 - `worker`: I/O-bound async code and cheap calls. On 3.14t it also runs CPU work in parallel, if your C extensions support free threading.
 - `owngil`: parallel pure-Python CPU work on 3.14. Extensions must support subinterpreters, and values are copied in and out.
 - `isolated`: C extensions that can crash or leak. Only that call fails.
-- Separate nodes: more than one machine, or surviving a whole VM failure.
+- Separate nodes: surviving a whole VM failure.
 
 Tasks run in `worker`, `owngil` or `isolated` mode; actors remain in `worker`. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
@@ -112,6 +112,6 @@ Subinterpreters isolate Python state, not native crashes. Only a separate OS pro
 | `worker` · 3.14 | 8, at most 32 calls admitted | 2.7 KB | 232 ms | 2.59 s |
 | `worker` · 3.14t | 8, at most 32 calls admitted | 2.7 KB | 258 ms | 1.80 s |
 
-Asyncio is fast and simple, but each event loop lives in one Python process, often inside a container; its tasks are isolated from other processes and lost if that process crashes. PyBEAM callers are preemptively scheduled and supervised, and can run on another machine. The admission limit bounds how much Python work runs at once.
+Asyncio is fast and simple, but each event loop lives in one Python process, often inside a container; its tasks are isolated from other processes and lost if that process crashes. PyBEAM callers are preemptively scheduled and supervised. The admission limit bounds how much Python work runs at once.
 
 Numbers on this page come from one 8-core machine and vary with hardware and load.
