@@ -208,6 +208,14 @@ class LaneRun:
         return bars
 
     @property
+    def calls_per_second(self) -> int:
+        return self.outcome.count * 1_000_000 // max(self.outcome.wall_us, 1)
+
+    @property
+    def kept_gil(self) -> bool:
+        return self.lane.runtime == "3.14t" and any(span.gil for span in self.outcome.spans)
+
+    @property
     def span_ns(self) -> int:
         spans = self.outcome.spans
         return max(span.end for span in spans) - min(span.start for span in spans) if spans else 0

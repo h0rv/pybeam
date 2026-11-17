@@ -1,6 +1,16 @@
 from fastapi.testclient import TestClient
 
-from examples.modes_lab.app import FANIN_CONTEXTS, LANES, LaneRun, Outcome, Run, Span, app, command
+from examples.modes_lab.app import (
+    FANIN_CONTEXTS,
+    LANES,
+    LaneRun,
+    Outcome,
+    Run,
+    Span,
+    app,
+    command,
+    runs,
+)
 
 
 def span(start: int, end: int, pid: int, thread: int, interpreter: int, gil: bool) -> Span:
@@ -22,6 +32,7 @@ def test_modes_lab__fanout_reports_topology_and_speedup() -> None:
     assert lane.topology == "1 OS process · 2 threads · 1 interpreter · 1 GIL"
     assert [bar.tone for bar in lane.bars(run.scale_ns)] == [0, 1]
     assert run.finished
+    assert not lane.kept_gil
 
 
 def test_modes_lab__free_threaded_spans_have_no_gil() -> None:
@@ -46,3 +57,18 @@ def test_modes_lab__fanin_passes_a_bounded_context_count() -> None:
     run = Run("key", "fanin", 1_000_000, 3_000_000, [LaneRun(lane)])
 
     assert command(lane, run)[-2:] == ["1000000", str(FANIN_CONTEXTS)]
+
+
+def test_modes_lab__renders_fanin_results() -> None:
+    lane = LaneRun(
+        LANES[5], "done", Outcome(count=10_000, wall_us=1_000_000, contexts=8, window=32)
+    )
+    runs["fanin"] = Run("fanin", "fanin", 10_000, 3_000_000, [lane])
+    try:
+        with TestClient(app) as client:
+            page = client.get("/runs/fanin")
+    finally:
+        runs.pop("fanin")
+
+    assert page.status_code == 200
+    assert "10,000 calls/s" in page.text

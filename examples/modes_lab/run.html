@@ -29,8 +29,9 @@
           <span>wall <b>{{ '%.0f'|format(lane.wall_ms) }} ms</b></span>
           <span>speedup <b class="{{ 'good' if lane.speedup > 1.5 else '' }}">{{ '%.1f'|format(lane.speedup) }}×</b></span>
           <span>{{ lane.topology }}</span>
+          {% if lane.kept_gil %}<span class="bad">the child processes started a GIL-enabled interpreter</span>{% endif %}
           {% if lane.outcome.create_us %}<span>start <b>{{ '%.1f'|format(lane.create_ms) }} ms</b>/worker</span>{% endif %}
-          {% if lane.outcome.rss_kib %}<span>memory <b>{{ '%.1f'|format(lane.rss_per_worker) }} MiB</b>/worker</span>{% endif %}
+          {% if lane.outcome.rss_kib > 0 %}<span>memory <b>{{ '%.1f'|format(lane.rss_per_worker) }} MiB</b>/worker</span>{% endif %}
           {% if lane.outcome.latency_p50_us %}<span>empty call <b>{{ lane.outcome.latency_p50_us }}/{{ lane.outcome.latency_p99_us }} µs</b> p50/p99</span>{% endif %}
         </div>
       {% elif run.experiment == "crash" %}
@@ -46,7 +47,7 @@
           <span>spawned in <b>{{ '%.2f'|format(lane.outcome.spawn_us / 1000000) }} s</b></span>
           <span><b>{{ "{:,}".format(lane.outcome.bytes_per_process) }} B</b> per waiting caller</span>
           <span>{{ lane.outcome.contexts }} Python context{{ "" if lane.outcome.contexts == 1 else "s" }}, at most {{ "{:,}".format(lane.outcome.window) }} calls in flight</span>
-          <span>all done in <b>{{ '%.1f'|format(lane.outcome.wall_us / 1000000) }} s</b> ({{ "{:,}".format((run.count * 1000000 // max(lane.outcome.wall_us, 1))) }} calls/s)</span>
+          <span>all done in <b>{{ '%.1f'|format(lane.outcome.wall_us / 1000000) }} s</b> ({{ "{:,}".format(lane.calls_per_second) }} calls/s)</span>
           <span>RSS <b>{{ "{:,}".format(lane.outcome.rss_kib // 1024) }} MiB</b></span>
         </div>
       {% endif %}

@@ -22,7 +22,7 @@
     <li>result as a message<br><small>or a crash signal to the supervisor</small></li>
   </ol>
   <p>A BEAM process is not a Python interpreter. A million of them waiting on Python share a fixed set of contexts, the same way a million web requests share a thread pool. The mode only decides what a context is:</p>
-  <table>
+  <div class="scroll"><table>
     <thead><tr><th>Mode</th><th>A context is</th><th>Gains</th><th>Gives up</th></tr></thead>
     <tbody>
       <tr><td><code>ExecutionMode.WORKER</code> · 3.14</td><td>a thread in the one interpreter, sharing its GIL</td><td>~1 ms start, ~15 KiB each, ~20 µs calls; every C extension works</td><td>CPU work runs one at a time; a segfault takes down the whole VM</td></tr>
@@ -31,7 +31,7 @@
       <tr><td><code>ExecutionMode.ISOLATED</code></td><td>a child OS process with its own interpreter</td><td>parallel CPU and a crash kills only that child, which restarts</td><td>~90 ms and ~24 MiB each; calls cost ~3× more because arguments cross a socket</td></tr>
       <tr><td>separate nodes</td><td>another BEAM VM, here or on another machine</td><td>scale past one box; whole-VM failure isolation</td><td>a VM's start time and memory per node; network latency; you run more machines</td></tr>
     </tbody>
-  </table>
+  </table></div>
   <p class="muted">Free-threaded or not is the interpreter you install (CPython 3.14 vs 3.14t), not a PyBeam option. The <code>ExecutionMode</code> setting is landing in <a href="https://github.com/h0rv/pybeam/pull/16">pybeam#16</a>: tasks accept <code>WORKER</code> today, <code>OWNGIL</code> and <code>ISOLATED</code> raise <code>CapabilityUnavailable</code> until erlang-python accepts a per-task mode. This lab drives erlang-python contexts directly so every mode can be measured now.</p>
 
   <h2>Run it</h2>

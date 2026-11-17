@@ -10,7 +10,9 @@ h2 { font-size: 1.15rem; margin: 2.25rem 0 .5rem; }
 p, li { max-width: 46rem; }
 .muted, small { color: var(--muted); }
 code { font: .9em ui-monospace, monospace; }
-table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+main { overflow-wrap: anywhere; }
+.scroll { overflow-x: auto; }
+table { min-width: 34rem; border-collapse: collapse; width: 100%; font-size: .9rem; }
 th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-weight: 600; }
 .path { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; padding: 0; list-style: none; }
