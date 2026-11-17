@@ -14,9 +14,9 @@ export const pages = [
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/execution.md", path: "execution/", label: "How Python work runs", examples: ["examples/docs/execution.py"] },
-  { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/docs_fastapi.py"] },
-  { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/docs_litestar.py"] },
-  { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/docs_pyview.py"] },
+  { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
+  { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
+  { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
   { source: "docs/guide/genstage.md", path: "genstage/", label: "Finite GenStage sample", hidden: true, examples: ["examples/docs/genstage_transform.py", "examples/docs/genstage.py"] },
 ];
 

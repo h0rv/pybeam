@@ -3,7 +3,7 @@
 Keep a shared counter behind a PyView page. Each click updates the counter atomically and renders the result with PyView's template engine.
 
 ```python
-# docs_pyview.py
+# pyview_app.py
 import asyncio
 from dataclasses import dataclass
 from string.templatelib import Template
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 ```
 
 ```console
-$ uv run docs_pyview.py
+$ uv run pyview_app.py
 ```
 
 Open [localhost:8769](http://127.0.0.1:8769/) in your browser. The counter starts at `0`; clicking **Increment** shows `1`.

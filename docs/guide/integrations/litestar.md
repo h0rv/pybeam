@@ -3,7 +3,7 @@
 Use Litestar's store API to share values across requests. `BeamStore` keeps each store's keys in its own namespace.
 
 ```python
-# docs_litestar.py
+# litestar_app.py
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 ```
 
 ```console
-$ uv run docs_litestar.py
+$ uv run litestar_app.py
 ```
 
 The server listens on port 8768. In another terminal, read and update the document status:

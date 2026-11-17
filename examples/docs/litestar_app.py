@@ -1,4 +1,4 @@
-# docs_litestar.py
+# litestar_app.py
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager

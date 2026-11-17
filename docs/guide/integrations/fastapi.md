@@ -3,7 +3,7 @@
 Share an atomic counter across requests. The dependency opens one connection during the application lifespan and selects the request's scope.
 
 ```python
-# docs_fastapi.py
+# fastapi_app.py
 import asyncio
 
 from fastapi import FastAPI
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 ```
 
 ```console
-$ uv run docs_fastapi.py
+$ uv run fastapi_app.py
 ```
 
 The server listens on port 8767. In another terminal, increment the counter and read it:
