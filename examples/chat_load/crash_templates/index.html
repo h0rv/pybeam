@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
-  <title>Room crash test</title>
+  <title>Room crash test · PyBEAM</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/assets/dashboard.css">
   <script src="/static/htmx.min.js" defer></script>
@@ -13,20 +13,23 @@
 </head>
 <body>
 <main>
-  <header>
-    <p class="eyebrow">LIVE CRASH TEST</p>
-    <h1>One room crashes. Who else notices?</h1>
-    <p class="intro">Same traffic. The same native crash in Room 1. Two stacks, side by side.</p>
+  <header class="page-header">
+    <div class="masthead">
+      <span class="wordmark"><svg class="brand-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h11M3 12h18M3 19h11"/></svg>PyBEAM<span class="demo-label">/ crash test</span></span>
+      <span class="live-label"><span aria-hidden="true"></span>REAL CONNECTIONS. REAL FAULTS.</span>
+    </div>
+    <h1>One room crashes. <em>Who else notices?</em></h1>
+    <p class="intro">Same traffic. Same native crash in Room 1. Follow the conversations in the other rooms.</p>
   </header>
   <p id="stream-status" role="status"><span id="stream-message">Connecting to the live view…</span> <a href="/">Reload live view</a></p>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
        hx-config='{"sse":{"pauseOnBackground":false}}'>
     {% include 'rooms.html' %}
   </div>
-  <details>
+  <details class="explanation">
     <summary>How this works · try two other failures</summary>
     <p>These are scripted messages over real connections, not an animation. “Confirmed” means the server acknowledged the send, not that another user read it. Both sides use the same messages and sending rate.</p>
-    <p>The usual stack has 8 web workers, a KV cache, a message broker and a task-queue worker. Its fault runs in a web worker. PyBeam runs the crash in an isolated child process; CPU work and exceptions use separate worker tasks. The configurations have different failure boundaries by design. This is not a throughput comparison.</p>
+    <p>The usual stack has 8 web workers, a KV cache, a message broker and a task-queue worker. Its fault runs in a web worker. PyBEAM runs the crash in an isolated child process; CPU work and exceptions use separate worker tasks. The configurations have different failure boundaries by design. This is not a throughput comparison.</p>
     <p>Each test waits 4 s, injects the same fault on both sides concurrently, watches the other rooms for 10 s, then allows 5 s for recovery. The displayed user switches to an actually affected user, matched across both sides. Connections retry without replay. “Unconfirmed” means a pending send was discarded at disconnect; it might have reached the server.</p>
     <p>Worker assignment and this machine affect the result. Zero disconnects does not mean zero latency impact. A lost fault request alone does not prove a process died. Keep this demo local.</p>
     <div class="alternatives">
@@ -35,7 +38,7 @@
     </div>
     <p>Wait for a test to finish before starting another. Results describe the latest test only.</p>
   </details>
-  <footer><p>Live simulated users. Real requests and failures. No prerecorded results.</p></footer>
+  <footer><span>PyBEAM / live crash test</span><p>Scripted users. Real requests. Results from this run, not a recording.</p></footer>
 </main>
 </body>
 </html>

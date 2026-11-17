@@ -242,7 +242,7 @@ class Dashboard:
         self.sides: dict[SideId, Side] = {}
         targets: tuple[tuple[SideId, str, HttpUrl], ...] = (
             ("usual", "Usual stack", settings.usual_url),
-            ("pybeam", "PyBeam", settings.pybeam_url),
+            ("pybeam", "PyBEAM", settings.pybeam_url),
         )
         for key, title, url in targets:
             rooms = [
