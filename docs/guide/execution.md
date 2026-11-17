@@ -61,7 +61,7 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints the same checksum four times.
+It prints the same checksum four times. On 3.14 the four tasks take turns. On 3.14t they run on four threads at once; in a local run four took 0.43 s against 0.32 s for one. Threads that touch the same Python object contend for it on 3.14t, so keep hot objects per task, and time your own workload before you count on parallel tasks.
 
 ## Fan out: four CPU jobs
 

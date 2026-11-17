@@ -3,8 +3,9 @@ from collections.abc import Awaitable, Callable, Generator
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
-from types import TracebackType
-from typing import TYPE_CHECKING, Protocol, Self, assert_never
+from inspect import iscoroutinefunction
+from types import FunctionType, TracebackType
+from typing import TYPE_CHECKING, Literal, Protocol, Self, assert_never, overload
 
 from pybeam.codec import Codec
 from pybeam.submissions import AdmissionClosed, CapabilityUnavailable, Overloaded
@@ -52,13 +53,11 @@ class ExecutionMode(StrEnum):
 
     Worker shares the main interpreter: GIL on 3.14, parallel threads on
     3.14t; a native crash kills the VM. Owngil owns an interpreter per context
-    and is not a crash boundary. Owngil tasks need approval for fork changes:
-    py_task hard-codes worker and retained main-interpreter closures must become
-    bodies named by importable module path. Codecs must also run in the caller
-    and pass raw bytes: subinterpreters reject some extensions, such as
-    pydantic_core and numpy. Isolated uses a child OS process that contains
+    and is not a crash boundary. Owngil tasks use importable byte entries and
+    caller-side codecs: their modules cannot import pybeam, pydantic_core or
+    incompatible extensions such as numpy. Isolated uses a child OS process that contains
     os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
-    Only worker is currently available for PyBeam tasks.
+    Worker and owngil are available for tasks; isolated is not yet supported.
     """
 
     WORKER = "worker"
@@ -72,8 +71,26 @@ class TaskFunction[Q, R]:
     dedicated_loop runs the body on its context-owned native loop instead of
     the shared driver. It still uses the main interpreter, not an isolation VM.
     Construct loop-bound resources inside the body and finalize them before return.
+
+    Owngil requires a plain top-level async byte function in a module without
+    pybeam/pydantic or incompatible extensions. The caller encodes requests and
+    decodes results; entries receive and return JSON bytes, not Q/R objects.
+    No nested PyBeam supervisors can run inside these entries. Cancellation is
+    cooperative and CPU/native-blocked entry loops delay it.
     """
 
+    @overload
+    def __init__(
+        self,
+        function: Callable[[bytes], Awaitable[bytes]],
+        request: Codec[Q],
+        result: Codec[R],
+        *,
+        execution: Literal[ExecutionMode.OWNGIL],
+        dedicated_loop: bool = False,
+    ) -> None: ...
+
+    @overload
     def __init__(
         self,
         function: Callable[[Q], Awaitable[R]],
@@ -82,27 +99,40 @@ class TaskFunction[Q, R]:
         *,
         execution: ExecutionMode = ExecutionMode.WORKER,
         dedicated_loop: bool = False,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        function: Callable[..., Awaitable[R]],
+        request: Codec[Q],
+        result: Codec[R],
+        *,
+        execution: ExecutionMode = ExecutionMode.WORKER,
+        dedicated_loop: bool = False,
     ) -> None:
         execution = ExecutionMode(execution)
-        if execution == ExecutionMode.OWNGIL:
-            raise CapabilityUnavailable(
-                "owngil tasks are unavailable: py_task hard-codes mode => worker; "
-                "retained main-interpreter closures cannot cross interpreters. "
-                "Task mode support and bodies named by importable module path need "
-                "approved erlang-python fork changes. PyBeam must move task codecs "
-                "to the caller and pass raw bytes because subinterpreters with "
-                "check_multi_interp_extensions reject some extension modules"
-            )
         if execution == ExecutionMode.ISOLATED:
             raise CapabilityUnavailable(
-                "isolated tasks are unavailable: erlang-python's py_task hard-codes "
-                "mode => worker and task bodies are main-interpreter objects; "
-                "fork support and the isolated bootstrap fix "
-                "(h0rv/erlang-python PR #5) are required"
+                "isolated tasks are unavailable: the fork rejects isolated named tasks; "
+                "the isolated bootstrap fix (h0rv/erlang-python PR #5) and "
+                "child-exit accounting are required"
             )
+        if execution == ExecutionMode.OWNGIL and dedicated_loop:
+            raise ValueError("dedicated_loop is worker-only; owngil owns its interpreter loop")
+        self._function = function
+        self._entry: FunctionType | None = None
+        if execution == ExecutionMode.OWNGIL:
+            if not isinstance(function, FunctionType) or not iscoroutinefunction(function):
+                raise TypeError("owngil tasks require a plain async Python function")
+            if (
+                not isinstance(function.__module__, str)
+                or not function.__qualname__.isidentifier()
+                or not all(part.isidentifier() for part in function.__module__.split("."))
+            ):
+                raise TypeError("owngil entries must be importable top-level functions")
+            self._entry = function
         self._execution = execution
         self._dedicated_loop = dedicated_loop
-        self._function = function
         self._request = request
         self._result = result
 
@@ -119,12 +149,16 @@ class TaskFunction[Q, R]:
     def body(self, owners: tuple[object, ...], job: object | None = None) -> Body:
         from erlang.tasks import Body
 
+        function = self._function
+        if self._entry is not None:
+            raise TypeError("owngil entries cannot run as worker bodies")
+
         async def invoke(payload: bytes) -> bytes:
             token = _body_owners.set(owners)
             job_token = _body_execution.set(_BodyExecution(job, asyncio.current_task()))
             try:
                 request = self._request.decode(payload)
-                value = await self._function(request)
+                value = await function(request)
                 return self._result.encode(value)
             finally:
                 _body_execution.reset(job_token)
@@ -340,7 +374,11 @@ class TaskSupervisor:
         self._admissions_settled.clear()
         cancelled = False
         try:
-            pending = asyncio.create_task(start(group, self._gate, factory, payload))
+            if function._entry is None:
+                submission = start(group, self._gate, factory, payload)
+            else:
+                submission = start(group, self._gate, function._entry, payload, mode="owngil")
+            pending = asyncio.create_task(submission)
             try:
                 pid = await _owned(pending)
             except asyncio.CancelledError:

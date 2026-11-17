@@ -5,9 +5,11 @@ from pathlib import Path
 from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import verify_manifest
 from tools.build_runtime import (
+    ELF,
     ERTS_EXECUTABLES,
     audit_binary,
     audit_elf,
+    linux_wheel_tag,
     native_binaries,
     wheel_tag,
 )
@@ -37,7 +39,11 @@ def runtime_tag(assets: Path) -> str:
     ):
         raise ValueError("Unsupported runtime ABI/platform")
     tag: object = manifest.get("wheel_tag")
-    pattern = r"cp314-cp314-linux_x86_64" if linux else r"cp314-cp314-macosx_\d+_\d+_arm64"
+    pattern = (
+        r"cp314-cp314-(?:linux|manylinux_2_\d+)_x86_64"
+        if linux
+        else r"cp314-cp314-macosx_\d+_\d+_arm64"
+    )
     if not isinstance(tag, str) or not re.fullmatch(pattern, tag):
         raise ValueError("Unsupported wheel ABI/platform tag")
     MANIFEST.decode((assets / "runtime.json").read_bytes())
@@ -90,15 +96,18 @@ def runtime_tag(assets: Path) -> str:
         if path.is_symlink():
             raise ValueError("Runtime assets must not contain symlinks: " + str(path))
     required = (natives[0], *(assets / bindir / name for name in executables))
+    elves: list[ELF] = []
     for path in native_binaries(assets, required):
         if linux:
-            audit_elf(path, python_nif=path == natives[0])
+            elves.append(audit_elf(path, python_nif=path == natives[0]))
             continue
         info = audit_binary(path, python_nif=path == natives[0])
         if info.minimum > target:
             raise ValueError("Wheel tag understates the native macOS deployment target")
         if any(not item.startswith("@loader_path") for item in info.rpaths):
             raise ValueError("Runtime contains a nonrelocatable dylib search path")
+    if linux and linux_wheel_tag(tuple(elves)) != tag:
+        raise ValueError("Wheel tag does not match the native Linux library requirements")
     optional_payload(assets, linux=linux)
     return tag
 

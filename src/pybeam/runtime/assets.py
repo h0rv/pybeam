@@ -47,6 +47,7 @@ def _relative(path: Path) -> None:
 
 _ERTS_VERSION = re.compile(r"[0-9.]+")
 _MACOS_WHEEL = re.compile(r"cp314-cp314-macosx_\d+_\d+_arm64")
+_LINUX_WHEEL = re.compile(r"cp314-cp314-(?:linux|manylinux_2_\d+)_x86_64")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -88,8 +89,13 @@ class DarwinManifest(ManifestBase):
 class LinuxManifest(ManifestBase):
     architecture: Literal["x86_64"]
     system: Literal["Linux"]
-    wheel_tag: Literal["cp314-cp314-linux_x86_64"]
+    wheel_tag: str
     python_library: Literal["libpython3.14.so.1.0"]
+
+    def __post_init__(self) -> None:
+        ManifestBase.__post_init__(self)
+        if _LINUX_WHEEL.fullmatch(self.wheel_tag) is None:
+            raise ValueError("wheel_tag must be a CPython 3.14 Linux x86_64 tag")
 
 
 type RuntimeManifest = DarwinManifest | LinuxManifest

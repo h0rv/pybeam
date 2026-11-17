@@ -1,9 +1,10 @@
 import os
 import subprocess
 import sys
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import assert_type
+from typing import Literal, assert_type
 
 import pytest
 
@@ -11,6 +12,15 @@ from pybeam.codec import CodecError, Json
 from pybeam.submissions import CapabilityUnavailable
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
+
+
+async def byte_entry(payload: bytes) -> bytes:
+    return payload
+
+
+@pytest.fixture
+def entry() -> Callable[[bytes], Awaitable[bytes]]:
+    return byte_entry
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +41,14 @@ async def checked(supervisor: TaskSupervisor) -> None:
     assert_type(await ref.result(), str)
     assert_type(await ref.exception(), BaseException | None)
     assert_type(await ref.cancel(), bool)
+
+
+async def checked_owngil(
+    supervisor: TaskSupervisor, entry: Callable[[bytes], Awaitable[bytes]]
+) -> None:
+    function = TaskFunction(entry, Json(Request), Json(str), execution=ExecutionMode.OWNGIL)
+    assert_type(function, TaskFunction[Request, str])
+    assert_type(await supervisor.start(function, Request(value=1)), TaskRef[str])
 
 
 def test_execution_mode__values() -> None:
@@ -63,20 +81,10 @@ def test_task_function__worker_default_and_explicit(
     ("execution", "reason"),
     [
         (
-            ExecutionMode.OWNGIL,
-            "py_task hard-codes mode => worker; "
-            "retained main-interpreter closures cannot cross interpreters.*"
-            "Task mode support and bodies named by importable module path need "
-            "approved erlang-python fork changes.*PyBeam must move task codecs "
-            "to the caller and pass raw bytes.*check_multi_interp_extensions reject some extension modules",
-        ),
-        (
             ExecutionMode.ISOLATED,
-            "py_task hard-codes mode => worker.*main-interpreter objects; "
-            "fork support.*bootstrap fix.*PR #5",
+            "fork rejects isolated named tasks.*PR #5.*child-exit accounting",
         ),
-        ("owngil", "py_task hard-codes mode => worker.*check_multi_interp_extensions"),
-        ("isolated", "py_task hard-codes mode => worker.*bootstrap fix.*PR #5"),
+        ("isolated", "fork rejects isolated named tasks.*PR #5.*child-exit accounting"),
     ],
 )
 def test_task_function__unavailable_modes(
@@ -90,6 +98,62 @@ def test_task_function__unavailable_modes(
             execution=execution,
             dedicated_loop=dedicated_loop,
         )
+
+
+@pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
+def test_task_function__owngil_requires_async_function(execution: ExecutionMode) -> None:
+    def not_async(payload: bytes) -> Awaitable[bytes]:
+        return byte_entry(payload)
+
+    class CallableEntry:
+        async def __call__(self, payload: bytes) -> bytes:
+            return payload
+
+    for function in (not_async, CallableEntry(), CallableEntry().__call__):
+        with pytest.raises(TypeError, match="owngil tasks require a plain async Python function"):
+            TaskFunction(function, Json(bytes), Json(bytes), execution=execution)
+
+
+@pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
+def test_task_function__owngil_entry_codecs(
+    entry: Callable[[bytes], Awaitable[bytes]], execution: Literal[ExecutionMode.OWNGIL]
+) -> None:
+    function = TaskFunction(entry, Json(Request), Json(str), execution=execution)
+    assert function.execution is ExecutionMode.OWNGIL
+    assert function.encode(Request(value=3)) == b'{"value":3}'
+    assert function.decode(b'"result"') == "result"
+    with pytest.raises(CodecError):
+        function.decode(b"")
+
+
+def test_task_function__owngil_rejects_dedicated_loop(
+    entry: Callable[[bytes], Awaitable[bytes]],
+) -> None:
+    with pytest.raises(ValueError, match="dedicated_loop is worker-only"):
+        TaskFunction(
+            entry,
+            Json(Request),
+            Json(str),
+            execution=ExecutionMode.OWNGIL,
+            dedicated_loop=True,
+        )
+
+
+def test_task_function__worker_accepts_byte_function() -> None:
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes))
+    assert function.execution is ExecutionMode.WORKER
+
+
+@pytest.mark.parametrize(
+    ("module", "name"), [("", "render"), (None, "render"), ("entries", "outer.<locals>.render")]
+)
+def test_task_function__owngil_rejects_nonimportable_entry(
+    monkeypatch: pytest.MonkeyPatch, module: object, name: str
+) -> None:
+    monkeypatch.setattr(byte_entry, "__module__", module)
+    monkeypatch.setattr(byte_entry, "__qualname__", name)
+    with pytest.raises(TypeError, match="importable top-level functions"):
+        TaskFunction(byte_entry, Json(Request), Json(str), execution=ExecutionMode.OWNGIL)
 
 
 @pytest.mark.parametrize("execution", ["unknown"])

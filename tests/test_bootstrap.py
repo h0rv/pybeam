@@ -1,11 +1,15 @@
 import asyncio
 import json
 import os
+import py_compile
 import signal
 import subprocess
 import sys
+import sysconfig
 import time
+import zipfile
 from pathlib import Path
+from types import FunctionType
 
 import pytest
 
@@ -106,7 +110,11 @@ def test_development_assets__rejects_incompatible_nif_without_loading_it(
 @pytest.fixture
 def fake_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     script = tmp_path / "vm.py"
-    monkeypatch.setattr(process, "_command", lambda _assets: [sys.executable, str(script)])
+
+    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+        return [sys.executable, str(script)]
+
+    monkeypatch.setattr(process, "_command", command)
     return script
 
 
@@ -146,6 +154,53 @@ def test_process__command_uses_packaged_boot_without_a_script_launcher(boot: Pat
         assert "-boot" not in command
     else:
         assert command[command.index("-boot") + 1] == str(boot)
+
+
+def test_process__command_registers_utf8_python_paths_as_data() -> None:
+    assets = RuntimeAssets(Path("erl"), ())
+    command = process._command(assets, python_paths=('a"b', "é"))
+    position = command.index("-erlang_python")
+    assert command[position : position + 3] == [
+        "-erlang_python",
+        "paths",
+        "[<<97,34,98>>,<<195,169>>]",
+    ]
+    assert "-erlang_python" not in process._command(assets)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")
+def test_process__command_registers_surrogate_escaped_paths_as_bytes() -> None:
+    assets = RuntimeAssets(Path("erl"), ())
+    command = process._command(assets, python_paths=("", os.fsdecode(b"entry-\xff")))
+    position = command.index("-erlang_python")
+    assert command[position : position + 3] == [
+        "-erlang_python",
+        "paths",
+        "[<<>>,<<101,110,116,114,121,45,255>>]",
+    ]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")
+def test_process__bootstrap_roundtrips_surrogate_escaped_paths(
+    fake_runtime: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    entry = fake_runtime.parent / os.fsdecode(b"entry-\xff") / "main.py"
+    search = str(fake_runtime.parent / os.fsdecode(b"search-\xfe"))
+    monkeypatch.setattr(sys, "path", [search])
+    fake_runtime.write_text(
+        "import json, os\nfrom pathlib import Path\n"
+        "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
+        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
+        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "print(json.dumps([p['argv'], p['python_paths']]))\n"
+    )
+    assert _launch(entry) == 0
+    assert json.loads(capfd.readouterr().out) == [
+        [str(entry), "a", "--flag"],
+        [str(entry.parent), search],
+    ]
 
 
 def test_process__merges_asset_environment_without_losing_caller_environment(
@@ -264,7 +319,9 @@ def test_process__signal_during_spawn_is_not_lost(
 ) -> None:
     fake_runtime.write_text("import time\ntime.sleep(30)\n")
 
-    def interrupted_command(_assets: RuntimeAssets) -> list[str]:
+    def interrupted_command(
+        _assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()
+    ) -> list[str]:
         os.kill(os.getpid(), signal.SIGTERM)
         return [sys.executable, str(fake_runtime)]
 
@@ -327,6 +384,84 @@ async def test_loader__registers_and_invokes_once(
     calls.unlink()
     assert await loader.invoke() == (exit_code or 0)
     assert not calls.exists()
+
+
+@pytest.mark.skipif(
+    not sysconfig.get_config_var("Py_GIL_DISABLED"),
+    reason="Only free-threaded builds immortalize code constants",
+)
+def test_loader__entry_constants_are_immortal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(loader, "_state", loader._Loader())
+    entry = tmp_path / "entry.py"
+    entry.write_text(
+        "from pybeam import run\nasync def main() -> None:\n    mask = 0xFFFFFFFF\nrun(main)\n"
+    )
+    monkeypatch.setenv(
+        "PYBEAM_BOOTSTRAP",
+        json.dumps(
+            {
+                "argv": [str(entry)],
+                "ready": str(tmp_path / "ready"),
+                "completed": str(tmp_path / "completed"),
+            }
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    loader.load()
+    session = loader._state.session
+    assert session is not None and isinstance(session.entry, FunctionType)
+    mask = next(value for value in session.entry.__code__.co_consts if value == 0xFFFFFFFF)
+    assert sys._is_immortal(mask)
+
+
+@pytest.mark.parametrize("kind", ["py", "pyc", "pyz"])
+async def test_loader__runs_source_bytecode_and_zip_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    monkeypatch.setattr(loader, "_state", loader._Loader())
+    marker = tmp_path / "marker.txt"
+    source = (
+        "from pathlib import Path\nfrom pybeam import run\n"
+        "async def main() -> None:\n"
+        + "    Path({!r}).write_text(repr((__cached__, __package__)))\n".format(str(marker))
+        + "run(main)\n"
+    )
+    script = tmp_path / "app.py"
+    script.write_text(source)
+    match kind:
+        case "py":
+            entry = script
+        case "pyc":
+            entry = tmp_path / "app.pyc"
+            py_compile.compile(str(script), cfile=str(entry), doraise=True)
+        case _:
+            entry = tmp_path / "app.pyz"
+            with zipfile.ZipFile(entry, "w") as archive:
+                archive.writestr("__main__.py", source)
+    monkeypatch.setenv(
+        "PYBEAM_BOOTSTRAP",
+        json.dumps(
+            {
+                "argv": [str(entry)],
+                "ready": str(tmp_path / "ready"),
+                "completed": str(tmp_path / "completed"),
+            }
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    loader.load()
+    assert await loader.invoke() == 0
+    if kind == "pyz":
+        assert marker.is_file()
+    else:
+        assert marker.read_text() == repr((None, ""))
 
 
 async def test_loader__reports_missing_entrypoint(
@@ -646,7 +781,7 @@ def test_native__application_stop_stall_has_parent_deadline(
         + "application:stop(pybeam_stop_stall), halt(0)."
     )
 
-    def command(_assets: RuntimeAssets) -> list[str]:
+    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
         return [
             str(assets.executable),
             "+S",
