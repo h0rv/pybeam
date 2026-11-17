@@ -8,13 +8,14 @@ test("code controls are rendered once in the HTML without changing code text", (
   const { html } = markdownToHtml("\`\`\`python\n" + source + "\n\`\`\`", { hastPlugins: [codeBlocks] });
   assert.equal([...html.matchAll(/class="code-block"/g)].length, 1);
   assert.equal([...html.matchAll(/class="copy-code"/g)].length, 1);
-  assert.match(html, /aria-label="Copy Python code"/);
+  assert.match(html, /aria-label="Copy code"/);
   assert.match(html, /Hi &lt;there&gt; (?:&amp;|&) friends/);
-  assert.ok(html.indexOf('class="code-toolbar"') < html.indexOf("<pre"));
+  assert.doesNotMatch(html, /code-toolbar|>Python<|>Shell</);
+  assert.ok(html.indexOf('class="copy-code"') < html.indexOf("<pre"));
 });
 
-test("plain code blocks retain their text and get a text label", () => {
+test("plain code blocks retain their text without a language label", () => {
   const { html } = markdownToHtml("    plain code", { hastPlugins: [codeBlocks] });
-  assert.match(html, /aria-label="Copy Text code"/);
+  assert.match(html, /aria-label="Copy code"/);
   assert.match(html, /plain code/);
 });

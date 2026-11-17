@@ -1,0 +1,1 @@
+{application, durable, [{description, "Scratch durability probe"}, {vsn, "0.1.0"}, {applications, [kernel, stdlib, khepri]}]}.

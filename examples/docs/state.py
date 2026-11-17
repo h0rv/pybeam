@@ -1,16 +1,23 @@
-from pybeam.integrations.hornbeam.client import Beam
-from pybeam.integrations.hornbeam.runtime import run
+# state.py
+from pybeam.integrations.hornbeam import Beam, run
 
 
 async def main() -> None:
     beam = await Beam.connect()
     store = beam.store("documents")
+
     await store.set("status", b"draft")
     print(await store.get("status"))
+
     await store.set("status", b"published")
     print(await store.get("status"))
-    print(await beam.incr("visits", 1, namespace="documents"))
-    print(await beam.incr("visits", 2, namespace="documents"))
+
+    visits = await beam.incr("visits", 1, namespace="documents")
+    print(visits)
+
+    visits = await beam.incr("visits", 2, namespace="documents")
+    print(visits)
+
     await store.delete("status")
 
 
