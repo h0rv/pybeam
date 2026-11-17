@@ -34,7 +34,9 @@ The difference is reach. Every task on an asyncio loop runs in one Python proces
 | Notify other connections | Redis pub/sub or a broker | `publish` and `subscribe` |
 | Recover from a failure | Your own restart code | Supervisor restarts the actor |
 
-If tasks and local variables already meet your needs, plain asyncio is enough.
+## When to use PyBEAM
+
+PyBEAM spends memory and call overhead on scheduling, supervision and distribution. That trade pays off when work spans connections, processes or machines: web apps with shared state, live updates, and services that must recover from failures. For local processing in one process, such as a script or a batch job, plain asyncio is cheaper and simpler.
 
 ## Limits
 
