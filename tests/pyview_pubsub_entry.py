@@ -44,6 +44,10 @@ async def main() -> None:
                     assert (await local(Request(op="connect", alias="b"))).status == "ok"
                     assert (await remote("b", Request(op="snapshot"))).status == "ok"
                     writer.write(b"connected\n")
+                elif command == b"lost":
+                    assert alias == "a"
+                    assert (await local(Request(op="snapshot"))).nodes == ()
+                    writer.write(b"disconnected\n")
                 else:
                     assert alias == "a"
                     count = await beam.publish(TOPIC, bytes.fromhex(command.decode()))

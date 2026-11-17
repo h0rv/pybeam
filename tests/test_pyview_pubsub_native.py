@@ -51,8 +51,18 @@ def test_pyview_subscription__cross_node_bytes_and_cleanup(
                 expected = b"event:" + payload.hex().encode() + b"\n"
                 assert {origin.readline(), origin.readline()} == {b"published:2\n", expected}
                 assert subscriber.readline() == expected
-            for stream in (origin, subscriber):
-                stream.write(b"stop\n")
-                assert stream.readline() == b"closed\n"
+            subscriber.write(b"stop\n")
+            assert subscriber.readline() == b"closed\n"
+            cluster.stop("b")
+            origin.write(b"lost\n")
+            assert origin.readline() == b"disconnected\n"
+            payload = b"survived node loss"
+            origin.write(payload.hex().encode() + b"\n")
+            assert {origin.readline(), origin.readline()} == {
+                b"published:1\n",
+                b"event:" + payload.hex().encode() + b"\n",
+            }
+            origin.write(b"stop\n")
+            assert origin.readline() == b"closed\n"
     assert cluster.cleanup is not None and cluster.cleanup.phase == "confirmed"
     assert all(resolve(value) is None for value in cluster.cleanup.owned)
