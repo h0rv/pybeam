@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" role="img" aria-labelledby="title desc">
-  <title id="title">Why actors serialize CPU work and direct contexts do not</title>
-  <desc id="desc">Left: three actors, each with its own worker context, all run their method bodies on one shared event loop thread, so eight CPU jobs took eight times one job on both 3.14 and 3.14t. Right: three BEAM processes each call their own worker context directly, with no shared loop, so on 3.14t eight CPU jobs took about as long as one, and on 3.14 the GIL made them take eight times as long.</desc>
+  <title id="title">Shared-loop tasks and pooled actor calls</title>
+  <desc id="desc">Left: shared-loop tasks run on one shared event loop thread, so a blocking task stalls others on that loop. Right: actor processes lease workers from a node-wide pool, each with its own thread and loop. Blocking calls on different workers overlap. Pure-Python CPU work can run in parallel with the GIL disabled on 3.14t, but serializes under the GIL on conventional builds.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -16,22 +16,22 @@
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1 7 4 1 7"/></marker>
   </defs>
-  <text x="194" y="36" class="heading" text-anchor="middle">Actor methods</text>
-  <text x="194" y="60" class="note" text-anchor="middle">PyBEAM actors today</text>
+  <text x="194" y="36" class="heading" text-anchor="middle">Shared-loop tasks</text>
+  <text x="194" y="60" class="note" text-anchor="middle">one thread executes task bodies</text>
   <rect x="28" y="80" width="104" height="48"/>
-  <text x="80" y="110" text-anchor="middle">actor</text>
+  <text x="80" y="110" text-anchor="middle">task</text>
   <path d="M80 129V158" marker-end="url(#arrow)"/>
   <rect x="28" y="170" width="104" height="64"/>
   <text x="80" y="196" text-anchor="middle">context</text>
   <text x="80" y="220" class="note" text-anchor="middle">own thread</text>
   <rect x="140" y="80" width="104" height="48"/>
-  <text x="192" y="110" text-anchor="middle">actor</text>
+  <text x="192" y="110" text-anchor="middle">task</text>
   <path d="M192 129V158" marker-end="url(#arrow)"/>
   <rect x="140" y="170" width="104" height="64"/>
   <text x="192" y="196" text-anchor="middle">context</text>
   <text x="192" y="220" class="note" text-anchor="middle">own thread</text>
   <rect x="252" y="80" width="104" height="48"/>
-  <text x="304" y="110" text-anchor="middle">actor</text>
+  <text x="304" y="110" text-anchor="middle">task</text>
   <path d="M304 129V158" marker-end="url(#arrow)"/>
   <rect x="252" y="170" width="104" height="64"/>
   <text x="304" y="196" text-anchor="middle">context</text>
@@ -41,35 +41,35 @@
   <path d="M192 235V273" marker-end="url(#arrow)"/>
   <rect x="28" y="285" width="328" height="70"/>
   <text x="194" y="315" class="heading" text-anchor="middle">Shared event loop</text>
-  <text x="194" y="339" class="note" text-anchor="middle">one thread runs every method body</text>
-  <text x="194" y="387" class="note" text-anchor="middle">8 CPU jobs: 8× one job</text>
-  <text x="194" y="409" class="note" text-anchor="middle">on 3.14 and on 3.14t</text>
-  <text x="566" y="36" class="heading" text-anchor="middle">Contexts called directly</text>
-  <text x="566" y="60" class="note" text-anchor="middle">BEAM processes, no shared loop</text>
+  <text x="194" y="339" class="note" text-anchor="middle">one thread runs the task bodies</text>
+  <text x="194" y="387" class="note" text-anchor="middle">Blocking code stalls this loop</text>
+  <text x="194" y="409" class="note" text-anchor="middle">even with the GIL disabled</text>
+  <text x="566" y="36" class="heading" text-anchor="middle">Actor calls</text>
+  <text x="566" y="60" class="note" text-anchor="middle">lease workers from a node-wide pool</text>
   <rect x="400" y="80" width="104" height="48"/>
-  <text x="452" y="110" text-anchor="middle">process</text>
+  <text x="452" y="110" text-anchor="middle">actor</text>
   <path d="M452 129V158" marker-end="url(#arrow)"/>
   <rect x="400" y="170" width="104" height="64"/>
-  <text x="452" y="196" text-anchor="middle">context</text>
-  <text x="452" y="220" class="note" text-anchor="middle">own thread</text>
+  <text x="452" y="196" text-anchor="middle">worker</text>
+  <text x="452" y="220" class="note" text-anchor="middle">thread, loop</text>
   <rect x="512" y="80" width="104" height="48"/>
-  <text x="564" y="110" text-anchor="middle">process</text>
+  <text x="564" y="110" text-anchor="middle">actor</text>
   <path d="M564 129V158" marker-end="url(#arrow)"/>
   <rect x="512" y="170" width="104" height="64"/>
-  <text x="564" y="196" text-anchor="middle">context</text>
-  <text x="564" y="220" class="note" text-anchor="middle">own thread</text>
+  <text x="564" y="196" text-anchor="middle">worker</text>
+  <text x="564" y="220" class="note" text-anchor="middle">thread, loop</text>
   <rect x="624" y="80" width="104" height="48"/>
-  <text x="676" y="110" text-anchor="middle">process</text>
+  <text x="676" y="110" text-anchor="middle">actor</text>
   <path d="M676 129V158" marker-end="url(#arrow)"/>
   <rect x="624" y="170" width="104" height="64"/>
-  <text x="676" y="196" text-anchor="middle">context</text>
-  <text x="676" y="220" class="note" text-anchor="middle">own thread</text>
+  <text x="676" y="196" text-anchor="middle">worker</text>
+  <text x="676" y="220" class="note" text-anchor="middle">thread, loop</text>
   <path d="M452 235V273" marker-end="url(#arrow)"/>
   <path d="M564 235V273" marker-end="url(#arrow)"/>
   <path d="M676 235V273" marker-end="url(#arrow)"/>
   <rect x="400" y="285" width="328" height="70"/>
   <text x="566" y="315" class="heading" text-anchor="middle">Main interpreter</text>
-  <text x="566" y="339" class="note" text-anchor="middle">each context runs Python itself</text>
-  <text x="566" y="387" class="note" text-anchor="middle">8 CPU jobs: 1× one job on 3.14t,</text>
-  <text x="566" y="409" class="note" text-anchor="middle">8× on 3.14 under the GIL</text>
+  <text x="566" y="339" class="note" text-anchor="middle">each worker runs its actor call</text>
+  <text x="566" y="387" class="note" text-anchor="middle">CPU work overlaps without the GIL</text>
+  <text x="566" y="409" class="note" text-anchor="middle">GIL-bound work still serializes</text>
 </svg>

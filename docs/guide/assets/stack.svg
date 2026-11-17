@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="600" viewBox="0 0 760 600" role="img" aria-labelledby="title desc">
   <title id="title">The PyBEAM runtime stack</title>
-  <desc id="desc">One OS process runs the BEAM VM. Inside it, one BEAM scheduler preempts BEAM processes: actors and tasks, about 2.7 KB each, with a mailbox and supervisor. Worker contexts, each with its own OS thread, run in the main Python interpreter, which has a GIL on 3.14, none on 3.14t, and shared module globals. Actor methods and shared-loop tasks run on one shared event loop thread; dedicated-loop tasks get their own thread and loop. Isolated tasks run outside the VM in a child OS process with its own interpreter, so a crash stays in the child.</desc>
+  <desc id="desc">One OS process runs the BEAM VM. Inside it, one BEAM scheduler preempts BEAM processes: actors and tasks, about 2.7 KB each, with a mailbox and supervisor. Worker contexts run in the main Python interpreter with shared module globals. Actor calls lease workers from a node-wide pool, each with its own OS thread and loop. Shared-loop tasks use a separate shared loop; dedicated-loop tasks own their thread and loop. Isolated tasks run outside the VM in a child OS process with its own interpreter, so a crash stays in the child.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -34,17 +34,21 @@
   <text x="120" y="376" text-anchor="middle">worker context</text>
   <text x="120" y="400" class="note" text-anchor="middle">own OS thread</text>
   <rect x="198" y="350" width="136" height="64"/>
-  <text x="266" y="376" text-anchor="middle">worker context</text>
-  <text x="266" y="400" class="note" text-anchor="middle">own OS thread</text>
+  <text x="266" y="376" text-anchor="middle">pooled worker</text>
+  <text x="266" y="400" class="note" text-anchor="middle">thread, loop</text>
   <rect x="344" y="350" width="136" height="64"/>
   <text x="412" y="376" text-anchor="middle">dedicated loop</text>
   <text x="412" y="400" class="note" text-anchor="middle">own thread, loop</text>
   <path d="M120 415V445" marker-end="url(#arrow)"/>
   <path d="M266 415V445" marker-end="url(#arrow)"/>
-  <rect x="52" y="457" width="282" height="92"/>
-  <text x="193" y="485" class="heading" text-anchor="middle">Shared event loop</text>
-  <text x="193" y="509" class="note" text-anchor="middle">one thread runs every actor</text>
-  <text x="193" y="531" class="note" text-anchor="middle">method and shared-loop task</text>
+  <rect x="52" y="457" width="136" height="92"/>
+  <text x="120" y="485" class="heading" text-anchor="middle">Shared loop</text>
+  <text x="120" y="509" class="note" text-anchor="middle">shared-loop</text>
+  <text x="120" y="531" class="note" text-anchor="middle">tasks only</text>
+  <rect x="198" y="457" width="136" height="92"/>
+  <text x="266" y="485" class="heading" text-anchor="middle">Actor calls</text>
+  <text x="266" y="509" class="note" text-anchor="middle">lease a worker</text>
+  <text x="266" y="531" class="note" text-anchor="middle">for each call</text>
   <text x="412" y="440" class="note" text-anchor="middle">tasks only</text>
   <path d="M497 217H650V268" marker-end="url(#arrow)"/>
   <rect x="556" y="280" width="188" height="148"/>

@@ -14,9 +14,9 @@ PyBEAM embeds CPython in the BEAM, Erlang's virtual machine, through [erlang-pyt
 | BEAM scheduler | Runs BEAM processes preemptively. The managed VM starts one (`+S 1:1`), so Python parallelism never comes from BEAM schedulers. | |
 | BEAM process | The identity, mailbox, links and supervisor of an actor or task. It holds no Python state. | 2.7 KB |
 | Python interpreter | The main CPython interpreter, embedded in the VM. A native crash in it ends the VM. | |
-| GIL | On 3.14 one thread at a time runs Python. On 3.14t no lock is held, so threads run Python at the same time. | |
-| Worker context | An erlang-python context: one OS thread that runs Python in the main interpreter. Each actor owns one. | 1.1–1.2 ms to create; an actor adds 50–60 KiB and one thread |
-| Shared event loop | One asyncio loop thread, erlang-python's `ErlangEventLoop`, which takes I/O readiness and timers from the BEAM. It runs every actor method body and every shared-loop task. | |
+| GIL | When enabled, one thread at a time runs Python. Free-threaded builds with the GIL disabled can run Python on several threads at once. | |
+| Worker context | An erlang-python context: one OS thread that runs Python in the main interpreter. Actors lease workers from a node-wide pool, not one context per actor. | 1.1–1.2 ms to create a context; pool size, not actor count, determines worker thread count |
+| Shared event loop | One asyncio loop thread, erlang-python's `ErlangEventLoop`, which takes I/O readiness and timers from the BEAM. Shared-loop tasks use it; actor calls use worker-local loops instead. | |
 | Dedicated loop | A worker task started with `dedicated_loop=True` runs on its context's own loop and thread. | |
 | Isolated context | A child OS process with its own interpreter. Requests and results cross as bytes. | 61–132 ms to create, 21–27 MiB |
 
@@ -26,21 +26,22 @@ Distinguish these layers when you reason about a change. A BEAM process is not a
 
 ![A BEAM process sends a call to a mailbox. A Python context takes the call. Supported contexts run as worker or isolated. The result returns as a message, or a crash signal goes to the supervisor.](../assets/call-path.svg)
 
-1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free. `TaskLimits` or an actor group's `max_children` caps how many contexts exist; starting a task when its ownership slots are full raises `Overloaded` instead of queuing it.
-2. The context's mode decides which interpreter runs the code and what a crash takes down.
+1. Each actor has a BEAM process and mailbox. It handles one call at a time, leasing a worker for construction and each call. The group's `max_children` caps actors, not worker contexts; the node-wide pool bounds active actor workers and queues checkouts at its cap.
+2. Tasks own their execution context. `TaskLimits` caps task ownership slots; starting a task when those slots are full raises `Overloaded`. The context's mode decides which interpreter runs the code and what a crash takes down.
 3. The result comes back as a message. If an actor crashes, its group starts a replacement with fresh state; it does not replay the call. Tasks are temporary children: their supervisor does not restart them.
 
 ## Where parallel Python comes from
 
-![Left: three actors each own a context, but all method bodies run on one shared event loop, so 8 CPU jobs took 8 times one job on 3.14 and 3.14t. Right: BEAM processes calling their own contexts directly ran 8 CPU jobs in the time of one on 3.14t.](../assets/actor-loop.svg)
+![Shared-loop tasks run on one loop thread. Actor calls lease pooled workers with separate threads and loops, so one blocking actor call does not block calls using other workers.](../assets/actor-loop.svg)
 
-- **Actors do not run Python in parallel.** Each actor owns a worker context, but every method body runs on the shared event loop thread. CPU-bound or blocking code in one actor stalls all of them, on 3.14 and on 3.14t alike.
-- **Worker contexts called directly run in parallel on 3.14t.** When each BEAM process calls its own context with no loop in between, eight CPU jobs took as long as one on 8 CPUs. On 3.14 the GIL serialized them.
+- **Actor calls** run on pooled workers, each with its own loop. Blocking operations that release the GIL, such as `time.sleep`, overlap on different workers on both builds. Pure-Python CPU work can overlap on 3.14t with the GIL disabled; the GIL serializes it on conventional builds.
+- **Shared-loop tasks** share one loop thread. CPU-bound or blocking code in one task stalls the other tasks on that loop, even on a free-threaded build.
 - **Dedicated-loop tasks** run on their own thread, so they overlap on 3.14t and take turns on 3.14.
 - **Isolated tasks** run in separate OS processes, so they overlap on either build.
-- **Actor calls** run on pooled workers, each with its own loop, so blocking calls in different actors overlap on both builds and CPU work overlaps on 3.14t.
 
-[Measurements](measurements.md) has the numbers, and [what to watch for](watch-for.md) covers the failure modes.
+If an actor's preferred worker is busy, its next call takes another worker immediately. Do not keep loop-bound objects across calls. A background asyncio task started during a call is not guaranteed to progress while that worker is idle.
+
+[Measurements](measurements.md) records the earlier execution-mode probes, including the pre-pool actor path; those actor costs and timings do not describe the pooled runtime. [What to watch for](watch-for.md) covers the failure modes.
 
 ## Own-GIL subinterpreters are unsupported
 
@@ -51,4 +52,4 @@ erlang-python also offers own-GIL contexts, one subinterpreter per context. PyBE
 - [Execution model](../../research/execution-model.md): each boundary from BEAM process to node.
 - [Execution modes](../../research/execution-modes.md): the mode probes and their method.
 - [Actor capacity](../../research/actor-capacity.md): actor cost, call timing and state movement.
-- [Worker design](../../research/worker-design.md): a proposal for running actors on a worker pool. It is not implemented.
+- [Worker design](../../research/worker-design.md): the broader proposal, including durable state migration and wait-then-fallback routing. The current pool reuses in-memory actor objects and falls back immediately when a preferred worker is busy.
