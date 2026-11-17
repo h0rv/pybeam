@@ -37,6 +37,7 @@ from tools.build_runtime import (
     audit_elf,
     inspect_macho,
     linux_wheel_tag,
+    manylinux_level,
     native_binaries,
     stage_hornbeam,
     stage_runtime,
@@ -207,7 +208,7 @@ def test_elf_audit_and_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         audit_elf(binary)
 
 
-def test_elf_audit__reads_highest_glibc_symbol_version(
+def test_elf_audit__reads_highest_symbol_version_level(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     binary = tmp_path / "native.so"
@@ -218,7 +219,23 @@ def test_elf_audit__reads_highest_glibc_symbol_version(
         "-V": "Name: GLIBC_2.2.5 Flags: none\nName: GLIBC_2.34 Flags: none\nName: GLIBCXX_3.4.30",
     }
     monkeypatch.setattr("tools.build_runtime.run", lambda args: outputs[args[1]])
-    assert audit_elf(binary).glibc == (2, 34)
+    assert audit_elf(binary).manylinux == (2, 35)
+
+
+@pytest.mark.parametrize(
+    ("versions", "level"),
+    [
+        ("GLIBC_2.2.5", (2, 17)),
+        ("GLIBC_2.28 GLIBCXX_3.4.29", (2, 34)),
+        ("GLIBC_2.35 GLIBCXX_3.4.21 CXXABI_1.3.9", (2, 35)),
+        ("GLIBC_2.17 GCC_12.0.0", (2, 35)),
+        ("GLIBC_2.17 GLIBCXX_3.4.34", None),
+    ],
+)
+def test_manylinux_level__covers_libstdcxx_and_libgcc_symbols(
+    versions: str, level: tuple[int, int] | None
+) -> None:
+    assert manylinux_level(versions) == level
 
 
 @pytest.mark.parametrize(
@@ -234,6 +251,7 @@ def test_elf_audit__reads_highest_glibc_symbol_version(
         ),
         ((ELF(("libtinfo.so.6",), (), (2, 28)),), "cp314-cp314-linux_x86_64"),
         ((ELF(("libcrypto.so.3",), ()),), "cp314-cp314-linux_x86_64"),
+        ((ELF(("libstdc++.so.6",), (), None),), "cp314-cp314-linux_x86_64"),
     ],
 )
 def test_linux_wheel_tag__claims_manylinux_only_for_portable_libraries(
