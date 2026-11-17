@@ -161,7 +161,9 @@ def test_process__preserves_args_environment_cwd_stdio(
         "import json, os\nfrom pathlib import Path\n"
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
         "Path(p['ready']).touch()\n"
-        "Path(p['completed']).write_text('0')\n"
+        "pending = Path(p['completed']).with_suffix('.tmp')\n"
+        "pending.write_text('0')\n"
+        "os.replace(pending, p['completed'])\n"
         "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
         "print(json.dumps([p['argv'], os.getcwd(), os.environ['PYBEAM_TEST_VALUE']]))\n"
     )

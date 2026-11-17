@@ -19,7 +19,8 @@ For runtime development, clone those branches next to this checkout:
 ```sh
 git clone --branch main https://github.com/h0rv/hornbeam.git ../hornbeam
 git clone --branch main https://github.com/h0rv/erlang-python.git ../erlang-python
-git -C ../erlang-python checkout f8935081563212719b32d2925a65a7ff8d03b6fa
+runtime_ref=$(sed -n '/<<"erlang_python">>/,/{ref/s/.*{ref,"\([^"]*\)"}.*/\1/p' rebar.lock)
+git -C ../erlang-python checkout "$runtime_ref"
 uv add --optional hornbeam --editable ../hornbeam
 uv sync --locked --all-extras
 uv run --locked --all-extras ty check --error-on-warning
