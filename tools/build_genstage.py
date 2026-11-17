@@ -6,8 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from pydantic import TypeAdapter
-
+from pybeam.codec import Json
 from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import (
     ApplicationAsset,
@@ -43,7 +42,7 @@ def build_manifest(root: Path, otp: Path, erts: str, sources: Sources) -> Option
         "modules=>Modules} end || Dir<-" + json.dumps(paths) + "], "
         "io:put_chars(json:encode(Apps)),halt()."
     )
-    applications = TypeAdapter(tuple[ApplicationAsset, ...]).validate_json(
+    applications = Json(tuple[ApplicationAsset, ...]).decode(
         run([str(otp / "bin/erl"), "+S", "2:2", "-noshell", "-eval", expression])
     )
     files = tuple(

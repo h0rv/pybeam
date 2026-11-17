@@ -19,7 +19,6 @@ from examples.distributed.policy import (
     walkthrough_stop,
 )
 from examples.showcase.catalog import ROOT
-from pybeam.codec import Json
 from pybeam.runtime.ownership import Identity, identity
 
 
@@ -74,7 +73,7 @@ def test_walkthrough_policy__excess_still_triggers_the_existing_watchdog(
         budget=walkthrough_budget(),
         adapter_command=(sys.executable, "-c", "import time; time.sleep(5)"),
     )
-    (tmp_path / "config.json").write_text(Json(type(config)).encode(config).decode())
+    (tmp_path / "config.json").write_text(config.model_dump_json())
     stop = tmp_path / "stop.request"
     stop.touch()
     owner = identity(os.getpid())

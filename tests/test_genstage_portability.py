@@ -34,7 +34,11 @@ class Task:
 
 
 def test_genstage_commands__do_not_require_private_checkout_inputs() -> None:
-    tasks = Json(dict[str, Task]).load(tomllib.loads((ROOT / "mise.toml").read_text())["tasks"])
+    raw = Json(dict[str, dict[str, object]]).load(
+        tomllib.loads((ROOT / "mise.toml").read_text())["tasks"]
+    )
+    run = Json(str | list[str])
+    tasks = {name: Task(run=run.load(value["run"])) for name, value in raw.items()}
     assert '--out-dir "${usage_output}/wheel"' in tasks["build:optional-genstage"].run
     for name, task in tasks.items():
         if "genstage" in name:

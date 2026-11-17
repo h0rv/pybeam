@@ -4,12 +4,11 @@ import json
 import shutil
 import stat
 import tempfile
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
-from pydantic import BaseModel, ConfigDict
-
+from pybeam.codec import Json
 from pybeam.runtime.assets import MANIFEST
 from pybeam.runtime.optional_manifest import contained
 from tools.runtime_wheel import runtime_tag
@@ -22,9 +21,8 @@ NIF_SHA256 = "4a106fb8c6cf562cef7bfd884b0656fcbb5aba338014d0fcafab1e7d1033381a"
 PREFIX = "pybeam/runtime/_assets/"
 
 
-class Provenance(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Provenance:
     artifact_sdk_revision: str
     artifact_native_revision: str
     wheel_sha256: str
@@ -124,7 +122,7 @@ def stage(wheel: Path, output: Path, *, hornbeam_runtime: Path | None = None) ->
             },
             preserved_hornbeam_payloads=preserved,
         )
-        (generation / "provenance.json").write_text(provenance.model_dump_json(indent=2) + "\n")
+        (generation / "provenance.json").write_bytes(Json(Provenance).encode(provenance) + b"\n")
         if output.exists() or output.is_symlink():
             raise FileExistsError("Output appeared during preparation: " + str(output))
         generation.rename(output)

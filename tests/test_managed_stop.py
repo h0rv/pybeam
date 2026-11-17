@@ -226,7 +226,7 @@ def test_managed_stop__guardian_waits_only_for_a_managed_ack(
         budget=Budget() if case == "measurement" else walkthrough_budget(),
         adapter_command=(sys.executable, "-c", code),
     )
-    (tmp_path / "config.json").write_text(Json(type(config)).encode(config).decode())
+    (tmp_path / "config.json").write_text(config.model_dump_json())
     parent = identity(os.getpid())
     if case == "dead_owner":
         parent = Identity(pid=99999999, created=1.0)

@@ -40,7 +40,8 @@ def probe(boundary: str) -> RaceProof:
         )
         owner_birth = identity(owner.pid)
         entry = (
-            "from pathlib import Path; from pybeam.runtime.ownership import Identity, resolve; "
+            "from pathlib import Path; from pybeam.codec import Json; "
+            "from pybeam.runtime.ownership import Identity, resolve; "
             "owner=Json(Identity).decode("
             + repr(Json(type(owner_birth)).encode(owner_birth).decode())
             + "); "

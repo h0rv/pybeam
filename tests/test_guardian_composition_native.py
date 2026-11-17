@@ -33,7 +33,7 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
         adapter_command=(sys.executable, str(ROOT / "tests/guardian_composition_probe.py")),
         budget=Budget(wall_seconds=25.0, processes=32, threads=128, sample_seconds=1.0),
     )
-    (tmp_path / "config.json").write_text(Json(type(config)).encode(config).decode())
+    (tmp_path / "config.json").write_text(config.model_dump_json())
     parent = identity(os.getpid())
     control = Control(owner=parent, stop_file=str(tmp_path / "stop.request"))
     captured: set[Identity] = set()
@@ -45,7 +45,7 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
                 "benchmarks.guardian",
                 str(tmp_path),
                 Json(type(parent)).encode(parent).decode(),
-                Json(type(control)).encode(control).decode(),
+                control.model_dump_json(),
             ],
             cwd=ROOT,
             env=dict(os.environ),
