@@ -318,7 +318,7 @@ run = "timeout 180 uv run --locked pytest tests/test_distribution.py tests/test_
 [tasks."modes-lab"]
 description = "Run one CPU job live in every execution mode next to asyncio, threads and process pools"
 usage = 'flag "--port <port>" default="38941"'
-run = 'exec uv run --locked --extra showcase python -m examples.modes_lab --port "${usage_port}"'
+run = 'exec uv run --locked --extra showcase --extra fastapi python -m examples.modes_lab --port "${usage_port}"'
 
 [tasks."showcase:private"]
 hide = true
