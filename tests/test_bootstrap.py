@@ -4,6 +4,7 @@ import os
 import signal
 import subprocess
 import sys
+import sysconfig
 import time
 from pathlib import Path
 
@@ -327,6 +328,38 @@ async def test_loader__registers_and_invokes_once(
     calls.unlink()
     assert await loader.invoke() == (exit_code or 0)
     assert not calls.exists()
+
+
+@pytest.mark.skipif(
+    not sysconfig.get_config_var("Py_GIL_DISABLED"),
+    reason="Only free-threaded builds immortalize code constants",
+)
+def test_loader__entry_constants_are_immortal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(loader, "_state", loader._Loader())
+    entry = tmp_path / "entry.py"
+    entry.write_text(
+        "from pybeam import run\nasync def main() -> None:\n    mask = 0xFFFFFFFF\nrun(main)\n"
+    )
+    monkeypatch.setenv(
+        "PYBEAM_BOOTSTRAP",
+        json.dumps(
+            {
+                "argv": [str(entry)],
+                "ready": str(tmp_path / "ready"),
+                "completed": str(tmp_path / "completed"),
+            }
+        ),
+    )
+    monkeypatch.setattr(sys, "argv", list(sys.argv))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    loader.load()
+    session = loader._state.session
+    assert session is not None and session.entry is not None
+    mask = next(value for value in session.entry.__code__.co_consts if value == 0xFFFFFFFF)
+    assert sys._is_immortal(mask)
 
 
 async def test_loader__reports_missing_entrypoint(

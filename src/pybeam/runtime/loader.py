@@ -1,12 +1,13 @@
 import asyncio
 import json
+import marshal
 import os
-import runpy
 import sys
 import traceback
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
 from pybeam.runtime.config import BootstrapError
 
@@ -76,6 +77,24 @@ def _status(error: BaseException) -> int:
     return 1
 
 
+def _run_entry(path: Path) -> None:
+    # compile() keeps code constants mortal on free-threaded builds, so threads
+    # running the same function contend on their reference counts. Loading
+    # through marshal immortalizes them, as running a script with python does.
+    code = marshal.loads(marshal.dumps(compile(path.read_bytes(), path, "exec")))  # noqa: S302
+    module = ModuleType("__main__")
+    module.__file__ = str(path)
+    previous = sys.modules.get("__main__")
+    sys.modules["__main__"] = module
+    try:
+        exec(code, module.__dict__)  # noqa: S102
+    finally:
+        if previous is None:
+            del sys.modules["__main__"]
+        else:
+            sys.modules["__main__"] = previous
+
+
 def load() -> None:
     if _state.session is not None:
         raise BootstrapError("The managed entry file has already been loaded")
@@ -93,7 +112,7 @@ def load() -> None:
     sys.path.insert(0, str(Path(argv[0]).parent))
     try:
         # File initialization deliberately runs again inside the embedded interpreter.
-        runpy.run_path(argv[0], run_name="__main__")
+        _run_entry(Path(argv[0]))
         if session.entry is None:
             raise BootstrapError("The entry file did not register an async main with pybeam.run")
     except BaseException as error:
