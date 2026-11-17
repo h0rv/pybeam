@@ -273,15 +273,12 @@ arg "<output>" help="New ephemeral test fixture directory"
 run = 'uv run --locked python -m tools.genstage_fixtures "${usage_wheel}" "${usage_output}"'
 
 [tasks."build:optional-genstage"]
-description = "Build this SDK wheel with exact reviewed prebuilt runtime assets; no native compilation"
-usage = '''
-arg "<wheel>" help="Exact reviewed input platform wheel, SHA256 checked"
-arg "<output>" help="New asset generation directory"
-'''
+wait_for = ["build"]
+description = "Compile the pinned GenStage sources into the staged runtime and build the wheel"
 run = '''
 set -eu
-uv run --locked python -m tools.genstage_assets "${usage_wheel}" "${usage_output}"
-PYBEAM_BUILD_RUNTIME="${usage_output}/runtime" uv build --wheel --out-dir "${usage_output}/wheel"
+uv run --locked python -m tools.build_genstage --otp "$(mise where erlang)"
+uv build --wheel
 '''
 
 [tasks.serve]
