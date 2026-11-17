@@ -1,6 +1,6 @@
 # Why PyBEAM
 
-Run concurrent Python without the pain of managing locks, a Redis server for counters and pub/sub, or restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
+When concurrent requests share data, an async Python app usually needs locks, a Redis server for counters and pub/sub, and restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
 
 ## No locks
 
