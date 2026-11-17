@@ -33,6 +33,7 @@ Hello from Python
 - [Shared state](state.md): store values and count across requests.
 - [Messaging](messaging.md): notify subscribers.
 - [Background services](background.md): run a long-lived loop and stop it cleanly.
+- [Durable tasks](durable-tasks.md): record retryable work across process crashes.
 - Integrations: [FastAPI](integrations/fastapi.md), [Litestar](integrations/litestar.md) or [PyView](integrations/pyview.md).
 
 To see why you would use these, read [Why PyBEAM](why.md).
