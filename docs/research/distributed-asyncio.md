@@ -18,7 +18,7 @@ None of this is implemented. PyBeam makes no durability claim today.
 
 ## What asyncio is missing
 
-asyncio is cheap. In the [fan-in measurement](../guide/execution.md#fan-in-100000-callers), 100,000 asyncio tasks used 1.1 KB each and finished faster than BEAM callers. Its limit is scope, not speed. One loop belongs to one OS thread in one process, usually one container:
+asyncio is cheap. In the [fan-in measurement](../guide/internals/measurements.md#fan-in-many-beam-processes-8-contexts), 100,000 asyncio tasks used 1.1 KB each and finished faster than BEAM callers. Its limit is scope, not speed. One loop belongs to one OS thread in one process, usually one container:
 
 | Need | One asyncio loop | What a cluster adds |
 | --- | --- | --- |

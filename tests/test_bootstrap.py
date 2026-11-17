@@ -149,6 +149,7 @@ def test_process__command_uses_packaged_boot_without_a_script_launcher(boot: Pat
     )
     command = process._command(assets)
     assert command[0] == str(assets.executable)
+    assert "+S" not in command
     assert command[-3:] == ["-s", "py_launch", "start"]
     if boot is None:
         assert "-boot" not in command
