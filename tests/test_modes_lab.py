@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from examples.modes_lab.app import (
@@ -9,6 +10,7 @@ from examples.modes_lab.app import (
     Span,
     app,
     command,
+    execute,
     runs,
 )
 
@@ -72,3 +74,14 @@ def test_modes_lab__renders_fanin_results() -> None:
 
     assert page.status_code == 200
     assert "10,000 calls/s" in page.text
+
+
+async def test_modes_lab__missing_interpreter_fails_the_lane(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYBEAM_LAB_PYTHON_314T", "/nonexistent/python3.14t")
+    lane = LaneRun(LANES[2])
+    await execute(lane, Run("key", "fanout", 1, 100_000, [lane]))
+
+    assert lane.status == "failed"
+    assert lane.detail.startswith("cannot start")

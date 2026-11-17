@@ -1,8 +1,10 @@
 import asyncio
 import os
 import shutil
+import signal
 import sys
 from collections import OrderedDict
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Literal
@@ -273,29 +275,38 @@ def command(lane: Lane, run: Run) -> list[str]:
 
 async def execute(lane: LaneRun, run: Run) -> None:
     lane.status = "running"
-    process = await asyncio.create_subprocess_exec(
-        *command(lane.lane, run),
-        cwd=ROOT,
-        env={**os.environ, "PYTHONPATH": str(ROOT)},
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command(lane.lane, run),
+            cwd=ROOT,
+            env={**os.environ, "PYTHONPATH": str(ROOT)},
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as error:
+        lane.status, lane.detail = "failed", "cannot start: {}".format(error.strerror)
+        return
     try:
         output, _ = await asyncio.wait_for(process.communicate(), TIMEOUT)
     except TimeoutError:
-        process.kill()
-        await process.wait()
         lane.status, lane.detail = "failed", "timed out after {} s".format(TIMEOUT)
         return
+    finally:
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
     lines = output.decode(errors="replace").strip().splitlines()
     if process.returncode in (-6, 134):
         lane.aborted = True
         lane.status = "done"
         return
     try:
-        lane.outcome = Outcome.model_validate_json(lines[-1] if lines else "{}")
+        lane.outcome = Outcome.model_validate_json(lines[-1] if lines else "")
     except ValidationError:
-        lane.status, lane.detail = "failed", "unreadable probe output"
+        lane.status, lane.detail = (
+            "failed",
+            "exit code {} without results".format(process.returncode),
+        )
         return
     lane.status = "done" if lane.outcome.error is None else "failed"
     lane.detail = lane.outcome.error or ""
