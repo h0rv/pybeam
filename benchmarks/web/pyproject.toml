@@ -1,0 +1,2 @@
+[tool.pybeam]
+development_runtime = "../../_build/hornbeam"
