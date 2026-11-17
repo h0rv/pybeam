@@ -63,7 +63,7 @@ def _choose(name: str | None) -> App:
 
 def _debug(name: str | None) -> None:
     app = _choose(name)
-    assets = discover_assets(load_config(Path.cwd()))
+    assets = discover_assets(load_config(Path(app.project)))
     with connect(app, assets) as connection:
         print("Attached to " + app.name + " (" + app.entry + ")")
         while True:

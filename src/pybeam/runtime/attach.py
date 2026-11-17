@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from collections.abc import Generator
@@ -38,6 +39,7 @@ Owner = spawn(Target, fun() ->
     end,
     Serve()
 end),
+Watch = erlang:monitor(process, Owner),
 Loop = fun Loop() ->
     case io:get_line("") of
         eof -> halt(0);
@@ -46,7 +48,8 @@ Loop = fun Loop() ->
             Owner ! {request, list_to_atom(Op), base64:decode(Arg)},
             Text = receive
                 {reply, {ok, Value}} when is_binary(Value) -> Value;
-                {reply, Other} -> unicode:characters_to_binary(io_lib:format("~p~n", [Other]))
+                {reply, Other} -> unicode:characters_to_binary(io_lib:format("~p~n", [Other]));
+                {'DOWN', Watch, process, Owner, _} -> halt(1)
             end,
             io:put_chars([base64:encode(Text), $\\n]),
             Loop()
@@ -62,12 +65,16 @@ class App:
     node: str
     pid: int
     entry: str
+    project: str
 
 
 def registry() -> Path:
     base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
     path = Path(base) / ("pybeam-" + str(os.getuid()))
     path.mkdir(mode=0o700, exist_ok=True)
+    status = path.lstat()
+    if not stat.S_ISDIR(status.st_mode) or status.st_uid != os.getuid() or status.st_mode & 0o077:
+        raise BootstrapError("Unsafe debug registry: " + str(path))
     return path
 
 
@@ -78,7 +85,7 @@ def node_name(entry: Path) -> str:
 
 def announce(app: App) -> Path:
     path = registry() / (app.name + ".json")
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "w") as file:
         json.dump(asdict(app), file)
     return path
@@ -90,8 +97,14 @@ def _parse(path: Path) -> App | None:
     except OSError, ValueError:
         return None
     match data:
-        case {"name": str(name), "node": str(node), "pid": int(pid), "entry": str(entry)}:
-            return App(name, node, pid, entry)
+        case {
+            "name": str(name),
+            "node": str(node),
+            "pid": int(pid),
+            "entry": str(entry),
+            "project": str(project),
+        }:
+            return App(name, node, pid, entry, project)
         case _:
             return None
 

@@ -159,7 +159,9 @@ def launch(
             if state.received:
                 _send(process, state.received)
             if debug:
-                record = announce(App(name, name + "@127.0.0.1", process.pid, str(entry)))
+                record = announce(
+                    App(name, name + "@127.0.0.1", process.pid, str(entry), str(Path.cwd()))
+                )
             while True:
                 if guardian is not None:
                     from pybeam.runtime.ownership import Identity, resolve

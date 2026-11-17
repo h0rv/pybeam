@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pybeam.runtime import attach, debug
+from pybeam.runtime.config import BootstrapError
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,16 +19,24 @@ def runtime_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_registry__lists_live_apps_and_removes_stale_records() -> None:
-    live = attach.App("live", "live@127.0.0.1", os.getpid(), "/app/main.py")
+    live = attach.App("live", "live@127.0.0.1", os.getpid(), "/app/main.py", "/app")
     path = attach.announce(live)
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
-    dead = attach.announce(attach.App("dead", "dead@127.0.0.1", 2**22 + 1, "/app/old.py"))
+    dead = attach.announce(attach.App("dead", "dead@127.0.0.1", 2**22 + 1, "/app/old.py", "/app"))
     garbage = attach.registry() / "garbage.json"
     garbage.write_text(json.dumps({"name": 1}))
     assert attach.running() == [live]
     assert not dead.exists()
     assert not garbage.exists()
+
+
+def test_registry__rejects_a_directory_other_users_can_write(runtime_dir: Path) -> None:
+    shared = runtime_dir / ("pybeam-" + str(os.getuid()))
+    shared.mkdir(mode=0o777)
+    shared.chmod(0o777)
+    with pytest.raises(BootstrapError, match="Unsafe debug registry"):
+        attach.registry()
 
 
 def test_node_name__is_a_safe_short_name() -> None:
