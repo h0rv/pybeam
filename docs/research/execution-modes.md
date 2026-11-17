@@ -18,7 +18,7 @@ Costs are single-trial raw-context measurements below, not task guarantees. PR #
 
 ### Unsupported own-GIL subinterpreters
 
-Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In the [PR #48 mode grid](https://github.com/h0rv/pybeam/pull/48), measured 2026-11-17 on both regular CPython 3.14 and free-threaded 3.14t, 15 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`. Failures included pydantic-core, uvloop, numpy, SQLAlchemy, orjson, httptools, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and pandas. Only asyncpg and MarkupSafe loaded. Free-threading support does not imply subinterpreter support.
+Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In the [PR #48 mode grid](https://github.com/h0rv/pybeam/pull/48), measured 2026-11-17 on both regular CPython 3.14 and free-threaded 3.14t, 14 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`: pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and orjson. Only asyncpg and MarkupSafe loaded; psycopg-binary was not importable. Free-threading support does not imply subinterpreter support.
 
 The following contract and measurements describe the historical implementation, not a supported execution option.
 
