@@ -10,7 +10,8 @@ This measures serving only, not shared state, persistence, or application work.
 Run from the repository root on a Linux host with CPUs 0–7, container-engine
 access, and sibling runtime checkouts as described in
 [development.md](../../docs/development.md). Use the source revisions below.
-Create the two `_checkouts` links once, if they do not already exist.
+Create the two `_checkouts` links once, if they do not already exist. Checkout
+links override the dependency pin; select the measured revisions before building.
 
 ```sh
 mise install
@@ -28,7 +29,11 @@ mise exec -- uv run --no-sync python -m benchmarks.web.run --output "$HOME/web-f
 
 Output directories must not exist and must be outside the repository. The runner
 stores raw measurements and container logs there, then stops/removes each
-container. The image mounts the current user's home directory read/write at the
+container. The default runner measures all four paths and recalculates the
+fixed rate from saturation. The A/B follow-up selected only those paths and
+retained 251 requests/s for comparison with the original run.
+
+The image mounts the current user's home directory read/write at the
 same path so the built runtime and virtual environment remain usable; run only
 with a trusted image. No raw results or logs are committed.
 
@@ -39,17 +44,22 @@ cells with parentheses are **median (minimum–maximum)** over three repeats,
 not confidence intervals. Latencies are milliseconds. A fresh container is used
 for each saturation pair, fixed-rate run, and WebSocket ramp in each repeat.
 
+A and B were re-measured after the runtime capacity fixes; C and C2 retain the
+earlier reference measurements and were not re-run. The dependency pin now
+targets merged runtime `9bbec50`; the tables measure the pre-merge revision below,
+not that later merge.
+
 | Component | Configuration |
 | --- | --- |
 | Host | x86_64, Intel Xeon, 8 vCPUs, 31.3 GiB RAM, no swap |
 | OS | Ubuntu 22.04.5, Linux 6.8.0-1060-aws, glibc 2.35 |
 | Python | CPython 3.14.10, conventional build, live GIL enabled |
-| BEAM | OTP 29 / ERTS 17.1.1 |
+| BEAM | OTP 29.1.2 / ERTS 17.1.1 |
 | Python libraries | FastAPI 0.163.0, Uvicorn 0.54.0, websockets 16.1.1 |
 | Load / container tools | oha 1.17.0, Docker 29.9.2, cgroups v2 |
-| PyBeam base | `68e7b225e48adc5008ec8cb15f7f48842628ed3a` |
+| PyBeam | A/B: `e071491`; C/C2: `68e7b225e48adc5008ec8cb15f7f48842628ed3a` |
 | Hornbeam | `c97d49e6537603ec46cd55116a1f1bb1e49a69ee` |
-| erlang-python | `56d20d46fc592a331e579bab7eddc3be75d19d56` |
+| erlang-python measured for A/B | `04058f3ea1b0946376b0b02b8fc908716c708e05` (capacity fixes and `TCP_NODELAY` enabled) |
 | Container base | Ubuntu 22.04, glibc 2.35; digest pinned in `Dockerfile` |
 
 Every server uses host networking and exactly
@@ -72,9 +82,10 @@ timeout. The optional `httptools` and `uvloop` libraries were not installed.
 HTTP saturation runs last 30 seconds at each of c64 and c256, following a
 two-second c16 warm-up. Requests use HTTP/1.1 keep-alive with compression disabled
 and a five-second timeout. Fixed-rate runs last 30 seconds at c64, with
-`--latency-correction -q 251`: half the lowest observed saturation rate, rounded
-down. These are successful-response latency percentiles emitted by the load
-generator; errors are noted separately rather than treated as latency samples.
+`--latency-correction -q 251`: the original comparison rate, retained for the
+follow-up rather than recalculated. These are successful-response latency
+percentiles emitted by the load generator; errors are noted separately rather
+than treated as latency samples.
 
 WebSockets ramp in batches of at most 64 concurrent handshakes per client
 process, to 1,000 / 5,000 / 10,000 / 20,000 / 30,000 / 50,000 total connections.
@@ -97,18 +108,19 @@ ramps do not establish peak memory or a per-connection memory estimate.
 
 | Path | Concurrency | Requests/s | p50 ms | p99 ms |
 | --- | ---: | ---: | ---: | ---: |
-| A: Hornbeam | 64 | 7,591.73 (7,238.45–7,849.96) | 7.97 (7.77–8.09) | 17.53 (16.32–19.30) |
-| A: Hornbeam | 256 | 8,025.10 (7,382.02–8,159.78) | 31.12 (30.78–32.49) | 54.14 (51.98–65.23) |
-| B: managed Uvicorn | 64 | 1,444.48 (1,424.85–1,463.51) | 43.01 (42.99–43.03) | 57.26 (53.01–64.00) |
-| B: managed Uvicorn | 256 | 754.05 (502.46–2,378.78) | 117.99 (104.98–237.03) | 1,141.98 (142.99–1,228.11) |
+| A: Hornbeam | 64 | 7,701.94 (7,199.34–8,243.23) | 7.73 (7.51–8.00) | 18.35 (14.24–20.66) |
+| A: Hornbeam | 256 | 7,916.94 (5,965.18–8,365.00) | 30.70 (30.04–38.15) | 62.11 (53.09–69.85) |
+| B: managed Uvicorn | 64 | 2,494.30 (2,325.78–2,629.03) | 24.76 (23.14–26.55) | 50.14 (46.86–50.60) |
+| B: managed Uvicorn | 256 | 2,616.53 (2,237.48–2,944.10) | 56.76 (56.00–60.67) | 96.23 (94.17–126.69) |
 | C: Uvicorn ×1 | 64 | 5,839.50 (5,783.07–5,928.25) | 10.68 (10.67–10.95) | 13.10 (11.40–21.74) |
 | C: Uvicorn ×1 | 256 | 5,511.02 (5,358.96–5,876.46) | 45.32 (43.18–46.85) | 73.51 (47.18–75.42) |
 | C2: Uvicorn ×2 | 64 | 1,554.72 (1,552.75–1,557.39) | 41.00 (41.00–41.00) | 46.07 (43.99–46.94) |
 | C2: Uvicorn ×2 | 256 | 6,024.85 (6,021.49–6,097.20) | 41.96 (41.13–41.99) | 51.09 (51.03–54.00) |
 
-B at c256 had 38 request timeouts in the third repeat (99.753% success);
-the other saturation runs had no recorded request errors. The large spread is
-retained. C2's poor c64 result is repeatable here; its cause was not investigated.
+B at c256 recorded **494 / 600 / 666 request timeouts** across the three runs
+(494–666 per run): this is **not clean throughput**. Percentiles exclude those
+failures. Other saturation runs had no recorded request errors.
+C2's poor c64 result was repeatable; its cause was not investigated.
 
 ## Fixed-rate HTTP
 
@@ -116,8 +128,8 @@ All twelve runs sustained the offered 251 requests/s without recorded errors.
 
 | Path | Achieved requests/s | p99 ms |
 | --- | ---: | ---: |
-| A: Hornbeam | 250.99 (250.99–251.00) | 2.67 (2.05–5.54) |
-| B: managed Uvicorn | 250.99 (250.99–250.99) | 3.96 (3.68–4.17) |
+| A: Hornbeam | 250.99 (250.98–250.99) | 0.69 (0.63–3.37) |
+| B: managed Uvicorn | 250.99 (250.99–250.99) | 3.38 (1.94–7.08) |
 | C: Uvicorn ×1 | 250.99 (250.98–250.99) | 0.54 (0.44–0.70) |
 | C2: Uvicorn ×2 | 250.99 (250.99–250.99) | 1.00 (0.98–1.93) |
 
@@ -131,31 +143,25 @@ are not a successful target hold.
 
 | Path | Largest clean step | First failed target | Minimum live at failed step | Idle baseline MiB |
 | --- | ---: | ---: | ---: | ---: |
-| A: Hornbeam | 5,000 | 10,000 | 8,120 (8,103–8,132) | 90.48 (87.88–90.55) |
-| B: managed Uvicorn | 1,000 | 5,000 | 4,095 (4,095–4,095) | 116.18 (116.11–116.55) |
+| A: Hornbeam | 10,000 | 20,000 | 0 (0–0) | 92.32 (92.28–92.80) |
+| B: managed Uvicorn | 30,000 | 50,000 | 0 (0–0) | 116.00 (115.95–116.04) |
 | C: Uvicorn ×1 | 30,000 | 50,000 | 0 (0–0) | 36.51 (36.38–36.54) |
 | C2: Uvicorn ×2 | 30,000 | 50,000 | 24,353 (0–24,922) | 97.02 (96.73–97.15) |
 
-- A opened 10,000, then lost connections with close code 1011. Each repeat's
-  server log reported `ChannelOverloaded: Native readiness capacity exhausted`.
-  Failed-step error counts were 1,933 / 1,872 / 1,962. No container OOM occurred.
-- B held 4,095 for the entire failed-step hold, but could not reach 5,000:
-  233 handshake timeouts in each repeat. Server logs reported
-  `Native FD poll lease limit reached`; the runtime's compiled limit is 4,096.
-  No container OOM occurred.
+- A opened all 20,000 connections, then the container ran out of memory early
+  in each hold. B ran out of memory while ramping toward 50,000. All six saved
+  states report `OOMKilled: true`, exit code 137. Neither old readiness-capacity
+  error appeared. The first observed limit is now the 2 GiB container budget,
+  not an exact connection maximum.
 - C and C2 encountered container OOM kills while ramping toward 50,000,
   confirmed by saved container state (`OOMKilled: true`) in all six runs.
   C lost all sockets; C2 sometimes retained a surviving worker's sockets.
   Neither establishes a clean 50,000-connection capacity. No source-port
   exhaustion was observed.
-- One early small smoke run also hit Hornbeam's concurrent session-table
-  creation error (`ets:new` on an existing named table); the three full repeats
-  did not exhibit that error. No runtime workaround was applied.
 
-An interrupted third C ramp was restarted after correcting a container-exit
-detection race in the memory sampler. Its complete replacement supplies that
-repeat; the interrupted ramp is not pooled with it. C2's third fixed-rate run
-and ramp then ran separately with the same settings.
+C's third reference ramp uses a complete replacement after a memory-sampler
+exit-detection fix; the interrupted attempt is excluded. C2's third fixed-rate
+run and ramp ran separately with the same settings.
 
 ## WebSocket memory and echo latency
 
@@ -165,9 +171,14 @@ include substantial warm-up/allocator overhead, especially for A.
 
 | Path | Held connections | Delta KiB/connection | Echo p99 ms |
 | --- | ---: | ---: | ---: |
-| A: Hornbeam | 1,000 | 156.70 (151.47–163.52) | 136.68 (118.38–150.63) |
-| A: Hornbeam | 5,000 | 72.13 (71.04–74.03) | 372.30 (343.02–400.50) |
-| B: managed Uvicorn | 1,000 | 41.46 (40.87–41.72) | 184.38 (162.41–218.62) |
+| A: Hornbeam | 1,000 | 151.06 (103.51–156.10) | 129.59 (127.34–156.77) |
+| A: Hornbeam | 5,000 | 71.78 (71.77–72.18) | 327.04 (293.24–360.52) |
+| A: Hornbeam | 10,000 | 84.48 (83.22–85.91) | 60.14 (59.24–220.67) |
+| B: managed Uvicorn | 1,000 | 41.39 (41.34–44.24) | 142.14 (120.16–286.72) |
+| B: managed Uvicorn | 5,000 | 41.42 (41.37–41.43) | 217.57 (150.80–487.45) |
+| B: managed Uvicorn | 10,000 | 41.62 (41.44–41.74) | 761.81 (270.82–1,156.73) |
+| B: managed Uvicorn | 20,000 | 41.54 (41.47–41.58) | 1,389.63 (132.92–1,619.20) |
+| B: managed Uvicorn | 30,000 | 41.50 (41.42–41.51) | 2,280.45 (1,920.19–2,786.08) |
 | C: Uvicorn ×1 | 1,000 | 42.31 (42.14–42.33) | 30.96 (27.99–47.70) |
 | C: Uvicorn ×1 | 5,000 | 42.09 (42.06–42.10) | 39.29 (35.27–43.65) |
 | C: Uvicorn ×1 | 10,000 | 41.88 (41.87–41.98) | 44.56 (37.38–45.86) |
@@ -180,5 +191,27 @@ include substantial warm-up/allocator overhead, especially for A.
 | C2: Uvicorn ×2 | 30,000 | 41.82 (41.81–41.84) | 15.12 (14.81–17.93) |
 
 These loopback measurements do not establish network-facing capacity or
-application-level parallelism. The native-runtime readiness limits, not memory,
-were the first observed blockers for A and B in this configuration.
+application-level parallelism. B holds more sockets after the fixes, but its
+large-count echo latency remains high and variable.
+
+## Why managed Uvicorn trails standalone Uvicorn
+
+Separate single 30-second c64 diagnostics used the same app and resource limits;
+they are not the three-repeat medians above. Before the `TCP_NODELAY` fix
+(`474aa42`), managed Uvicorn reached 1,466.05 requests/s with 43.00 ms p50.
+With the fix (`2dc02fd`, included in diagnostic revision `0f18016`), it reached
+2,870.02 requests/s and 21.15 ms p50. Re-enabling Nagle on that same main
+reproduced 1,501.31 requests/s and 41.99 ms p50; accepted-socket checks verified
+`TCP_NODELAY` off/on/off. The standalone control reached 6,107.26 requests/s.
+
+In-process profiling during a 10-second load found per-response keep-alive timer scheduling and
+cancellation through the native loop: 13,452 schedules and 13,398 cancellations
+took 0.734 seconds of profile internal time. Suppressing those timers in a
+diagnostic raised unprofiled c64 throughput to 4,047.77 requests/s, but removes
+idle expiry and is not a production fix. Leases were not duplicated per request:
+about 13,400 requests needed only 66 reader registrations and 65 releases.
+
+The managed transport made 26,867 receive attempts for about 13,400 requests,
+versus 20,478 for about 20,400 standalone requests: its drain-until-EAGAIN loop
+adds receive attempts. These measurements identify contributors, not a complete
+whole-runtime CPU breakdown. The remaining gap and c256 timeouts are unattributed.
