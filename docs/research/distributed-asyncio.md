@@ -1,5 +1,7 @@
 # Distributed and durable asyncio
 
+Historical research note: own-GIL subinterpreter mode is unsupported because common native extensions do not load in it; use free-threaded 3.14t workers or isolated OS processes instead. See the [compatibility results](execution-modes.md#unsupported-own-gil-subinterpreters).
+
 ## Answer
 
 asyncio's programming model can extend across a cluster, but its loop cannot. A coroutine runs to completion on the loop that started it, so nothing in this design moves suspended coroutines between nodes. A cluster can share three things instead:
