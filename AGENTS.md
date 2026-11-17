@@ -28,6 +28,10 @@ Use mise for development tools and tasks, uv for Python dependencies, and rebar3
 
 Keep one Python distribution. Core primitives belong in domain packages such as `pybeam.actors`, `pybeam.mailbox`, `pybeam.services`, `pybeam.supervision`, and `pybeam.runtime`. Optional framework and ecosystem adapters belong under `pybeam.integrations.<name>`. Hornbeam-specific web-service contracts belong to its integration, not core services. Keep initializers minimal. Core modules must not import integrations or optional frameworks, and framework adapters must not import other framework adapters. Avoid duplicate transport abstractions and speculative plugin systems.
 
+## Documentation
+
+Before writing, editing, or reviewing README content, guides, API prose, docstrings, or example explanations, read and apply the [documentation-writing skill](.agents/skills/documentation-writing/SKILL.md). Include that path in delegated documentation briefs, including resumed tasks. Its Python-first audience rules, example checks, and editing checklist apply to small changes too. Keep this skill in the repository so future sessions use the same writing standard.
+
 ## Python and examples
 
 Every delegated task, including a resumed task, must begin by reading the `modern-python` skill and its relevant reference files. Agent briefs must include the skill's file path explicitly. Apply its design principles, not just its lint rules. Verify Python changes with Ruff and strict ty.
