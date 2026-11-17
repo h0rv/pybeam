@@ -333,6 +333,21 @@ def test_readiness__stale_replies_do_not_enable_a_run() -> None:
     assert not live.ready
 
 
+def test_cli__documented_launch_uses_readable_message_rate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["crash_test"])
+    monkeypatch.setattr(crash_test, "session", crash_test.Session())
+    launched: list[float] = []
+
+    def serve(application: object, host: str, port: int) -> None:
+        assert application is app
+        assert host == "127.0.0.1"
+        launched.append(crash_test.session.settings.rate)
+
+    monkeypatch.setattr(crash_test.uvicorn, "run", serve)
+    crash_test.main()
+    assert launched == [1.0]
+
+
 async def test_traffic__reconnects_counts_lost_and_records_acknowledgements() -> None:
     ready = asyncio.Event()
     sessions = 0

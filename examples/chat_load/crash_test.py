@@ -44,6 +44,7 @@ PUSH: TypeAdapter[Push] = TypeAdapter(Push)
 BASELINE_SECONDS = 4.0
 OBSERVE_SECONDS = 10.0
 RECOVERY_SECONDS = 5.0
+DEFAULT_RATE = 1.0
 CHAT = (
     "Anyone here?",
     "Can you still see my messages?",
@@ -121,7 +122,7 @@ class Settings(BaseModel):
     pybeam_url: HttpUrl = HttpUrl("http://127.0.0.1:8800")
     rooms: int = Field(default=8, ge=2, le=32)
     clients: int = Field(default=4, ge=1, le=16)
-    rate: float = Field(default=1, ge=0.1, le=20)
+    rate: float = Field(default=DEFAULT_RATE, ge=0.1, le=20)
     port: int = Field(default=8802, ge=1024, le=65535)
 
 
@@ -145,7 +146,7 @@ class Client:
     lost: int = 0
     drops: int = 0
     error: str = ""
-    messages: deque[ChatMessage] = field(default_factory=lambda: deque(maxlen=5))
+    messages: deque[ChatMessage] = field(default_factory=lambda: deque(maxlen=3))
     sequence: int = 0
     replies: int = 0
     last_reply: float = 0
@@ -618,7 +619,9 @@ def main() -> None:
     parser.add_argument("--pybeam-url", default="http://127.0.0.1:8800")
     parser.add_argument("--rooms", type=int, default=8)
     parser.add_argument("--clients", type=int, default=4)
-    parser.add_argument("--rate", type=float, default=4, help="Messages per second per socket")
+    parser.add_argument(
+        "--rate", type=float, default=DEFAULT_RATE, help="Messages per second per socket"
+    )
     parser.add_argument("--port", type=int, default=8802)
     session.settings = Settings.model_validate(vars(parser.parse_args()))
     uvicorn.run(app, host="127.0.0.1", port=session.settings.port)
