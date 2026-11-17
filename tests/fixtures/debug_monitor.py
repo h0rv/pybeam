@@ -33,7 +33,7 @@ async def main() -> None:
         pending = asyncio.create_task(counter.wait(), name="counter-wait")
         try:
             await asyncio.sleep(0.05)
-            Path("monitor.ready").touch()
+            await asyncio.to_thread(Path("monitor.ready").touch)
             await asyncio.Event().wait()
         finally:
             pending.cancel()

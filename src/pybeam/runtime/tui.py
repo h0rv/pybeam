@@ -96,7 +96,12 @@ def _stacks(screen: curses.window, connection: Connection, resource: Resource | 
             lines.extend(text.splitlines() or ["No Python stacks available."])
             refresh = False
         title = "Python stacks" if resource is None else resource.name
-        size = _frame(screen, title, "Snapshot; r reads again", "up/down scroll  r refresh  p shell  b back  q quit")
+        size = _frame(
+            screen,
+            title,
+            "Snapshot; r reads again",
+            "up/down scroll  r refresh  p shell  b back  q quit",
+        )
         selection.index = min(selection.index, max(0, len(lines) - max(1, size)))
         for row, line in enumerate(lines[selection.index : selection.index + size], 3):
             _put(screen, row, line)
@@ -121,7 +126,9 @@ def _dashboard(screen: curses.window, app: App, connection: Connection) -> None:
         if time.monotonic() >= deadline:
             previous = report.resources[selection.index].identity if report.resources else None
             report = REPORT.decode(connection.request("inspect", "", timeout=3.0))
-            resources = tuple(sorted(report.resources, key=lambda row: (row.kind, row.name, row.identity)))
+            resources = tuple(
+                sorted(report.resources, key=lambda row: (row.kind, row.name, row.identity))
+            )
             report = Report(resources, report.unavailable)
             selection.index = next(
                 (index for index, row in enumerate(resources) if row.identity == previous), 0
@@ -130,7 +137,12 @@ def _dashboard(screen: curses.window, app: App, connection: Connection) -> None:
         status = "Attached / refresh 2s / PID " + str(app.pid)
         if report.unavailable:
             status = "Degraded / unavailable: " + ", ".join(report.unavailable)
-        size = _frame(screen, app.name, status, "up/down select  Enter stacks  p shell  r refresh  b apps  q quit")
+        size = _frame(
+            screen,
+            app.name,
+            status,
+            "up/down select  Enter stacks  p shell  r refresh  b apps  q quit",
+        )
         if not report.resources:
             _put(screen, 3, "No actors, task supervisors or opened queues.")
             _put(screen, 4, "s shows Python threads and entry-loop tasks; p opens the shell.")
@@ -188,14 +200,24 @@ def _main(screen: curses.window, name: str | None) -> None:
             name = None
         else:
             chosen = None
-        size = _frame(screen, "apps", error or "Running Python apps / refresh 2s", "up/down select  Enter attach  r refresh  q quit")
+        size = _frame(
+            screen,
+            "apps",
+            error or "Running Python apps / refresh 2s",
+            "up/down select  Enter attach  r refresh  q quit",
+        )
         if not apps:
             _put(screen, 3, "No debuggable apps.")
             _put(screen, 4, "Start one with: pybeam run --debug app.py")
         start = max(0, selection.index - size + 1)
         for index in range(start, min(len(apps), start + size)):
             app = apps[index]
-            _put(screen, 3 + index - start, "{:<24} {:>8}  {}".format(app.name, app.pid, app.entry), selected=index == selection.index)
+            _put(
+                screen,
+                3 + index - start,
+                "{:<24} {:>8}  {}".format(app.name, app.pid, app.entry),
+                selected=index == selection.index,
+            )
         screen.refresh()
         key = screen.getch() if chosen is None else -1
         if key == ord("q"):
@@ -208,7 +230,7 @@ def _main(screen: curses.window, name: str | None) -> None:
             try:
                 _attach(screen, chosen)
                 error = ""
-            except BootstrapError, CodecError, OSError as failure:
+            except (BootstrapError, CodecError, OSError) as failure:
                 error = "Disconnected: " + str(failure)
             deadline = 0.0
         selection.move(key, len(apps))

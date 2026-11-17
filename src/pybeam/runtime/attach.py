@@ -24,14 +24,17 @@ EPMD = {"ERL_EPMD_ADDRESS": "127.0.0.1"}
 
 # Runs on a hidden client node. A process spawned on the target owns one
 # worker context and stops it when this client goes away.
-_CLIENT = """
+_CLIENT = (
+    """
 Target = list_to_atom(os:getenv("PYBEAM_DEBUG_TARGET")),
 true = net_kernel:connect_node(Target),
 Client = self(),
 Owner = spawn(Target, fun() ->
     erlang:monitor(process, Client),
     {ok, Ctx} = py_context:new(#{mode => worker}),
-""" + NATIVE_INSPECT + """
+"""
+    + NATIVE_INSPECT
+    + """
     Serve = fun Serve() ->
         receive
             {request, inspect, _} ->
@@ -64,6 +67,7 @@ Loop = fun Loop() ->
 end,
 Loop().
 """
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +155,8 @@ class Connection:
             stdin.write(operation.encode() + b" " + base64.b64encode(payload.encode()) + b"\n")
             stdin.flush()
         except OSError as error:
+            with suppress(OSError):
+                stdin.close()
             raise BootstrapError("Debug connection closed") from error
         if timeout is None:
             line = stdout.readline()
@@ -170,7 +176,7 @@ class Connection:
             raise BootstrapError("Debug connection closed")
         try:
             return base64.b64decode(line.strip(), validate=True).decode()
-        except ValueError, UnicodeError as error:
+        except (ValueError, UnicodeError) as error:
             raise BootstrapError("Debug client failed: " + line.decode().strip()) from error
 
 
@@ -201,7 +207,8 @@ def connect(app: App, assets: RuntimeAssets) -> Generator[Connection]:
         yield Connection(process)
     finally:
         if process.stdin is not None:
-            process.stdin.close()
+            with suppress(OSError):
+                process.stdin.close()
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:

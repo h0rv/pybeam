@@ -25,7 +25,14 @@ def test_monitor__reads_real_actor_task_and_queue_state_without_changing_app(
     environment = dict(os.environ, PYTHONPATH=str(ROOT / "src"))
     with (tmp_path / "app.log").open("w") as output:
         process = subprocess.Popen(
-            [sys.executable, "-c", "from pybeam.runtime.cli import main; main()", "run", "--debug", str(ROOT / "tests/fixtures/debug_monitor.py")],
+            [
+                sys.executable,
+                "-c",
+                "from pybeam.runtime.cli import main; main()",
+                "run",
+                "--debug",
+                str(ROOT / "tests/fixtures/debug_monitor.py"),
+            ],
             cwd=tmp_path,
             env=environment,
             stdout=output,
@@ -49,7 +56,9 @@ def test_monitor__reads_real_actor_task_and_queue_state_without_changing_app(
                 assert {stat.name: stat.value for stat in actor.stats}["Admitted calls"] == "1"
                 assert {stat.name: stat.value for stat in rows["tasks"].stats}["Free slots"] == "2"
                 assert {stat.name: stat.value for stat in rows["queue"].stats} == {
-                    "Queue depth": "1", "Active leases": "1", "Capacity": "4"
+                    "Queue depth": "1",
+                    "Active leases": "1",
+                    "Capacity": "4",
                 }
                 assert "counter-wait" in connection.request("snapshot", "", timeout=5)
                 assert connection.request("evaluate", "6 * 7", timeout=5) == "42"
