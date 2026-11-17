@@ -2,7 +2,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import assert_type
+from types import ModuleType
+from typing import TYPE_CHECKING, assert_type
 
 import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
@@ -10,6 +11,28 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 from pybeam.submissions import CapabilityUnavailable
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
+
+if TYPE_CHECKING:
+    from erlang.tasks import EntryPoint, EntryResult
+
+
+class _EntryPoint:
+    module = "entries"
+    name = "render"
+
+    async def __call__(self, token: int, payload: bytes) -> EntryResult:
+        return "ok", payload
+
+
+class _TaskModule(ModuleType):
+    EntryPoint = _EntryPoint
+
+
+@pytest.fixture
+def entry(monkeypatch: pytest.MonkeyPatch) -> _EntryPoint:
+    monkeypatch.setitem(sys.modules, "erlang", ModuleType("erlang"))
+    monkeypatch.setitem(sys.modules, "erlang.tasks", _TaskModule("erlang.tasks"))
+    return _EntryPoint()
 
 
 class Request(BaseModel):
@@ -30,6 +53,14 @@ async def checked(supervisor: TaskSupervisor) -> None:
     assert_type(await ref.result(), str)
     assert_type(await ref.exception(), BaseException | None)
     assert_type(await ref.cancel(), bool)
+
+
+async def checked_owngil(supervisor: TaskSupervisor, entry: EntryPoint) -> None:
+    function = TaskFunction(
+        entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL
+    )
+    assert_type(function, TaskFunction[Request, str])
+    assert_type(await supervisor.start(function, Request(value=1)), TaskRef[str])
 
 
 def test_execution_mode__values() -> None:
@@ -62,20 +93,10 @@ def test_task_function__worker_default_and_explicit(
     ("execution", "reason"),
     [
         (
-            ExecutionMode.OWNGIL,
-            "py_task hard-codes mode => worker; "
-            "retained main-interpreter closures cannot cross interpreters.*"
-            "Task mode support and bodies named by importable module path need "
-            "approved erlang-python fork changes.*PyBeam must move task codecs "
-            "to the caller and pass raw bytes.*check_multi_interp_extensions reject pydantic_core",
-        ),
-        (
             ExecutionMode.ISOLATED,
-            "py_task hard-codes mode => worker.*main-interpreter objects; "
-            "fork support.*bootstrap fix.*PR #5",
+            "fork rejects isolated named tasks.*PR #5.*child-exit accounting",
         ),
-        ("owngil", "py_task hard-codes mode => worker.*check_multi_interp_extensions"),
-        ("isolated", "py_task hard-codes mode => worker.*bootstrap fix.*PR #5"),
+        ("isolated", "fork rejects isolated named tasks.*PR #5.*child-exit accounting"),
     ],
 )
 def test_task_function__unavailable_modes(
@@ -89,6 +110,47 @@ def test_task_function__unavailable_modes(
             execution=execution,
             dedicated_loop=dedicated_loop,
         )
+
+
+@pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
+def test_task_function__owngil_requires_entry(execution: ExecutionMode) -> None:
+    with pytest.raises(TypeError, match=r"owngil tasks require an erlang\.tasks\.EntryPoint"):
+        TaskFunction(render, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+
+
+@pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
+def test_task_function__owngil_entry_codecs(entry: EntryPoint, execution: ExecutionMode) -> None:
+    function = TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+    assert function.execution is ExecutionMode.OWNGIL
+    assert function.encode(Request(value=3)) == b'{"value":3}'
+    assert function.decode(b'"result"') == "result"
+    with pytest.raises(ValidationError):
+        function.decode(b"")
+
+
+def test_task_function__owngil_rejects_dedicated_loop(entry: EntryPoint) -> None:
+    with pytest.raises(ValueError, match="dedicated_loop is worker-only"):
+        TaskFunction(
+            entry,
+            TypeAdapter(Request),
+            TypeAdapter(str),
+            execution=ExecutionMode.OWNGIL,
+            dedicated_loop=True,
+        )
+
+
+def test_task_function__worker_rejects_entry(entry: EntryPoint) -> None:
+    with pytest.raises(TypeError, match=r"EntryPoint requires execution=ExecutionMode\.OWNGIL"):
+        TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str))
+
+
+@pytest.mark.parametrize(("module", "name"), [("", "render"), ("entries", "outer.<locals>.render")])
+def test_task_function__owngil_rejects_nonimportable_entry(
+    entry: EntryPoint, module: str, name: str
+) -> None:
+    entry.module, entry.name = module, name
+    with pytest.raises(TypeError, match="importable top-level functions"):
+        TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL)
 
 
 @pytest.mark.parametrize("execution", ["unknown"])

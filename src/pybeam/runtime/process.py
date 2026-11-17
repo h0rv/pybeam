@@ -52,7 +52,15 @@ def _completion(path: Path) -> int | None:
     return value
 
 
-def _command(assets: RuntimeAssets) -> list[str]:
+def _command(assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+    paths = (
+        "["
+        + ",".join(
+            "<<" + ",".join(str(byte) for byte in path.encode("utf-8")) + ">>"
+            for path in python_paths
+        )
+        + "]"
+    )
     return [
         str(assets.executable),
         "+S",
@@ -63,6 +71,7 @@ def _command(assets: RuntimeAssets) -> list[str]:
         *(["-boot", str(assets.boot)] if assets.boot is not None else []),
         "-pa",
         *(str(path) for path in assets.code_paths),
+        *(["-erlang_python", "paths", paths] if python_paths else []),
         "-s",
         "py_launch",
         "start",
@@ -109,10 +118,13 @@ def launch(
         environment["PYBEAM_COMPLETION"] = str(completed)
         environment["PYBEAM_CLEANUP"] = str(cleanup)
         environment["PYBEAM_SHUTDOWN_TIMEOUT_MS"] = str(math.ceil(config.shutdown_timeout * 1000))
+        python_paths = tuple(
+            dict.fromkeys((str(entry.parent), *(str(Path(path).resolve()) for path in sys.path)))
+        )
         environment["PYBEAM_BOOTSTRAP"] = json.dumps(
             {
                 "argv": [str(entry), *args],
-                "python_paths": [str(Path(path).resolve()) for path in sys.path],
+                "python_paths": python_paths,
                 "ready": str(ready),
                 "completed": str(completed),
             }
@@ -139,7 +151,7 @@ def launch(
             signal.signal(signal.SIGINT, forward)
             signal.signal(signal.SIGTERM, forward)
             try:
-                command = [*_command(assets), *options]
+                command = [*_command(assets, python_paths=python_paths), *options]
                 if "PYBEAM_OWNER_DIRECTORY" in environment:
                     command = [sys.executable, "-m", "pybeam.runtime.guardian", "gate", *command]
                 process = subprocess.Popen(  # noqa: S603

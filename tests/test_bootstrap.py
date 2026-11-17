@@ -106,7 +106,11 @@ def test_development_assets__rejects_incompatible_nif_without_loading_it(
 @pytest.fixture
 def fake_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     script = tmp_path / "vm.py"
-    monkeypatch.setattr(process, "_command", lambda _assets: [sys.executable, str(script)])
+
+    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+        return [sys.executable, str(script)]
+
+    monkeypatch.setattr(process, "_command", command)
     return script
 
 
@@ -146,6 +150,18 @@ def test_process__command_uses_packaged_boot_without_a_script_launcher(boot: Pat
         assert "-boot" not in command
     else:
         assert command[command.index("-boot") + 1] == str(boot)
+
+
+def test_process__command_registers_utf8_python_paths_as_data() -> None:
+    assets = RuntimeAssets(Path("erl"), ())
+    command = process._command(assets, python_paths=('a"b', "é"))
+    position = command.index("-erlang_python")
+    assert command[position : position + 3] == [
+        "-erlang_python",
+        "paths",
+        "[<<97,34,98>>,<<195,169>>]",
+    ]
+    assert "-erlang_python" not in process._command(assets)
 
 
 def test_process__merges_asset_environment_without_losing_caller_environment(
@@ -264,7 +280,9 @@ def test_process__signal_during_spawn_is_not_lost(
 ) -> None:
     fake_runtime.write_text("import time\ntime.sleep(30)\n")
 
-    def interrupted_command(_assets: RuntimeAssets) -> list[str]:
+    def interrupted_command(
+        _assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()
+    ) -> list[str]:
         os.kill(os.getpid(), signal.SIGTERM)
         return [sys.executable, str(fake_runtime)]
 
@@ -646,7 +664,7 @@ def test_native__application_stop_stall_has_parent_deadline(
         + "application:stop(pybeam_stop_stall), halt(0)."
     )
 
-    def command(_assets: RuntimeAssets) -> list[str]:
+    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
         return [
             str(assets.executable),
             "+S",

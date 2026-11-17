@@ -4,14 +4,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 from types import TracebackType
-from typing import TYPE_CHECKING, Annotated, Protocol, Self, assert_never
+from typing import TYPE_CHECKING, Annotated, Protocol, Self, TypeIs, assert_never
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from pybeam.submissions import AdmissionClosed, CapabilityUnavailable, Overloaded
 
 if TYPE_CHECKING:
-    from erlang.tasks import Body
+    from erlang.tasks import Body, EntryPoint
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,13 +45,11 @@ class ExecutionMode(StrEnum):
 
     Worker shares the main interpreter: GIL on 3.14, parallel threads on
     3.14t; a native crash kills the VM. Owngil owns an interpreter per context
-    and is not a crash boundary. Owngil tasks need approval for fork changes:
-    py_task hard-codes worker and retained main-interpreter closures must become
-    bodies named by importable module path. PyBeam must also move its pydantic
-    codecs to the caller and pass raw bytes: subinterpreters reject pydantic_core
-    (and numpy). Isolated uses a child OS process that contains
+    and is not a crash boundary. Owngil tasks use importable byte entries and
+    caller-side codecs: their modules cannot import pybeam, pydantic_core or
+    incompatible extensions such as numpy. Isolated uses a child OS process that contains
     os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
-    Only worker is currently available for PyBeam tasks.
+    Worker and owngil are available for tasks; isolated is not yet supported.
     """
 
     WORKER = "worker"
@@ -65,11 +63,17 @@ class TaskFunction[Q, R]:
     dedicated_loop runs the body on its context-owned native loop instead of
     the shared driver. It still uses the main interpreter, not an isolation VM.
     Construct loop-bound resources inside the body and finalize them before return.
+
+    Owngil requires an erlang.tasks.EntryPoint in an importable module without
+    pybeam/pydantic or incompatible extensions. The caller encodes requests and
+    decodes results; entries receive and return JSON bytes, not Q/R objects.
+    No nested PyBeam supervisors can run inside these entries. Cancellation is
+    cooperative and CPU/native-blocked entry loops delay it.
     """
 
     def __init__(
         self,
-        function: Callable[[Q], Awaitable[R]],
+        function: Callable[[Q], Awaitable[R]] | EntryPoint,
         request: TypeAdapter[Q],
         result: TypeAdapter[R],
         *,
@@ -77,25 +81,30 @@ class TaskFunction[Q, R]:
         dedicated_loop: bool = False,
     ) -> None:
         execution = ExecutionMode(execution)
-        if execution == ExecutionMode.OWNGIL:
-            raise CapabilityUnavailable(
-                "owngil tasks are unavailable: py_task hard-codes mode => worker; "
-                "retained main-interpreter closures cannot cross interpreters. "
-                "Task mode support and bodies named by importable module path need "
-                "approved erlang-python fork changes. PyBeam must move task codecs "
-                "to the caller and pass raw bytes because subinterpreters with "
-                "check_multi_interp_extensions reject pydantic_core"
-            )
         if execution == ExecutionMode.ISOLATED:
             raise CapabilityUnavailable(
-                "isolated tasks are unavailable: erlang-python's py_task hard-codes "
-                "mode => worker and task bodies are main-interpreter objects; "
-                "fork support and the isolated bootstrap fix "
-                "(h0rv/erlang-python PR #5) are required"
+                "isolated tasks are unavailable: the fork rejects isolated named tasks; "
+                "the isolated bootstrap fix (h0rv/erlang-python PR #5) and "
+                "child-exit accounting are required"
             )
+        if execution == ExecutionMode.OWNGIL and dedicated_loop:
+            raise ValueError("dedicated_loop is worker-only; owngil owns its interpreter loop")
+        self._function: Callable[[Q], Awaitable[R]] | None = None
+        self._entry: EntryPoint | None = None
+        if _worker_function(function):
+            if execution == ExecutionMode.OWNGIL:
+                raise TypeError("owngil tasks require an erlang.tasks.EntryPoint")
+            self._function = function
+        else:
+            if execution == ExecutionMode.WORKER:
+                raise TypeError("EntryPoint requires execution=ExecutionMode.OWNGIL")
+            if not function.name.isidentifier() or not all(
+                part.isidentifier() for part in function.module.split(".")
+            ):
+                raise TypeError("owngil entries must be importable top-level functions")
+            self._entry = function
         self._execution = execution
         self._dedicated_loop = dedicated_loop
-        self._function = function
         self._request = request
         self._result = result
 
@@ -112,18 +121,32 @@ class TaskFunction[Q, R]:
     def body(self, owners: tuple[object, ...], job: object | None = None) -> Body:
         from erlang.tasks import Body
 
+        function = self._function
+        if function is None:
+            raise TypeError("owngil entries cannot run as worker bodies")
+
         async def invoke(payload: bytes) -> bytes:
             token = _body_owners.set(owners)
             job_token = _body_execution.set(_BodyExecution(job, asyncio.current_task()))
             try:
                 request = self._request.validate_json(payload, strict=True)
-                value = await self._function(request)
+                value = await function(request)
                 return self._result.dump_json(self._result.validate_python(value, strict=True))
             finally:
                 _body_execution.reset(job_token)
                 _body_owners.reset(token)
 
         return Body(invoke, dedicated_loop=self._dedicated_loop)
+
+
+def _worker_function[Q, R](
+    function: Callable[[Q], Awaitable[R]] | EntryPoint,
+) -> TypeIs[Callable[[Q], Awaitable[R]]]:
+    try:
+        from erlang.tasks import EntryPoint
+    except ImportError:
+        return True
+    return not isinstance(function, EntryPoint)
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,7 +356,11 @@ class TaskSupervisor:
         self._admissions_settled.clear()
         cancelled = False
         try:
-            pending = asyncio.create_task(start(group, self._gate, factory, payload))
+            if function._entry is None:
+                submission = start(group, self._gate, factory, payload)
+            else:
+                submission = start(group, self._gate, function._entry, payload, mode="owngil")
+            pending = asyncio.create_task(submission)
             try:
                 pid = await _owned(pending)
             except asyncio.CancelledError:

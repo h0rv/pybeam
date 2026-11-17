@@ -24,6 +24,152 @@ def task_program(tmp_path: Path, source: str) -> None:
     assert "native-submission-ok" in result.stdout
 
 
+def owngil_program(tmp_path: Path, source: str) -> None:
+    for name in ("owngil_entries", "owngil_bad_import"):
+        fixture = Path(__file__).parent / "native" / (name + ".py")
+        (tmp_path / (name + ".py")).write_text(fixture.read_text())
+    task_program(tmp_path, "from pybeam.tasks import ExecutionMode\n" + textwrap.dedent(source))
+
+
+def test_tasks__owngil_caller_codecs_and_entry_script_module_path(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        from pydantic import BaseModel, ConfigDict, ValidationError
+        from owngil_entries import double, echo
+        class Request(BaseModel):
+            model_config = ConfigDict(strict=True, revalidate_instances='always')
+            value: int
+        class Reply(BaseModel):
+            model_config = ConfigDict(strict=True)
+            value: int
+        function = TaskFunction(double, TypeAdapter(Request), TypeAdapter(Reply),
+                                execution=ExecutionMode.OWNGIL)
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=2000)) as sup:
+            ref = await sup.start(function, Request(value=21))
+            assert await ref == Reply(value=42)
+            bad_request = Request.model_construct(value='invalid')
+            try:
+                await sup.start(function, bad_request)
+            except ValidationError:
+                pass
+            else:
+                raise AssertionError('The caller accepted an invalid request')
+            invalid_result = TaskFunction(echo, TypeAdapter(str), TypeAdapter(Reply),
+                                          execution=ExecutionMode.OWNGIL)
+            ref = await sup.start(invalid_result, 'not a model')
+            assert isinstance(await ref.exception(), ValidationError)
+    """,
+    )
+
+
+def test_tasks__owngil_empty_value_and_empty_result(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        from pydantic import ValidationError
+        from owngil_entries import echo, empty_result
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=2000)) as sup:
+            function = TaskFunction(echo, TypeAdapter(bytes), TypeAdapter(bytes),
+                                    execution=ExecutionMode.OWNGIL)
+            assert await (await sup.start(function, b'')) == b''
+            function = TaskFunction(empty_result, TypeAdapter(bytes), TypeAdapter(bytes),
+                                    execution=ExecutionMode.OWNGIL)
+            ref = await sup.start(function, b'')
+            assert isinstance(await ref.exception(), ValidationError)
+    """,
+    )
+
+
+def test_tasks__owngil_remote_error(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        from erlang.tasks import RemoteTaskError
+        from owngil_entries import failure
+        function = TaskFunction(failure, TypeAdapter(int), TypeAdapter(int),
+                                execution=ExecutionMode.OWNGIL)
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=2000)) as sup:
+            ref = await sup.start(function, 1)
+            error = await ref.exception()
+            assert isinstance(error, RemoteTaskError)
+            assert error.type_name == 'ValueError' and error.message == 'remote entry failed'
+            try:
+                await ref.result()
+            except RemoteTaskError as raised:
+                assert raised is error
+            else:
+                raise AssertionError('Remote failure was lost')
+    """,
+    )
+
+
+def test_tasks__owngil_running_cancel_and_close(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        from pathlib import Path
+        from owngil_entries import waiting
+        function = TaskFunction(waiting, TypeAdapter(str), TypeAdapter(type(None)),
+                                execution=ExecutionMode.OWNGIL)
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=1000, shutdown_ms=2000)) as sup:
+            marker = Path.cwd() / 'entry-running'
+            ref = await sup.start(function, str(marker))
+            async with asyncio.timeout(5):
+                while not marker.exists():
+                    await asyncio.sleep(0.01)
+            assert await ref.cancel()
+            assert marker.read_text() == 'finished'
+            assert isinstance(await ref.exception(), asyncio.CancelledError)
+            marker.unlink()
+            ref = await sup.start(function, str(marker))
+            async with asyncio.timeout(5):
+                while not marker.exists():
+                    await asyncio.sleep(0.01)
+        assert marker.read_text() == 'finished'
+        assert isinstance(await ref.exception(), asyncio.CancelledError)
+    """,
+    )
+
+
+def test_tasks__owngil_module_import_failure_is_uncertain(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        from erlang.tasks import UncertainInflight
+        from owngil_bad_import import echo
+        function = TaskFunction(echo, TypeAdapter(int), TypeAdapter(int),
+                                execution=ExecutionMode.OWNGIL)
+        sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=500)).__aenter__()
+        ref = await sup.start(function, 1)
+        error = await ref.exception()
+        assert isinstance(error, UncertainInflight), repr(error)
+        assert 'function_not_found' in str(error), str(error)
+        try:
+            await sup.close()
+        except UncertainInflight:
+            pass
+    """,
+    )
+
+
+def test_tasks__owngil_cpu_overlap(tmp_path: Path) -> None:
+    owngil_program(
+        tmp_path,
+        """
+        import time
+        from owngil_entries import cpu
+        function = TaskFunction(cpu, TypeAdapter(int), TypeAdapter(tuple[int, int]),
+                                execution=ExecutionMode.OWNGIL)
+        async with TaskSupervisor(TaskLimits(capacity=3, max_bytes=1000, shutdown_ms=2000)) as sup:
+            deadline = time.monotonic_ns() + 3_000_000_000
+            refs = [await sup.start(function, deadline) for _ in range(3)]
+            spans = await asyncio.gather(*(ref.result() for ref in refs))
+            assert max(begin for begin, _ in spans) < min(end for _, end in spans), spans
+    """,
+    )
+
+
 def test_tasks__dedicated_uncertainty_keeps_the_existing_watcher_until_cleanup(
     tmp_path: Path,
 ) -> None:
