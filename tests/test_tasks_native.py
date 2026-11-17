@@ -129,7 +129,7 @@ def test_tasks__named_running_cancel_and_close(tmp_path: Path, mode: str) -> Non
             marker = Path.cwd() / 'entry-running'
             ref = await sup.start(function, str(marker))
             async with asyncio.timeout(5):
-                while not marker.exists():
+                while not marker.exists() or marker.read_text() != 'running':
                     await asyncio.sleep(0.01)
             assert await ref.cancel()
             assert marker.read_text() == 'finished'
@@ -137,7 +137,7 @@ def test_tasks__named_running_cancel_and_close(tmp_path: Path, mode: str) -> Non
             marker.unlink()
             ref = await sup.start(function, str(marker))
             async with asyncio.timeout(5):
-                while not marker.exists():
+                while not marker.exists() or marker.read_text() != 'running':
                     await asyncio.sleep(0.01)
         assert marker.read_text() == 'finished'
         assert isinstance(await ref.exception(), asyncio.CancelledError)
