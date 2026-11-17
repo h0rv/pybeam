@@ -6,9 +6,9 @@ A BEAM process costs about 2.7 KB, so you can run millions. A Python interpreter
 
 ![A BEAM process sends a call to a mailbox. A Python context takes the call. Each context runs as worker, owngil or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
 
-1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free, and `TaskLimits` or an actor group's `max_children` caps how many contexts exist, so a million callers become a queue, not a million interpreters.
+1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free. `TaskLimits` or an actor group's `max_children` caps how many contexts exist; starting a task when its ownership slots are full raises `Overloaded` instead of queuing it.
 2. A context owns one OS thread. Its mode decides which interpreter and GIL run your code.
-3. The result comes back as a message. If the context dies, its supervisor gets a crash signal and starts a fresh one. Supervision restarts the context; it does not replay the call or keep its in-memory state.
+3. The result comes back as a message. If an actor crashes, its group starts a replacement with fresh state; it does not replay the call. Tasks are temporary children: their supervisor does not restart them.
 
 ## Choose a mode
 
@@ -27,7 +27,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 - `isolated`: C extensions that can crash or leak. Only that call fails.
 - Separate nodes: more than one machine, or surviving a whole VM failure.
 
-Tasks run in `worker` or `owngil` mode; actors run in `worker`, and `isolated` is not yet available to either. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
+Tasks run in `worker`, `owngil` or `isolated` mode; actors remain in `worker`. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
 # execution.py

@@ -1,6 +1,6 @@
 # Debug a running app from another terminal
 
-A running PyBeam app can already show every Python stack and asyncio task to a second terminal, through BEAM distribution and without root. Stock `pdb -p` cannot attach to the embedded interpreter. A spiked `pybeam debug` command hides the BEAM steps from Python users.
+A running PyBeam app can already show every Python stack and asyncio task to a second terminal, through BEAM distribution and without root. With an erlang-python change, stock `pdb -p` and the Python 3.15 sampling profiler attach too. A spiked `pybeam debug` command hides the BEAM steps from Python users.
 
 ## Evidence boundary
 
@@ -13,7 +13,7 @@ Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBeam `90
 | Python stacks for every thread | `_remote_debugging.RemoteUnwinder(pid, all_threads=True)` with `sudo` | Works. The spinning thread shows `Orders.place` at `main.py:14` under `Container.dispatch` |
 | asyncio task tree | `sudo python -m asyncio ps <pid>` and `pstree <pid>` | Works, but only for the managed entry loop: `Task-1` awaiting `TaskGroup.__aexit__`. Worker tasks are not listed |
 | Stacks, tasks, and app state without root | BEAM distribution, then Python run in a new worker context on the target node | Works. Shows every thread's stack, the spinning actor, and all asyncio tasks of the entry loop, including `worker-0` to `worker-2` |
-| Interactive `pdb` | `sudo python -m pdb -p <pid>` | Fails: `RuntimeError: Can't find the main thread in the remote process` |
+| Interactive `pdb` | `sudo python -m pdb -p <pid>` | Works with [erlang-python#9](https://github.com/h0rv/erlang-python/pull/9); failed before with `RuntimeError: Can't find the main thread in the remote process` |
 | Run Python in the entry context | `py_context:exec/2` on the context in `py_context_sup` | Refused: `{error, loop_running}` |
 | Stop the spinning actor | `py_context:interrupt/1` on its context | Returns `ok`, but the loop keeps running |
 
@@ -62,9 +62,23 @@ RESULT = "".join(lines)
 
 The output named the spinning frame (`main.py`, `place`) and the waiting workers (`main.py:21` and `:22`). The owning process must outlive the RPC because `py_context:new/1` links the context to its caller.
 
-### Why `pdb -p` fails
+### Stock Python debuggers
 
-`pdb -p` uses `sys.remote_exec`, which needs CPython's main thread state. PyBeam runs Python on erlang-python context threads, not on the process's main thread, so the debugger cannot find a target. `RemoteUnwinder` and `asyncio ps` only read memory, so they work, but they need `ptrace` rights and see only the entry loop.
+CPython's remote debuggers attach to the interpreter's main thread. Only `Py_RunMain` records that thread, so in an embedded interpreter `pdb -p` first failed with "Can't find the main thread". erlang-python now records the thread that runs a context's event loop while the loop runs ([erlang-python#9](https://github.com/h0rv/erlang-python/pull/9)). In PyBeam that thread runs the entry loop and, in worker mode, actor methods.
+
+With that change, these commands attach to the PID that `pybeam ps` prints:
+
+```sh
+sudo python -m pdb -p PID                         # 3.14+: breakpoints, stepping, inspection
+sudo python -m profiling.sampling attach -d 5 PID  # 3.15+: sampling profile
+sudo python -m profiling.sampling dump PID         # 3.15+: one stack dump
+```
+
+- Run the same Python minor version as the app. A 3.15 client refuses a 3.14 target.
+- They need `ptrace` rights: `sudo`, or `kernel.yama.ptrace_scope` set to 0.
+- On the probe app, `pdb -p` stopped in the spinning `Orders.place` frame and `p self.seen` returned its state. `sys.remote_exec` ran on the loop thread and listed every task. The 3.15 profiler took 1000 samples per second with no errors. Without the erlang-python change, the profiler got no samples and `pdb -p` could not attach.
+- While `pdb` is stopped, the loop does not run. Every task on that loop, including actor methods that run on it, waits until you continue.
+- PyBeam pins CPython 3.14.10, so the 3.15 run used a local 3.15.2 build of the runtime. Own-GIL and isolated contexts are not marked. These tools reach only the main interpreter.
 
 ### Why interrupt missed the actor
 
@@ -92,7 +106,7 @@ On the probe app, `s` listed the spinning `Orders.place` frame and all five task
 - erlang-python needs a supported way to run code on a context whose loop is running (for example `py_context:submit/4` to a debug entry point), and to list each context's event loop. Without it, `stacks` sees only threads and the entry loop.
 - Interrupting a spinning actor needs the interrupt to reach the thread that runs the actor method.
 - Own-GIL and isolated contexts have their own interpreters. A debug context in the main interpreter cannot see their state; each needs evaluation inside that interpreter.
-- A real interactive `pdb` (breakpoints, stepping) needs a runtime hook that runs `pdb` on the target context thread with its input and output sent over distribution. CPython's `pdb -p` will not do this for an embedded interpreter.
+- `pdb -p` works only from the same machine with `ptrace` rights. Remote `pdb` over distribution would need its input and output sent through the debug client.
 - The debug shell runs arbitrary code inside the app. Anyone with the cookie controls the node, and cookies do not encrypt traffic. Keep it loopback-only and opt-in.
 - Running debug code holds the GIL in worker mode and can slow or block the app. A slow `repr` delays every worker context.
 - If an EPMD daemon already runs on all interfaces, the loopback setting does not move it.
