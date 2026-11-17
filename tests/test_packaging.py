@@ -229,7 +229,7 @@ def test_elf_audit__reads_highest_symbol_version_level(
         ("GLIBC_2.28 GLIBCXX_3.4.29", (2, 34)),
         ("GLIBC_2.35 GLIBCXX_3.4.21 CXXABI_1.3.9", (2, 35)),
         ("GLIBC_2.17 GCC_12.0.0", (2, 35)),
-        ("GLIBC_2.28 CXXABI_1.3.14 CXXABI_TM_1", (2, 39)),
+        ("GLIBC_2.28 CXXABI_1.3.15 CXXABI_TM_1", (2, 39)),
         ("GLIBC_2.17 CXXABI_1.3.16", None),
         ("GLIBC_2.17 GLIBCXX_3.4.34", None),
     ],
