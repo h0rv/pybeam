@@ -103,7 +103,9 @@ class Observation:
             self.measurement.pending_ms = max(self.measurement.pending_ms, room.oldest_ms(now))
         self.measurement.dropped = sum(client.drops > before for client, before, _ in self.clients)
         self.measurement.lost = sum(client.lost - before for client, _, before in self.clients)
-        self.measurement.replies = sum(client.replies for client, _, _ in self.clients) - self.replies_before
+        self.measurement.replies = (
+            sum(client.replies for client, _, _ in self.clients) - self.replies_before
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +205,7 @@ class Room:
     @property
     def lost(self) -> int:
         return sum(client.lost for client in self.clients)
+
 
 @dataclass(slots=True)
 class Side:
@@ -352,9 +355,15 @@ class Dashboard:
             side = self.sides[key]
             for client, drops, _ in observation.clients:
                 if client.drops > drops:
-                    self.focus_room = next(i for i, room in enumerate(side.rooms) if client in room.clients)
+                    self.focus_room = next(
+                        i for i, room in enumerate(side.rooms) if client in room.clients
+                    )
                     self.focus_client = side.rooms[self.focus_room].clients.index(client)
-                    self.focus_reason = "This user disconnected on " + side.title + "; showing the matching user on both sides."
+                    self.focus_reason = (
+                        "This user disconnected on "
+                        + side.title
+                        + "; showing the matching user on both sides."
+                    )
                     self.focus_dropped = True
                     return
         if self.focus_delayed:
@@ -369,7 +378,9 @@ class Dashboard:
         age, room_index, client_index = max(candidates, default=(0, 1, 0))
         if age >= 0.5:
             self.focus_room, self.focus_client = room_index, client_index
-            self.focus_reason = "A reply is delayed for this user; showing the matching user on both sides."
+            self.focus_reason = (
+                "A reply is delayed for this user; showing the matching user on both sides."
+            )
             self.focus_delayed = True
 
     @property
@@ -443,8 +454,14 @@ class Dashboard:
             self.until = time.monotonic() + OBSERVE_SECONDS
             self.observations = {
                 key: Observation(
-                    [(client, client.drops, client.lost) for room in side.rooms[1:] for client in room.clients],
-                    replies_before=sum(client.replies for room in side.rooms[1:] for client in room.clients),
+                    [
+                        (client, client.drops, client.lost)
+                        for room in side.rooms[1:]
+                        for client in room.clients
+                    ],
+                    replies_before=sum(
+                        client.replies for room in side.rooms[1:] for client in room.clients
+                    ),
                 )
                 for key, side in self.sides.items()
             }
@@ -461,7 +478,10 @@ class Dashboard:
             self.results.append(
                 Result(
                     step,
-                    {key: observation.measurement for key, observation in self.observations.items()},
+                    {
+                        key: observation.measurement
+                        for key, observation in self.observations.items()
+                    },
                     {key: side.result for key, side in self.sides.items()},
                 )
             )

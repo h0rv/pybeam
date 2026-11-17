@@ -299,7 +299,11 @@ def test_focus__real_bystander_impact_is_matched_and_retained() -> None:
     live_clients(live)
     for key, side in live.sides.items():
         live.observations[key] = Observation(
-            [(client, client.drops, client.lost) for room in side.rooms[1:] for client in room.clients]
+            [
+                (client, client.drops, client.lost)
+                for room in side.rooms[1:]
+                for client in room.clients
+            ]
         )
     side = live.sides["usual"]
     side.rooms[0].clients[0].drops += 1
@@ -342,7 +346,7 @@ async def test_traffic__reconnects_counts_lost_and_records_acknowledgements() ->
                 await socket.close()
                 return
             await socket.send(Ack(id=send.id, count=1).model_dump_json())
-            if send.id > 0:
+            if send.id > 1:
                 ready.set()
 
     async with serve(echo, "127.0.0.1", 0) as server:

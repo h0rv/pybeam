@@ -2,9 +2,9 @@
 @media (prefers-color-scheme: dark) { :root { --bg: #181b18; --panel: #202520; --text: #ecf0e7; --muted: #aeb8a7; --line: #414a3e; --bubble: #30392e; --fault: #ffb299; --tint: #392820; --accent: #c0d4b4; --button-text: #192217; } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
-main { max-width: 1120px; margin: auto; padding: 30px 28px 16px; }
-header { margin-bottom: 22px; }
-h1 { margin: 10px 0; font-size: clamp(28px, 4vw, 40px); font-weight: 650; letter-spacing: -1.3px; line-height: 1.12; }
+main { max-width: 1120px; margin: auto; padding: 24px 28px 16px; }
+header { margin-bottom: 18px; }
+h1 { margin: 10px 0; font-size: clamp(28px, 3.2vw, 36px); font-weight: 650; letter-spacing: -1.3px; line-height: 1.12; }
 h2, h3, p { margin: 0; }
 h2 { font-size: 21px; font-weight: 620; }
 .intro { color: var(--muted); max-width: 680px; }
@@ -37,7 +37,7 @@ small { font-size: 9px; font-weight: 400; color: var(--muted); }
 .conversation-heading > span { font-size: 11px; }
 .connection-event { min-height: 30px; padding: 0 18px 9px; color: var(--muted); font-size: 11px; }
 .connection-event.problem { color: var(--fault); }
-.messages { list-style: none; margin: 0; padding: 3px 18px 12px; height: 330px; display: flex; flex-direction: column; justify-content: flex-end; gap: 9px; overflow: hidden; }
+.messages { list-style: none; margin: 0; padding: 3px 18px 12px; height: 285px; display: flex; flex-direction: column; justify-content: flex-end; gap: 9px; overflow: hidden; }
 .message { align-self: flex-end; max-width: 95%; padding: 8px 12px; border-radius: 7px 7px 0 7px; background: var(--bubble); border: 1px solid transparent; font-size: 13px; }
 .message small { display: block; font-size: 10px; margin-top: 3px; }
 .message.pending { border-color: var(--fault); }
