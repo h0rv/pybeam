@@ -108,7 +108,8 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
     marker = tmp_path / "entry-owned.json"
     bad = tmp_path / "bad.py"
     bad.write_text(
-        "import os, psutil\nfrom pathlib import Path\n"
+        "import os\nfrom pathlib import Path\n"
+        "from pybeam.codec import Json\n"
         "from pybeam.runtime.ownership import Identity, identity, Registry\n"
         "directory = Path(os.environ['PYBEAM_OWNER_DIRECTORY'])\n"
         "registry = Json(Registry).decode((directory / 'ownership.json').read_text())\n"
