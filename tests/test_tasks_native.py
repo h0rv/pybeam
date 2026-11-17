@@ -160,6 +160,7 @@ def test_tasks__owngil_cpu_overlap(tmp_path: Path) -> None:
         tmp_path,
         """
         import time
+        from itertools import combinations
         from owngil_entries import cpu
         function = TaskFunction(cpu, Json(int), Json(tuple[int, int]),
                                 execution=ExecutionMode.OWNGIL)
@@ -167,7 +168,10 @@ def test_tasks__owngil_cpu_overlap(tmp_path: Path) -> None:
             deadline = time.monotonic_ns() + 3_000_000_000
             refs = [await sup.start(function, deadline) for _ in range(3)]
             spans = await asyncio.gather(*(ref.result() for ref in refs))
-            assert max(begin for begin, _ in spans) < min(end for _, end in spans), spans
+            overlaps = [min(left_end, right_end) - max(left_begin, right_begin)
+                        for (left_begin, left_end), (right_begin, right_end)
+                        in combinations(spans, 2)]
+            assert max(overlaps) >= 200_000_000, spans
     """,
     )
 

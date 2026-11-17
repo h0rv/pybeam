@@ -7,7 +7,9 @@ on:
       - pyproject.toml
       - tools/build_native.py
       - tools/build_runtime.py
-      - tools/genstage_assets.py
+      - src/pybeam/integrations/genstage/**
+      - src/pybeam/runtime/optional_specs/**
+      - tools/build_genstage.py
       - tools/hatch_build.py
       - tools/runtime_wheel.py
   release:
@@ -95,7 +97,6 @@ jobs:
         with:
           working_directory: pybeam
       - name: Resolve locked runtime pin
-        if: matrix.target == 'linux-x86_64'
         id: pins
         run: |
           native_ref=$(erl -noshell -eval '
@@ -116,21 +117,18 @@ jobs:
           echo "erlang_python=$native_ref" >> "$GITHUB_OUTPUT"
           echo "hornbeam=$hornbeam_ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
-        if: matrix.target == 'linux-x86_64'
         with:
           repository: h0rv/erlang-python
           ref: ${{ steps.pins.outputs.erlang_python }}
           path: erlang-python
           persist-credentials: false
       - uses: actions/checkout@v4
-        if: matrix.target == 'linux-x86_64'
         with:
           repository: h0rv/hornbeam
           ref: ${{ steps.pins.outputs.hornbeam }}
           path: hornbeam
           persist-credentials: false
       - name: Build pinned native runtime
-        if: matrix.target == 'linux-x86_64'
         run: |
           uv sync --locked --all-extras --python "$(mise which python)"
           mkdir -p _checkouts
@@ -138,7 +136,6 @@ jobs:
           ln -s ../../hornbeam _checkouts/hornbeam
           uv run --locked --all-extras python tools/build_native.py
       - name: Stage runtime assets
-        if: matrix.target == 'linux-x86_64'
         run: |
           curl --fail --location --retry 3 \
             https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt \
@@ -148,35 +145,22 @@ jobs:
             --native-app _build/hornbeam/checkouts/erlang_python \
             --otp-license "$RUNNER_TEMP/OTP-LICENSE.txt" \
             --native-license ../erlang-python/LICENSE
-      # The Darwin GenStage payload is pinned to one reviewed wheel's bytes and cannot be
-      # rebuilt from source, so the macOS wheel repackages that wheel's runtime.
-      - name: Fetch reviewed macOS wheel
-        id: reviewed
+      # Linux wheels omit GenStage. The pin is this job's build: see docs/development.md.
+      - name: Build GenStage payload
         if: matrix.target == 'macos-arm64'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p "$RUNNER_TEMP/reviewed"
-          if gh release download genstage-reviewed --repo "$GITHUB_REPOSITORY" \
-              --pattern '*.whl' --dir "$RUNNER_TEMP/reviewed"; then
-            wheels=("$RUNNER_TEMP"/reviewed/*.whl)
-            test "${#wheels[@]}" -eq 1
-            uv sync --locked --python "$(mise which python)"
-            uv run --locked python -m tools.genstage_assets "${wheels[0]}" "$RUNNER_TEMP/assets"
-            echo "PYBEAM_BUILD_RUNTIME=$RUNNER_TEMP/assets/runtime" >> "$GITHUB_ENV"
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          elif [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            echo "::warning::No reviewed wheel on the genstage-reviewed release; skipping the macOS wheel"
-            echo "found=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Upload the reviewed macOS wheel to the genstage-reviewed release"
-            exit 1
-          fi
+          uv run --locked python -m tools.build_genstage --otp "$(mise where erlang)" \
+            --derived "$RUNNER_TEMP/genstage.json"
+      - name: Upload derived GenStage manifest
+        if: failure() && matrix.target == 'macos-arm64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: genstage-manifest
+          path: ${{ runner.temp }}/genstage.json
+          if-no-files-found: ignore
       - name: Build wheel
-        if: matrix.target == 'linux-x86_64' || steps.reviewed.outputs.found == 'true'
         run: uv build --wheel
       - name: Verify clean wheel install
-        if: matrix.target == 'linux-x86_64' || steps.reviewed.outputs.found == 'true'
         run: |
           wheels=(dist/*.whl)
           test "${#wheels[@]}" -eq 1
@@ -184,7 +168,6 @@ jobs:
             tests/test_packaging.py tests/test_optional_wheel_imports.py \
             --run-runtime -q --basetemp="$RUNNER_TEMP/wheel-tests"
       - uses: actions/upload-artifact@v4
-        if: matrix.target == 'linux-x86_64' || steps.reviewed.outputs.found == 'true'
         with:
           name: dist-${{ matrix.target }}
           path: pybeam/dist/*.whl
