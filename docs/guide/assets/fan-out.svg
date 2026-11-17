@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="584" viewBox="0 0 760 584" role="img" aria-labelledby="title desc">
+  <title id="title">Four CPU jobs in every mode</title>
+  <desc id="desc">Each row runs four jobs of 3,000,000 loop iterations. Bars show when each job ran on a shared time axis. asyncio.gather 3.14: wall 0.99 s, speedup 1.0x. asyncio.to_thread 3.14: wall 1.20 s, speedup 0.8x. asyncio.to_thread 3.14t: wall 0.42 s, speedup 2.5x. process per job 3.14: wall 0.34 s, speedup 4.9x. prefork pool 3.14: wall 0.27 s, speedup 3.7x. worker 3.14: wall 1.44 s, speedup 1.1x. worker 3.14t: wall 0.66 s, speedup 2.1x. owngil 3.14: wall 0.40 s, speedup 3.3x. isolated 3.14: wall 0.36 s, speedup 4.0x. isolated 3.14t: wall 0.53 s, speedup 2.0x. separate nodes 3.14: wall 0.35 s, speedup 3.7x.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+
+  <text x="250" y="30" class="note">0 s</text>
+  <text x="360" y="30" class="note" text-anchor="middle">0.5 s</text>
+  <text x="470" y="30" class="note" text-anchor="middle">1.0 s</text>
+  <text x="580" y="30" class="note" text-anchor="middle">1.5 s</text>
+  <path class="axis" d="M250 40V544"/>
+  <path class="axis" d="M360 40V544"/>
+  <path class="axis" d="M470 40V544"/>
+  <path class="axis" d="M580 40V544"/>
+  <text x="236" y="70" text-anchor="end">asyncio.gather <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="54" width="55.4" height="6" rx="1"/>
+  <rect class="bar" x="305.4" y="62" width="54.1" height="6" rx="1"/>
+  <rect class="bar" x="359.5" y="70" width="53.3" height="6" rx="1"/>
+  <rect class="bar" x="412.8" y="78" width="54.7" height="6" rx="1"/>
+  <text x="598" y="70" class="note">0.99 s · 1.0×</text>
+  <text x="236" y="114" text-anchor="end">asyncio.to_thread <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="98" width="180.4" height="6" rx="1"/>
+  <rect class="bar" x="252.3" y="106" width="261.5" height="6" rx="1"/>
+  <rect class="bar" x="263.8" y="114" width="218.8" height="6" rx="1"/>
+  <rect class="bar" x="271.6" y="122" width="213.5" height="6" rx="1"/>
+  <text x="598" y="114" class="note">1.20 s · 0.8×</text>
+  <text x="236" y="158" text-anchor="end">asyncio.to_thread <tspan class="note">· 3.14t</tspan></text>
+  <rect class="bar" x="250.0" y="142" width="60.6" height="6" rx="1"/>
+  <rect class="bar" x="250.1" y="150" width="92.9" height="6" rx="1"/>
+  <rect class="bar" x="250.2" y="158" width="84.8" height="6" rx="1"/>
+  <rect class="bar" x="250.2" y="166" width="88.2" height="6" rx="1"/>
+  <text x="598" y="158" class="note">0.42 s · 2.5×</text>
+  <text x="236" y="202" text-anchor="end">process per job <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="186" width="55.2" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="194" width="55.1" height="6" rx="1"/>
+  <rect class="bar" x="251.0" y="202" width="54.7" height="6" rx="1"/>
+  <rect class="bar" x="250.1" y="210" width="56.9" height="6" rx="1"/>
+  <text x="598" y="202" class="note">0.34 s · 4.9×</text>
+  <text x="236" y="246" text-anchor="end">prefork pool <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="230" width="59.2" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="238" width="54.9" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="246" width="55.5" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="254" width="53.9" height="6" rx="1"/>
+  <text x="598" y="246" class="note">0.27 s · 3.7×</text>
+  <text x="236" y="290" text-anchor="end">worker <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="274" width="250.1" height="6" rx="1"/>
+  <rect class="bar" x="251.1" y="282" width="266.3" height="6" rx="1"/>
+  <rect class="bar" x="256.7" y="290" width="310.1" height="6" rx="1"/>
+  <rect class="bar" x="252.7" y="298" width="273.8" height="6" rx="1"/>
+  <text x="598" y="290" class="note">1.44 s · 1.1×</text>
+  <text x="236" y="334" text-anchor="end">worker <tspan class="note">· 3.14t</tspan></text>
+  <rect class="bar" x="250.0" y="318" width="72.4" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="326" width="146.1" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="334" width="145.9" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="342" width="69.6" height="6" rx="1"/>
+  <text x="598" y="334" class="note">0.66 s · 2.1×</text>
+  <text x="236" y="378" text-anchor="end">owngil <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="362" width="86.0" height="6" rx="1"/>
+  <rect class="bar" x="250.1" y="370" width="69.8" height="6" rx="1"/>
+  <rect class="bar" x="250.1" y="378" width="70.9" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="386" width="87.2" height="6" rx="1"/>
+  <text x="598" y="378" class="note">0.40 s · 3.3×</text>
+  <text x="236" y="422" text-anchor="end">isolated <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="406" width="55.2" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="414" width="54.3" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="422" width="55.2" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="430" width="79.8" height="6" rx="1"/>
+  <text x="598" y="422" class="note">0.36 s · 4.0×</text>
+  <text x="236" y="466" text-anchor="end">isolated <tspan class="note">· 3.14t</tspan></text>
+  <rect class="bar" x="250.1" y="450" width="70.8" height="6" rx="1"/>
+  <rect class="bar" x="250.0" y="458" width="112.7" height="6" rx="1"/>
+  <rect class="bar" x="250.2" y="466" width="71.9" height="6" rx="1"/>
+  <rect class="bar" x="250.1" y="474" width="115.3" height="6" rx="1"/>
+  <text x="598" y="466" class="note">0.53 s · 2.0×</text>
+  <text x="236" y="510" text-anchor="end">separate nodes <tspan class="note">· 3.14</tspan></text>
+  <rect class="bar" x="250.0" y="494" width="76.1" height="6" rx="1"/>
+  <rect class="bar" x="250.7" y="502" width="70.1" height="6" rx="1"/>
+  <rect class="bar" x="250.7" y="510" width="70.0" height="6" rx="1"/>
+  <rect class="bar" x="251.0" y="518" width="73.5" height="6" rx="1"/>
+  <text x="598" y="510" class="note">0.35 s · 3.7×</text>
+  <text x="24" y="572" class="note">Measured on one 8-core Linux x86_64 machine. Speedup = 4 × one job alone ÷ wall time.</text>
+</svg>
