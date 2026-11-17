@@ -45,6 +45,7 @@ To learn how calls use threads and CPU cores, see [How Python work runs](executi
 Subscribe to a topic, publish a message, and receive it:
 
 ```python
+# messaging.py
 from pybeam.integrations.hornbeam.client import Beam
 from pybeam.integrations.hornbeam.runtime import run
 
@@ -61,4 +62,9 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints `order-42`. Next, try [shared state](state.md) or [supervision](supervision.md).
+```console
+$ uv run messaging.py
+order-42
+```
+
+Next, try [shared state](state.md) or [supervision](supervision.md).

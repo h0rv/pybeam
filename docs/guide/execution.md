@@ -30,6 +30,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 Tasks and actors run in `worker` mode; `owngil` and `isolated` are not yet available to them. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
+# execution.py
 from pydantic import TypeAdapter
 
 from pybeam import run
@@ -62,7 +63,13 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints the same checksum four times.
+```console
+$ uv run execution.py
+637018976
+637018976
+637018976
+637018976
+```
 
 ## Fan out: four CPU jobs
 

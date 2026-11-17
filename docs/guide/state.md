@@ -3,6 +3,7 @@
 Store values and count events across requests, without defining an actor.
 
 ```python
+# state.py
 from pybeam.integrations.hornbeam.client import Beam
 from pybeam.integrations.hornbeam.runtime import run
 
@@ -23,7 +24,15 @@ if __name__ == "__main__":
     run(main)
 ```
 
-In a fresh run, this prints `b'draft'`, `b'published'`, `1`, then `3`. Each store keeps its own keys. `incr` adds to a counter and returns the new value in one atomic operation, so concurrent requests never lose an increment. A separate `get` and `set` is not atomic.
+```console
+$ uv run state.py
+b'draft'
+b'published'
+1
+3
+```
+
+Each store keeps its own keys. `incr` adds to a counter and returns the new value in one atomic operation, so concurrent requests never lose an increment. A separate `get` and `set` is not atomic.
 
 Start programs that use shared state with `run` from `pybeam.integrations.hornbeam.runtime`.
 

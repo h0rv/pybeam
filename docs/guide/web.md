@@ -3,6 +3,7 @@
 Share a counter across FastAPI requests.
 
 ```python
+# web.py
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -72,7 +73,18 @@ if __name__ == "__main__":
     run(main)
 ```
 
-Run this file with Python, then open `http://127.0.0.1:8767/docs`. Send `POST /increment`, then `GET /counter`. In a fresh run, both return `{"count": 1}`. Stop the server with Ctrl+C.
+```console
+$ uv run web.py
+```
+
+```console
+$ curl -X POST http://127.0.0.1:8767/increment
+{"count":1}
+$ curl http://127.0.0.1:8767/counter
+{"count":1}
+```
+
+The counter is served on port 8767. In a fresh run, incrementing it once sets its value to `1`. Stop the server with Ctrl+C.
 
 The lifespan connects once and every request reuses that connection. `loop="none"` tells Uvicorn to use the event loop PyBEAM already runs. Concurrent requests increment the counter atomically, without a lock.
 

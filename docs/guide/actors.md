@@ -3,6 +3,7 @@
 Use an actor to keep state that many tasks update.
 
 ```python
+# actors.py
 import pybeam
 
 
@@ -29,7 +30,13 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `12` twice. `spawn` creates the actor with `value=10`. `add` changes its state and `read` returns it. Leaving the `ActorGroup` stops its actors.
+```console
+$ uv run actors.py
+12
+12
+```
+
+`spawn` creates the actor with `value=10`. `add` changes its state and `read` returns it. Leaving the `ActorGroup` stops its actors.
 
 An actor runs one method call at a time, even while a method awaits, so concurrent callers never need a lock. Call methods instead of reading `counter.value`: arguments and results are copied.
 

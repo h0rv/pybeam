@@ -2,9 +2,10 @@
 
 Run a long-lived loop and stop it cleanly.
 
-Save this function as `background_body.py`. A service must be a module-level async function, not a closure or lambda.
+A service must be a module-level async function, not a closure or lambda.
 
 ```python
+# background_body.py
 import asyncio
 
 
@@ -18,9 +19,8 @@ async def watch(ready: asyncio.Event) -> None:
         print("cleanup complete")
 ```
 
-Save this file beside it and run it.
-
 ```python
+# background.py
 import asyncio
 
 from background_body import watch
@@ -44,6 +44,13 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-It prints `heartbeat`, `cleanup complete`, then `cancelled`. `main` waits for the first heartbeat and then stops the service. Waiting on the event, instead of sleeping, proves the loop started.
+```console
+$ uv run background.py
+heartbeat
+cleanup complete
+cancelled
+```
+
+`main` waits for the first heartbeat and then stops the service. Waiting on the event, instead of sleeping, proves the loop started.
 
 `ServiceSlot(capacity=1)` runs at most one service at a time. Keep the handle `start` returns and call `stop` in `finally`. `stop` cancels the loop and waits for its `finally` block to finish. If `stop` times out, the loop may still be running.
