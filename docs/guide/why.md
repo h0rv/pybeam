@@ -40,7 +40,7 @@ PyBEAM spends memory and call overhead on scheduling, supervision and distributi
 
 ## How it works
 
-PyBEAM runs on the BEAM, Erlang's virtual machine, which preemptively schedules each actor and task's BEAM process across available scheduler cores. The BEAM is the shared scheduler, not a single asyncio loop spanning processes; Python execution still depends on the mode you choose. Your async code uses asyncio through erlang-python's `ErlangEventLoop`, which gets I/O readiness and timers from the BEAM. One loop runs one coroutine step at a time, so CPU-bound work blocks that loop, including other bodies on the default shared loop. See [How Python work runs](execution.md) for `dedicated_loop` and execution modes, including their parallelism limits.
+PyBEAM runs on the BEAM, Erlang's virtual machine. Each actor and task is a BEAM process, and the BEAM, not an asyncio loop, schedules those processes preemptively across CPU cores. Inside them you still write asyncio code, which runs on erlang-python's `ErlangEventLoop`; the loop takes I/O readiness and timers from the BEAM. A loop runs one coroutine step at a time, and by default tasks share one loop, so CPU-bound code delays the others. [How Python work runs](execution.md) shows how `dedicated_loop` and the execution modes change that.
 
 - Saša Jurić: [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE).
 - Erlang documentation: [Processes](https://www.erlang.org/doc/system/ref_man_processes.html).
