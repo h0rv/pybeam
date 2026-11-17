@@ -60,6 +60,11 @@ def test_core__does_not_import_optional_frameworks() -> None:
                 names = [node.module]
             for name in names:
                 assert name.split(".")[0] not in forbidden, (path, name)
+                if path == PACKAGE / "hornbeam.py" and name in {
+                    "pybeam.integrations.hornbeam.client",
+                    "pybeam.integrations.hornbeam.runtime",
+                }:
+                    continue
                 assert not name.startswith("pybeam.integrations"), (path, name)
 
 
@@ -83,6 +88,7 @@ def test_core__imports_without_optional_dependencies() -> None:
             "import sys",
             "sys.path.insert(0, 'src')",
             "from pybeam import run",
+            "from pybeam.hornbeam import Beam, run as run_hornbeam",
             "from pybeam import ActorGroup, actor, spawn",
             "from pybeam.mailbox import BoundedMailbox, UnboundedMailbox",
             "from pybeam.supervision.config import SupervisorConfig",

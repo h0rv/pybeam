@@ -22,7 +22,9 @@ class Counter:
 async def main() -> None:
     async with pybeam.ActorGroup() as actors:
         counter = await actors.spawn(Counter, value=10)
+
         print(await counter.add(2))
+
         print(await counter.read())
 
 

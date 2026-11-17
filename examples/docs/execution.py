@@ -21,8 +21,10 @@ async def main() -> None:
         dedicated_loop=True,
     )
     limits = TaskLimits(capacity=4, max_bytes=4096, shutdown_ms=1000)
+
     async with TaskSupervisor(limits) as supervisor:
         tasks = [await supervisor.start(job, 3_000_000) for _ in range(4)]
+
         for task in tasks:
             print(await task)
 

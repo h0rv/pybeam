@@ -13,9 +13,8 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException
 from uvicorn import Config, Server
 
-from pybeam.integrations.hornbeam.client import Beam
+from pybeam.hornbeam import Beam, run
 from pybeam.integrations.hornbeam.contracts import Services
-from pybeam.integrations.hornbeam.runtime import run
 
 
 @dataclass
@@ -61,6 +60,7 @@ async def main() -> None:
     server = Server(
         Config(app, host="127.0.0.1", port=8767, loop="none", http="h11", lifespan="on")
     )
+
     try:
         await server.serve()
     except asyncio.CancelledError:

@@ -19,10 +19,13 @@ class Counter:
 async def main() -> None:
     async with pybeam.ActorGroup() as actors:
         counter = await actors.spawn(Counter)
+
         print(await counter.add(5))
+
         await actors.crash(counter)
         replacement = await actors.rejoin(counter)
         print(await replacement.add(1))
+
         await actors.stop(replacement)
 
 
