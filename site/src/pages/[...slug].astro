@@ -5,7 +5,7 @@ import { pages } from "../links.mjs";
 
 export async function getStaticPaths() {
   const files = import.meta.glob<MarkdownInstance<Record<string, unknown>>>(
-    ["../../../docs/guide/*.md"],
+    ["../../../docs/guide/**/*.md"],
   );
   return Promise.all(pages.map(async ({ source, path: route }) => {
     const page = await files[`../../../${source}`]();

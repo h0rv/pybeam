@@ -2,9 +2,8 @@
 
 Consume a fixed sample of transformed messages. In `stream(2, uppercase)`, `2` is the number of sample requests. The count must be 1 to 16. This API supplies its own `héllo` requests; it does not accept your records.
 
-Save the callback as `genstage_transform.py`.
-
 ```python
+# genstage_transform.py
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -19,14 +18,12 @@ class Work(BaseModel):
 
 
 def uppercase(payload: bytes) -> bytes:
-    # Parse one request before using its fields.
     work = Work.model_validate_json(payload)
     return work.text.upper().encode("utf-8")
 ```
 
-Run this entry file from the same directory.
-
 ```python
+# genstage.py
 from genstage_transform import uppercase
 
 import pybeam
@@ -43,6 +40,12 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `HÉLLO` twice. The callback parses each request and returns transformed bytes.
+```console
+$ uv run genstage.py
+HÉLLO
+HÉLLO
+```
+
+The callback parses each request and returns transformed bytes.
 
 One request is admitted at a time, including running callback work. Pulling the next result permits more work. Context exit waits for graph cleanup. Requests and results are each limited to 1024 encoded bytes.

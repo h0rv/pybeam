@@ -1,6 +1,6 @@
 ---
 import type { MarkdownHeading } from "astro";
-import { withBase, repositoryURL, navigation } from "./links.mjs";
+import { withBase, repositoryURL, navigationSections } from "./links.mjs";
 import styles from "./style.css?url";
 import GithubIcon from "./GithubIcon.astro";
 import TableOfContents from "./TableOfContents.astro";
@@ -21,10 +21,9 @@ const sections = buildToc(headings);
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <style is:inline>html{color-scheme:light dark;background:light-dark(#ffffff,#141820);color:light-dark(#171d2b,#edf1f7)}body{margin:0}</style>
-    <meta name="description" content="Run async Python on BEAM with supervised actors and shared messages." />
+    <style is:inline>html{color-scheme:light dark;background:light-dark(#ffffff,#171b24);color:light-dark(#171d2b,#f0f3f9)}body{margin:0}</style>
+    <meta name="description" content="Actors, shared state and messaging for async Python, without locks or extra infrastructure." />
     <title>{title === "PyBEAM" ? title : `${title} · PyBEAM`}</title>
-    <link rel="stylesheet" href={withBase("missing.css", base)} />
     <link rel="stylesheet" href={styles} />
     <link rel="icon" type="image/svg+xml" href={withBase("favicon-braces.svg", base)} />
   </head>
@@ -46,14 +45,17 @@ const sections = buildToc(headings);
       <details class="sidebar">
         <summary>Browse documentation</summary>
         <nav class="docs-nav" aria-label="Documentation">
-          <ul>{navigation.map(({ label, path }) => <li>
-            <a href={withBase(path, base)} aria-current={Astro.url.pathname === withBase(path, base) ? "page" : undefined}>{label}</a>
-          </li>)}</ul>
+          {navigationSections.map(({ label, pages }) => <section class="nav-group">
+            <h2 class="nav-title">{label}</h2>
+            <ul>{pages.map(({ label, path }) => <li>
+              <a href={withBase(path, base)} aria-current={Astro.url.pathname === withBase(path, base) ? "page" : undefined}>{label}</a>
+            </li>)}</ul>
+          </section>)}
         </nav>
       </details>
       <main id="content">
         <article><slot /></article>
-        <footer><a href={`${repositoryURL}/blob/main/${source}`}>Page source</a><span><a href="https://astro.build/">Astro</a> · <a href="https://missing.style/">missing.css</a></span></footer>
+        <footer><a href={`${repositoryURL}/blob/main/${source}`}>Page source</a><span><a href="https://astro.build/">Astro</a></span></footer>
       </main>
       {sections.length > 0 && <aside class="page-toc" aria-label="On this page">
         <p class="nav-title">On this page</p>
