@@ -37,7 +37,14 @@ def test_distribution__shared_ingress_and_request_scope_survive_caller_exit(
         for name in ("scope", "unrelated", "sender-scope"):
             info = Json(ScopeInfo).decode(wait_file(cluster.directory / (name + ".json")))
             assert info.children == info.contexts == []
-            assert info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
+            assert (
+                info.starting
+                == info.jobs
+                == info.gate.count
+                == info.gate.bytes
+                == info.gate.unsettled
+                == 0
+            )
         births = [
             Json(Identity).decode(wait_file(cluster.directory / (alias + ".birth.json")))
             for alias in ("a", "b")

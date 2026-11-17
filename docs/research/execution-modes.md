@@ -83,7 +83,7 @@ Creation checkpoints were 1, 8, 64, 256 and 1000, with a 100 s deadline. The two
 
 ## PyBeam task probe
 
-The public `TaskSupervisor` / `TaskFunction` probe ran the same calibrated sum-of-squares workload in N tasks, after importing PyBeam and pydantic. Creation was outside timing. Timing began at a shared start gate and ended when every `TaskRef.result()` completed. The launcher retained `+S 1:1`.
+The public `TaskSupervisor` / `TaskFunction` probe ran the same calibrated sum-of-squares workload in N tasks, after importing PyBeam and pydantic. Creation was outside timing. Timing began at a shared start gate and ended when every `TaskRef.result()` completed. These historical measurements used `+S 1:1`; the current launcher leaves the BEAM scheduler count at its runtime default.
 
 | Build / task loop | Wall ms, N=1 / 2 / 4 / 8 | Speedup, N=1 / 2 / 4 / 8 | GIL inside tasks |
 |---|---|---|---|

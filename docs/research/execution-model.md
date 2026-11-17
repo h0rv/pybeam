@@ -69,7 +69,7 @@ A scalable direction is **many logical jobs → bounded admission → finite nat
 
 | Choice | Parallelism and isolation | Trade-off | Inspected integration |
 |---|---|---|---|
-| Conventional CPython workers | One Python bytecode lane under the main interpreter's shared GIL; I/O and native libraries that release it can overlap | Shared module/native state; CPU-bound Python threads do not execute bytecode in parallel there | Conventional CPython 3.14.10 remains the builder default and packaged-wheel ABI; `workers` is limited to one and the launcher uses one regular BEAM scheduler (`+S 1:1`).[P2][P3][P4] |
+| Conventional CPython workers | One Python bytecode lane under the main interpreter's shared GIL; I/O and native libraries that release it can overlap | Shared module/native state; CPU-bound Python threads do not execute bytecode in parallel there | Conventional CPython 3.14.10 remains the builder default and packaged-wheel ABI; `workers` is limited to one. The launcher leaves the BEAM scheduler count at its runtime default, independently of the Python GIL.[P2][P3][P4] |
 | Free-threaded CPython | Multiple actual threads can execute Python in parallel in one interpreter | Shared-state synchronization, extension compatibility, memory and single-thread overhead; one loop still runs one coroutine step at a time | Builder accepts CPython 3.14.10t with `PYBEAM_ALLOW_FREE_THREADED=1`. Dedicated-loop task CPU parallelism was measured; shared-loop tasks do not parallelize. Packaged wheels remain conventional and full integration acceptance is incomplete.[P2][R9] |
 | Own-GIL subinterpreters | Separate interpreter state and GIL per lane, with one pthread per context; parallel execution across lanes | Interpreter/import overhead, extension compatibility and data transfer; shared address space/native-crash fate | Fork constructs `PyInterpreterConfig_OWN_GIL`; retained in code but unsupported because common native extensions reject subinterpreters. Actor object references require the main interpreter.[R10][R11][R12] |
 | Isolated Python processes | Independent process/interpreter execution; stronger containment of a Python/native child crash | Startup, memory, framing/serialization and IPC; not automatically a sandbox | Fork's `isolated` context runs a Python child through a port and Unix socket. This is not a PyBeam actor-backend switch.[R13] |
@@ -125,7 +125,7 @@ This shows data/work recovery, not persistence or migration of Python coroutine 
 [P1]: https://github.com/h0rv/pybeam/blob/d5bdc9e07332819c12a7f2f06480126bff64aded/src/pybeam/tasks.py#L42-L58
 [P2]: https://github.com/h0rv/pybeam/blob/98a72e2153669ef07cfc949cd6f6259ae1a207ab/tools/build_native.py#L36-L50
 [P3]: https://github.com/h0rv/pybeam/blob/d5bdc9e07332819c12a7f2f06480126bff64aded/src/pybeam/runtime/config.py#L86-L96
-[P4]: https://github.com/h0rv/pybeam/blob/d5bdc9e07332819c12a7f2f06480126bff64aded/src/pybeam/runtime/process.py#L54-L65
+[P4]: ../../src/pybeam/runtime/process.py
 [P5]: https://github.com/h0rv/pybeam/blob/d5bdc9e07332819c12a7f2f06480126bff64aded/src/pybeam/runtime/cluster.py#L87-L92
 [R0]: https://github.com/h0rv/erlang-python/tree/d227c0de29fa3f748610352bf8a808a235bcd5c3
 [R1]: https://github.com/h0rv/erlang-python/blob/d227c0de29fa3f748610352bf8a808a235bcd5c3/priv/_erlang_impl/_loop.py#L73-L89
