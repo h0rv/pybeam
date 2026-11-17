@@ -23,9 +23,9 @@ Two WebSocket clients connect to your app and need to see the same count.
 
 ## Compared with plain asyncio
 
-Asyncio tasks are fast and cheap. A million sleeping tasks took about 2.2 GB on Python 3.10 ([2023 benchmark](https://pkolaczk.github.io/memory-consumption-of-async/)) and 1.3 GB on Python 3.13 ([2024 rerun](https://hez2010.github.io/async-runtimes-benchmarks-2024)), and Textual measured about 260,000 tasks created, run and finished per second ([Textual](https://textual.textualize.io/blog/2023/03/08/overhead-of-python-asyncio-tasks/)). A BEAM process is not smaller: it starts at 338 words, about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), and a million idle processes peaked near 2.6 GiB ([measurement](https://hauleth.dev/post/beam-process-memory-usage/)).
+Asyncio tasks are fast and cheap. A million sleeping tasks took about 2.2 GB on Python 3.10 ([2023 benchmark](https://pkolaczk.github.io/memory-consumption-of-async/)) and 1.3 GB on Python 3.13 ([2024 rerun](https://hez2010.github.io/async-runtimes-benchmarks-2024)), and Textual measured about 260,000 tasks created, run and finished per second ([Textual](https://textual.textualize.io/blog/2023/03/08/overhead-of-python-asyncio-tasks/)). A PyBEAM actor costs more: one thread and about 50–60 KiB, so 10,000 idle actors used about 600 MiB in a local run.
 
-The difference is isolation. Every task on an asyncio loop runs in one Python process, so the tasks share its memory and fail with it. PyBEAM runs your actors and tasks as BEAM processes, which are preemptively scheduled and supervised.
+What you get for that is ownership and recovery. Tasks on an asyncio loop share mutable objects, and a failed task stays failed unless you write the restart. A PyBEAM actor owns its state, receives copies of its arguments, and is replaced by its supervisor when it fails.
 
 | Need | Plain asyncio | PyBEAM |
 | --- | --- | --- |
@@ -40,10 +40,7 @@ PyBEAM spends memory and call overhead on scheduling, supervision and distributi
 
 ## How it works
 
-PyBEAM runs on the BEAM, Erlang's virtual machine. Each actor and task is a BEAM process, and the BEAM, not an asyncio loop, schedules those processes preemptively across CPU cores. Inside them you still write asyncio code, which runs on erlang-python's `ErlangEventLoop`; the loop takes I/O readiness and timers from the BEAM. A loop runs one coroutine step at a time, and by default tasks share one loop, so CPU-bound code delays the others. [How Python work runs](execution.md) shows how `dedicated_loop` and the execution modes change that.
-
-- Saša Jurić: [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE).
-- Erlang documentation: [Processes](https://www.erlang.org/doc/system/ref_man_processes.html).
+PyBEAM runs your program on Erlang's virtual machine, which provides the actors, supervision and messaging. You write ordinary asyncio code and need no Erlang. Actor methods share one event loop, so a blocking call in one delays the others; [Blocking and CPU work](execution.md) shows what to do instead. [How PyBEAM works](internals/index.md) explains the runtime in depth.
 
 ## Limits
 

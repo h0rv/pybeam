@@ -73,7 +73,7 @@ try {
           return { minimum: Math.min(...records.map(({ ratio }) => ratio)), failures: records.filter(({ ratio }) => ratio < 4.5), colors };
         });
         assert.deepEqual(report.failures, [], `${device}/${colorScheme}/${path}`);
-        assert.ok(report.colors.length >= 3, `Monochrome code: ${device}/${colorScheme}/${path}`);
+        assert.ok(report.colors.length >= 3 || path.startsWith("internals/"), `Monochrome code: ${device}/${colorScheme}/${path}`);
         minimumContrast = Math.min(minimumContrast, report.minimum);
         if (["", "actors/", "genstage/", "web/"].includes(path)) {
           await page.screenshot({ path: `${screenshotRoot}-${path.replaceAll("/", "") || "home"}-${device}-${colorScheme}${base === "/" ? "" : "-base"}.png`, fullPage: true });

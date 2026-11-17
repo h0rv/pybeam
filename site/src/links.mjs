@@ -7,7 +7,6 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
-  { source: "docs/guide/execution.md", path: "execution/", label: "How Python work runs", examples: ["examples/docs/execution.py"] },
   { source: "docs/guide/index.md", path: "", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
@@ -16,17 +15,22 @@ export const pages = [
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_body.py", "examples/docs/durable_tasks.py"] },
+  { source: "docs/guide/execution.md", path: "execution/", label: "Blocking and CPU work", examples: ["examples/docs/execution.py"] },
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
+  { source: "docs/guide/internals/index.md", path: "internals/", label: "Overview", examples: [] },
+  { source: "docs/guide/internals/measurements.md", path: "internals/measurements/", label: "Measurements", examples: [] },
+  { source: "docs/guide/internals/watch-for.md", path: "internals/watch-for/", label: "What to watch for", examples: [] },
   { source: "docs/guide/genstage.md", path: "genstage/", label: "Finite GenStage sample", hidden: true, examples: ["examples/docs/genstage_transform.py", "examples/docs/genstage.py"] },
 ];
 
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
-  { label: "Get started", pages: navigation.slice(0, 3) },
-  { label: "Guides", pages: navigation.slice(3, 10) },
-  { label: "Integrations", pages: navigation.slice(10) },
+  { label: "Get started", pages: navigation.slice(0, 2) },
+  { label: "Guides", pages: navigation.slice(2, 10) },
+  { label: "Integrations", pages: navigation.slice(10, 13) },
+  { label: "How PyBEAM works", pages: navigation.slice(13) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",
