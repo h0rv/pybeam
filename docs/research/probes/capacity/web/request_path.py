@@ -87,12 +87,22 @@ async def serve(count: int) -> None:
 
 
 def run(threads: int, count: int) -> float:
-    workers = [threading.Thread(target=asyncio.run, args=(serve(count),)) for _ in range(threads)]
+    errors: list[BaseException] = []
+
+    def work() -> None:
+        try:
+            asyncio.run(serve(count))
+        except Exception as error:
+            errors.append(error)
+
+    workers = [threading.Thread(target=work) for _ in range(threads)]
     start = time.perf_counter()
     for worker in workers:
         worker.start()
     for worker in workers:
         worker.join()
+    if errors:
+        raise ExceptionGroup("Requests failed", errors)
     return threads * count / (time.perf_counter() - start)
 
 
