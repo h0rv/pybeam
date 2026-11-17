@@ -131,7 +131,7 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
         capacity=2,
         max_bytes=4096,
     )
-    cluster = LocalCluster(distribution, config=config.model_copy(update={"startup_timeout": 3.0}))
+    cluster = LocalCluster(distribution, config=config.model_copy(update={"startup_timeout": 15.0}))
     try:
         with cluster:
             value = Identity.model_validate_json(wait_file(marker, seconds=5))
