@@ -29,3 +29,63 @@ and `uv.lock`; keep those local overrides out of commits. Restore the committed
 Hornbeam source and lock entries to return to the pinned default. `mise run setup`
 also opts into editable Hornbeam before building the native runtime; that full
 build additionally needs the runtime's other native dependencies and toolchain.
+
+## Runtime requirements
+
+`pybeam.run` needs a managed runtime: either a `python-beam` wheel with bundled
+runtime assets, or an already-built development runtime. A source install alone
+does not include ERTS or the native extension. Packaged wheels currently support
+macOS arm64 and Linux x86_64 on conventional CPython 3.14.
+
+Native builds use CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0
+as pinned in `mise.toml`. With these tools and the sibling checkouts above
+(plus `erlang-ws` and `erlang-h1`), build with `mise run setup`.
+
+### Use a development runtime
+
+Build the native runtime with `tools/build_native.py`, then add this to the
+consumer project's `pyproject.toml` (absolute, or relative to that file):
+
+```toml
+[tool.pybeam]
+development_runtime = "/path/to/pybeam/_build/hornbeam"
+```
+
+The directory is the build profile, not an executable or source checkout. It
+must contain `lib/*/ebin` or `checkouts/*/ebin` directories with
+`py_launch.beam` and `erlang_python.app`, and exactly one matching `py_nif.so`
+or `py_nif.dylib` in that application's sibling `priv` directory. The native
+library must match the host Python, and `erl` must be on `PATH`. Nothing is
+built or downloaded implicitly.
+
+### Build a Linux wheel
+
+Linux wheels use the `cp314-cp314-linux_x86_64` tag, not a manylinux tag, and
+need conventional CPython 3.14 with a shared `libpython3.14.so.1.0`. The system
+must provide glibc, libm, libstdc++, libgcc_s, libtinfo.so.6, zlib and
+libcrypto.so.3. The build is verified on Ubuntu 22.04.
+
+```sh
+mise install
+mise exec -- uv sync --locked --all-extras
+mise exec -- uv run --locked python tools/build_native.py
+mkdir -p build
+curl -fL https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt -o build/OTP-LICENSE.txt
+mise exec -- uv run --locked python tools/build_runtime.py \
+  --otp-root "$(mise where erlang)" \
+  --native-app _build/default/lib/erlang_python \
+  --otp-license build/OTP-LICENSE.txt \
+  --native-license _build/default/lib/erlang_python/LICENSE
+mise exec -- uv build --wheel
+```
+
+Install `dist/python_beam-0.1.0a1-cp314-cp314-linux_x86_64.whl` into a Python
+3.14 environment; `python examples/hello.py` then runs without `erl`, rebar3 or
+mise on `PATH`. Linux wheels do not bundle the optional GenStage payload;
+Darwin wheels do.
+
+### Pooled actor execution
+
+`ActorGroup(execution=ExecutionLimits(workers=..., capacity=..., max_bytes=...))`
+requests pooled actor execution. It needs native support that is still under
+development and fails rather than falling back when that support is missing.

@@ -1,6 +1,6 @@
 # Actors
 
-Use an actor to own Python state and expose methods that change it.
+Use an actor to keep state that many tasks update.
 
 ```python
 import pybeam
@@ -29,47 +29,10 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-This prints `12` twice. `spawn` constructs the actor. Call `add` to change its state and `read` to return the current value. Leaving the group stops its children.
+This prints `12` twice. `spawn` creates the actor with `value=10`. `add` changes its state and `read` returns it. Leaving the `ActorGroup` stops its actors.
 
-Call methods rather than reading `counter.value`. Requests and results are serialized copies. Each actor handles calls serially, even while a method awaits.
+An actor runs one method call at a time, even while a method awaits, so concurrent callers never need a lock. Call methods instead of reading `counter.value`: arguments and results are copied.
 
-Actor admission bounds queued plus running requests and encoded bytes, not total memory. A timeout stops waiting; it does not undo effects. Retrying a call can repeat its effects.
+Each actor accepts a limited number of waiting calls. A timeout stops waiting; it does not undo the call, and retrying can repeat its effects.
 
-## Execution limits
-
-Dedicated execution is the default (`execution=None`). To request pooled execution
-from a native runtime that supports it, pass an immutable `ExecutionLimits` value.
-
-```python
-from actors import Counter
-
-import pybeam
-from pybeam import ActorGroup, ExecutionLimits
-
-
-async def pooled() -> None:
-    async with ActorGroup(
-        max_children=800,
-        max_pending=8,
-        max_bytes=65_536,
-        execution=ExecutionLimits(workers=4, capacity=32, max_bytes=1_048_576),
-    ) as actors:
-        counter = await actors.spawn(Counter)
-        await counter.add(1)
-
-
-if __name__ == "__main__":
-    pybeam.run(pooled)
-```
-
-`workers` bounds physical Python execution contexts, not the number of actors.
-`execution.capacity` and `execution.max_bytes` bound aggregate admitted pool work
-and encoded request bytes. The group's `max_pending` and `max_bytes` remain
-per-actor limits. Neither byte limit bounds arbitrary Python heap allocation.
-All three execution limits must be strict positive integers.
-
-Pooled execution requires native support that is still under development. A
-requested pool fails if that support is unavailable. It never falls back to
-dedicated execution.
-
-To replace a failed actor, see [Supervision](supervision.md).
+To restart an actor that fails, see [Supervision](supervision.md).

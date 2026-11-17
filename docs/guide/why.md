@@ -1,45 +1,48 @@
 # Why PyBEAM
 
-Asyncio lets your Python app wait on many things at once. It does not decide who owns shared state, how readers learn it changed, or what replaces a failed actor. PyBEAM brings BEAM/OTP tools to those jobs through typed Python APIs.
+When concurrent requests share data, an async Python app usually needs locks, a Redis server for counters and pub/sub, and restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
 
-Keep your async functions and [web framework](web.md). Use [actors](actors.md) for state with serial method calls, [shared counters](state.md) for atomic increments, and [pub/sub](messaging.md) to notify readers. You choose the ownership and failure boundaries; PyBEAM handles the runtime lifecycle.
+## No locks
 
-## Python at the surface, OTP underneath
+- An [actor](actors.md) owns its state and runs one method call at a time, even while a method awaits. Calls never interleave inside an actor, so its state needs no lock.
+- Arguments and results are copied, so callers never share a mutable object with an actor.
+- A [shared counter](state.md) changes and returns its value in one atomic step.
+- [Messaging](messaging.md) notifies subscribers without a separate broker.
+- [Supervision](supervision.md) replaces a failed actor with a fresh one.
 
-![Architecture: Python app, PyBEAM typed wrappers, erlang-python and optional Hornbeam services, then BEAM/OTP supervisors, ETS shared state, pub/sub and mailboxes.](assets/architecture.svg)
+## Example: two clients, one count
 
-PyBEAM is a thin Python-facing layer, not a new scheduler or web framework. erlang-python owns execution, contexts and message passing. Hornbeam supplies the current counter, store and pub/sub services; these services do not require replacing your ASGI server. OTP supplies supervision underneath the actor API.
+Two WebSocket clients connect to your app and need to see the same count.
 
-Ordinary asyncio tasks remain asyncio tasks, not OTP processes. Today's build runs Python in one main interpreter with its GIL, so Python code does not run on multiple cores yet. In the current build, OTP processes do not isolate C-extension crashes.
+![Two clients share one atomic counter through Python handlers. A changed-key notification prompts fresh reads. Separately, a supervisor replaces a crashed actor with fresh state.](assets/shared-state.svg)
 
-## Shared state, explicit recovery
+1. A handler calls `incr`. The increment and the returned count are one atomic operation.
+2. The handler publishes a message naming the changed key.
+3. Each subscriber reads the current count and sends it to its client.
+4. If a supervised actor crashes, the supervisor starts a replacement from its constructor. Call `rejoin` to get the new reference.
 
-Imagine two WebSocket clients connected to your async app. Both need the same count, not a separate Python variable per connection. This is a composition of [shared state](state.md), [change notifications](messaging.md#notify-readers-of-a-changed-key) and your framework's connection handling, not a new browser protocol.
+## Compared with plain asyncio
 
-![Two clients share one atomic counter through Python handlers. A changed-key notification prompts fresh reads. Separately, an OTP supervisor replaces a crashed actor with fresh state.](assets/shared-state.svg)
-
-1. A handler calls `incr`: the increment and returned count are one atomic operation.
-2. After the update, the app publishes a changed-key notification. This is a separate operation, not a transaction with the write.
-3. Subscribers read the current count and send it to their clients. An invalidation is a prompt to read, not a historical snapshot or delivery guarantee.
-4. Separately, if a supervised actor crashes, OTP constructs a replacement. The app uses `rejoin` to acquire its new reference. The old state is lost, the old reference does not follow it, and no method is replayed.
-
-The shared counter does not need an actor. Actor restart does not restore the counter or provide persistence. Stored values are volatile; pub/sub messages are not durable. Leaving a subscription context releases it. A full subscription queue fails explicitly rather than silently dropping messages.
-
-## Plain asyncio vs PyBEAM
-
-| Need | Plain asyncio | With PyBEAM |
+| Need | Plain asyncio | PyBEAM |
 | --- | --- | --- |
-| Concurrent I/O | Tasks and coroutines | Keep tasks and coroutines inside the runtime |
-| Own mutable state | Arrange access and locking in your app | Actor methods execute serially, even across awaits |
-| Share a counter | Choose and coordinate a state owner or service | Hornbeam provides an atomic BEAM counter |
-| Notify readers | Choose queues or a messaging service | Pub/sub with explicit subscription lifetime and byte limits |
-| Replace a failed actor | Arrange a restart policy | OTP restarts from the constructor; explicitly acquire the replacement |
+| Mutable state shared by tasks | Locks around every access | Actor methods run one at a time |
+| Shared counter | Redis or a lock | Atomic `incr` |
+| Notify other connections | Redis pub/sub or a broker | `publish` and `subscribe` |
+| Recover from a failure | Your own restart code | Supervisor restarts the actor |
 
-PyBEAM is useful when you want these BEAM ownership and messaging semantics in a Python app. If tasks and local state already meet your needs, plain asyncio may be enough. Neither choice makes your data durable automatically. Timeouts stop waiting; they do not undo effects, and retries can repeat them.
+If tasks and local variables already meet your needs, plain asyncio is enough.
 
-## Try one boundary
+## Limits
 
-This [messaging example](messaging.md) subscribes before publishing and releases the subscription on context exit:
+- State and messages live in memory and do not survive a restart. Keep durable data in your database.
+- A timeout stops waiting; it does not undo the call. Retrying can repeat its effects.
+- A restarted actor starts from its constructor. The old state and any in-flight calls are lost.
+
+To learn how calls use threads and CPU cores, see [How Python work runs](execution.md).
+
+## Try it
+
+Subscribe to a topic, publish a message, and receive it:
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -58,4 +61,4 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints `order-42`. Publishing does not acknowledge that a receiver finished processing. Next, try [shared state](state.md) or [actor supervision](supervision.md).
+It prints `order-42`. Next, try [shared state](state.md) or [supervision](supervision.md).
