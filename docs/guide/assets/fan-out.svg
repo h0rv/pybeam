@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="584" viewBox="0 0 760 584" role="img" aria-labelledby="title desc">
   <title id="title">Four CPU jobs in every mode</title>
-  <desc id="desc">Each row runs four jobs of 3,000,000 loop iterations. Bars show when each job ran on a shared time axis. asyncio.gather 3.14: wall 0.99 s, speedup 1.0x. asyncio.to_thread 3.14: wall 1.20 s, speedup 0.8x. asyncio.to_thread 3.14t: wall 0.42 s, speedup 2.5x. process per job 3.14: wall 0.34 s, speedup 4.9x. prefork pool 3.14: wall 0.27 s, speedup 3.7x. worker 3.14: wall 1.44 s, speedup 1.1x. worker 3.14t: wall 0.66 s, speedup 2.1x. owngil 3.14: wall 0.40 s, speedup 3.3x. isolated 3.14: wall 0.36 s, speedup 4.0x. isolated 3.14t: wall 0.53 s, speedup 2.0x. separate nodes 3.14: wall 0.35 s, speedup 3.7x.</desc>
+  <desc id="desc">Each row runs four jobs of 3,000,000 loop iterations. Bars show when each job ran on a shared time axis. asyncio.gather 3.14: wall 0.99 s, speedup 1.0x. asyncio.to_thread 3.14: wall 1.20 s, speedup 0.8x. asyncio.to_thread 3.14t: wall 0.42 s, speedup 2.5x. process per job 3.14: wall 0.34 s, speedup 4.9x. prefork pool 3.14: wall 0.27 s, speedup 3.7x. worker 3.14: wall 1.44 s, speedup 1.1x. worker 3.14t: wall 0.66 s, speedup 2.1x. isolated 3.14: wall 0.36 s, speedup 4.0x. isolated 3.14t: wall 0.53 s, speedup 2.0x. separate nodes 3.14: wall 0.35 s, speedup 3.7x.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -68,12 +68,6 @@
   <rect class="bar" x="250.0" y="334" width="145.9" height="6" rx="1"/>
   <rect class="bar" x="250.0" y="342" width="69.6" height="6" rx="1"/>
   <text x="598" y="334" class="note">0.66 s · 2.1×</text>
-  <text x="236" y="378" text-anchor="end">owngil <tspan class="note">· 3.14</tspan></text>
-  <rect class="bar" x="250.0" y="362" width="86.0" height="6" rx="1"/>
-  <rect class="bar" x="250.1" y="370" width="69.8" height="6" rx="1"/>
-  <rect class="bar" x="250.1" y="378" width="70.9" height="6" rx="1"/>
-  <rect class="bar" x="250.0" y="386" width="87.2" height="6" rx="1"/>
-  <text x="598" y="378" class="note">0.40 s · 3.3×</text>
   <text x="236" y="422" text-anchor="end">isolated <tspan class="note">· 3.14</tspan></text>
   <rect class="bar" x="250.0" y="406" width="55.2" height="6" rx="1"/>
   <rect class="bar" x="250.0" y="414" width="54.3" height="6" rx="1"/>

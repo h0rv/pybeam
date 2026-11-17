@@ -4,7 +4,7 @@ A BEAM process starts at about 2.7 KB ([Erlang memory guide](https://www.erlang.
 
 ## From a BEAM process to Python
 
-![A BEAM process sends a call to a mailbox. A Python context takes the call. Each context runs as worker, owngil or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
+![A BEAM process sends a call to a mailbox. A Python context takes the call. Supported contexts run as worker or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
 
 1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free. `TaskLimits` or an actor group's `max_children` caps how many contexts exist; starting a task when its ownership slots are full raises `Overloaded` instead of queuing it.
 2. A context owns one OS thread. Its mode decides which interpreter and GIL run your code.
@@ -12,22 +12,22 @@ A BEAM process starts at about 2.7 KB ([Erlang memory guide](https://www.erlang.
 
 ## Choose a mode
 
-Each mode trades startup, memory and call cost for parallelism and crash isolation. Start and memory are per context, and call is an empty round trip. Free threading comes from the interpreter you install, CPython 3.14 or 3.14t.
+Use free-threaded CPython 3.14t workers by default. Use isolated OS processes for code that might crash the interpreter. Start and memory are per context, and call is an empty round trip.
+
+**Own-GIL subinterpreter mode (`owngil`) is unsupported:** common native extensions refuse to load in subinterpreters on both CPython 3.14 and 3.14t. Free-threading support does not imply subinterpreter support. See the [package compatibility results](../research/execution-modes.md#unsupported-own-gil-subinterpreters).
 
 | Mode | Parallel CPU | Crash kills | Start | Memory | Call p50/p99 |
 | --- | --- | --- | --- | --- | --- |
 | `worker` · 3.14 | No | The VM | 1.3 ms | 15 KiB | 17/31 µs |
 | `worker` · 3.14t | Yes | The VM | 1.5 ms | 21 KiB | 29/51 µs |
-| `owngil` · 3.14 | Yes | The VM | 79 ms | 10.5 MiB | 14/23 µs |
 | `isolated` · 3.14 | Yes | That child | 90 ms | 24 MiB | 76/146 µs |
 | Separate nodes | Yes | That node | Seconds | A whole VM | Network |
 
 - `worker`: I/O-bound async code and cheap calls. On 3.14t it also runs CPU work in parallel, if your C extensions support free threading.
-- `owngil`: parallel pure-Python CPU work on 3.14. Extensions must support subinterpreters, and values are copied in and out.
 - `isolated`: C extensions that can crash or leak. Only that call fails.
 - Separate nodes: surviving a whole VM failure.
 
-Tasks run in `worker`, `owngil` or `isolated` mode; actors remain in `worker`. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
+Supported task modes are `worker` and `isolated`; actors remain in `worker`. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
 # execution.py
@@ -83,9 +83,9 @@ On 3.14 the four tasks take turns. On 3.14t they run on four threads at once; in
 
 Each row runs the same four pure-Python jobs at once. Bars show when each job ran.
 
-![Four CPU jobs on a shared time axis for asyncio, threads on 3.14 and 3.14t, a process per job, a prefork pool, and PyBEAM worker, owngil, isolated and separate-node modes, with wall time and speedup per row.](assets/fan-out.svg)
+![Four CPU jobs on a shared time axis for asyncio, threads on 3.14 and 3.14t, a process per job, a prefork pool, and PyBEAM worker, isolated and separate-node modes, with wall time and speedup per row.](assets/fan-out.svg)
 
-With the GIL, asyncio, threads and `worker` run the jobs one at a time. On 3.14t, threads and `worker` overlap them. `owngil`, `isolated`, a process per job, a prefork pool and separate nodes overlap them on either build, at the costs in the table above.
+With the GIL, asyncio, threads and `worker` run the jobs one at a time. On 3.14t, threads and `worker` overlap them. `isolated`, a process per job, a prefork pool and separate nodes overlap them on either build, at the costs in the table above.
 
 ## Blast radius: one job calls `os.abort()`
 
@@ -94,7 +94,7 @@ Four jobs run; one aborts the interpreter.
 | Lane | Other jobs that finish | Replacement ready in |
 | --- | --- | --- |
 | asyncio, threads | 0 of 3: the process dies | Restart the app |
-| `worker`, `owngil` | 0 of 3: the VM dies | Restart the app |
+| `worker` | 0 of 3: the VM dies | Restart the app |
 | Process per job | 3 of 3 | 80 ms for a new process |
 | Prefork pool | 0 of 3: the pool breaks | 53 ms for a new pool |
 | `isolated` | 3 of 3 | 70 ms for a new child |
@@ -136,8 +136,8 @@ atomic snapshot or an application-level health check.
 
 Press Enter on a resource for its counters and the Python stacks, or `p` for a
 Python shell in the app's globals. Stacks show all worker threads and entry-loop
-tasks, not a stack matched to the selected resource; own-GIL and isolated
-interpreters are not visible. Press `b` to go back and `q` to detach without
+tasks, not a stack matched to the selected resource; isolated child interpreters
+are not visible. Press `b` to go back and `q` to detach without
 stopping the app. `pybeam tui <name>` attaches directly; `pybeam ps` lists names.
 
 Debugging is opt-in and local to your user account. The shell can change the app's

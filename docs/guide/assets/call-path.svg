@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="592" viewBox="0 0 760 592" role="img" aria-labelledby="title desc">
   <title id="title">How a BEAM process reaches Python</title>
-  <desc id="desc">A BEAM process sends a call to a mailbox. A Python context, which owns one OS thread, takes the call; limits cap how many contexts exist. A context runs Python in one of three modes: worker uses the main interpreter with a shared GIL on 3.14 and no GIL on 3.14t; owngil uses a subinterpreter with its own GIL in the same OS process; isolated uses a child OS process so a crash stays in the child. The result returns as a message, or a crash signal goes to the supervisor.</desc>
+  <desc id="desc">A BEAM process sends a call to a mailbox. A Python context, which owns one OS thread, takes the call; limits cap how many contexts exist. Supported contexts run Python in two modes: worker uses the main interpreter with a shared GIL on 3.14 and no GIL on 3.14t; isolated uses a child OS process so a crash stays in the child. The result returns as a message, or a crash signal goes to the supervisor.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -33,25 +33,18 @@
   <text x="380.0" y="264" class="heading" text-anchor="middle">Python context</text>
   <text x="380.0" y="288" class="note" text-anchor="middle">each owns one OS thread; limits cap how many exist</text>
   <path d="M380 305V323H134V337" marker-end="url(#arrow)"/>
-  <path d="M380 323V337" marker-end="url(#arrow)"/>
   <path d="M380 323H626V337" marker-end="url(#arrow)"/>
   <rect x="24" y="349" width="220" height="112"/>
   <text x="134.0" y="379" class="heading" text-anchor="middle">worker</text>
   <text x="134.0" y="403" class="note" text-anchor="middle">main interpreter</text>
   <text x="134.0" y="423" class="note" text-anchor="middle">shared GIL on 3.14</text>
   <text x="134.0" y="443" class="note" text-anchor="middle">no GIL on 3.14t</text>
-  <rect x="270" y="349" width="220" height="112"/>
-  <text x="380.0" y="379" class="heading" text-anchor="middle">owngil</text>
-  <text x="380.0" y="403" class="note" text-anchor="middle">subinterpreter</text>
-  <text x="380.0" y="423" class="note" text-anchor="middle">own GIL</text>
-  <text x="380.0" y="443" class="note" text-anchor="middle">same OS process</text>
   <rect x="516" y="349" width="220" height="112"/>
   <text x="626.0" y="379" class="heading" text-anchor="middle">isolated</text>
   <text x="626.0" y="403" class="note" text-anchor="middle">child OS process</text>
   <text x="626.0" y="423" class="note" text-anchor="middle">own interpreter</text>
   <text x="626.0" y="443" class="note" text-anchor="middle">crash stays in the child</text>
   <path d="M134 462V480H380V494" marker-end="url(#arrow)"/>
-  <path d="M380 462V494" marker-end="url(#arrow)"/>
   <path d="M626 462V480H380" marker-end="url(#arrow)"/>
   <rect x="24" y="506" width="712" height="70"/>
   <text x="380.0" y="536" class="heading" text-anchor="middle">Result as a message</text>
