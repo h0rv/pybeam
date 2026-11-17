@@ -12,19 +12,19 @@ A BEAM process is cheap: about 2.7 KB, preemptively scheduled, millions per mach
 
 ## Choose a mode
 
-Each mode trades startup, memory and call cost against parallelism and crash isolation. Free-threaded or not is the interpreter you install, CPython 3.14 or 3.14t, not a PyBEAM option.
+Each mode trades startup, memory and call cost against parallelism and crash isolation. Start and memory are per context; call is an empty round trip. Free-threaded or not is the interpreter you install, CPython 3.14 or 3.14t, not a PyBEAM option.
 
-| Mode | Python runs in | CPU work in parallel | Native crash kills | Start a context | Memory per context | Empty call p50/p99 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `worker` · 3.14 | Main interpreter, one shared GIL | No | The whole VM | 1.3 ms | 15 KiB | 17/31 µs |
-| `worker` · 3.14t | Main interpreter, no GIL | Yes | The whole VM | 1.5 ms | 21 KiB | 29/51 µs |
-| `owngil` · 3.14 | A subinterpreter with its own GIL | Yes | The whole VM | 79 ms | 10.5 MiB | 14/23 µs |
-| `isolated` · 3.14 | A child OS process | Yes | Only that child | 90 ms | 24 MiB | 76/146 µs |
-| Separate nodes | Another BEAM VM | Yes | Only that node | Seconds | A whole VM | Network round trip |
+| Mode | Parallel CPU | Crash kills | Start | Memory | Call p50/p99 |
+| --- | --- | --- | --- | --- | --- |
+| `worker` · 3.14 | No | The VM | 1.3 ms | 15 KiB | 17/31 µs |
+| `worker` · 3.14t | Yes | The VM | 1.5 ms | 21 KiB | 29/51 µs |
+| `owngil` · 3.14 | Yes | The VM | 79 ms | 10.5 MiB | 14/23 µs |
+| `isolated` · 3.14 | Yes | That child | 90 ms | 24 MiB | 76/146 µs |
+| Separate nodes | Yes | That node | Seconds | A whole VM | Network |
 
 Pick `worker` for I/O-bound async code and cheap calls. On 3.14t it also runs CPU work in parallel, if your C extensions support free threading. Pick `owngil` for parallel pure-Python CPU work on the conventional build; extensions must support subinterpreters, and values cross the boundary by copy. Pick `isolated` when a C extension can segfault or leak and you want only that call to fail. Add nodes when one machine is not enough or a VM failure must not take everything down.
 
-Tasks choose a mode with `ExecutionMode`. Today they accept `ExecutionMode.WORKER`; `OWNGIL` and `ISOLATED` raise `CapabilityUnavailable` until the runtime accepts a per-task mode. Actors run in worker mode. `dedicated_loop=True` gives each worker task its own event loop; on 3.14t that is what lets CPU-bound tasks overlap, because tasks sharing one loop still take turns.
+Tasks choose a mode with `ExecutionMode`. Today they accept `ExecutionMode.WORKER`; `OWNGIL` and `ISOLATED` raise `CapabilityUnavailable` until PyBeam enables them. Actors run in worker mode. `dedicated_loop=True` gives each worker task its own event loop and native thread. Tasks sharing one loop take turns on either build.
 
 ```python
 from pydantic import TypeAdapter
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints the same checksum four times. On 3.14 the four tasks take turns; on 3.14t they run at once.
+It prints the same checksum four times. On 3.14 the four tasks take turns. On 3.14t they run on four threads at once, but in a local run each ran about three times slower than it does alone, so the four finished no sooner than in turn. Plain Python threads on the same build did not slow down, so the cost is in the task path, not free threading. Time your own workload before you count on parallel tasks.
 
 ## Fan out: four CPU jobs
 
