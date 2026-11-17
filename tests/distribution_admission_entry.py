@@ -27,6 +27,7 @@ class ScopeInfo:
     children: list[object]
     contexts: list[object]
     jobs: int
+    starting: int
 
 
 async def callback(name: str, *args: object) -> Reply:
@@ -43,7 +44,9 @@ async def empty_scope(supervisor: TaskSupervisor) -> ScopeInfo:
     value: object = await async_call("_task_info", supervisor._group)
     info = Json(ScopeInfo).load(value)
     assert info.children == info.contexts == []
-    assert info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
+    assert (
+        info.starting == info.jobs == info.gate.count == info.gate.bytes == info.gate.unsettled == 0
+    )
     return info
 
 
