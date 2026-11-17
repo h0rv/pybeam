@@ -12,6 +12,7 @@ export const pages = [
   { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
   { source: "docs/guide/state.md", path: "state/", label: "Shared state", examples: ["examples/docs/state.py"] },
+  { source: "docs/guide/chat-rooms.md", path: "chat-rooms/", label: "Example: chat rooms", examples: ["examples/docs/chat_rooms.py"] },
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_body.py", "examples/docs/durable_tasks.py"] },
@@ -24,8 +25,8 @@ export const pages = [
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 3) },
-  { label: "Guides", pages: navigation.slice(3, 9) },
-  { label: "Integrations", pages: navigation.slice(9) },
+  { label: "Guides", pages: navigation.slice(3, 10) },
+  { label: "Integrations", pages: navigation.slice(10) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",

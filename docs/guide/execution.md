@@ -115,3 +115,31 @@ Subinterpreters isolate Python state, not native crashes. Only a separate OS pro
 Asyncio is fast and simple, but each event loop lives in one Python process, often inside a container; its tasks are isolated from other processes and lost if that process crashes. PyBEAM callers are preemptively scheduled and supervised. The admission limit bounds how much Python work runs at once.
 
 Numbers on this page come from one 8-core machine and vary with hardware and load.
+
+## Inspect a running app
+
+Start your app with debugging enabled, then open the monitor in another terminal:
+
+```sh
+pybeam run --debug app.py
+```
+
+```sh
+pybeam tui
+```
+
+Select an app and press Enter. The monitor refreshes actor mailboxes and admitted
+calls, task ownership slots, and queue depth and active leases every two seconds.
+Full means a limit has been reached, not that the app has crashed. Task slots can
+remain occupied until their results are observed. Counts are live samples, not an
+atomic snapshot or an application-level health check.
+
+Press Enter on a resource for its counters and the Python stacks, or `p` for a
+Python shell in the app's globals. Stacks show all worker threads and entry-loop
+tasks, not a stack matched to the selected resource; own-GIL and isolated
+interpreters are not visible. Press `b` to go back and `q` to detach without
+stopping the app. `pybeam tui <name>` attaches directly; `pybeam ps` lists names.
+
+Debugging is opt-in and local to your user account. The shell can change the app's
+state, and statements print to the app's terminal. Keep it for trusted development
+sessions; it is not a read-only production interface.
