@@ -1,3 +1,6 @@
 _build/
 store_*/
 erl_crash.dump
+log-order-*/
+*.log
+*.term
