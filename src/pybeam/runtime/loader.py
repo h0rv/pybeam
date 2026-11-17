@@ -21,6 +21,7 @@ class _Session:
     invoked: bool = False
     task: asyncio.Task[object] | None = None
     load_status: int = 0
+    globals: dict[str, object] | None = None
 
 
 @dataclass(slots=True)
@@ -49,6 +50,20 @@ def require_managed_entry() -> None:
         or session.task.get_loop() is not asyncio.get_running_loop()
     ):
         raise BootstrapError("Optional applications require a running managed Python entry")
+
+
+def entry_loop() -> asyncio.AbstractEventLoop | None:
+    session = _state.session
+    if session is None or session.task is None:
+        return None
+    return session.task.get_loop()
+
+
+def entry_globals() -> dict[str, object]:
+    session = _state.session
+    if session is None or session.globals is None:
+        return {}
+    return session.globals
 
 
 def _strings(value: object) -> list[str]:
@@ -93,7 +108,7 @@ def load() -> None:
     sys.path.insert(0, str(Path(argv[0]).parent))
     try:
         # File initialization deliberately runs again inside the embedded interpreter.
-        runpy.run_path(argv[0], run_name="__main__")
+        session.globals = runpy.run_path(argv[0], run_name="__main__")
         if session.entry is None:
             raise BootstrapError("The entry file did not register an async main with pybeam.run")
     except BaseException as error:
