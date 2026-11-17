@@ -80,6 +80,10 @@ test("each concept has complete source-associated Python examples", () => {
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);
+      assert.ok(snippet.startsWith(`# ${examples[index].split("/").at(-1)}\n`), source);
+      if (!["background_body.py", "genstage_transform.py"].includes(examples[index].split("/").at(-1))) {
+        assert.ok(markdown.includes(`\n\n\`\`\`console\n$ uv run ${examples[index].split("/").at(-1)}\n`), source);
+      }
       assert.doesNotMatch(snippet, /\.\.\.|# (?:rest|omitted)|\b(?:Any|cast)\b|type: ignore/, source);
     });
   }
@@ -98,7 +102,7 @@ test("the homepage puts Python before explanations and links to the first action
 test("state and supervision teach distinct operations without another introduction", () => {
   const guide = (name) => readFileSync(join(repositoryRoot, `docs/guide/${name}.md`), "utf8");
   assert.match(guide("supervision"), /actors\.crash[\s\S]*actors\.rejoin/);
-  assert.match(guide("supervision"), /prints `5`, then `1`/);
+  assert.match(guide("supervision"), /```console\n\$ uv run supervision\.py\n5\n1\n```/);
   assert.doesNotMatch(guide("actors"), /actors\.crash/);
   assert.match(guide("state"), /beam\.incr[\s\S]*atomic operation/);
   assert.doesNotMatch(guide("state"), /beam\.subscribe|beam\.publish/);

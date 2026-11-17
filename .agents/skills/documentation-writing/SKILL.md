@@ -63,6 +63,7 @@ For example:
 | --- | --- |
 | In this section, we will explore how to leverage shared state. | Store values across requests. |
 | The actor will be restarted by the supervisor. | The group restarts the failed actor. |
+| Save this as `main.py` and run `python main.py`. It prints `Hello`. | Put `# main.py` first in the Python example, then show `$ uv run main.py` and `Hello` in a shell block. |
 | State is managed automatically. | Values live in memory and are lost when the program stops. |
 
 ## Make examples usable
@@ -73,8 +74,13 @@ For example:
   pseudocode, ellipses, omitted-code comments, or invented output in runnable samples.
 - Published guide Python fences must byte-match their associated files in
   `examples/docs/`, in the order listed in `site/src/links.mjs`. Edit the source and
-  fence together. State how to run the example and what it demonstrates, without
-  repeating a generic installation or hello-world section on every concept page.
+  fence together. Do not repeat a generic installation or hello-world section on
+  every concept page.
+- Put the actual filename in a comment on the first line of each Python example,
+  such as `# main.py`. Follow each runnable example with a `console` shell block
+  showing `uv run <file>` and its exact output. Keep imported helper files beside
+  the entry file; show the command for the entry file, not the helper.
+  Never narrate "Save this as X and run Y. It prints Z."
 - Verify claimed results with the appropriate checks. Site tests verify source
   matching and presentation, not native behavior; run relevant runtime checks when
   behavior changes and report anything you could not verify.

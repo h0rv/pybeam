@@ -14,7 +14,7 @@ export const codeBlocks = defineHastPlugin({
       const classes = code.properties.className || [];
       const language = node.properties["data-language"] || node.properties.dataLanguage ||
         (Array.isArray(classes) ? classes.find((name) => name.startsWith("language-"))?.slice(9) : null) || "text";
-      const name = { python: "Python", sh: "Shell", bash: "Shell", json: "JSON", text: "Text" }[language] || language;
+      const name = { python: "Python", sh: "Shell", bash: "Shell", console: "Shell", json: "JSON", text: "Text" }[language] || language;
       const copy = element("pre", { ...node.properties, "data-copy-ready": true }, [...node.children]);
       const icon = element("svg", {
         "aria-hidden": "true", width: 14, height: 14, viewBox: "0 0 24 24",
