@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, ValidationError
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 TIMEOUT = 240
+FANIN_CONTEXTS = 8
 
 type Experiment = Literal["fanout", "crash", "fanin"]
 type Runtime = Literal["3.14", "3.14t"]
@@ -248,7 +249,8 @@ def python(runtime: Runtime) -> str:
 
 
 def command(lane: Lane, run: Run) -> list[str]:
-    arguments = [run.experiment, lane.mode, str(run.count), str(run.size)]
+    last = FANIN_CONTEXTS if run.experiment == "fanin" else run.size
+    arguments = [run.experiment, lane.mode, str(run.count), str(last)]
     if lane.engine == "python":
         return [python(lane.runtime), "-m", "examples.modes_lab.baselines", *arguments]
     escript = shutil.which("escript") or "escript"

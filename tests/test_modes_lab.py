@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from examples.modes_lab.app import LANES, LaneRun, Outcome, Run, Span, app
+from examples.modes_lab.app import FANIN_CONTEXTS, LANES, LaneRun, Outcome, Run, Span, app, command
 
 
 def span(start: int, end: int, pid: int, thread: int, interpreter: int, gil: bool) -> Span:
@@ -39,3 +39,10 @@ def test_modes_lab__renders_and_validates_experiments() -> None:
     assert page.status_code == 200
     assert "ExecutionMode.ISOLATED" in page.text
     assert rejected.status_code == 422
+
+
+def test_modes_lab__fanin_passes_a_bounded_context_count() -> None:
+    lane = LANES[5]
+    run = Run("key", "fanin", 1_000_000, 3_000_000, [LaneRun(lane)])
+
+    assert command(lane, run)[-2:] == ["1000000", str(FANIN_CONTEXTS)]
