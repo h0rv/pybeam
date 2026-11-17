@@ -1,0 +1,19 @@
+[project]
+name = "chat-conventional"
+version = "0.1.0"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "celery>=5.5,<6",
+    "fastapi==0.163.0",
+    "redis>=6,<8",
+    "uvicorn[standard]==0.54.0",
+]
+
+[dependency-groups]
+dev = ["ty>=0.0.104"]
+
+[tool.uv]
+package = false
+
+[tool.ty.rules]
+all = "error"

@@ -78,6 +78,7 @@ all = "error"
 
 [tool.ty.src]
 include = ["src", "tests", "examples", "tools"]
+exclude = ["examples/chat_load/conventional"]
 
 [tool.ruff]
 target-version = "py314"

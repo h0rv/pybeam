@@ -55,6 +55,7 @@ run = [
     "uv run --locked --all-extras ruff format --check .",
     "uv run --locked --all-extras ty check --error-on-warning",
     "uv run --locked --project benchmarks ty check --project benchmarks --extra-search-path . --extra-search-path src --extra-search-path typings --error-on-warning",
+    "uv run --locked --project examples/chat_load/conventional ty check --project examples/chat_load/conventional --extra-search-path . --error-on-warning",
 ]
 
 [tasks.test]
@@ -189,6 +190,16 @@ wait_for = ["setup", "build"]
 description = "Native room miniapp at /rooms/general; prebuilt staged assets required, no implicit build"
 usage = 'flag "--port <port>" default="8766"'
 run = 'exec uv run --locked --extra fastapi --extra hornbeam python -m examples.discord_demo.main --port "${usage_port}"'
+
+[tasks."example:chat"]
+wait_for = ["setup", "build"]
+description = "Chat server for the traffic simulator on one PyBEAM process; requires staged assets"
+usage = 'flag "--port <port>" default="8800"'
+run = 'exec uv run --locked --extra fastapi --extra hornbeam python -m examples.chat_load.app --port "${usage_port}"'
+
+[tasks."example:chat-load"]
+description = "Simulate chat traffic against a running chat server and print measured results"
+run = "uv run --locked python -m examples.chat_load.traffic"
 
 [tasks."example:discord-simulation"]
 wait_for = ["setup", "build"]
