@@ -10,13 +10,16 @@ from pybeam.integrations.hornbeam.dependencies import BeamProvider as ServicesPr
 
 class BeamProvider(ServicesProvider):
     async def __call__(self, connection: HTTPConnection) -> Services:
-        return self.services.for_scope(connection.scope)
+        """Return the shared lifespan connection without changing its owner."""
+        return self.services
 
     def subscription(
         self, topic: str, *, max_bytes: int = 65536
     ) -> Callable[[HTTPConnection], AsyncGenerator[Subscription]]:
+        """Open a subscription owned by the connection; unowned scopes raise."""
+
         async def dependency(connection: HTTPConnection) -> AsyncGenerator[Subscription]:
-            beam = await self(connection)
+            beam = self.for_scope(connection.scope)
             async with beam.subscribe(topic, max_bytes=max_bytes) as subscription:
                 yield subscription
 

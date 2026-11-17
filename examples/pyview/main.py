@@ -65,7 +65,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self._beam = beam
         async with self._initialization:
             if is_connected(socket):
-                self.subscription = await ViewSubscription.start(beam, socket, TOPIC, counter_event)
+                self.subscription = await services.subscribe(socket, TOPIC, counter_event)
                 logger.info("Subscription connected to %s", TOPIC)
             socket.context.count = await beam.incr("shared", 0, namespace="demo")
 

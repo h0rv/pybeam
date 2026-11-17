@@ -365,15 +365,16 @@ async def test_actual_socket__should_render_tstrings_and_expose_swallowed_output
     context = BindContext(Params({}), None, None, socket, None)
     result = await Binder[CounterState]().abind(handler, context)
     assert result.success, result.errors
-    scoped = result.bound_args["beam"]
-    assert isinstance(scoped, Beam)
-    assert scoped.owner == "actual-pyview-socket"
+    assert result.bound_args["beam"] is services.services
     del websocket.scope["extensions"]
+    assert services(socket) is services.services
     with pytest.raises(RuntimeError, match="scope has no Hornbeam owner"):
-        services(socket)
+        await services.subscribe(socket, "demo:counter", counter_event)
     websocket.scope["extensions"] = {"hornbeam.owner": "actual-pyview-socket"}
     beam = services.services
     await view.mount(socket, {}, beam=services(socket))
+    assert isinstance(beam, Beam)
+    assert ("subscribe", ["actual-pyview-socket", "demo:counter", 65536]) in beam.state.calls
     try:
         await view.handle_event("amount", socket, "10", beam=services(socket))
         assert await beam.incr("shared", 7, namespace="demo") == 7
