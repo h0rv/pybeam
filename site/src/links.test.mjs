@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "why/", "actors/", "supervision/", "state/", "chat-rooms/", "messaging/", "background/", "execution/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["why/", "execution/", "", "actors/", "supervision/", "state/", "chat-rooms/", "messaging/", "background/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -116,10 +116,10 @@ test("state and supervision teach distinct operations without another introducti
 
 test("navigation groups getting started, guides and integrations", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Get started", "Why PyBEAM", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Messaging", "Background services", "How Python work runs", "FastAPI", "Litestar", "PyView",
+    "Why PyBEAM", "How Python work runs", "Get started", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Messaging", "Background services", "FastAPI", "Litestar", "PyView",
   ]);
   assert.deepEqual(navigationSections.map(({ label }) => label), ["Get started", "Guides", "Integrations"]);
-  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 7, 3]);
+  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [3, 6, 3]);
   assert.deepEqual(navigationSections.flatMap(({ pages }) => pages), navigation);
   assert.equal(redirects["web/"], "integrations/fastapi/");
   assert.ok(!navigation.some(({ path }) => path === "genstage/"));

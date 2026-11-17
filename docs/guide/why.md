@@ -25,7 +25,7 @@ Two WebSocket clients connect to your app and need to see the same count.
 
 Asyncio tasks are fast and cheap. A million sleeping tasks took about 2.2 GB on Python 3.10 ([2023 benchmark](https://pkolaczk.github.io/memory-consumption-of-async/)) and 1.3 GB on Python 3.13 ([2024 rerun](https://hez2010.github.io/async-runtimes-benchmarks-2024)), and Textual measured about 260,000 tasks created, run and finished per second ([Textual](https://textual.textualize.io/blog/2023/03/08/overhead-of-python-asyncio-tasks/)). A BEAM process is not smaller: it starts at 338 words, about 2.7 KB ([Erlang memory guide](https://www.erlang.org/doc/system/memory.html)), and a million idle processes peaked near 2.6 GiB ([measurement](https://hauleth.dev/post/beam-process-memory-usage/)).
 
-The difference is reach. Every task on an asyncio loop runs in one Python process, so the tasks share its memory and fail with it. PyBEAM runs your actors and tasks as BEAM processes, which are preemptively scheduled, supervised, and can run on another machine.
+The difference is isolation. Every task on an asyncio loop runs in one Python process, so the tasks share its memory and fail with it. PyBEAM runs your actors and tasks as BEAM processes, which are preemptively scheduled and supervised.
 
 | Need | Plain asyncio | PyBEAM |
 | --- | --- | --- |
@@ -36,15 +36,20 @@ The difference is reach. Every task on an asyncio loop runs in one Python proces
 
 ## When to use PyBEAM
 
-PyBEAM spends memory and call overhead on scheduling, supervision and distribution. That trade pays off when work spans connections, processes or machines: web apps with shared state, live updates, and services that must recover from failures. For local processing in one process, such as a script or a batch job, plain asyncio is cheaper and simpler.
+PyBEAM spends memory and call overhead on scheduling, supervision and distribution. That trade pays off when concurrent work shares state or must recover from failures: web apps with shared state, live updates, and long-running services. For local processing in one process, such as a script or a batch job, plain asyncio is cheaper and simpler.
+
+## How it works
+
+PyBEAM runs on the BEAM, Erlang's virtual machine. Each actor and task is a BEAM process, and the BEAM, not an asyncio loop, schedules those processes preemptively across CPU cores. Inside them you still write asyncio code, which runs on erlang-python's `ErlangEventLoop`; the loop takes I/O readiness and timers from the BEAM. A loop runs one coroutine step at a time, and by default tasks share one loop, so CPU-bound code delays the others. [How Python work runs](execution.md) shows how `dedicated_loop` and the execution modes change that.
+
+- Saša Jurić: [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE).
+- Erlang documentation: [Processes](https://www.erlang.org/doc/system/ref_man_processes.html).
 
 ## Limits
 
 - State and messages live in memory and do not survive a restart. Keep durable data in your database.
 - A timeout stops waiting; it does not undo the call. Retrying can repeat its effects.
 - A restarted actor starts from its constructor. The old state and any in-flight calls are lost.
-
-To learn how calls use threads and CPU cores, see [How Python work runs](execution.md).
 
 ## Try it
 
@@ -75,7 +80,3 @@ order-42
 ```
 
 Next, try [shared state](state.md) or [supervision](supervision.md).
-
-## Learn more
-
-PyBEAM uses the [BEAM runtime](https://www.erlang.org/) for scheduling and supervision; Saša Jurić's [The Soul of Erlang and Elixir (GOTO 2019)](https://www.youtube.com/watch?v=JvBT4XBdoUE) introduces the ideas behind it.
