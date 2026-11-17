@@ -29,8 +29,8 @@ async def waiting(payload: bytes) -> bytes:
     if not isinstance(path, str):
         raise ValueError("Expected a path")
     marker = Path(path)
-    await asyncio.to_thread(marker.write_text, "running")
     try:
+        await asyncio.to_thread(marker.write_text, "running")
         await asyncio.sleep(60)
     finally:
         await asyncio.to_thread(marker.write_text, "finished")

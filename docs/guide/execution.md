@@ -27,7 +27,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 - `isolated`: C extensions that can crash or leak. Only that call fails.
 - Separate nodes: more than one machine, or surviving a whole VM failure.
 
-Tasks run in `worker` or `owngil` mode; actors run in `worker`, and `isolated` is not yet available to either. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
+Tasks run in `worker`, `owngil` or `isolated` mode; actors remain in `worker`. An `owngil` task is a plain top-level `async def` that takes and returns JSON bytes, in a module that imports neither pybeam nor Pydantic. `dedicated_loop=True` gives each `worker` task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
 # execution.py
