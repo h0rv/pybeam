@@ -5,10 +5,12 @@
 asyncio's programming model can extend across a cluster, but its loop cannot. A coroutine runs to completion on the loop that started it, so nothing in this design moves suspended coroutines between nodes. A cluster can share three things instead:
 
 1. **A cluster task group.** Start a named `async def` on any node, await its result, and cancel it, with `asyncio.TaskGroup` failure semantics. The task's state lives in memory, and a node crash fails it.
-2. **A durable queue.** `put()` returns only after a replicated store has committed the item to disk on a majority of nodes. A consumer on any node leases the item and acknowledges it when done. If the consumer's node dies, the lease expires and another node retries the item. Delivery is at least once.
+2. **A durable queue.** `put()` returns only after the store has synced the item to disk. A consumer leases the item and acknowledges it when done. If the consumer's node dies, the lease expires and another consumer retries the item. Delivery is at least once.
 3. **Durable execution** (Temporal-style replay of a coroutine's steps). This is out of scope. It needs deterministic replay and versioned code, so it would turn PyBeam into a workflow engine.
 
-The first two map well to asyncio and need no new infrastructure if they use an embedded Raft store. In same-host crash probes, Khepri, the Raft-backed store RabbitMQ uses, kept every acknowledged job and every committed state. Mnesia, which ships with OTP, kept every job but lost recently committed state changes in a full-cluster `kill -9`. Oban is the established BEAM job queue, but it requires Postgres.
+Recommend built-in Mnesia as the default store, starting with one node. Log syncing stays on by default: a per-node group-commit process batches writers, calls `mnesia:sync_log()`, then replies. A write returns only after every active replica has synced. Both synced variants retained acknowledged jobs and states in the crash probes below; unsynced Mnesia regressed states.
+
+Keep one Python API, with the storage backend hidden behind it. Khepri/Ra is a later backend for deployments that need consensus and partition safety on three or more nodes. Oban remains an option for applications that already use Postgres.
 
 None of this is implemented. PyBeam makes no durability claim today.
 
@@ -20,7 +22,7 @@ asyncio is cheap. In the [fan-in measurement](../guide/execution.md#fan-in-10000
 | --- | --- | --- |
 | Run more work than one process can | Run more containers, each with its own isolated loop | Any node can start, await, and cancel a task |
 | Survive a process crash | Work in memory is lost | A node crash fails or retries the work instead of losing it silently |
-| Keep accepted work across a crash | Needs an external broker (Redis, RabbitMQ, Postgres) | A replicated log embedded in the nodes |
+| Keep accepted work across a crash | Needs persistent storage or an external broker | A disk-backed store embedded in the runtime |
 | Bound how much work runs | Semaphores, per process | Admission limits enforced by the BEAM, per node and per queue |
 
 Celery, RQ, Dramatiq and Temporal cover the last two rows with a separate broker or server. The opportunity here is the same asyncio-shaped API with the queue embedded in the runtime the application already runs.
@@ -103,76 +105,127 @@ async def send_welcome_emails() -> None:
             await send_welcome(int(item.payload))
 ```
 
-`put()` returns after a quorum commit. Leaving the `async with` block without an exception acknowledges the item. An exception, a lease timeout, or the consumer's node dying returns the item to the queue with `item.attempt` incremented. A task API such as `await queue.submit(send_welcome, user_id)` can come later, built on the queue and named entries.
+With the proposed default store, `put()` returns after the transaction and a log sync on every active replica (one replica on a single node). Leaving the `async with` block without an exception acknowledges the item. An exception, a lease timeout, or the consumer's node dying returns the item to the queue with `item.attempt` incremented. A task API such as `await queue.submit(send_welcome, user_id)` can come later, built on the queue and named entries.
 
 ### Semantics the API must state
 
-- **Acceptance.** `put()` either commits on a majority or raises. A timeout is `uncertain`: the item may exist. A `key` makes `put()` idempotent, so the caller can retry an uncertain `put()` safely.
+- **Acceptance.** The default Mnesia store returns success only after the transaction and log sync on every active replica. A timeout is `uncertain`: the item may exist. A `key` would make retries of an uncertain `put()` idempotent.
 - **At-least-once delivery.** A consumer can finish its effect and die before it acknowledges, so the item runs again. Consumers must be idempotent. No exactly-once claim.
 - **Leases.** A lease has a duration and a heartbeat. A consumer whose lease expires while it is still running is fenced: its acknowledgment is rejected, and the item's next attempt has already started.
 - **Retries.** Maximum attempts and backoff are queue settings. An item that runs out of attempts moves to a dead-letter state the application can inspect.
-- **Availability.** A three-node cluster tolerates one node down. Without a majority, `put()` and `get()` fail rather than accept work that might be lost. A single node keeps items across a process crash, not across losing its disk.
+- **Availability.** Start with one node: items survive a process crash, not loss of its disk. Symmetric three-node Mnesia survived one node down in the probe, but it does not provide partition protection. A later Khepri backend would require a majority for writes and consistent reads. Hiding the backend must not hide these failure boundaries.
 - **Bounds.** Payload size, queue length and in-flight leases are limited, and overflow raises `Overloaded`.
 
 ## Store options
 
 | Option | Infrastructure | Replication | Fit |
 | --- | --- | --- | --- |
-| [Khepri](https://github.com/rabbitmq/khepri) on [Ra](https://github.com/rabbitmq/ra) | None; embedded in each node | Raft, majority commit, fsync'd WAL | Best fit. RabbitMQ's metadata store; Apache-2.0/MPL-2.0. Lost nothing in the probes below |
-| Mnesia `disc_copies` | None; ships with OTP | Synchronous replication, no consensus | Lost committed state changes in a full crash (below). Has no automatic recovery after a network partition |
+| Mnesia `disc_copies`, with group-commit log sync | None; ships with OTP | Synchronous replication, no consensus | Recommended default, single-node first. Retained acknowledged states in the tested single and symmetric non-majority configurations |
+| [Khepri](https://github.com/rabbitmq/khepri) on [Ra](https://github.com/rabbitmq/ra) | None; embedded in each node | Raft, majority commit, fsync'd WAL | Later backend for 3+ node consensus and partition safety. RabbitMQ's metadata store; Apache-2.0/MPL-2.0. Lost nothing in these probes |
 | [Oban](https://github.com/oban-bg/oban) (Elixir) | Postgres | Postgres | Mature queue with retries, uniqueness, cron. Requires Postgres and an Elixir build in the runtime |
 | [oban](https://pypi.org/project/oban/) 0.8.0 (Python) | Postgres | Postgres | Requires psycopg, psycopg-pool, orjson, click and uvloop (uvloop is used only by its CLI), which conflicts with a standard-library-only PyBeam. Not run on `ErlangEventLoop` |
 | [procrastinate](https://pypi.org/project/procrastinate/) | Postgres | Postgres | Same dependency conflict |
 | DETS or `disk_log` | None | None | Single node only; no replication |
 | Horde, `pg`, `global` | None | Memory only | Placement and discovery, not durability |
 
-Oban remains the right choice for an application that already runs Postgres and wants its queue features. PyBeam could bind Elixir Oban without any Python dependency. The default "no extra infrastructure" path needs an embedded store, and Khepri is the candidate the evidence supports.
+Oban remains a good choice for an application that already runs Postgres and wants its queue features. Binding Elixir Oban would avoid its Python client's dependencies, but still needs Postgres and an Elixir build. Mnesia provides the default embedded-store path without either dependency.
+
+## Mnesia commit paths
+
+`sync_transaction` is not an fsync. In OTP 29.1.2, Mnesia's synchronous log append uses `disk_log:log/blog` ([`mnesia_log.erl:223–259`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_log.erl#L223-L259)). `sync_log()` takes a separate path through `disk_log:sync`, which flushes the cache and calls `file:sync` ([`mnesia_monitor.erl:395–396`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_monitor.erl#L395-L396), [`disk_log_1.erl:1707–1715`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/kernel/src/disk_log_1.erl#L1707-L1715)).
+
+The transaction protocol matters:
+
+- **Majority-enabled tables: syncing the log is insufficient.** Majority metadata selects `asym_trans` ([`mnesia_tm.erl:1379–1387`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_tm.erl#L1379-L1387)). The coordinator queues its committed decision through `mnesia_recover`; that process logs the decision asynchronously ([`mnesia_tm.erl:1692–1704`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_tm.erl#L1692-L1704), [`mnesia_recover.erl:180–181`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_recover.erl#L180-L181), [`252–270`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_recover.erl#L252-L270)). A forced-window witness suspended that process, received write success and `sync_log() = ok` on all three replicas, then killed all nodes. The acknowledged job was missing after restart on every replica.
+- **Single-node and symmetric non-majority tables: the tested commit path supports a later log sync.** `sync_transaction` selects `sync_sym_trans`, with `presume_commit` records ([`mnesia_tm.erl:1174–1243`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_tm.erl#L1174-L1243)). The coordinator synchronously appends its record and waits for participant completion; participants also append before replying ([`1512–1542`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_tm.erl#L1512-L1542), [`302–324`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_tm.erl#L302-L324)). Recovery treats `presume_commit` as committed without a separate decision log ([`mnesia_recover.erl:440–442`](https://github.com/erlang/otp/blob/OTP-29.1.2/lib/mnesia/src/mnesia_recover.erl#L440-L442)). Both configurations survived the same forced-window witness with the recovery process suspended.
+
+These findings cover jobs-only transactions with matching `disc_copies` placement, no majority flag, and no schema changes. They do not cover arbitrary multi-table or asymmetric transactions. The durable probe variants sync every active replica, not just the coordinator. They use documented Mnesia APIs only; suspending the recovery process is test instrumentation, not part of the store.
 
 ## Crash probes
 
-The [probe](probes/durable/) ran three Erlang nodes as separate OS processes on one host, with a separate controller. It enqueued 10,000 jobs, each counted only after the store acknowledged the write. Workers on all three nodes claimed jobs with a compare-and-swap transaction and a 2 s lease, slept 1–5 ms, and marked them done. The controller recorded every execution start outside the nodes it killed.
+The [probe sources](probes/durable/) run one or three Erlang OS processes on one host, plus a separate controller. Each workload enqueues 10,000 acknowledged jobs. Twelve workers claim jobs with compare-and-swap transactions and 2 s leases, sleep 1–5 ms, then mark them done. The controller records acknowledged states and execution starts outside the nodes it kills.
 
-| Measurement | Khepri 0.19.3 / Ra 3.2.0 | Mnesia 4.27.1 `disc_copies` |
-| --- | ---: | ---: |
-| Acknowledged jobs lost after `kill -9` of one node (Raft leader for Khepri) | 0 | 0 |
-| Jobs executed more than once in that run | 0 | 1 |
-| Time from kill to a verified new leader and an acknowledged write | 223 ms | 17 ms (no leader) |
-| Enqueue, one producer, sequential | 1,148 jobs/s | 2,095 jobs/s |
-| Enqueue, 16 concurrent producers | 5,760 jobs/s | 8,203 jobs/s |
-| Claim, run and complete, including the crash and rejoin | 256 jobs/s | 296 jobs/s |
-| Killed node restarted from its data directory and rejoined | Yes | Yes |
-| Jobs missing after `kill -9` of all three nodes | 0 | 0 |
-| Committed states that changed after `kill -9` of all three nodes | 0 | 21 |
-| Data directories after both scenarios | 69 MiB | 6.4 MiB |
+The matrix kills nodes while workers are still claiming and completing jobs. It does not stop workers or read a pre-crash store snapshot. Recovery may be newer than the controller's last acknowledgement; an older state or a conflicting state at the same version counts as a regression. This replaces the earlier stopped-worker snapshot comparison.
 
-In one unsynchronized full-crash run, 21 committed Mnesia states regressed (18 `done` back to `queued`, 1 `done` to `claimed`, 2 `claimed` to `queued`); a later unsynchronized run had none. One run that called `mnesia:sync_log()` on every node before the crash also had none, which is too few runs to prove the cause. The source supports a cause: `sync_transaction` waits for each node to append to `LATEST.LOG` through `disk_log`, and `disk_log` keeps up to 64 KiB or 2 s of writes in VM memory until a sync (OTP 29 `kernel/src/disk_log_1.erl:1638-1664`, `mnesia/src/mnesia_log.erl:218-259`). A committed Mnesia transaction is therefore not yet on disk. Ra's write-ahead log calls `file:datasync` on each batch before it notifies writers (Ra 3.2.0 `src/ra_log_wal.erl`, `flush_pending` and `complete_batch`).
+### Full-crash results
 
-A separate scenario killed the node holding an unfinished lease, once with the Raft leader holding it and once with a follower. In all four runs (two per store), a surviving node reclaimed the job after its 2 s lease expired and finished it on attempt 2. That second attempt is the at-least-once duplicate the API must expose.
+Each Mnesia row lists five trials in order. Khepri ran one full-crash trial. Counts are per workload, not summed across replicas. All replicas recovered identical snapshots.
 
-For the full-cluster crash, the controller stopped workers, snapshotted every committed state, then killed all three nodes. This tests committed data, not transactions in flight. The failover time includes polling and RPC overhead, so it is an upper bound. These are same-host process crashes. They do not test power loss, independent hosts or network partitions, and claim throughput is bounded by the probe's 1–5 ms simulated work and its per-job transactions, not by the store.
+| Store | Replicas | Lost acknowledged jobs | State regressions | Jobs executed more than once |
+| --- | ---: | --- | --- | --- |
+| Mnesia unsynced | 1 | 0 in all trials | 62, 66, 78, 117, 126 | 62, 66, 75, 117, 122 |
+| Mnesia sync-each | 1 | 0 in all trials | 0 in all trials | 1, 11, 9, 12, 7 |
+| Mnesia group-commit | 1 | 0 in all trials | 0 in all trials | 4, 7, 0, 3, 9 |
+| Mnesia unsynced | 3 | 0 in all trials | 106, 35, 160, 110, 6 | 106, 35, 160, 109, 9 |
+| Mnesia sync-each | 3 | 0 in all trials | 0 in all trials | 4, 3, 1, 2, 1 |
+| Mnesia group-commit | 3 | 0 in all trials | 0 in all trials | 6, 2, 10, 9, 4 |
+| Khepri | 3 | 0 | 0 | 8 |
 
-Environment: Erlang/OTP 29.1.2 (ERTS 17.1.1), rebar3 3.28.0, Linux x86-64, 8 logical CPUs, each node `+S 2:2 +A 2`.
+Every three-node store also survived a single-node crash with zero lost jobs or state regressions, and the killed node rejoined. Duplicate-execution job counts were 4 for unsynced Mnesia, 4 for sync-each, 2 for group-commit, and 1 for Khepri. Khepri's actual leader was killed. With one replica, the full-crash test is also the single-node crash test.
+
+A separate held-lease scenario killed a follower and then a leader, once per store. In all four runs, a survivor reclaimed the expired lease and finished on attempt 2. Mnesia has no leader; those labels select the second and first nodes.
+
+### Throughput
+
+Jobs/s, rounded. Sequential and concurrent enqueue each use 10,000 fresh IDs; concurrency is 16. Claim/complete includes simulated work, controller RPCs, and completion checks. The final column also includes the single-node crash and rejoin.
+
+| Store | Replicas | Enqueue sequential | Enqueue concurrent | Claim/complete | Claim/complete with crash |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Mnesia unsynced | 1 | 14,144 | 38,168 | 886 | — |
+| Mnesia sync-each | 1 | 2,206 | 1,585 | 594 | — |
+| Mnesia group-commit | 1 | 288 | 4,013 | 634 | — |
+| Mnesia unsynced | 3 | 3,537 | 14,993 | 2,093 | 1,244 |
+| Mnesia sync-each | 3 | 423 | 2,144 | 540 | 630 |
+| Mnesia group-commit | 3 | 187 | 3,353 | 728 | 501 |
+| Khepri | 3 | 932 | 9,718 | 950 | 445 |
+
+The 1 ms group-commit window slows sequential writes. Under concurrent enqueue it delivered 2.53× sync-each throughput on one replica and 1.56× on three. Batches reached 16 callers. Each three-node batcher handled 40,000 durability requests in about 13,800 `sync_log()` calls. Physical fsync syscall counts were not traced; `disk_log` may also combine concurrent sync requests internally.
+
+### Boundaries and failures
+
+- These are same-host process crashes, not power-loss, disk-loss, independent-host, or partition tests. Symmetric three-node Mnesia has no partition protection. Do not treat its results as consensus guarantees.
+- Log syncing does not prevent duplicate execution after an interrupted claim. Consumers still need idempotent effects.
+- Worker transient exceptions are retried, not individually logged. An initial matrix launch failed because peer code paths were relative; the copied launcher uses absolute build paths. Khepri restart logged discarded replies to old node incarnations; its recovered snapshots still had zero loss or regressions.
+- The matrix does not verify Python integration or payloads larger than 32 bytes.
+
+Environment: Erlang/OTP 29.1.2 (ERTS 17.1.1), Mnesia 4.27.1, Khepri 0.19.3, Ra 3.2.0, rebar3 3.28.0, Linux x86-64, 8 logical CPUs, each node `+S 2:2 +A 2`.
 
 ## Ownership and open decisions
 
-[AGENTS.md](../../AGENTS.md) says PyBeam must not introduce a task queue or workflow engine, and must bind existing BEAM libraries instead of inventing durable queues. Khepri supplies replication and transactions, but leases, retries and dead-lettering on top of it are new queue semantics. Building them needs an explicit decision:
+[AGENTS.md](../../AGENTS.md) keeps queue and workflow engines outside PyBeam's ownership. Mnesia supplies the proposed default storage, not leases, retry policy, fencing, or dead-letter handling. The prototype must settle ownership of those semantics and test lease expiry, uniqueness, and uncertain outcomes before making a product durability claim.
 
-1. **Khepri queue in erlang-python, or a separate Erlang application.** No infrastructure, and it matches the "back-end primitives without extra infrastructure" pitch. The lease protocol would be new code and would need model checking (lease expiry, fencing, uniqueness keys) before any durability claim.
-2. **Bind Elixir Oban.** Reuses a mature queue's semantics, but every deployment needs Postgres.
-
-The recommendation is option 1, with Oban as an optional integration later. Either way, the cluster task group comes first: it needs no storage, and its named-entry transport is the same body shape a durable queue would store.
-
-Not verified: any of these stores driven from Python through erlang-python, Khepri behavior under network partitions, multi-host latency, and payloads larger than 32 bytes.
+Recommend one Python API over a single-node Mnesia store with batched syncing enabled by default. Keep backend selection in deployment configuration. Add Khepri/Ra later for three-or-more-node consensus and partition safety, and leave Oban as an optional integration for Postgres users. None of these queue APIs or store bindings is implemented in PyBeam today.
 
 ## Reproduce
 
+Run the forced-window witnesses first. `majority` should recover a missing job; `single` and `symmetric` should recover the job.
+
 ```bash
 cd docs/research/probes/durable
-mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh store_khepri
-mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh store_mnesia
+mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh witness majority
+mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh witness single
+mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh witness symmetric
+```
+
+Run the matrix with `matrix STORE REPLICAS FULL_CRASH_TRIALS`. All Mnesia matrix runs disable the majority flag.
+
+```bash
+for replicas in 1 3; do
+  for store in store_mnesia store_mnesia_sync_each store_mnesia_synced; do
+    mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh matrix "$store" "$replicas" 5
+  done
+done
+mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh matrix store_khepri 3 1
+```
+
+`run.sh` changes to its own directory and fetches Khepri from Hex. The matrix starts named OS processes, obtains their PIDs with `rpc:call(Node, os, getpid, [])`, and uses `kill -9`. It prints `ENQUEUE`, `WORK`, `ACTIVE`, `CRASH`, `RECOVERY`, and `MATRIX_DONE` lines. Data directories and binary comparison snapshots stay in the ignored probe directory paths; do not commit them.
+
+The earlier stopped-worker and held-lease probes remain available:
+
+```bash
 mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh store_mnesia sync_log
 mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh lease store_khepri
 mise exec erlang@29.1.2 rebar@3.28.0 -- bash run.sh lease store_mnesia
 ```
 
-`run.sh` fetches Khepri from Hex, starts three named nodes, finds each node's OS PID with `rpc:call(Node, os, getpid, [])`, and stops nodes with `kill -9`. The default run prints one `SINGLE_CRASH` and one `FULL_CRASH` line, `sync_log` syncs Mnesia's log before the full crash, and `lease` prints `LEASE_HELD` and `LEASE_RECOVERED` lines for the leader and follower scenarios. Data directories are written under the probe directory.
+The legacy `store_mnesia sync_log` run enables majority and syncs before a snapshot. A zero-mismatch legacy run does not override the forced-window failure above.
