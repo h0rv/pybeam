@@ -138,8 +138,14 @@ async def sender(directory: Path) -> None:
             info = await empty_scope(handles)
             durable_write(directory / "sender-scope.json", Json(type(info)).encode(info).decode())
     # All three persistent native caller Tasks and their contexts have now exited.
-    running = await remote("b", Request(op="result", incarnation=inc, token=token))
-    assert running.status == "pending" and running.worker is not None
+    # B's serving loop picks the job up only after the held receipt releases it.
+    async with asyncio.timeout(5):
+        while True:
+            running = await remote("b", Request(op="result", incarnation=inc, token=token))
+            if running.worker is not None:
+                break
+            await asyncio.sleep(0.01)
+    assert running.status == "pending"
     assert (await remote("b", Request(op="snapshot"))).count == 1
     assert (await remote("b", reservation(inc, "quota-shared", payload))).status == "overloaded"
     assert (
