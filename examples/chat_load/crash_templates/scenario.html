@@ -1,17 +1,4 @@
 <section class="scenario" data-phase="{{ live.phase }}" aria-label="Parallel fault control">
-  <div class="scenario-copy">
-    <p class="eyebrow">{% if live.running %}{{ live.remaining(now) }} S · {% endif %}{% if live.phase == 'baseline' %}BEFORE THE FAULT{% elif live.phase == 'observe' %}FAULT IN ROOM 1 · BOTH STACKS{% elif live.phase == 'recovery' %}RECOVERY{% elif live.phase == 'done' %}TEST COMPLETE{% elif live.phase == 'interrupted' %}TEST INTERRUPTED{% else %}ONE CLICK · BOTH STACKS{% endif %}</p>
-    <h2>{% if live.phase == 'baseline' %}Watch the messages. The fault is next.{% elif live.phase == 'observe' %}{{ live.current.title }}. Watch the other rooms.{% elif live.phase == 'recovery' %}Back online. The interruption stays visible.{% elif live.phase == 'done' %}What the other chat users experienced.{% elif live.phase == 'interrupted' %}Test stopped. No fault was sent.{% else %}Crash Room 1. Watch the other rooms.{% endif %}</h2>
-    <p>{% if live.current %}{{ live.current.simulates }}{% else %}Watch whether the other users have to reconnect.{% endif %}</p>
-  </div>
-  <div class="run-control">
-    <button id="run-crash" class="primary" type="button" data-run data-ready="{{ 'true' if not live.running and live.ready else 'false' }}" hx-post="/run" hx-swap="none" hx-disabled-elt="this" disabled>{% if live.running %}Test running…{% elif not live.ready %}Waiting for both stacks…{% elif live.phase == 'ready' %}Crash Room 1 on both{% else %}Crash Room 1 again{% endif %}</button>
-    <span>{{ live.settings.rooms }} rooms × {{ live.settings.clients }} users per side · {{ live.settings.rate | round(1) }} messages/s/user</span>
-  </div>
-  <ol class="phase-track" aria-label="Test progress">
-    <li{% if live.phase in ('ready', 'baseline', 'interrupted') %} aria-current="step"{% endif %}><span>01</span> Live chat</li>
-    <li{% if live.phase == 'observe' %} aria-current="step"{% endif %}><span>02</span> Fault + watch</li>
-    <li{% if live.phase == 'recovery' %} aria-current="step"{% endif %}><span>03</span> Recover</li>
-    <li{% if live.phase == 'done' %} aria-current="step"{% endif %}><span>04</span> Compare</li>
-  </ol>
+  <button id="run-crash" class="primary" type="button" data-run data-ready="{{ 'true' if not live.running and live.ready else 'false' }}" hx-post="/run" hx-swap="none" hx-disabled-elt="this" disabled>{% if live.running %}Test running…{% elif not live.ready %}Waiting for both stacks…{% elif live.phase == 'ready' %}Crash Room 1 on both{% else %}Crash Room 1 again{% endif %}</button>
+  <p class="phase" role="status">{% if live.phase == 'baseline' %}Crashing in {{ live.remaining(now) }} s.{% elif live.phase == 'observe' %}{{ live.current.title }}. Watching other rooms for {{ live.remaining(now) }} s.{% elif live.phase == 'recovery' %}Allowing {{ live.remaining(now) }} s for recovery.{% elif live.phase == 'done' %}Test complete. Results cover the 10 s after the fault.{% elif live.phase == 'interrupted' %}Test interrupted.{% else %}{{ live.settings.rooms }} rooms × {{ live.settings.clients }} users per stack. {{ live.settings.rate | round(1) }} messages/s/user.{% endif %}</p>
 </section>

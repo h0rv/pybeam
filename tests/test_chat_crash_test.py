@@ -143,7 +143,7 @@ async def test_routes__single_run_is_owned_by_group_and_rejects_cross_origin(
             assert not calls
             result = await client.post("/run")
             assert result.status_code == 200
-            assert "BEFORE THE FAULT" in result.text
+            assert "Crashing in" in result.text
             assert "disabled" in result.text
             assert live.running
             assert (await client.post("/run", headers={"origin": "http://test"})).status_code == 409

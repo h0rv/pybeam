@@ -14,12 +14,8 @@
 <body>
 <main>
   <header class="page-header">
-    <div class="masthead">
-      <span class="wordmark"><svg class="brand-mark" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h11M3 12h18M3 19h11"/></svg>PyBEAM<span class="demo-label">/ crash test</span></span>
-      <span class="live-label"><span aria-hidden="true"></span>REAL CONNECTIONS. REAL FAULTS.</span>
-    </div>
-    <h1>One room crashes. <em>Who else notices?</em></h1>
-    <p class="intro">Same traffic. Same native crash in Room 1. Follow the conversations in the other rooms.</p>
+    <h1>PyBEAM <span>/ crash test</span></h1>
+    <p class="intro">Crash Room 1 on both stacks. See whether users in other rooms get disconnected.</p>
   </header>
   <p id="stream-status" role="status"><span id="stream-message">Connecting to the live view…</span> <a href="/">Reload live view</a></p>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
@@ -27,7 +23,7 @@
     {% include 'rooms.html' %}
   </div>
   <details class="explanation">
-    <summary>How this works · try two other failures</summary>
+    <summary>How this works</summary>
     <p>These are scripted messages over real connections, not an animation. “Confirmed” means the server acknowledged the send, not that another user read it. Both sides use the same messages and sending rate.</p>
     <p>The usual stack has 8 web workers, a KV cache, a message broker and a task-queue worker. Its fault runs in a web worker. PyBEAM runs the crash in an isolated child process; CPU work and exceptions use separate worker tasks. The configurations have different failure boundaries by design. This is not a throughput comparison.</p>
     <p>Each test waits 4 s, injects the same fault on both sides concurrently, watches the other rooms for 10 s, then allows 5 s for recovery. The displayed user switches to an actually affected user, matched across both sides. Connections retry without replay. “Unconfirmed” means a pending send was discarded at disconnect; it might have reached the server.</p>
@@ -38,7 +34,6 @@
     </div>
     <p>Wait for a test to finish before starting another. Results describe the latest test only.</p>
   </details>
-  <footer><span>PyBEAM / live crash test</span><p>Scripted users. Real requests. Results from this run, not a recording.</p></footer>
 </main>
 </body>
 </html>
