@@ -7,6 +7,7 @@ uv add python-beam
 ```
 
 ```python
+# hello.py
 import pybeam
 
 
@@ -18,7 +19,10 @@ if __name__ == "__main__":
     pybeam.run(main)
 ```
 
-Save this as `main.py` and run `python main.py`. It prints `Hello from Python`.
+```console
+$ uv run hello.py
+Hello from Python
+```
 
 `pybeam.run` starts PyBEAM, runs `main`, and shuts down when `main` returns. Pass the function, not `main()`. Inside `main`, write ordinary async Python. PyBEAM requires Python 3.14.
 

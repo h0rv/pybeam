@@ -1,3 +1,4 @@
+# genstage_transform.py
 from dataclasses import dataclass
 from typing import Literal
 
@@ -12,6 +13,5 @@ class Work:
 
 
 def uppercase(payload: bytes) -> bytes:
-    # Parse one request before using its fields.
     work = Json(Work).decode(payload)
     return work.text.upper().encode("utf-8")

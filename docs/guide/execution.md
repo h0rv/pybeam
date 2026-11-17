@@ -30,6 +30,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 Tasks and actors run in `worker` mode; `owngil` and `isolated` are not yet available to them. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
+# execution.py
 from pybeam import run
 from pybeam.codec import Json
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskSupervisor
@@ -51,8 +52,10 @@ async def main() -> None:
         dedicated_loop=True,
     )
     limits = TaskLimits(capacity=4, max_bytes=4096, shutdown_ms=1000)
+
     async with TaskSupervisor(limits) as supervisor:
         tasks = [await supervisor.start(job, 3_000_000) for _ in range(4)]
+
         for task in tasks:
             print(await task)
 
@@ -61,7 +64,15 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints the same checksum four times. On 3.14 the four tasks take turns. On 3.14t they run on four threads at once; in a local run four took 0.43 s against 0.32 s for one. Threads that touch the same Python object contend for it on 3.14t, so keep hot objects per task, and time your own workload before you count on parallel tasks.
+```console
+$ uv run execution.py
+637018976
+637018976
+637018976
+637018976
+```
+
+On 3.14 the four tasks take turns. On 3.14t they run on four threads at once; in a local run four took 0.43 s against 0.32 s for one. Threads that touch the same Python object contend for it on 3.14t, so keep hot objects per task, and time your own workload before you count on parallel tasks.
 
 ## Fan out: four CPU jobs
 
@@ -96,6 +107,6 @@ Subinterpreters isolate Python state, not native crashes. Only a separate OS pro
 | `worker` · 3.14 | 8, at most 32 calls admitted | 2.7 KB | 232 ms | 2.59 s |
 | `worker` · 3.14t | 8, at most 32 calls admitted | 2.7 KB | 258 ms | 1.80 s |
 
-For empty calls on one machine, asyncio is cheaper and faster. What the BEAM callers add: each one is preemptively scheduled, supervised and can live on another node, and the admission limit bounds how much Python work runs at once.
+Asyncio is fast and simple, but each event loop lives in one Python process, often inside a container; its tasks are isolated from other processes and lost if that process crashes. PyBEAM callers are preemptively scheduled and supervised, and can run on another machine. The admission limit bounds how much Python work runs at once.
 
 Numbers on this page come from one 8-core machine and vary with hardware and load.
