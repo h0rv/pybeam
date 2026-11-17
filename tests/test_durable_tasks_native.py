@@ -97,6 +97,8 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
             {Peer, Node}
         end || Name <- [durable_py_a, durable_py_b, durable_py_c]],
         try
+            [pong = peer:call(P, net_adm, ping, [N])
+             || {P, Local} <- Peers, {_, N} <- Peers, N =/= Local],
             Nodes = [atom_to_binary(N) || {_, N} <- Peers],
             Contexts = [begin
                 ok = peer:call(P, file, set_cwd, [filename:join(DIRECTORY, integer_to_list(I))]),
