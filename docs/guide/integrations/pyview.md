@@ -18,7 +18,7 @@ from pyview.template.template_view import TemplateView
 from uvicorn import Config, Server
 
 from pybeam.integrations.hornbeam import Services, run
-from pybeam.integrations.pyview.dependencies import beam_services, provider
+from pybeam.integrations.pyview.dependencies import services
 
 
 @dataclass
@@ -32,7 +32,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self,
         socket: LiveViewSocket[CounterState],
         session: Session,
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         count = await beam.incr("visits", 0, namespace="pyview")
         socket.context = CounterState(count)
@@ -41,7 +41,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self,
         event: str,
         socket: LiveViewSocket[CounterState],
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         if event == "increment":
             count = await beam.incr("visits", namespace="pyview")
@@ -55,7 +55,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         </main>"""
 
 
-app = PyView(lifespan=provider.lifespan)
+app = PyView(lifespan=services.lifespan)
 app.add_live_view("/", CounterView)
 
 
@@ -81,7 +81,7 @@ $ uv run pyview_app.py
 
 Open [localhost:8769](http://127.0.0.1:8769/) in your browser. The counter starts at `0`; clicking **Increment** shows `1`.
 
-`provider.lifespan` connects once for the application. `Depends(beam_services)` passes the shared services to each handler. Connected handlers use the WebSocket's ownership scope; the initial HTTP render uses the application connection. Dependencies require an active application lifespan. Do not create subscriptions during the initial HTTP render.
+`services.lifespan` connects once for the application. `Depends(services)` passes the shared services to each handler. Connected handlers use the WebSocket's ownership scope; the initial HTTP render uses the application connection. Dependencies require an active application lifespan. Do not create subscriptions during the initial HTTP render.
 
 Each view reads the shared counter when it mounts or increments. Other open views do not refresh automatically in this example. Values live in memory and are lost when the program stops. Stop the server with Ctrl+C.
 

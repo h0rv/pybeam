@@ -14,9 +14,4 @@ class BeamProvider(ServicesProvider):
         return beam
 
 
-provider = BeamProvider()
-
-
-def beam_services[T](socket: LiveViewSocket[T]) -> Services:
-    """Use with Depends in mount and event handlers, not constructors or info handlers."""
-    return provider(socket)
+services = BeamProvider()

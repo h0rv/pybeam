@@ -24,7 +24,7 @@ from examples.pyview.main import (
 )
 from pybeam.integrations.hornbeam import Services
 from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
-from pybeam.integrations.pyview.dependencies import beam_services, provider
+from pybeam.integrations.pyview.dependencies import services
 from pybeam.integrations.pyview.subscriptions import ViewSubscription
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState
@@ -120,10 +120,10 @@ async def test_wait__cancelled_observer__should_leave_owned_consumer_running() -
 
 async def test_lifespan__outside_hornbeam__should_fail_without_memory_fallback() -> None:
     with pytest.raises(RuntimeUnavailable):
-        async with provider.lifespan(app):
+        async with services.lifespan(app):
             pytest.fail("startup unexpectedly succeeded outside Hornbeam")
     with pytest.raises(RuntimeError, match="active application lifespan"):
-        _ = provider.services
+        _ = services.services
 
 
 async def test_close__before_first_task_step__should_release_subscription() -> None:
@@ -252,9 +252,9 @@ async def client(monkeypatch: pytest.MonkeyPatch) -> AsyncGenerator[AsyncClient]
     async def connect() -> Beam:
         return Beam(bridge, owner="explicit-test-double")
 
-    monkeypatch.setattr(provider, "_connect", connect)
+    monkeypatch.setattr(services, "_connect", connect)
     async with (
-        provider.lifespan(app),
+        services.lifespan(app),
         AsyncClient(transport=ASGITransport(app=app), base_url="http://demo") as client,
     ):
         yield client
@@ -275,7 +275,7 @@ async def test_http_demo__should_serve_readiness_root_and_packaged_client(
     assert 'href="/demo-static/missing.min.css"' in page.text
     assert 'rel="icon" href="data:,"' in page.text
     assert (await client.get("/static/assets/app.js")).status_code == 200
-    assert await provider.services.subscription_count() == 0
+    assert await services.services.subscription_count() == 0
 
 
 async def test_live_form__should_retain_amount_and_publish_invalidation(
@@ -283,11 +283,11 @@ async def test_live_form__should_retain_amount_and_publish_invalidation(
 ) -> None:
     view = CounterView()
     socket = UnconnectedSocket[CounterState]()
-    await view.mount(socket, {}, beam=provider(socket))
-    async with provider.services.subscribe("demo:counter") as subscription:
-        await view.handle_event("amount", socket, "10", beam=provider(socket))
+    await view.mount(socket, {}, beam=services(socket))
+    async with services.services.subscribe("demo:counter") as subscription:
+        await view.handle_event("amount", socket, "10", beam=services(socket))
         assert (await client.get("/counter")).text == "0"
-        await view.handle_event("increment", socket, "10", beam=provider(socket))
+        await view.handle_event("increment", socket, "10", beam=services(socket))
         assert await subscription.receive() == b"changed"
     assert socket.context.amount == 10
     assert socket.context.error == ""
@@ -298,8 +298,8 @@ async def test_live_form__should_retain_amount_and_publish_invalidation(
 async def test_live_form__invalid_amount__should_reject(client: AsyncClient, amount: str) -> None:
     view = CounterView()
     socket = UnconnectedSocket[CounterState]()
-    await view.mount(socket, {}, beam=provider(socket))
-    await view.handle_event("increment", socket, amount, beam=provider(socket))
+    await view.mount(socket, {}, beam=services(socket))
+    await view.handle_event("increment", socket, amount, beam=services(socket))
     assert socket.context.error == "Amount must be an integer from 1 to 10."
     assert socket.context.amount == 1
     assert (await client.get("/counter")).text == "0"
@@ -359,23 +359,23 @@ async def test_actual_socket__should_render_tstrings_and_expose_swallowed_output
         websocket, "lv:test", view, AsyncIOScheduler(), NoOpInstrumentation()
     )
 
-    def handler(services: Services = Depends(beam_services)) -> Services:  # noqa: B008
-        return services
+    def handler(beam: Services = Depends(services)) -> Services:
+        return beam
 
     context = BindContext(Params({}), None, None, socket, None)
     result = await Binder[CounterState]().abind(handler, context)
     assert result.success, result.errors
-    scoped = result.bound_args["services"]
+    scoped = result.bound_args["beam"]
     assert isinstance(scoped, Beam)
     assert scoped.owner == "actual-pyview-socket"
     del websocket.scope["extensions"]
     with pytest.raises(RuntimeError, match="scope has no Hornbeam owner"):
-        beam_services(socket)
+        services(socket)
     websocket.scope["extensions"] = {"hornbeam.owner": "actual-pyview-socket"}
-    beam = provider.services
-    await view.mount(socket, {}, beam=provider(socket))
+    beam = services.services
+    await view.mount(socket, {}, beam=services(socket))
     try:
-        await view.handle_event("amount", socket, "10", beam=provider(socket))
+        await view.handle_event("amount", socket, "10", beam=services(socket))
         assert await beam.incr("shared", 7, namespace="demo") == 7
         assert await beam.publish("demo:counter", b"stale or arbitrary invalidation") == 1
         async with asyncio.timeout(1):

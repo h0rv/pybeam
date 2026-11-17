@@ -13,7 +13,7 @@ from pyview.template.template_view import TemplateView
 from uvicorn import Config, Server
 
 from pybeam.integrations.hornbeam import Services, run
-from pybeam.integrations.pyview.dependencies import beam_services, provider
+from pybeam.integrations.pyview.dependencies import services
 
 
 @dataclass
@@ -27,7 +27,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self,
         socket: LiveViewSocket[CounterState],
         session: Session,
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         count = await beam.incr("visits", 0, namespace="pyview")
         socket.context = CounterState(count)
@@ -36,7 +36,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self,
         event: str,
         socket: LiveViewSocket[CounterState],
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         if event == "increment":
             count = await beam.incr("visits", namespace="pyview")
@@ -50,7 +50,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         </main>"""
 
 
-app = PyView(lifespan=provider.lifespan)
+app = PyView(lifespan=services.lifespan)
 app.add_live_view("/", CounterView)
 
 

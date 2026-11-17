@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from pybeam.integrations.hornbeam import Services
-from pybeam.integrations.pyview.dependencies import beam_services, provider
+from pybeam.integrations.pyview.dependencies import services
 from pybeam.integrations.pyview.subscriptions import ViewSubscription
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         self,
         socket: LiveViewSocket[CounterState],
         session: Session,
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         socket.context = CounterState(0)
         self._beam = beam
@@ -74,7 +74,7 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
         event: str,
         socket: LiveViewSocket[CounterState],
         amount: str = "",
-        beam: Services = Depends(beam_services),  # noqa: B008
+        beam: Services = Depends(services),
     ) -> None:
         if event not in {"increment", "amount"}:
             message = "unexpected counter event"
@@ -153,17 +153,17 @@ class Increment(BaseModel):
 
 
 async def health(_request: Request) -> Response:
-    await provider.services.incr("shared", 0, namespace="demo")
+    await services.services.incr("shared", 0, namespace="demo")
     return PlainTextResponse("ok")
 
 
 async def counter(_request: Request) -> Response:
-    value = await provider.services.incr("shared", 0, namespace="demo")
+    value = await services.services.incr("shared", 0, namespace="demo")
     return PlainTextResponse(str(value))
 
 
 app = PyView(
-    lifespan=provider.lifespan,
+    lifespan=services.lifespan,
     routes=[
         Route("/health", health, methods=["GET"]),
         Route("/counter", counter, methods=["GET"]),

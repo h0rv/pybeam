@@ -7,7 +7,7 @@ from pyview.live_socket import UnconnectedSocket
 from pyview.pyview import PyView
 
 from pybeam.integrations.hornbeam import Services
-from pybeam.integrations.pyview.dependencies import BeamProvider, beam_services, provider
+from pybeam.integrations.pyview.dependencies import BeamProvider, services
 from tests.fakes import FakeServices, ServiceState
 
 
@@ -20,25 +20,25 @@ async def test_binder_injects_socket_into_dependency(monkeypatch: pytest.MonkeyP
         calls += 1
         return beam
 
-    monkeypatch.setattr(provider, "_connect", connect)
+    monkeypatch.setattr(services, "_connect", connect)
     socket = UnconnectedSocket[int]()
 
-    async def handler(services: Services = Depends(beam_services)) -> None:  # noqa: B008
-        assert services is beam
+    async def handler(beam: Services = Depends(services)) -> None:
+        assert isinstance(beam, FakeServices)
 
-    app = PyView(lifespan=provider.lifespan)
+    app = PyView(lifespan=services.lifespan)
     async with app.router.lifespan_context(app):
         context = BindContext(Params({}), None, None, socket, None)
         result = await Binder[int]().abind(handler, context)
         assert result.success, result.errors
-        assert result.bound_args["services"] is beam
-        await handler(beam_services(socket))
+        assert result.bound_args["beam"] is beam
+        await handler(services(socket))
         with pytest.raises(RuntimeError, match="already running"):
-            async with provider.lifespan(app):
+            async with services.lifespan(app):
                 pytest.fail("nested lifespan accepted")
     assert calls == 1
     with pytest.raises(RuntimeError, match="active application lifespan"):
-        beam_services(socket)
+        services(socket)
 
 
 async def test_failed_startup_can_be_retried() -> None:
