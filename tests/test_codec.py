@@ -114,6 +114,8 @@ def test_mapping_keys__integer_enums_and_literals_round_trip() -> None:
     assert by_literal.decode(by_literal.encode({1: 2, "a": 3})) == {1: 2, "a": 3}
     with pytest.raises(CodecError, match="unexpected key"):
         by_level.decode(b'{"2":"x"}')
+    with pytest.raises(TypeError, match="distinct"):
+        Json(dict[Literal[1, "1"], int])
 
 
 def test_union__unhashable_set_members_fall_through_to_later_options() -> None:

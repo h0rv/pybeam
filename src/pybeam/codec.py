@@ -341,6 +341,22 @@ class _Dict(_Node):
         self.key = key
         self.item = item
         self.accepts = accepts
+        match key:
+            case _Literal():
+                options: tuple[object, ...] = key.values
+            case _Enum():
+                options = tuple(key.cls)
+            case _:
+                options = ()
+        self.options: dict[str, object] = {}
+        for option in options:
+            try:
+                text = self._dump_key(option)
+            except _Invalid:
+                continue
+            if text in self.options:
+                raise TypeError("Mapping keys must have distinct JSON forms: " + repr(text))
+            self.options[text] = option
 
     def _load_key(self, key: object) -> object:
         if not isinstance(key, str):
@@ -350,20 +366,11 @@ class _Dict(_Node):
                 return int(key)
             except ValueError as error:
                 raise _Invalid("expected an integer key, got " + repr(key)) from error
-        match self.key:
-            case _Literal():
-                options: tuple[object, ...] = self.key.values
-            case _Enum():
-                options = tuple(self.key.cls)
-            case _:
-                return key
-        for option in options:
-            try:
-                if self._dump_key(option) == key:
-                    return option
-            except _Invalid:
-                continue
-        raise _Invalid("unexpected key " + repr(key))
+        if not isinstance(self.key, _Literal | _Enum):
+            return key
+        if key not in self.options:
+            raise _Invalid("unexpected key " + repr(key))
+        return self.options[key]
 
     def _dump_key(self, key: object) -> str:
         dumped = self.key.dump(key)
@@ -519,7 +526,9 @@ def _build(form: object, memo: dict[object, _Node]) -> _Node:
         case _ if container is frozenset:
             return _Array(item, "frozenset", (frozenset,))
         case _ if container is tuple:
-            if origin is None or (len(arguments) == 2 and arguments[1] is Ellipsis):
+            if form == tuple[()]:
+                return _Tuple(())
+            if not arguments or (len(arguments) == 2 and arguments[1] is Ellipsis):
                 return _Array(item, "tuple", (tuple,))
             return _Tuple(tuple(_build(entry, memo) for entry in arguments))
         case _ if container is dict or container is Mapping:
