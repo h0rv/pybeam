@@ -1,12 +1,12 @@
 # How Python work runs
 
-A BEAM process costs about 2.7 KB, so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Many processes share a small pool of Python contexts, and you choose how each context runs Python.
+A BEAM process costs about 2.7 KB, so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Each task or actor gets a Python context, limits cap how many run at once, and you choose how each context runs Python.
 
 ## From a BEAM process to Python
 
-![A BEAM process sends a call to a mailbox. A bounded pool of Python contexts takes calls. Each context runs as worker, owngil or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
+![A BEAM process sends a call to a mailbox. A Python context takes the call. Each context runs as worker, owngil or isolated. The result returns as a message, or a crash signal goes to the supervisor.](assets/call-path.svg)
 
-1. Your task or actor is a BEAM process. Calls wait in its mailbox until a context is free; a million callers become a queue, not a million interpreters.
+1. Your task or actor is a BEAM process. Calls wait in its mailbox until its context is free, and `TaskLimits` or an actor group's `max_children` caps how many contexts exist, so a million callers become a queue, not a million interpreters.
 2. A context owns one OS thread. Its mode decides which interpreter and GIL run your code.
 3. The result comes back as a message. If the context dies, its supervisor gets a crash signal and starts a fresh one. Supervision restarts the context; it does not replay the call or keep its in-memory state.
 
@@ -27,7 +27,7 @@ Each mode trades startup, memory and call cost for parallelism and crash isolati
 - `isolated`: C extensions that can crash or leak. Only that call fails.
 - Separate nodes: more than one machine, or surviving a whole VM failure.
 
-Choose a mode per task with `execution`. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
+Tasks and actors run in `worker` mode; `owngil` and `isolated` are not yet available to them. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
 from pydantic import TypeAdapter
