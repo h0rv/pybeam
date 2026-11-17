@@ -201,7 +201,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
                 },
             )
         return Response(
-            "".join(Json(type(trial)).encode(trial).decode() + "\n" for trial in job.trials),
+            "".join(trial.model_dump_json() + "\n" for trial in job.trials),
             media_type="application/x-ndjson",
             headers={"Content-Disposition": "attachment; filename=trials.jsonl"},
         )

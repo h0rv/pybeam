@@ -15,7 +15,6 @@ from playwright.sync_api import Locator, expect, sync_playwright
 from benchmarks.ownership import identity, resolve
 from benchmarks.runner import TrialSummary, measurement_lock
 from examples.showcase.catalog import ROOT
-from pybeam.codec import Json
 
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
@@ -98,7 +97,7 @@ def test_showcase__actual_chrome_controls_and_evidence(
                 )
                 assert href is not None
                 evidence = page.request.get(BASE + href).text()
-                result = Json(TrialSummary).decode(evidence.strip())
+                result = TrialSummary.model_validate_json(evidence.strip())
                 assert result.outcome.status == "passed"
                 assert result.completed == 100
                 assert result.throughput_per_second is not None
@@ -126,7 +125,9 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "href"
                 )
                 assert href is not None
-                stopped = Json(TrialSummary).decode(page.request.get(BASE + href).text().strip())
+                stopped = TrialSummary.model_validate_json(
+                    page.request.get(BASE + href).text().strip()
+                )
                 assert not stopped.outcome.cleanup_survivors
                 assert stopped.outcome.forced_cleanup_count >= 1
                 assert (
@@ -191,7 +192,9 @@ def test_showcase__actual_chrome_controls_and_evidence(
                     "link", name="Download actual trials.jsonl"
                 ).get_attribute("href")
                 assert href is not None
-                failure = Json(TrialSummary).decode(page.request.get(BASE + href).text().strip())
+                failure = TrialSummary.model_validate_json(
+                    page.request.get(BASE + href).text().strip()
+                )
                 assert failure.outcome.cleanup_state == "confirmed"
                 assert not failure.outcome.cleanup_survivors
                 assert all(resolve(value) is None for value in captured)

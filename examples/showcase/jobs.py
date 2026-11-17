@@ -194,7 +194,7 @@ class Jobs:
                     budget=walkthrough_budget(),
                     adapter_command=(sys.executable, "-m", "examples.showcase.distributed"),
                 )
-            (job.directory / "config.json").write_text(Json(type(config)).encode(config).decode())
+            (job.directory / "config.json").write_text(config.model_dump_json())
             control = Control(
                 owner=identity(os.getpid()), stop_file=str(job.directory / "stop.request")
             )
@@ -210,7 +210,7 @@ class Jobs:
                 "--output",
                 str(job.directory / "result"),
                 "--control",
-                Json(type(control)).encode(control).decode(),
+                control.model_dump_json(),
             )
             try:
                 with (job.directory / "runner.log").open("wb") as log:
@@ -233,17 +233,19 @@ class Jobs:
                     job = replace(
                         job,
                         trials=tuple(
-                            Json(TrialSummary).decode(line)
+                            TrialSummary.model_validate_json(line)
                             for line in path.read_text().splitlines()
                         ),
                     )
                 provenance = job.directory / "result/provenance.json"
                 if provenance.is_file():
-                    job = replace(job, provenance=Json(Provenance).decode(provenance.read_text()))
+                    job = replace(
+                        job, provenance=Provenance.model_validate_json(provenance.read_text())
+                    )
                 job = replace(
                     job,
                     results=tuple(
-                        Json(AdapterResult).decode(
+                        AdapterResult.model_validate_json(
                             (
                                 job.directory
                                 / "result"

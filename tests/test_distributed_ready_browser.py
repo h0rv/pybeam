@@ -27,7 +27,7 @@ def wait_audit(path: Path, *, subscribers: int) -> Audit:
     deadline = time.monotonic() + 5
     while True:
         if path.is_file():
-            audit = Json(Audit).decode(path.read_bytes())
+            audit = Audit.model_validate_json(path.read_bytes())
             if audit.subscribers == subscribers:
                 return audit
         assert time.monotonic() < deadline
@@ -112,7 +112,7 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     (tmp_path / "download.json").write_bytes(download.content)
                     for forbidden in ("cookie", "token", "payload", "directory", str(ROOT)):
                         assert forbidden not in download.text
-                    audit = Json(Audit).decode(audit_path.read_bytes())
+                    audit = Audit.model_validate_json(audit_path.read_bytes())
                     run = audit.jobs[0]
                     assert run.proof == proof and run.outcome is not None
                     assert run.outcome.forced_cleanup_count == 0
@@ -135,7 +135,7 @@ def test_native_browser__finite_run_cancel_sse_and_owned_sigterm(tmp_path: Path)
                     assert response.status == 204
                     route.fulfill(response=response)
                     expect(live).to_have_attribute("data-status", "stopped")
-                    audit = Json(Audit).decode(audit_path.read_bytes())
+                    audit = Audit.model_validate_json(audit_path.read_bytes())
                     cancelled = audit.jobs[-1]
                     assert cancelled.outcome is not None and cancelled.registry is not None
                     assert not cancelled.outcome.cleanup_survivors

@@ -15,7 +15,6 @@ import pytest
 from playwright.async_api import Page, Request, Route, async_playwright, expect
 
 from examples.discord_demo.main import Resources
-from pybeam.codec import Json
 from pybeam.runtime.ownership import identity, resolve
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -309,7 +308,7 @@ async def test_miniapp__nonreading_output_peer_releases_native_subscription(
                 async with asyncio.timeout(5):
                     while await reader.read(65536):
                         pass
-                print("Nonreading peer retired:", Json(type(final)).encode(final).decode())
+                print("Nonreading peer retired:", final.model_dump_json())
             finally:
                 writer.close()
                 await writer.wait_closed()
@@ -447,7 +446,7 @@ async def test_miniapp__leave_rejoin_rejects_captured_old_form_and_preserves_rec
                 captured["generation"],
                 "membership revision 0 -> 1; native receipts A=3 B=2; stale form rejected;",
                 "drained resources:",
-                Json(type(final)).encode(final).decode(),
+                final.model_dump_json(),
             )
         finally:
             release_ack.set()
@@ -577,7 +576,7 @@ async def send(page: Page, text: str) -> None:
 async def resource_counts(page: Page, url: str) -> Resources:
     response = await page.request.get(url + "/resources")
     assert response.ok
-    return Json(Resources).decode(await response.body())
+    return Resources.model_validate_json(await response.body())
 
 
 async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
@@ -714,7 +713,7 @@ async def test_miniapp__two_chrome_sessions_push_ack_race_and_native_restart(
                 "other room:",
                 other_pid,
                 "drained resources:",
-                Json(type(final)).encode(final).decode(),
+                final.model_dump_json(),
             )
         finally:
             release_ack.set()

@@ -75,7 +75,7 @@ def test_composition__outer_ack_owns_every_executable_birth_without_sampling(
                 (tmp_path / "release").touch()
             process.wait(timeout=15)
             assert process.returncode == 0, (tmp_path / "guardian.log").read_text()
-            outcome = Json(Outcome).decode((tmp_path / "outcome.json").read_text())
+            outcome = Outcome.model_validate_json((tmp_path / "outcome.json").read_text())
             assert outcome.cleanup_state == "confirmed" and not outcome.cleanup_survivors
             assert all(resolve(birth) is None for birth in captured)
             assert (tmp_path / "registration.closed").is_file()

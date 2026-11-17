@@ -36,7 +36,7 @@ def created_job(audit: Audit, previous: frozenset[str]) -> JobAudit | None:
 def wait_created(path: Path, previous: frozenset[str]) -> JobAudit:
     deadline = time.monotonic() + 10
     while True:
-        job = created_job(Json(Audit).decode(path.read_bytes()), previous)
+        job = created_job(Audit.model_validate_json(path.read_bytes()), previous)
         if job is not None:
             return job
         assert time.monotonic() < deadline, "No new authoritative job ID"
@@ -160,9 +160,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         assert resolve(server_birth) is not None
                         assert all(resolve(node.birth) is not None for node in ready.nodes)
                         before = wait_audit(audit_path, subscribers=2)
-                        (tmp_path / "before-sigterm.json").write_text(
-                            Json(type(before)).encode(before).decode()
-                        )
+                        (tmp_path / "before-sigterm.json").write_text(before.model_dump_json())
                         started = time.monotonic()
                         process.terminate()
                         process.wait(timeout=ACK_DEADLINE)
@@ -171,7 +169,7 @@ def test_controlled_native__active_job_identity_cleanup_and_sse(
                         )
                         assert process.returncode in (0, -15)
                         assert resolve(server_birth) is None
-                    audit = Json(Audit).decode(audit_path.read_bytes())
+                    audit = Audit.model_validate_json(audit_path.read_bytes())
                     actual = next(item for item in audit.jobs if item.id == job.id)
                     assert actual.outcome is not None and actual.registry is not None
                     assert actual.outcome.status == "cancelled"

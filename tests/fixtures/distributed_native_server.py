@@ -1,13 +1,12 @@
 import asyncio
 import socket
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 import pytest
 import uvicorn
-from pydantic import field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from benchmarks.contract import Config as RunConfig
 from benchmarks.contract import Outcome, ResourceSample
@@ -20,8 +19,9 @@ from pybeam.codec import Json
 from pybeam.runtime.ownership import Registry, durable_write
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class JobAudit:
+class JobAudit(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
     id: str
     status: str
     directory: Path
@@ -32,8 +32,9 @@ class JobAudit:
     peak_sample: ResourceSample | None = None
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Audit:
+class Audit(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
     subscribers: int
     close_calls: int
     jobs: tuple[JobAudit, ...]
@@ -62,7 +63,7 @@ def serve(
                 resources = trial / "resources.jsonl"
                 samples = (
                     tuple(
-                        Json(ResourceSample).decode(line)
+                        ResourceSample.model_validate_json(line)
                         for line in resources.read_text().splitlines(keepends=True)
                         if line.endswith("\n")
                     )
@@ -97,7 +98,7 @@ def serve(
                         registry=Json(Registry).decode(registry.read_bytes())
                         if registry.is_file()
                         else None,
-                        outcome=Json(Outcome).decode(outcome.read_bytes())
+                        outcome=Outcome.model_validate_json(outcome.read_bytes())
                         if outcome.is_file()
                         else None,
                         peak_sample=max(
@@ -109,23 +110,11 @@ def serve(
                 )
             durable_write(
                 audit,
-                Json(
-                    type(
-                        Audit(
-                            subscribers=len(self.subscribers),
-                            close_calls=self.close_calls,
-                            jobs=tuple(jobs),
-                        )
-                    )
-                )
-                .encode(
-                    Audit(
-                        subscribers=len(self.subscribers),
-                        close_calls=self.close_calls,
-                        jobs=tuple(jobs),
-                    )
-                )
-                .decode(),
+                Audit(
+                    subscribers=len(self.subscribers),
+                    close_calls=self.close_calls,
+                    jobs=tuple(jobs),
+                ).model_dump_json(),
             )
 
         @override
