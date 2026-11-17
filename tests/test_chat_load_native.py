@@ -8,12 +8,33 @@ from pathlib import Path
 
 import httpx
 import pytest
+from websockets.asyncio.client import connect
 
+from examples.chat_load.protocol import Fault
 from examples.chat_load.traffic import Plan, simulate
 
 pytestmark = pytest.mark.runtime
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+async def faults(url: str) -> None:
+    async with (
+        httpx.AsyncClient(base_url=url, timeout=10) as client,
+        connect(url.replace("http://", "ws://") + "/rooms/fault-probe/ws?client=probe") as socket,
+    ):
+        for kind in ("raise", "hog", "abort"):
+            response = await client.post(
+                "/rooms/fault-probe/faults/" + kind, params={"seconds": 0.1}
+            )
+            assert response.status_code == 200, response.text
+            expected = Fault(kind=kind, outcome="completed" if kind == "hog" else "contained")
+            assert Fault.model_validate_json(response.content) == expected
+            async with asyncio.timeout(5):
+                assert Fault.model_validate_json(await socket.recv()) == expected
+            assert (await client.get("/health")).status_code == 200
+        for path in ("unknown", "hog?seconds=0", "hog?seconds=6", "hog?seconds=nan"):
+            assert (await client.post("/rooms/fault-probe/faults/" + path)).status_code == 422
 
 
 def free_port() -> int:
@@ -63,6 +84,7 @@ def test_native__chat_rooms_share_counters_fanout_and_jobs(
                     time.sleep(0.1)
             plan = Plan(url, rooms=2, clients=3, seconds=2, rate=5, jobs=5, job_size=1000)
             report = asyncio.run(simulate(plan, [process.pid]))
+            asyncio.run(faults(url))
         finally:
             process.terminate()
             process.wait(timeout=15)

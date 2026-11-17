@@ -14,9 +14,11 @@ from redis.asyncio import Redis
 from redis.asyncio.client import PubSub
 
 from examples.chat_load.conventional.worker import CHECKSUM, queue
+from examples.chat_load.faults import FaultKind, FaultRequest, RoomFault, trigger
 from examples.chat_load.protocol import (
     ROOM_PATTERN,
     Ack,
+    Fault,
     JobAccepted,
     JobRequest,
     Message,
@@ -103,6 +105,24 @@ async def submit(request: JobRequest) -> JobAccepted:
     job = secrets.token_hex(8)
     await asyncio.to_thread(queue.send_task, CHECKSUM, (job, request.room, request.size))
     return JobAccepted(job=job)
+
+
+@app.post("/rooms/{room}/faults/{kind}")
+async def fault(
+    kv: Store,
+    room: Room,
+    kind: FaultKind,
+    seconds: Annotated[float, Query(ge=0.1, le=5)] = 3,
+) -> Fault:
+    try:
+        trigger(FaultRequest(kind, seconds))
+    except RoomFault:
+        notice = Fault(kind=kind, outcome="failed")
+        await kv.publish(topic(room), notice.model_dump_json())
+        raise
+    notice = Fault(kind=kind, outcome="completed")
+    await kv.publish(topic(room), notice.model_dump_json())
+    return notice
 
 
 async def forward(websocket: WebSocket, pushes: asyncio.Queue[bytes], lock: asyncio.Lock) -> None:

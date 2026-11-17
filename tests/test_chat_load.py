@@ -5,10 +5,37 @@ from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
 
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
-from examples.chat_load.protocol import Ack, JobDone, Message
+from examples.chat_load.faults import FaultRequest, RoomFault, trigger
+from examples.chat_load.protocol import Ack, Fault, JobDone, Message, Push
 from examples.chat_load.rooms import Hub
 from examples.chat_load.traffic import Latency, Tally, summarize, usage
+
+
+def test_faults__raise_hog_and_abort_use_the_requested_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(RoomFault, match="Injected room handler failure"):
+        trigger(FaultRequest("raise", 0))
+    trigger(FaultRequest("hog", 0))
+    calls: list[None] = []
+    monkeypatch.setattr(os, "abort", lambda: calls.append(None))
+    trigger(FaultRequest("abort", 0))
+    assert calls == [None]
+
+
+def test_fault_notice__parses_as_a_push_without_affecting_traffic_counts() -> None:
+    adapter: TypeAdapter[Push] = TypeAdapter(Push)
+    notice = Fault(kind="raise", outcome="contained")
+    assert adapter.validate_json(notice.model_dump_json()) == notice
+    tally = Tally()
+    tally.receive("room", "client", notice)
+    assert tally.pending == 0
+    assert tally.errors == {}
+    for payload in (b"{}", b'{"type":"fault","kind":"unknown","outcome":"contained"}'):
+        with pytest.raises(ValidationError):
+            adapter.validate_json(payload)
 
 
 def test_summarize__reports_percentiles_and_handles_small_samples() -> None:

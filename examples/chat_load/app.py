@@ -5,7 +5,7 @@ import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, WebSocket
 from fastapi.responses import PlainTextResponse
@@ -13,10 +13,12 @@ from fastapi.websockets import WebSocketDisconnect
 from pydantic import ValidationError
 from uvicorn import Config, Server
 
+from examples.chat_load.faults import FaultKind, FaultRequest, RoomFault, abort_entry, worker_fault
 from examples.chat_load.jobs import checksum_entry
 from examples.chat_load.protocol import (
     ROOM_PATTERN,
     Ack,
+    Fault,
     JobAccepted,
     JobDone,
     JobRequest,
@@ -37,7 +39,9 @@ from pybeam.tasks import (
     TaskSupervisor,
 )
 
-CHECKSUM = TaskFunction(checksum_entry, Json(int), Json(int), execution=ExecutionMode.OWNGIL)
+CHECKSUM = TaskFunction(checksum_entry, Json(int), Json(int), dedicated_loop=True)
+WORKER_FAULT = TaskFunction(worker_fault, Json(FaultRequest), Json(None), dedicated_loop=True)
+ABORT = TaskFunction(abort_entry, Json(None), Json(None), execution=ExecutionMode.ISOLATED)
 
 type Room = Annotated[str, Path(pattern=ROOM_PATTERN)]
 type Client = Annotated[str, Query(pattern=ROOM_PATTERN)]
@@ -143,6 +147,30 @@ async def submit(jobs: Runner, request: JobRequest) -> JobAccepted:
         return JobAccepted(job=await jobs.submit(request))
     except Overloaded as error:
         raise HTTPException(503, "Job slots are full") from error
+
+
+@app.post("/rooms/{room}/faults/{kind}")
+async def fault(
+    jobs: Runner,
+    beam: Shared,
+    room: Room,
+    kind: FaultKind,
+    seconds: Annotated[float, Query(ge=0.1, le=5)] = 3,
+) -> Fault:
+    outcome: Literal["completed", "contained"] = "completed"
+    try:
+        if kind == "abort":
+            ref = await jobs.supervisor.start(ABORT, None)
+        else:
+            ref = await jobs.supervisor.start(WORKER_FAULT, FaultRequest(kind, seconds))
+        await ref
+    except RoomFault, TaskCrashed:
+        outcome = "contained"
+    except Overloaded as error:
+        raise HTTPException(503, "Job slots are full") from error
+    notice = Fault(kind=kind, outcome=outcome)
+    await beam.publish(topic(room), notice.model_dump_json().encode())
+    return notice
 
 
 async def forward(websocket: WebSocket, pushes: asyncio.Queue[bytes], lock: asyncio.Lock) -> None:

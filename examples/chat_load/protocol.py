@@ -2,6 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from examples.chat_load.faults import FaultKind
+
 ROOM_PATTERN = "^[a-z0-9-]{1,40}$"
 
 type RoomId = Annotated[str, Field(pattern=ROOM_PATTERN)]
@@ -46,7 +48,13 @@ class JobDone(Model):
     result: int | None
 
 
-type Push = Annotated[Ack | Message | JobDone, Field(discriminator="type")]
+class Fault(Model):
+    type: Literal["fault"] = "fault"
+    kind: FaultKind
+    outcome: Literal["completed", "contained", "failed"]
+
+
+type Push = Annotated[Ack | Message | JobDone | Fault, Field(discriminator="type")]
 
 
 class RoomStats(Model):

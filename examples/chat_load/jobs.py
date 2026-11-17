@@ -5,5 +5,5 @@ def checksum(size: int) -> int:
     return total
 
 
-async def checksum_entry(payload: bytes) -> bytes:
-    return str(checksum(int(payload))).encode()
+async def checksum_entry(size: int) -> int:
+    return checksum(size)
