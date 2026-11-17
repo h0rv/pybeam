@@ -1,6 +1,6 @@
 # Shared state
 
-Store document status and count visits without defining an actor.
+Store values and count events across requests, without defining an actor.
 
 ```python
 from pybeam.integrations.hornbeam.client import Beam
@@ -23,10 +23,10 @@ if __name__ == "__main__":
     run(main)
 ```
 
-In a fresh run, this prints `b'draft'`, `b'published'`, `1`, then `3`. Keys belong to the named store. `incr` adds the amount and returns the new count as one atomic operation. Separate reads and writes are not a transaction.
+In a fresh run, this prints `b'draft'`, `b'published'`, `1`, then `3`. Each store keeps its own keys. `incr` adds to a counter and returns the new value in one atomic operation, so concurrent requests never lose an increment. A separate `get` and `set` is not atomic.
 
-Use an [actor](actors.md) when you need Python state and methods. Use `incr` for a shared counter without an actor.
+Start programs that use shared state with `run` from `pybeam.integrations.hornbeam.runtime`.
 
-Delete stored values when they are no longer needed. Values are volatile, not persistent storage. A timeout does not undo a write. The Hornbeam `run` function starts and stops these services alongside Python.
+Values live in memory and are lost when the program stops. Delete keys you no longer need. For state with its own methods, use an [actor](actors.md).
 
-To notify readers of a change, see [Messaging](messaging.md#notify-readers-of-a-changed-key).
+To tell readers that a value changed, see [Messaging](messaging.md#notify-readers-of-a-changed-key).

@@ -1,6 +1,6 @@
 # Web integration
 
-Use FastAPI handlers with BEAM services and an application-owned lifespan.
+Share a counter across FastAPI requests.
 
 ```python
 import asyncio
@@ -72,8 +72,8 @@ if __name__ == "__main__":
     run(main)
 ```
 
-Run this file with Python, then open `http://127.0.0.1:8767/docs`. Send `POST /increment`, then `GET /counter`. Both return `{"count": 1}` after the first increment in a fresh run. Stop the server with Ctrl+C.
+Run this file with Python, then open `http://127.0.0.1:8767/docs`. Send `POST /increment`, then `GET /counter`. In a fresh run, both return `{"count": 1}`. Stop the server with Ctrl+C.
 
-The lifespan owns application access to Hornbeam services. `loop="none"` keeps Uvicorn on the event loop supplied by Hornbeam rather than selecting another loop. The shared counter increments atomically without an actor.
+The lifespan connects once and every request reuses that connection. `loop="none"` tells Uvicorn to use the event loop PyBEAM already runs. Concurrent requests increment the counter atomically, without a lock.
 
-The [FastAPI counter](../../examples/fastapi/main.py) also demonstrates SSE. The [Litestar](../../examples/litestar/main.py) and [PyView](../../examples/pyview/main.py) examples adapt the same services to their frameworks.
+The [FastAPI example](../../examples/fastapi/main.py) adds server-sent events. The [Litestar](../../examples/litestar/main.py) and [PyView](../../examples/pyview/main.py) examples use the same services.

@@ -1,6 +1,6 @@
 # Project boundaries
 
-This is a personal MVP. Do not add company references, project licenses, copyright notices, publishing machinery, or generated reports. Preserve vendored third-party notices. GitHub forks and committed branch pushes under the user's personal `h0rv` account are authorized. Do not force-push, push to upstream repositories, or publish to PyPI without separate permission. Keep README content focused on using the examples, not naming discussions, agent activity, audit history, test counts, or branch bookkeeping.
+This is a personal MVP. Do not add company references, project licenses, copyright notices, or generated reports. Preserve vendored third-party notices. GitHub forks and committed branch pushes under the user's personal `h0rv` account are authorized. Do not force-push, push to upstream repositories, or publish to PyPI without separate permission. Keep README content focused on using the examples, not naming discussions, agent activity, audit history, test counts, or branch bookkeeping.
 
 Bring BEAM capabilities to Python developers, including users of Django, FastAPI, Redis, Celery, and SQLAlchemy; do not require an Elixir or LiveView mental model. Map the useful semantics to concise, first-class Python and asyncio APIs and familiar framework integrations. Users should not need BEAM knowledge or infrastructure plumbing for ordinary use; expose advanced operations separately. Simplicity must not imply free durability or conceal deployment and failure boundaries.
 
@@ -27,6 +27,10 @@ Use mise for development tools and tasks, uv for Python dependencies, and rebar3
 - Follow actual upstream runtime contracts. Investigate existing support before proposing additions.
 
 Keep one Python distribution. Core primitives belong in domain packages such as `pybeam.actors`, `pybeam.mailbox`, `pybeam.services`, `pybeam.supervision`, and `pybeam.runtime`. Optional framework and ecosystem adapters belong under `pybeam.integrations.<name>`. Hornbeam-specific web-service contracts belong to its integration, not core services. Keep initializers minimal. Core modules must not import integrations or optional frameworks, and framework adapters must not import other framework adapters. Avoid duplicate transport abstractions and speculative plugin systems.
+
+## Documentation
+
+Before writing, editing, or reviewing README content, guides, API prose, docstrings, or example explanations, read and apply the [documentation-writing skill](.agents/skills/documentation-writing/SKILL.md). Include that path in delegated documentation briefs, including resumed tasks. Its Python-first audience rules, example checks, and editing checklist apply to small changes too. Keep this skill in the repository so future sessions use the same writing standard.
 
 ## Python and examples
 

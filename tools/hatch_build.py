@@ -22,6 +22,7 @@ class RuntimeBuildHook(BuildHookInterface[BuilderConfig]):
         build_data["force_include"] = {
             str(assets): "pybeam/runtime/_assets",
             str(priv / "_erlang_impl"): "_erlang_impl",
+            str(priv / "_erlang_isolated"): "_erlang_isolated",
             str(priv / "erlang-stubs"): "erlang-stubs",
             str(priv / "erlang_services.py"): "erlang_services.py",
             str(priv / "py_isolated_child.py"): "py_isolated_child.py",

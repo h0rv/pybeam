@@ -29,3 +29,80 @@ and `uv.lock`; keep those local overrides out of commits. Restore the committed
 Hornbeam source and lock entries to return to the pinned default. `mise run setup`
 also opts into editable Hornbeam before building the native runtime; that full
 build additionally needs the runtime's other native dependencies and toolchain.
+
+## Runtime requirements
+
+`pybeam.run` needs a managed runtime: either a `python-beam` wheel with bundled
+runtime assets, or an already-built development runtime. A source install alone
+does not include ERTS or the native extension. Packaged wheels currently support
+macOS arm64 and Linux x86_64 on conventional CPython 3.14.
+
+Native builds use CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0
+as pinned in `mise.toml`. With these tools and the sibling checkouts above
+(plus `erlang-ws` and `erlang-h1`), build with `mise run setup`.
+
+### Use a development runtime
+
+Build the native runtime with `tools/build_native.py`, then add this to the
+consumer project's `pyproject.toml` (absolute, or relative to that file):
+
+```toml
+[tool.pybeam]
+development_runtime = "/path/to/pybeam/_build/hornbeam"
+```
+
+The directory is the build profile, not an executable or source checkout. It
+must contain `lib/*/ebin` or `checkouts/*/ebin` directories with
+`py_launch.beam` and `erlang_python.app`, and exactly one matching `py_nif.so`
+or `py_nif.dylib` in that application's sibling `priv` directory. The native
+library must match the host Python, and `erl` must be on `PATH`. Nothing is
+built or downloaded implicitly.
+
+### Build a Linux wheel
+
+Linux wheels need conventional CPython 3.14 with a shared
+`libpython3.14.so.1.0`. Build Erlang with static OpenSSL and without termcap so
+the runtime needs only glibc, libm, libstdc++, libgcc_s and zlib; the wheel is
+then tagged `manylinux_<glibc>_x86_64` for the newest glibc symbol it uses.
+An Erlang that links libtinfo or libcrypto produces a `linux_x86_64` wheel,
+which PyPI rejects. Releases build on Ubuntu 22.04.
+
+```sh
+KERL_CONFIGURE_OPTIONS="--disable-dynamic-ssl-lib --without-termcap --without-javac --without-wx --without-odbc" \
+  MISE_ALL_COMPILE=true mise install
+mise exec -- uv sync --locked --all-extras
+mise exec -- uv run --locked python tools/build_native.py
+mkdir -p build
+curl -fL https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt -o build/OTP-LICENSE.txt
+mise exec -- uv run --locked python tools/build_runtime.py \
+  --otp-root "$(mise where erlang)" \
+  --native-app _build/default/lib/erlang_python \
+  --otp-license build/OTP-LICENSE.txt \
+  --native-license _build/default/lib/erlang_python/LICENSE
+mise exec -- uv build --wheel
+```
+
+Install the `dist/python_beam-*-manylinux_*_x86_64.whl` wheel into a Python
+3.14 environment; `python examples/hello.py` then runs without `erl`, rebar3 or
+mise on `PATH`. Linux wheels do not bundle the optional GenStage payload;
+Darwin wheels do.
+
+### Pooled actor execution
+
+`ActorGroup(execution=ExecutionLimits(workers=..., capacity=..., max_bytes=...))`
+requests pooled actor execution. It needs native support that is still under
+development and fails rather than falling back when that support is missing.
+
+## Releases
+
+`.github/workflows/release.yml` builds the sdist and the Linux x86_64 and
+macOS arm64 wheels, and verifies each clean wheel install. Publishing a GitHub
+release whose tag is `v` plus the project version uploads them to PyPI through
+trusted publishing from the `pypi` environment; a manual run uploads only when
+`publish` is selected.
+
+The Darwin GenStage payload is pinned to the bytes of one reviewed wheel and
+cannot be rebuilt from source, so the macOS job repackages that wheel's runtime
+with `tools.genstage_assets`. Upload the reviewed wheel as the only `.whl` asset
+of a GitHub release tagged `genstage-reviewed`; until then, pull requests skip
+the macOS wheel and releases fail.

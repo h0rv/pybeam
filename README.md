@@ -1,41 +1,20 @@
 # PyBEAM
 
-Run async Python on BEAM with supervised actors and shared messages.
+Actors, shared state and messaging for async Python, without locks or extra infrastructure.
 
-![Python applications use PyBEAM typed wrappers over erlang-python and Hornbeam, backed by BEAM/OTP services.](docs/guide/assets/architecture.svg)
+```sh
+uv add python-beam
+```
 
-Keep async Python and your existing web framework.
-Give state an actor owner, or use atomic shared counters without an actor.
-Notify readers with pub/sub; let OTP replace failed actors with fresh state.
-PyBEAM owns runtime startup and shutdown, not your storage policy.
+- [Actors](docs/guide/actors.md) keep state and handle one call at a time, so you never need a lock.
+- [Supervision](docs/guide/supervision.md) restarts an actor that fails.
+- [Shared state](docs/guide/state.md) stores values and counts atomically across requests.
+- [Messaging](docs/guide/messaging.md) notifies subscribers without a broker.
+- [Background services](docs/guide/background.md) run long-lived loops that stop cleanly.
+- [Web integration](docs/guide/web.md) works with FastAPI, Litestar and PyView.
 
-See [Why PyBEAM](docs/guide/why.md) for the architecture, a shared-state scenario, and the limits.
+Start with [Get started](docs/guide/index.md), or read [Why PyBEAM](docs/guide/why.md).
 
-## When to use PyBEAM
+Try the [Discord demo](examples/discord_demo/README.md) and the [showcase](examples/showcase).
 
-PyBEAM is for Python developers who need supervised stateful work and shared
-services alongside async applications. Keep plain asyncio for local concurrency;
-PyBEAM adds OTP lifecycle management and explicit admission limits.
-
-- [Actors](docs/guide/actors.md) own Python state and serialize method calls.
-  [OTP supervision](docs/guide/supervision.md) restarts failed actors with fresh
-  state; acquire a new reference rather than retrying the old one.
-- Bounded admission limits queued and running actor requests and encoded bytes,
-  not total memory. Timeouts do not undo effects.
-- [Hornbeam services](docs/guide/state.md) provide shared key/value storage and
-  atomic counters; [pub/sub](docs/guide/messaging.md) sends volatile notifications.
-- [Background services](docs/guide/background.md) and tasks support owned async
-  work; [web adapters](docs/guide/web.md) integrate FastAPI, Litestar and PyView.
-- PyBEAM owns VM startup and shutdown through `pybeam.run`.
-
-Python uses one main interpreter and its GIL: no multicore Python execution or
-C-extension crash isolation. OTP supervision does not change those limits.
-
-Read [Get started](docs/guide/index.md), then try [actors](docs/guide/actors.md) or [shared state](docs/guide/state.md).
-
-Check the [runtime requirements](docs/guide/index.md#requirements) before running the examples.
-
-Explore the runnable [Discord demo](examples/discord_demo/README.md) and
-[showcase](examples/showcase).
-
-For contributor instructions, see [Development](docs/development.md).
+To work on PyBEAM itself, see [Development](docs/development.md).

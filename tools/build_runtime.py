@@ -63,12 +63,41 @@ LINUX_LIBRARIES = frozenset(
         "libutil.so.1",
     }
 )
+MANYLINUX_LIBRARIES = LINUX_LIBRARIES - {"libtinfo.so.6", "libcrypto.so.3"}
+MANYLINUX_FLOOR = (2, 17)
+# Oldest manylinux glibc level whose libstdc++ and libgcc_s provide each symbol version,
+# from auditwheel's manylinux policy.
+GLIBCXX_LEVELS = (
+    ((3, 4, 19), (2, 17)),
+    ((3, 4, 22), (2, 24)),
+    ((3, 4, 24), (2, 27)),
+    ((3, 4, 28), (2, 31)),
+    ((3, 4, 29), (2, 34)),
+    ((3, 4, 30), (2, 35)),
+    ((3, 4, 33), (2, 39)),
+)
+LIBGCC_LEVELS = (
+    ((4, 8, 0), (2, 17)),
+    ((7, 0, 0), (2, 27)),
+    ((12, 0, 0), (2, 35)),
+    ((14, 0, 0), (2, 39)),
+)
+CXXABI_LEVELS = (
+    ((1, 3, 7), (2, 17)),
+    ((1, 3, 10), (2, 24)),
+    ((1, 3, 11), (2, 27)),
+    ((1, 3, 12), (2, 31)),
+    ((1, 3, 13), (2, 34)),
+    ((1, 3, 15), (2, 39)),
+)
 
 
 @dataclass(frozen=True, slots=True)
 class ELF:
     dependencies: tuple[str, ...]
     rpaths: tuple[str, ...]
+    manylinux: tuple[int, int] | None = MANYLINUX_FLOOR
+    """Oldest manylinux glibc level that provides every symbol version, or None if none does."""
 
 
 def audit_elf(path: Path, *, python_nif: bool = False) -> ELF:
@@ -95,7 +124,39 @@ def audit_elf(path: Path, *, python_nif: bool = False) -> ELF:
     for dependency in dependencies:
         if dependency not in allowed:
             raise ValueError("Unbundled shared library: " + dependency + " in " + str(path))
-    return ELF(dependencies, rpaths)
+    return ELF(dependencies, rpaths, manylinux_level(run(["readelf", "-V", "--wide", str(path)])))
+
+
+def manylinux_level(versions: str) -> tuple[int, int] | None:
+    glibc = [
+        (int(major), int(minor)) for major, minor in re.findall(r"\bGLIBC_(\d+)\.(\d+)\b", versions)
+    ]
+    levels = [MANYLINUX_FLOOR, *glibc]
+    for prefix, table in (
+        ("GLIBCXX", GLIBCXX_LEVELS),
+        ("CXXABI", CXXABI_LEVELS),
+        ("GCC", LIBGCC_LEVELS),
+    ):
+        for match in re.findall(r"\b" + prefix + r"_(\d+(?:\.\d+)*)\b", versions):
+            version = tuple(int(part) for part in match.split("."))
+            level = next((level for provided, level in table if version <= provided), None)
+            if level is None:
+                return None
+            levels.append(level)
+    return max(levels)
+
+
+def linux_wheel_tag(binaries: tuple[ELF, ...]) -> str:
+    """Claim manylinux only when every binary needs nothing beyond a manylinux level's libraries.
+
+    The Python NIF's libpython dependency is resolved from the installing interpreter.
+    """
+    portable = MANYLINUX_LIBRARIES | {"libpython3.14.so.1.0"}
+    levels = [binary.manylinux for binary in binaries]
+    if None in levels or any(not portable.issuperset(binary.dependencies) for binary in binaries):
+        return "cp314-cp314-linux_x86_64"
+    major, minor = max(level for level in levels if level is not None)
+    return "cp314-cp314-manylinux_{}_{}_x86_64".format(major, minor)
 
 
 def macho_magic(path: Path) -> bytes:
@@ -316,10 +377,11 @@ def stage_runtime(
         nif = priv / "py_nif.so"
         required = (nif, *(erts_bin / name for name in ERTS_EXECUTABLES))
         minimum = (0, 0)
+        elves: list[ELF] = []
         if linux:
             for item in native_binaries(staged, required):
                 run(["patchelf", "--remove-rpath", str(item)])
-                audit_elf(item, python_nif=item == nif)
+                elves.append(audit_elf(item, python_nif=item == nif))
         else:
             nif_info = audit_binary(nif, python_nif=True)
             for rpath in nif_info.rpaths:
@@ -358,7 +420,7 @@ def stage_runtime(
             manifest.update(
                 architecture="x86_64",
                 system="Linux",
-                wheel_tag="cp314-cp314-linux_x86_64",
+                wheel_tag=linux_wheel_tag(tuple(elves)),
                 python_library="libpython3.14.so.1.0",
             )
             del manifest["minimum_macos"]
