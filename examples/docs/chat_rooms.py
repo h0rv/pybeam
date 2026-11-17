@@ -94,13 +94,14 @@ async def main() -> None:
             snapshot = await room.snapshot()
             likes = len(snapshot.messages[-1].reactions["like"])
             online = sum(snapshot.members.values())
-            require(likes == 8 and online == 0)
+            recent = len(snapshot.messages)
+            require(recent == 6 and likes == 8 and online == 0)
             snapshot.messages.clear()
             require(len((await room.snapshot()).messages) == 6)
             print(
                 "room-" + str(index),
                 "posted=" + str(snapshot.posted),
-                "recent=6",
+                "recent=" + str(recent),
                 "likes=" + str(likes),
                 "online=" + str(online),
             )
