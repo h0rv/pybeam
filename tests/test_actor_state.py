@@ -22,6 +22,7 @@ class MemoryStore:
         self.release = asyncio.Event()
         self.release.set()
         self.fail = False
+        self.lose_ack = False
 
     async def async_call(self, name: str, *args: object) -> object:
         if name == "_actor_state_open":
@@ -44,6 +45,8 @@ class MemoryStore:
         if expected != current:
             return "error", ("version_conflict", expected, current)
         self.records[key] = current + 1, payload
+        if self.lose_ack:
+            raise ConnectionError("reply lost after commit")
         return "ok", current + 1
 
 
@@ -125,6 +128,22 @@ async def test_storage_failure_prevents_blind_retry(store: MemoryStore) -> None:
         store.fail = False
         with pytest.raises(ActorCallError, match="restart"):
             await progress.advance(2, save=True)
+
+
+async def test_lost_ack_requires_restart_and_restores_the_committed_snapshot(
+    store: MemoryStore,
+) -> None:
+    async with ActorGroup() as group:
+        progress = await group.restore("job", Progress)
+        store.lose_ack = True
+        with pytest.raises(ActorCallError, match="Actor state operation failed"):
+            await progress.advance(42, save=True)
+        store.lose_ack = False
+        with pytest.raises(ActorCallError, match="restart"):
+            await progress.advance(99, save=True)
+        restored = await group.restore("job", Progress)
+        assert await restored.read() == (42, [42], b"changed")
+        assert await restored.advance(43, save=True) == 2
 
 
 async def test_incompatible_snapshot_fails_start_without_replacing_saved_data(

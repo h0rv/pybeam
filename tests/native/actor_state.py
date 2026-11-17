@@ -1,3 +1,5 @@
+import asyncio
+
 from pybeam import ActorGroup
 from tests.fixtures.persistent_actor import Progress
 
@@ -22,6 +24,8 @@ async def prepare_crash() -> bool:
         progress = await group.restore("vm-crash", Progress)
         assert await progress.advance(42, save=True) == 1
         await progress.advance(99)
+        print("actor-state-ready", flush=True)
+        await asyncio.Event().wait()
     return True
 
 

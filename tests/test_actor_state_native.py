@@ -85,7 +85,7 @@ def test_acknowledged_state_survives_sigkill_of_whole_vm(
             with selectors.DefaultSelector() as selector:
                 selector.register(process.stdout, selectors.EVENT_READ)
                 output = b""
-                while b"actor-state-ok" not in output:
+                while b"actor-state-ready" not in output:
                     assert selector.select(timeout=40), output.decode(errors="replace")
                     chunk = os.read(process.stdout.fileno(), 65536)
                     assert chunk, output.decode(errors="replace")
