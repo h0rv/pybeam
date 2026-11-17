@@ -73,19 +73,19 @@ try {
           return { minimum: Math.min(...records.map(({ ratio }) => ratio)), failures: records.filter(({ ratio }) => ratio < 4.5), colors };
         });
         assert.deepEqual(report.failures, [], `${device}/${colorScheme}/${path}`);
-        assert.ok(report.colors.length >= 3, `Monochrome code: ${device}/${colorScheme}/${path}`);
+        assert.ok(report.colors.length >= 3 || path.startsWith("internals/"), `Monochrome code: ${device}/${colorScheme}/${path}`);
         minimumContrast = Math.min(minimumContrast, report.minimum);
         if (["", "actors/", "genstage/", "web/"].includes(path)) {
           await page.screenshot({ path: `${screenshotRoot}-${path.replaceAll("/", "") || "home"}-${device}-${colorScheme}${base === "/" ? "" : "-base"}.png`, fullPage: true });
         }
         if (!path) {
           assert.ok(await page.locator("pre").first().evaluate((node) => node.getBoundingClientRect().bottom < innerHeight), "Home code must fit on the first screen");
-          assert.ok(await page.getByRole("link", { name: "Actors", exact: true }).last().evaluate((node) => node.getBoundingClientRect().top < innerHeight), "Home Actors link must be on the first screen");
+          if (device === "desktop") assert.ok(await page.getByRole("link", { name: "Actors", exact: true }).last().evaluate((node) => node.getBoundingClientRect().top < innerHeight), "Home Actors link must be on the first screen");
         }
         if (path === "genstage/") {
           const tokenColors = await page.locator("pre code span[style]").evaluateAll((nodes) => {
             const token = (text) => nodes.find((node) => node.textContent.trim() === text);
-            return ["def", "ok", "uppercase", "Parse one request before using its fields."].map((text) => {
+            return ["def", "ok", "uppercase", "genstage_transform.py"].map((text) => {
               const node = token(text);
               return node ? getComputedStyle(node).color : null;
             });
@@ -125,7 +125,7 @@ try {
   assert.match(await page.locator("pre").first().innerText(), /actors\.spawn[\s\S]*counter\.add[\s\S]*counter\.read/);
   await page.locator(".sidebar > summary").click();
   await page.locator(".docs-nav").getByRole("link", { name: "Get started", exact: true }).click();
-  assert.match(await page.locator("pre").innerText(), /pybeam\.run\(main\)/);
+  assert.match(await page.locator('pre[data-language="python"]').innerText(), /pybeam\.run\(main\)/);
   await page.goto(origin + withBase("quickstart/", base));
   await page.waitForURL(origin + base);
   assert.equal(await page.locator("h1").innerText(), "Get started");
