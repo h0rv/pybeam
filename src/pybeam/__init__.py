@@ -1,6 +1,7 @@
 from pybeam.actors.classes import ActorStateAccessError as ActorStateAccessError
 from pybeam.actors.classes import ActorStoppedError as ActorStoppedError
 from pybeam.actors.classes import actor as actor
+from pybeam.actors.classes import write_state as write_state
 from pybeam.actors.codec import ActorCallError as ActorCallError
 from pybeam.actors.codec import ActorConstructionError as ActorConstructionError
 from pybeam.actors.codec import ActorPayloadError as ActorPayloadError

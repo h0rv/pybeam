@@ -16,6 +16,7 @@ from pybeam.actors.codec import (
     decode_reply,
     encode_failure,
 )
+from pybeam.actors.state import Snapshot, SnapshotSpec
 
 
 class ActorStateAccessError(AttributeError):
@@ -32,26 +33,26 @@ class Constructing:
 
 
 class State:
-    __slots__ = ("_actor_owner",)
+    __slots__ = ("_actor_owner", "_actor_snapshot")
 
     @override
     def __getattribute__(self, name: str) -> object:
         require_state(self)
-        if name == "_actor_owner":
+        if name in {"_actor_owner", "_actor_snapshot"}:
             raise ActorStateAccessError("Actor ownership is private")
         return object.__getattribute__(self, name)
 
     @override
     def __setattr__(self, name: str, value: object) -> None:
         require_state(self)
-        if name == "_actor_owner":
+        if name in {"_actor_owner", "_actor_snapshot"}:
             raise ActorStateAccessError("Actor ownership is private")
         object.__setattr__(self, name, value)
 
     @override
     def __delattr__(self, name: str) -> None:
         require_state(self)
-        if name == "_actor_owner":
+        if name in {"_actor_owner", "_actor_snapshot"}:
             raise ActorStateAccessError("Actor ownership is private")
         object.__delattr__(self, name)
 
@@ -63,6 +64,22 @@ def require_state(state: State) -> None:
     if isinstance(owner, asyncio.Task) and owner is asyncio.current_task():
         return
     raise ActorStateAccessError("Actor state belongs only to its current native dispatch task")
+
+
+async def write_state(state: object, /) -> int:
+    """Save all declared fields and return the new version, starting at one.
+
+    Call inside a method of an actor started with ActorGroup.restore. Unsaved
+    changes are lost on restart. This does not commit external side effects.
+    Cancellation waits for the write outcome; storage errors require restart.
+    """
+    if not isinstance(state, State):
+        raise ActorStateAccessError("write_state requires actor-owned state")
+    require_state(state)
+    snapshot: object = object.__getattribute__(state, "_actor_snapshot")
+    if not isinstance(snapshot, Snapshot):
+        raise ActorStateAccessError("ActorGroup.restore is required for state writes")
+    return await snapshot.write(state)
 
 
 class DataActor(Protocol):
@@ -161,7 +178,9 @@ class Definition:
             raise TypeError("Actor reference does not implement the declared class")
         return reference
 
-    def factory(self, payload: bytes, *, max_bytes: int = 1_048_576) -> Callable[[], Container]:
+    def factory(
+        self, payload: bytes, *, max_bytes: int = 1_048_576, snapshot: SnapshotSpec | None = None
+    ) -> Callable[[], Container]:
         def construct() -> Container:
             try:
                 bound = self.constructor.decode(payload)
@@ -172,7 +191,7 @@ class Definition:
                     self.methods,
                     max_bytes=max_bytes,
                 )
-            return Container(state, self.methods, max_bytes=max_bytes)
+            return Container(state, self.methods, max_bytes=max_bytes, snapshot=snapshot)
 
         return construct
 
@@ -194,12 +213,23 @@ class Container:
         methods: tuple[Method, ...],
         *,
         max_bytes: int = 1_048_576,
+        snapshot: SnapshotSpec | None = None,
     ) -> None:
         self._construction = construction
         self._methods = methods
         self._max_bytes = max_bytes
+        self._snapshot = Snapshot(snapshot) if snapshot is not None else None
+        self._loaded = False
 
     async def dispatch(self, payload: bytes) -> bytes:
+        if not self._loaded and isinstance(self._construction, Constructed):
+            if self._snapshot is not None:
+                try:
+                    await self._snapshot.restore(self._construction.state)
+                    object.__setattr__(self._construction.state, "_actor_snapshot", self._snapshot)
+                except Exception as error:
+                    self._construction = ConstructionFailed(encode_failure(error, "construction"))
+            self._loaded = True
         if isinstance(self._construction, ConstructionFailed):
             reply = self._construction.payload
             return reply if len(reply) <= self._max_bytes else b"\x02"
@@ -291,7 +321,7 @@ def actor[T](cls: type[T]) -> type[T]:
             }
         )
     for name, member in members.items():
-        if name in {"_actor_route", "_actor_owner"}:
+        if name in {"_actor_route", "_actor_owner", "_actor_snapshot"}:
             raise TypeError("Reserved actor reference member: " + name)
         if isinstance(member, (property, staticmethod, classmethod)):
             raise TypeError("Actor descriptors are unsupported: " + name)
@@ -355,7 +385,7 @@ def actor[T](cls: type[T]) -> type[T]:
             type.__setattr__(state, method.name, wrapper)
         namespace[method.name] = wrapper
     for name in get_type_hints(state):
-        if name in {"_actor_route", "_actor_owner"}:
+        if name in {"_actor_route", "_actor_owner", "_actor_snapshot"}:
             raise TypeError("Reserved actor reference field: " + name)
         namespace[name] = StateField(name)
     namespace["__dict__"] = StateField("__dict__")
@@ -365,6 +395,7 @@ def actor[T](cls: type[T]) -> type[T]:
 
     def initialize(instance: object, *args: object, **kwargs: object) -> None:
         object.__setattr__(instance, "_actor_owner", Constructing(get_ident()))
+        object.__setattr__(instance, "_actor_snapshot", None)
         try:
             if defaults is not None:
                 for name, value in defaults.decode().items():
