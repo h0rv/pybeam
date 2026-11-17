@@ -26,15 +26,24 @@ class CounterState:
 
 class CounterView(TemplateView[CounterState], LiveView[CounterState]):
     @override
-    async def mount(self, socket: LiveViewSocket[CounterState], session: Session) -> None:
+    async def mount(
+        self,
+        socket: LiveViewSocket[CounterState],
+        session: Session,
+    ) -> None:
         beam = await Beam.connect()
         count = await beam.incr("visits", 0, namespace="pyview")
         socket.context = CounterState(count)
 
-    async def handle_event(self, event: str, socket: LiveViewSocket[CounterState]) -> None:
+    async def handle_event(
+        self,
+        event: str,
+        socket: LiveViewSocket[CounterState],
+    ) -> None:
         if event == "increment":
             beam = await Beam.connect()
-            socket.context.count = await beam.incr("visits", namespace="pyview")
+            count = await beam.incr("visits", namespace="pyview")
+            socket.context.count = count
 
     @override
     def template(self, assigns: CounterState, meta: PyViewMeta) -> Template:
@@ -49,7 +58,8 @@ app.add_live_view("/", CounterView)
 
 
 async def main() -> None:
-    server = Server(Config(app, host="127.0.0.1", port=8769, loop="none", http="h11"))
+    config = Config(app, host="127.0.0.1", port=8769, loop="none", http="h11")
+    server = Server(config)
 
     try:
         await server.serve()

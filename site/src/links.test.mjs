@@ -80,6 +80,9 @@ test("each concept has complete source-associated Python examples", () => {
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);
+      for (const line of snippet.trimEnd().split("\n")) {
+        assert.ok(line.length <= 79, `${source}: Python line exceeds 79 characters: ${line}`);
+      }
       assert.ok(snippet.startsWith(`# ${examples[index].split("/").at(-1)}\n`), source);
       if (!["background_body.py", "genstage_transform.py"].includes(examples[index].split("/").at(-1))) {
         assert.ok(markdown.includes(`\n\n\`\`\`console\n$ uv run ${examples[index].split("/").at(-1)}\n`), source);

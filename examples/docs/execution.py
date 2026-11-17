@@ -2,7 +2,12 @@
 from pydantic import TypeAdapter
 
 from pybeam import run
-from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskSupervisor
+from pybeam.tasks import (
+    ExecutionMode,
+    TaskFunction,
+    TaskLimits,
+    TaskSupervisor,
+)
 
 
 async def checksum(iterations: int) -> int:

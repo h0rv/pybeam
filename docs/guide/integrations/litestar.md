@@ -40,7 +40,8 @@ app = Litestar(route_handlers=[status, publish], lifespan=[lifespan])
 
 
 async def main() -> None:
-    server = Server(Config(app, host="127.0.0.1", port=8768, loop="none", http="h11"))
+    config = Config(app, host="127.0.0.1", port=8768, loop="none", http="h11")
+    server = Server(config)
 
     try:
         await server.serve()
