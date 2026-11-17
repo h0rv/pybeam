@@ -18,7 +18,7 @@
     <h1>One room crashes. Who else notices?</h1>
     <p class="intro">Same traffic. The same native crash in Room 1. Two stacks, side by side.</p>
   </header>
-  <p id="stream-status" role="status">Connecting to the live view…</p>
+  <p id="stream-status" role="status"><span id="stream-message">Connecting to the live view…</span> <a href="/">Reload live view</a></p>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
        hx-config='{"sse":{"pauseOnBackground":false}}'>
     {% include 'rooms.html' %}

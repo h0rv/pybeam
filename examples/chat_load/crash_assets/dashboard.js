@@ -1,6 +1,7 @@
 (() => {
   const live = document.getElementById("live");
   const status = document.getElementById("stream-status");
+  const message = document.getElementById("stream-message");
   let lastUpdate = null;
 
   function fresh() {
@@ -16,7 +17,7 @@
 
   function disconnected() {
     lastUpdate = null;
-    status.textContent = "Live view interrupted. Reconnecting… Results may be out of date.";
+    message.textContent = "Live view interrupted. Results may be out of date.";
     status.hidden = false;
     controls();
   }
