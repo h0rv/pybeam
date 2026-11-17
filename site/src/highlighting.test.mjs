@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { codeToHtml } from "shiki";
 import { pybeamLight, pybeamDark } from "./pybeam-themes.mjs";
@@ -8,6 +9,22 @@ function luminance(hex) {
     .map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
   return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
 }
+
+test("page text, links and controls meet AA in both color schemes", () => {
+  const css = readFileSync(new URL("./style.css", import.meta.url), "utf8");
+  const colors = Object.fromEntries([...css.matchAll(/--([\w-]+): light-dark\((#[a-f\d]{6}), (#[a-f\d]{6})\)/g)]
+    .map(([, name, light, dark]) => [name, [light, dark]]));
+  for (const scheme of [0, 1]) {
+    for (const foreground of ["fg", "muted-fg", "accent"]) {
+      for (const background of ["bg", "box-bg", "inline-bg"]) {
+        const text = luminance(colors[foreground][scheme]);
+        const surface = luminance(colors[background][scheme]);
+        const contrast = (Math.max(text, surface) + .05) / (Math.min(text, surface) + .05);
+        assert.ok(contrast >= 4.5, `${foreground} on ${background}, scheme ${scheme}: ${contrast}`);
+      }
+    }
+  }
+});
 
 for (const theme of [pybeamLight, pybeamDark]) {
   test(`${theme.name} token palette meets normal-text AA contrast`, () => {

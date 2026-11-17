@@ -33,7 +33,12 @@ Tasks and actors run in `worker` mode; `owngil` and `isolated` are not yet avail
 # execution.py
 from pybeam import run
 from pybeam.codec import Json
-from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskSupervisor
+from pybeam.tasks import (
+    ExecutionMode,
+    TaskFunction,
+    TaskLimits,
+    TaskSupervisor,
+)
 
 
 async def checksum(iterations: int) -> int:
