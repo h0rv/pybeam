@@ -59,7 +59,7 @@ Inspect = fun() ->
                   true -> GateState(G, Occupied); false -> <<"restarting">> end,
               stats => [Stat(<<"Generation">>, Generation),
                         Stat(<<"Mailbox messages">>, Mailbox) | GateStats(G, Occupied)]}
-        end || {{Group, Id}, Pid, Generation, Gate, _, _}
+        end || {{Group, Id}, Pid, Generation, Gate}
                    <- ets:tab2list(py_actor_generations)]
     end,
     Tasks = fun() ->
