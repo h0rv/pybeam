@@ -1,6 +1,6 @@
 # How Python work runs
 
-A BEAM process is cheap: about 2.7 KB, preemptively scheduled, millions per machine. A Python interpreter is not. PyBEAM does not start an interpreter per process. Many BEAM processes share a bounded pool of Python contexts, and each context runs Python in the mode you choose.
+A BEAM process costs about 2.7 KB, so you can run millions. A Python interpreter costs far more, so PyBEAM does not start one per process. Many processes share a small pool of Python contexts, and you choose how each context runs Python.
 
 ## From a BEAM process to Python
 
@@ -12,7 +12,7 @@ A BEAM process is cheap: about 2.7 KB, preemptively scheduled, millions per mach
 
 ## Choose a mode
 
-Each mode trades startup, memory and call cost against parallelism and crash isolation. Start and memory are per context; call is an empty round trip. Free-threaded or not is the interpreter you install, CPython 3.14 or 3.14t, not a PyBEAM option.
+Each mode trades startup, memory and call cost for parallelism and crash isolation. Start and memory are per context, and call is an empty round trip. Free threading comes from the interpreter you install, CPython 3.14 or 3.14t.
 
 | Mode | Parallel CPU | Crash kills | Start | Memory | Call p50/p99 |
 | --- | --- | --- | --- | --- | --- |
@@ -22,9 +22,12 @@ Each mode trades startup, memory and call cost against parallelism and crash iso
 | `isolated` · 3.14 | Yes | That child | 90 ms | 24 MiB | 76/146 µs |
 | Separate nodes | Yes | That node | Seconds | A whole VM | Network |
 
-Pick `worker` for I/O-bound async code and cheap calls. On 3.14t it also runs CPU work in parallel, if your C extensions support free threading. Pick `owngil` for parallel pure-Python CPU work on the conventional build; extensions must support subinterpreters, and values cross the boundary by copy. Pick `isolated` when a C extension can segfault or leak and you want only that call to fail. Add nodes when one machine is not enough or a VM failure must not take everything down.
+- `worker`: I/O-bound async code and cheap calls. On 3.14t it also runs CPU work in parallel, if your C extensions support free threading.
+- `owngil`: parallel pure-Python CPU work on 3.14. Extensions must support subinterpreters, and values are copied in and out.
+- `isolated`: C extensions that can crash or leak. Only that call fails.
+- Separate nodes: more than one machine, or surviving a whole VM failure.
 
-Tasks choose a mode with `ExecutionMode`. Today they accept `ExecutionMode.WORKER`; `OWNGIL` and `ISOLATED` raise `CapabilityUnavailable` until PyBeam enables them. Actors run in worker mode. `dedicated_loop=True` gives each worker task its own event loop and native thread. Tasks sharing one loop take turns on either build.
+Choose a mode per task with `execution`. `dedicated_loop=True` gives each task its own event loop and thread, so CPU-bound tasks do not wait on each other's loop.
 
 ```python
 from pydantic import TypeAdapter
@@ -59,15 +62,15 @@ if __name__ == "__main__":
     run(main)
 ```
 
-It prints the same checksum four times. On 3.14 the four tasks take turns. On 3.14t they run on four threads at once, but in a local run each ran about three times slower than it does alone, so the four finished no sooner than in turn. Plain Python threads on the same build did not slow down, so the cost is in the task path, not free threading. Time your own workload before you count on parallel tasks.
+It prints the same checksum four times.
 
 ## Fan out: four CPU jobs
 
-Each row runs the same four pure-Python jobs at once, against today's Python tools. Bars show when each job ran.
+Each row runs the same four pure-Python jobs at once. Bars show when each job ran.
 
 ![Four CPU jobs on a shared time axis for asyncio, threads on 3.14 and 3.14t, a process per job, a prefork pool, and PyBEAM worker, owngil, isolated and separate-node modes, with wall time and speedup per row.](assets/fan-out.svg)
 
-On the GIL build, asyncio, threads and `worker` run the jobs one at a time. Free-threaded 3.14t threads and `worker` overlap them. `owngil`, `isolated`, a process per job, a prefork pool and separate nodes overlap them on every build, at the start and memory costs in the table above. The isolated · 3.14t row starts conventional GIL child interpreters here, so its parallelism comes from separate processes, not free threading.
+With the GIL, asyncio, threads and `worker` run the jobs one at a time. On 3.14t, threads and `worker` overlap them. `owngil`, `isolated`, a process per job, a prefork pool and separate nodes overlap them on either build, at the costs in the table above.
 
 ## Blast radius: one job calls `os.abort()`
 
@@ -94,14 +97,6 @@ Subinterpreters isolate Python state, not native crashes. Only a separate OS pro
 | `worker` · 3.14 | 8, at most 32 calls admitted | 2.7 KB | 232 ms | 2.59 s |
 | `worker` · 3.14t | 8, at most 32 calls admitted | 2.7 KB | 258 ms | 1.80 s |
 
-For no-op calls on one machine, asyncio is cheaper and faster. Callers here are BEAM processes queued in front of eight contexts: each one is preemptively scheduled, can be supervised, and can live on another node, and the admission window bounds how much Python work is in flight.
+For empty calls on one machine, asyncio is cheaper and faster. What the BEAM callers add: each one is preemptively scheduled, supervised and can live on another node, and the admission limit bounds how much Python work runs at once.
 
-## Run it yourself
-
-These numbers come from one 8-core Linux x86_64 machine and change with hardware and load. They are not production benchmarks. From a repository checkout with the native runtime built, run the lab and repeat each experiment live:
-
-```sh
-mise run modes-lab
-```
-
-Open http://127.0.0.1:38941/. The lab drives erlang-python contexts directly, so it can show `owngil` and `isolated` before tasks accept them. Free-threaded lanes need a 3.14t runtime; set `PYBEAM_LAB_PYTHON_314T` and `PYBEAM_LAB_ERLANG_PYTHON_314T` to point at it.
+Numbers on this page come from one 8-core machine and vary with hardware and load.
