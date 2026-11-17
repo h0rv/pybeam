@@ -82,6 +82,14 @@ LIBGCC_LEVELS = (
     ((12, 0, 0), (2, 35)),
     ((14, 0, 0), (2, 39)),
 )
+CXXABI_LEVELS = (
+    ((1, 3, 7), (2, 17)),
+    ((1, 3, 10), (2, 24)),
+    ((1, 3, 11), (2, 27)),
+    ((1, 3, 12), (2, 31)),
+    ((1, 3, 13), (2, 34)),
+    ((1, 3, 14), (2, 39)),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +132,11 @@ def manylinux_level(versions: str) -> tuple[int, int] | None:
         (int(major), int(minor)) for major, minor in re.findall(r"\bGLIBC_(\d+)\.(\d+)\b", versions)
     ]
     levels = [MANYLINUX_FLOOR, *glibc]
-    for prefix, table in (("GLIBCXX", GLIBCXX_LEVELS), ("GCC", LIBGCC_LEVELS)):
+    for prefix, table in (
+        ("GLIBCXX", GLIBCXX_LEVELS),
+        ("CXXABI", CXXABI_LEVELS),
+        ("GCC", LIBGCC_LEVELS),
+    ):
         for match in re.findall(r"\b" + prefix + r"_(\d+(?:\.\d+)*)\b", versions):
             version = tuple(int(part) for part in match.split("."))
             level = next((level for provided, level in table if version <= provided), None)
