@@ -87,12 +87,20 @@ class Config(BaseModel):
     model_config = ConfigDict(frozen=True, strict=True, extra="forbid", validate_default=True)
 
     development_runtime: Path | None = None
+    data_dir: Path = Path(".pybeam/data")
     startup_timeout: Timeout = 30.0
     shutdown_timeout: Timeout = 5.0
     mode: Mode = Mode.MANAGED
     workers: Annotated[int, Field(ge=1, le=1)] = 1
     distribution: Literal[False] | Distribution = False
     listeners: bool = False
+
+    @field_validator("data_dir", mode="plain")
+    @classmethod
+    def resolve_data_dir(cls, value: object, info: ValidationInfo) -> Path:
+        path = value if isinstance(value, Path) else Path(_PATH_TEXT.validate_python(value))
+        directory: object = info.context
+        return ((directory if isinstance(directory, Path) else Path.cwd()) / path).resolve()
 
     @field_validator("distribution", mode="before")
     @classmethod
@@ -161,4 +169,4 @@ def load_config(directory: Path) -> Config:
                 raise BootstrapError("Invalid tool.pybeam configuration: " + str(error)) from error
             except (OSError, tomllib.TOMLDecodeError) as error:
                 raise BootstrapError("Cannot read configuration: " + str(project)) from error
-    return Config()
+    return Config.model_validate({}, context=directory)

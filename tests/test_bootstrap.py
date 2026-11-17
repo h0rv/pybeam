@@ -54,7 +54,7 @@ def test_config__rejects_unsupported_or_invalid_settings(value: object, tmp_path
 
 
 def test_config__defaults_and_relative_development_path(tmp_path: Path) -> None:
-    assert parse_config({}, tmp_path) == Config()
+    assert parse_config({}, tmp_path) == Config(data_dir=tmp_path / ".pybeam/data")
     project = tmp_path / "pyproject.toml"
     project.write_text('[tool.pybeam]\ndevelopment_runtime = "build"\nstartup_timeout = 2.5\n')
     child = tmp_path / "nested"
