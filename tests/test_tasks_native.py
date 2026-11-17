@@ -132,23 +132,25 @@ def test_tasks__owngil_running_cancel_and_close(tmp_path: Path) -> None:
     )
 
 
-def test_tasks__owngil_module_import_failure_is_uncertain(tmp_path: Path) -> None:
+def test_tasks__owngil_module_import_failure_is_terminal(tmp_path: Path) -> None:
     owngil_program(
         tmp_path,
         """
-        from erlang.tasks import UncertainInflight
+        from erlang.tasks import RemoteTaskError
         from owngil_bad_import import echo
+        from owngil_entries import double
         function = TaskFunction(echo, TypeAdapter(int), TypeAdapter(int),
                                 execution=ExecutionMode.OWNGIL)
-        sup = await TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=500)).__aenter__()
-        ref = await sup.start(function, 1)
-        error = await ref.exception()
-        assert isinstance(error, UncertainInflight), repr(error)
-        assert 'function_not_found' in str(error), str(error)
-        try:
-            await sup.close()
-        except UncertainInflight:
-            pass
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=2000)) as sup:
+            ref = await sup.start(function, 1)
+            error = await ref.exception()
+            assert isinstance(error, RemoteTaskError), repr(error)
+            assert error.type_name == 'ImportError', str(error)
+            assert 'pydantic_core._pydantic_core' in error.message, str(error)
+            assert 'does not support loading in subinterpreters' in error.message, str(error)
+            healthy = TaskFunction(double, TypeAdapter(dict[str, int]), TypeAdapter(dict[str, int]),
+                                   execution=ExecutionMode.OWNGIL)
+            assert await (await sup.start(healthy, {'value': 2})) == {'value': 4}
     """,
     )
 

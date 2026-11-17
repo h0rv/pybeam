@@ -3,15 +3,16 @@ from collections.abc import Awaitable, Callable, Generator
 from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
-from types import TracebackType
-from typing import TYPE_CHECKING, Annotated, Protocol, Self, TypeIs, assert_never
+from inspect import iscoroutinefunction
+from types import FunctionType, TracebackType
+from typing import TYPE_CHECKING, Annotated, Literal, Protocol, Self, assert_never, overload
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from pybeam.submissions import AdmissionClosed, CapabilityUnavailable, Overloaded
 
 if TYPE_CHECKING:
-    from erlang.tasks import Body, EntryPoint
+    from erlang.tasks import Body
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,16 +65,38 @@ class TaskFunction[Q, R]:
     the shared driver. It still uses the main interpreter, not an isolation VM.
     Construct loop-bound resources inside the body and finalize them before return.
 
-    Owngil requires an erlang.tasks.EntryPoint in an importable module without
+    Owngil requires a plain top-level async byte function in a module without
     pybeam/pydantic or incompatible extensions. The caller encodes requests and
     decodes results; entries receive and return JSON bytes, not Q/R objects.
     No nested PyBeam supervisors can run inside these entries. Cancellation is
     cooperative and CPU/native-blocked entry loops delay it.
     """
 
+    @overload
     def __init__(
         self,
-        function: Callable[[Q], Awaitable[R]] | EntryPoint,
+        function: Callable[[bytes], Awaitable[bytes]],
+        request: TypeAdapter[Q],
+        result: TypeAdapter[R],
+        *,
+        execution: Literal[ExecutionMode.OWNGIL],
+        dedicated_loop: bool = False,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        function: Callable[[Q], Awaitable[R]],
+        request: TypeAdapter[Q],
+        result: TypeAdapter[R],
+        *,
+        execution: ExecutionMode = ExecutionMode.WORKER,
+        dedicated_loop: bool = False,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        function: Callable[..., Awaitable[object]],
         request: TypeAdapter[Q],
         result: TypeAdapter[R],
         *,
@@ -89,17 +112,15 @@ class TaskFunction[Q, R]:
             )
         if execution == ExecutionMode.OWNGIL and dedicated_loop:
             raise ValueError("dedicated_loop is worker-only; owngil owns its interpreter loop")
-        self._function: Callable[[Q], Awaitable[R]] | None = None
-        self._entry: EntryPoint | None = None
-        if _worker_function(function):
-            if execution == ExecutionMode.OWNGIL:
-                raise TypeError("owngil tasks require an erlang.tasks.EntryPoint")
-            self._function = function
-        else:
-            if execution == ExecutionMode.WORKER:
-                raise TypeError("EntryPoint requires execution=ExecutionMode.OWNGIL")
-            if not function.name.isidentifier() or not all(
-                part.isidentifier() for part in function.module.split(".")
+        self._function = function
+        self._entry: FunctionType | None = None
+        if execution == ExecutionMode.OWNGIL:
+            if not isinstance(function, FunctionType) or not iscoroutinefunction(function):
+                raise TypeError("owngil tasks require a plain async Python function")
+            if (
+                not isinstance(function.__module__, str)
+                or not function.__qualname__.isidentifier()
+                or not all(part.isidentifier() for part in function.__module__.split("."))
             ):
                 raise TypeError("owngil entries must be importable top-level functions")
             self._entry = function
@@ -122,7 +143,7 @@ class TaskFunction[Q, R]:
         from erlang.tasks import Body
 
         function = self._function
-        if function is None:
+        if self._entry is not None:
             raise TypeError("owngil entries cannot run as worker bodies")
 
         async def invoke(payload: bytes) -> bytes:
@@ -137,16 +158,6 @@ class TaskFunction[Q, R]:
                 _body_owners.reset(token)
 
         return Body(invoke, dedicated_loop=self._dedicated_loop)
-
-
-def _worker_function[Q, R](
-    function: Callable[[Q], Awaitable[R]] | EntryPoint,
-) -> TypeIs[Callable[[Q], Awaitable[R]]]:
-    try:
-        from erlang.tasks import EntryPoint
-    except ImportError:
-        return True
-    return not isinstance(function, EntryPoint)
 
 
 @dataclass(frozen=True, slots=True)

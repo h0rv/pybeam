@@ -1,9 +1,9 @@
 import os
 import subprocess
 import sys
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from types import ModuleType
-from typing import TYPE_CHECKING, assert_type
+from typing import Literal, assert_type
 
 import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
@@ -12,27 +12,14 @@ from pybeam.submissions import CapabilityUnavailable
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
 
-if TYPE_CHECKING:
-    from erlang.tasks import EntryPoint, EntryResult
 
-
-class _EntryPoint:
-    module = "entries"
-    name = "render"
-
-    async def __call__(self, token: int, payload: bytes) -> EntryResult:
-        return "ok", payload
-
-
-class _TaskModule(ModuleType):
-    EntryPoint = _EntryPoint
+async def byte_entry(payload: bytes) -> bytes:
+    return payload
 
 
 @pytest.fixture
-def entry(monkeypatch: pytest.MonkeyPatch) -> _EntryPoint:
-    monkeypatch.setitem(sys.modules, "erlang", ModuleType("erlang"))
-    monkeypatch.setitem(sys.modules, "erlang.tasks", _TaskModule("erlang.tasks"))
-    return _EntryPoint()
+def entry() -> Callable[[bytes], Awaitable[bytes]]:
+    return byte_entry
 
 
 class Request(BaseModel):
@@ -55,7 +42,9 @@ async def checked(supervisor: TaskSupervisor) -> None:
     assert_type(await ref.cancel(), bool)
 
 
-async def checked_owngil(supervisor: TaskSupervisor, entry: EntryPoint) -> None:
+async def checked_owngil(
+    supervisor: TaskSupervisor, entry: Callable[[bytes], Awaitable[bytes]]
+) -> None:
     function = TaskFunction(
         entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL
     )
@@ -113,13 +102,23 @@ def test_task_function__unavailable_modes(
 
 
 @pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
-def test_task_function__owngil_requires_entry(execution: ExecutionMode) -> None:
-    with pytest.raises(TypeError, match=r"owngil tasks require an erlang\.tasks\.EntryPoint"):
-        TaskFunction(render, TypeAdapter(Request), TypeAdapter(str), execution=execution)
+def test_task_function__owngil_requires_async_function(execution: ExecutionMode) -> None:
+    def not_async(payload: bytes) -> Awaitable[bytes]:
+        return byte_entry(payload)
+
+    class CallableEntry:
+        async def __call__(self, payload: bytes) -> bytes:
+            return payload
+
+    for function in (not_async, CallableEntry(), CallableEntry().__call__):
+        with pytest.raises(TypeError, match="owngil tasks require a plain async Python function"):
+            TaskFunction(function, TypeAdapter(bytes), TypeAdapter(bytes), execution=execution)
 
 
 @pytest.mark.parametrize("execution", [ExecutionMode.OWNGIL, "owngil"])
-def test_task_function__owngil_entry_codecs(entry: EntryPoint, execution: ExecutionMode) -> None:
+def test_task_function__owngil_entry_codecs(
+    entry: Callable[[bytes], Awaitable[bytes]], execution: Literal[ExecutionMode.OWNGIL]
+) -> None:
     function = TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str), execution=execution)
     assert function.execution is ExecutionMode.OWNGIL
     assert function.encode(Request(value=3)) == b'{"value":3}'
@@ -128,7 +127,9 @@ def test_task_function__owngil_entry_codecs(entry: EntryPoint, execution: Execut
         function.decode(b"")
 
 
-def test_task_function__owngil_rejects_dedicated_loop(entry: EntryPoint) -> None:
+def test_task_function__owngil_rejects_dedicated_loop(
+    entry: Callable[[bytes], Awaitable[bytes]],
+) -> None:
     with pytest.raises(ValueError, match="dedicated_loop is worker-only"):
         TaskFunction(
             entry,
@@ -139,18 +140,23 @@ def test_task_function__owngil_rejects_dedicated_loop(entry: EntryPoint) -> None
         )
 
 
-def test_task_function__worker_rejects_entry(entry: EntryPoint) -> None:
-    with pytest.raises(TypeError, match=r"EntryPoint requires execution=ExecutionMode\.OWNGIL"):
-        TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str))
+def test_task_function__worker_accepts_byte_function() -> None:
+    function = TaskFunction(byte_entry, TypeAdapter(bytes), TypeAdapter(bytes))
+    assert function.execution is ExecutionMode.WORKER
 
 
-@pytest.mark.parametrize(("module", "name"), [("", "render"), ("entries", "outer.<locals>.render")])
+@pytest.mark.parametrize(
+    ("module", "name"), [("", "render"), (None, "render"), ("entries", "outer.<locals>.render")]
+)
 def test_task_function__owngil_rejects_nonimportable_entry(
-    entry: EntryPoint, module: str, name: str
+    monkeypatch: pytest.MonkeyPatch, module: object, name: str
 ) -> None:
-    entry.module, entry.name = module, name
+    monkeypatch.setattr(byte_entry, "__module__", module)
+    monkeypatch.setattr(byte_entry, "__qualname__", name)
     with pytest.raises(TypeError, match="importable top-level functions"):
-        TaskFunction(entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL)
+        TaskFunction(
+            byte_entry, TypeAdapter(Request), TypeAdapter(str), execution=ExecutionMode.OWNGIL
+        )
 
 
 @pytest.mark.parametrize("execution", ["unknown"])

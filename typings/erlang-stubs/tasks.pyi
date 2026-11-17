@@ -8,15 +8,6 @@ type EntryResult = (
     | tuple[Literal["remote_error"], str, str]
 )
 
-@final
-class EntryPoint:
-    module: str
-    name: str
-    def __init__(self, function: Callable[[bytes], Awaitable[bytes]]) -> None: ...
-    async def __call__(self, token: int, payload: bytes) -> EntryResult: ...
-
-def entrypoint(function: Callable[[bytes], Awaitable[bytes]]) -> EntryPoint: ...
-
 class RemoteTaskError(RuntimeError):
     type_name: str
     message: str
@@ -32,7 +23,7 @@ async def open_group(count: int, max_bytes: int) -> tuple[object, object]: ...
 async def start(
     group: object,
     gate: object,
-    factory: Callable[[], Body] | EntryPoint,
+    factory: Callable[[], Body] | Callable[[bytes], Awaitable[bytes]],
     payload: bytes,
     *,
     mode: Literal["worker", "owngil"] = "worker",
