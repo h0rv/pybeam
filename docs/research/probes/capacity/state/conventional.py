@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import socket
 import statistics
 import threading
@@ -11,6 +12,7 @@ from typing import override
 
 KV = ("127.0.0.1", int(os.environ.get("PROBE_KV_PORT", "6379")))
 ENTRIES = (32, 3300, 33000)
+KEY = b"pybeam-probe-" + secrets.token_hex(8).encode()
 
 
 def build(entries: int) -> dict[str, object]:
@@ -78,17 +80,17 @@ def main() -> None:
     kv = Resp()
     for entries in ENTRIES:
         blob = json.dumps(build(entries)).encode()
-        kv.command(b"SET", b"actor", blob)
+        kv.command(b"SET", KEY, blob)
 
         def over_http(body: bytes = blob) -> None:
             http.request("POST", "/", body, {"Content-Type": "application/json"})
             http.getresponse().read()
 
         def through_kv() -> None:
-            data = kv.command(b"GET", b"actor")
+            data = kv.command(b"GET", KEY)
             if data is None:
                 raise RuntimeError("Missing state")
-            kv.command(b"SET", b"actor", step(json.loads(data)))
+            kv.command(b"SET", KEY, step(json.loads(data)))
 
         row = {
             "json_bytes": len(blob),
@@ -97,6 +99,7 @@ def main() -> None:
             "kv_json_us": median_us(through_kv),
         }
         print(json.dumps(row), flush=True)
+    kv.command(b"DEL", KEY)
     server.shutdown()
 
 
