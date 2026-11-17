@@ -15,6 +15,7 @@ from uvicorn import Config, Server
 
 from examples.chat_load.faults import FaultKind, FaultRequest, RoomFault, abort_entry, worker_fault
 from examples.chat_load.jobs import checksum_entry
+from examples.chat_load.origin import require_same_origin
 from examples.chat_load.protocol import (
     ROOM_PATTERN,
     Ack,
@@ -149,7 +150,7 @@ async def submit(jobs: Runner, request: JobRequest) -> JobAccepted:
         raise HTTPException(503, "Job slots are full") from error
 
 
-@app.post("/rooms/{room}/faults/{kind}")
+@app.post("/rooms/{room}/faults/{kind}", dependencies=[Depends(require_same_origin)])
 async def fault(
     jobs: Runner,
     beam: Shared,

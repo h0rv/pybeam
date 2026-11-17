@@ -21,6 +21,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed, InvalidHandshake
 
 from examples.chat_load.faults import FaultKind
+from examples.chat_load.origin import require_same_origin
 from examples.chat_load.protocol import Ack, Fault, Push, Send
 from examples.chat_load.traffic import summarize
 
@@ -295,15 +296,6 @@ def dashboard() -> Dashboard:
 
 
 type Live = Annotated[Dashboard, Depends(dashboard)]
-
-
-def require_same_origin(request: Request) -> None:
-    origin = request.headers.get("origin")
-    expected = request.url.scheme + "://" + request.url.netloc
-    if request.headers.get("sec-fetch-site") not in (None, "none", "same-origin") or (
-        origin is not None and origin != expected
-    ):
-        raise HTTPException(403, "Cross-origin mutations are not allowed")
 
 
 async def http_client() -> AsyncIterator[httpx.AsyncClient]:

@@ -24,6 +24,11 @@ async def faults(url: str) -> None:
         connect(url.replace("http://", "ws://") + "/rooms/fault-probe/ws?client=probe") as socket,
     ):
         for kind in ("raise", "hog", "abort"):
+            rejected = await client.post(
+                "/rooms/fault-probe/faults/" + kind,
+                headers={"origin": "http://other"},
+            )
+            assert rejected.status_code == 403, rejected.text
             response = await client.post(
                 "/rooms/fault-probe/faults/" + kind, params={"seconds": 0.1}
             )

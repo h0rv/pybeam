@@ -15,6 +15,7 @@ from redis.asyncio.client import PubSub
 
 from examples.chat_load.conventional.worker import CHECKSUM, queue
 from examples.chat_load.faults import FaultKind, FaultRequest, RoomFault, trigger
+from examples.chat_load.origin import require_same_origin
 from examples.chat_load.protocol import (
     ROOM_PATTERN,
     Ack,
@@ -107,7 +108,7 @@ async def submit(request: JobRequest) -> JobAccepted:
     return JobAccepted(job=job)
 
 
-@app.post("/rooms/{room}/faults/{kind}")
+@app.post("/rooms/{room}/faults/{kind}", dependencies=[Depends(require_same_origin)])
 async def fault(
     kv: Store,
     room: Room,

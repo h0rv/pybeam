@@ -4,13 +4,50 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 import pytest
+from fastapi import Depends, FastAPI
 from pydantic import TypeAdapter, ValidationError
 
 from examples.chat_load.faults import FaultRequest, RoomFault, trigger
+from examples.chat_load.origin import require_same_origin
 from examples.chat_load.protocol import Ack, Fault, JobDone, Message, Push
 from examples.chat_load.rooms import Hub
 from examples.chat_load.traffic import Latency, Tally, summarize, usage
+
+
+@pytest.mark.parametrize(
+    ("headers", "status"),
+    [
+        ({}, 200),
+        ({"origin": "http://test"}, 200),
+        ({"origin": "http://other"}, 403),
+        ({"origin": "http://test:8800"}, 403),
+        ({"origin": "https://test"}, 403),
+        ({"origin": "null"}, 403),
+        ({"origin": ""}, 403),
+        ({"sec-fetch-site": "cross-site"}, 403),
+        ({"origin": "http://test", "sec-fetch-site": "same-site"}, 403),
+    ],
+)
+async def test_fault_routes__reject_cross_origin_before_running_faults(
+    headers: dict[str, str],
+    status: int,
+) -> None:
+    app = FastAPI()
+    calls: list[None] = []
+
+    @app.post("/rooms/{room}/faults/{kind}", dependencies=[Depends(require_same_origin)])
+    async def fault() -> Fault:
+        calls.append(None)
+        return Fault(kind="hog", outcome="completed")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post("/rooms/room-1/faults/hog", headers=headers)
+    assert response.status_code == status
+    assert len(calls) == (1 if status == 200 else 0)
 
 
 def test_faults__raise_hog_and_abort_use_the_requested_boundary(
