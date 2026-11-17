@@ -165,7 +165,22 @@ def test_process__command_registers_utf8_python_paths_as_data() -> None:
         "paths",
         "[<<97,34,98>>,<<195,169>>]",
     ]
-    assert "-erlang_python" not in process._command(assets)
+    assert "paths" not in process._command(assets)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")
+def test_process__command_selects_caller_python_for_isolated_tasks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "executable", os.fsdecode(b'/python-\xff/"python'))
+    assets = RuntimeAssets(Path("erl"), ())
+    command = process._command(assets)
+    position = command.index("isolated_python")
+    assert command[position - 1 : position + 2] == [
+        "-erlang_python",
+        "isolated_python",
+        "<<47,112,121,116,104,111,110,45,255,47,34,112,121,116,104,111,110>>",
+    ]
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")

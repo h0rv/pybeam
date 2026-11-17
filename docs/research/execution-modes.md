@@ -4,7 +4,7 @@ These are single trials on one Linux x86-64 VM with eight CPUs, not compatibilit
 
 ## Choosing a mode
 
-Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task boundary with the keyword-only `TaskFunction(..., execution=ExecutionMode.WORKER, dedicated_loop=False)`. Worker is the default; owngil accepts an importable byte entry. Isolated raises `pybeam.submissions.CapabilityUnavailable` at construction.
+Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task boundary with the keyword-only `TaskFunction(..., execution=ExecutionMode.WORKER, dedicated_loop=False)`. Worker is the default; owngil and isolated accept importable byte entries with caller-side codecs.
 
 | Mode / build | How to select in PyBeam | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility | Cost |
 |---|---|---|---|---|---|---|
@@ -12,9 +12,9 @@ Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task bou
 | worker / 3.14t | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution | ~21 KiB/context; ~29 µs raw calls |
 | worker + dedicated loop / 3.14t | Also `dedicated_loop=True` | Development tasks / no actor loop option | Measured across task loops | None; VM dies | Same as worker / 3.14t | Context-owned loop; ~1 s unexplained task completion overhead |
 | owngil | `TaskFunction(entry, request, result, execution=ExecutionMode.OWNGIL)` | Yes, byte entries / no | Across task interpreters | None; VM dies | Entry modules cannot import pybeam/pydantic or incompatible extensions such as numpy; codecs run in caller | ~11–28 MiB/context; ~14 µs raw calls |
-| isolated | `execution=ExecutionMode.ISOLATED` (rejected) | No / no | Across raw child processes | Contains `os.abort()`; not a sandbox | pydantic/numpy imported in probes | ~24–40 MiB/context; ~76–81 µs raw calls |
+| isolated | `TaskFunction(entry, request, result, execution=ExecutionMode.ISOLATED)` | Yes, byte entries / no | Across task child processes | Contains `os.abort()`; not a sandbox | Entry-module imports of pybeam/pydantic/pydantic_core verified; NumPy imported in earlier raw probes | ~24–40 MiB/context; ~76–81 µs raw calls; child startup per task |
 
-Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Named owngil tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: owngil already owns its interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
+Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Named owngil and isolated tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: both named modes already own their interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
 
 ### Owngil byte-entry contract
 
@@ -25,6 +25,16 @@ The caller validates and encodes the request to JSON bytes; the entry receives t
 Entry modules cannot import `pybeam`, `pydantic`, `pydantic_core`, or unsupported native extensions such as NumPy (including single-phase-init extensions). In particular, nested PyBeam supervisors are unavailable inside an owngil entry. Python failures surface as `RemoteTaskError(type_name, message)`; original exception identity and remote traceback objects do not cross interpreters. Module import and attribute-resolution failures are terminal errors too: importing Pydantic at module scope produces a remote `ImportError` with the native extension's message, releases the ticket, and permits clean shutdown. A context that dies without a terminal reply remains uncertain.
 
 Cancellation and shutdown are cooperative: CPU/native-blocked entry loops delay cancellation until they yield. Owngil provides CPU parallelism and separate interpreter state, **not native-crash containment**; a crashing extension still kills the VM.
+
+### Isolated byte-entry contract
+
+Use the same plain module-level `async def entry(payload: bytes) -> bytes`, validation and caller-side JSON codecs as owngil, with `execution=ExecutionMode.ISOLATED`. Each task owns a fresh child process and loop; `dedicated_loop=True` is rejected. Child startup and separate interpreter/module memory make this more expensive than shared workers. PyBeam selects the caller's Python executable through the runtime's `isolated_python` option rather than discovering it through an occupied managed worker.
+
+Unlike owngil, isolated entry modules **can import PyBeam and Pydantic**. A native task probe imported `pybeam`, Pydantic **2.14.3** and `pydantic_core` **2.50.4** at module scope in a different OS process, and successfully ran a Pydantic model-based byte entry. This removes the subinterpreter import limitation, not every extension's own compatibility requirements. Importability does not establish that nested BEAM-backed PyBeam APIs work inside the child; byte entries are the supported boundary.
+
+Python exceptions and module import/lookup failures remain terminal `RemoteTaskError` outcomes. A confirmed child exit instead raises **`pybeam.tasks.TaskCrashed`**, also returned by `ref.exception()`, with `.reason`, for example `('signal', 6)` after `os.abort()`. The process exited and execution stopped, but **external effects are unknown**. The task is **never restarted or retried**. Confirmed death releases its native admission ticket and leaves the supervisor open for a following task; as with other completed tasks, observe the outcome to release the Python handle's slot. A timeout or context death without child-exit acknowledgement remains `UncertainInflight`, not proof of stopped execution. A terminal result already received wins over a later child exit.
+
+Cancellation and shutdown use the existing cooperative cancel path. An acknowledged terminal cancellation yields `asyncio.CancelledError`; if interruption escalates to child termination without that acknowledgement, it yields `TaskCrashed`. Child crashes are contained, but isolated processes are **not a sandbox**, and neither cancellation nor crash containment rolls back effects.
 
 Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBeam limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
 
@@ -44,11 +54,11 @@ Choose the Python build when installing the interpreter: conventional **3.14** o
 
 ### Isolated children
 
-![Each isolated context owns a separate child OS process with a Python interpreter and execution thread. A native abort kills only that child; the BEAM VM survives and the child restarts.](assets/isolated.svg)
+![Each isolated context owns a separate child OS process with a Python interpreter and execution thread. A native abort kills only that child; the BEAM VM survives. Generic contexts can restart their child.](assets/isolated.svg)
 
-The isolated diagram describes the fixed runtime measured below; it requires the PR #5 bootstrap fix.
+The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task. The current runtime includes the merged PR #5 bootstrap fix.
 
-A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context currently costs one pthread; isolated contexts instead cost a child process. This is **not actor pooling**: today's actors/tasks allocate worker contexts per native child, so a million Python actors would still imply roughly a million context pthreads plus other overhead.
+A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context currently costs one pthread; isolated contexts instead cost a child process. This is **not actor pooling**: actors allocate worker contexts per native child and tasks allocate contexts in their selected mode, so a million Python actors would still imply roughly a million context pthreads plus other overhead.
 
 ## Raw context matrix
 
@@ -106,16 +116,16 @@ Future measurements should record thread CPU (`time.thread_time()`), elapsed wor
 
 - **owngil extensions:** [the interpreter configuration][own-gil] sets `check_multi_interp_extensions = 1`. Actual imports returned `module pydantic_core._pydantic_core does not support loading in subinterpreters` and `module numpy._core._multiarray_umath does not support loading in subinterpreters` (the latter wrapped by NumPy). Free-threading does not remove subinterpreter compatibility requirements.
 - **Actors require the main interpreter:** [local-object retention/unwrapping][local-object] rejects other interpreters with `Actors require the main interpreter`; [context validation][local-context] rejects subinterpreters with `local_objects_require_worker`.
-- **Native actors/tasks are worker-only:** [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. PyBeam's `execution` setting rejects unavailable modes rather than silently falling back. `dedicated_loop=True` selects a loop, not a different interpreter or process.
-- **Isolated bootstrap:** [package initialization][bootstrap-import] eagerly imported [_supervision, which imports erlang][bootstrap-supervision], before [the child installed its synthetic erlang module][bootstrap-child]. This produced `ModuleNotFoundError: No module named 'erlang'` and `{handshake_failed,closed}`. [PR #5](https://github.com/h0rv/erlang-python/pull/5) fixes the import order. The isolated results above used its `249a970` fix; fork main at `54ccee8` still lacks it. PyBeam follows main, not that PR commit.
+- **Historical worker-only task path:** the matrix revision's [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. Current actors remain worker-only; current tasks also support named owngil and isolated entries. `dedicated_loop=True` selects a worker loop, not a different interpreter or process.
+- **Isolated bootstrap:** [package initialization][bootstrap-import] eagerly imported [_supervision, which imports erlang][bootstrap-supervision], before [the child installed its synthetic erlang module][bootstrap-child]. This produced `ModuleNotFoundError: No module named 'erlang'` and `{handshake_failed,closed}`. The isolated results above used [PR #5](https://github.com/h0rv/erlang-python/pull/5)'s `249a970` fix, now merged and included in the current runtime.
 - **owngil is not a crash boundary:** its subinterpreter runs inside the BEAM address space. The separate crash probes terminated the whole VM on both builds. Only isolated contained `os.abort()` in these trials.
 
 ## Decisions and open questions
 
 - Setting: `TaskFunction(..., execution=ExecutionMode.WORKER)`; values are `worker`, `owngil`, and `isolated`. Default: conventional **3.14 worker**, because it is reproducible and the packaged wheels are conventional.
 - Recommended development path for CPU parallelism: **3.14t with dedicated-loop tasks**, opt in with `PYBEAM_ALLOW_FREE_THREADED=1`. Free-threaded packaged wheels have not been built. Shared-loop tasks do not parallelize on either build.
-- Actors stay worker-only: local objects require the main interpreter. Owngil tasks accept plain top-level async byte functions and keep Pydantic codecs in the caller. Their entry modules must not import PyBeam/Pydantic or unsupported extensions. The runtime is pinned to erlang-python fork main merge commit `40cdea9`; raw-context measurements below remain historical, not task benchmarks.
-- Isolated tasks are the next step: the fork rejects isolated named tasks. They require the isolated bootstrap fix in h0rv/erlang-python PR #5 and child-exit accounting. This is fork work, not a PyBeam scheduler or fallback.
+- Actors stay worker-only: local objects require the main interpreter. Owngil and isolated tasks accept plain top-level async byte functions and keep Pydantic codecs in the caller. Only owngil entry modules must avoid PyBeam/Pydantic and incompatible extensions. The runtime is temporarily pinned to erlang-python `a9803dd` ([PR #11](https://github.com/h0rv/erlang-python/pull/11)) for named isolated tasks; raw-context measurements remain historical, not task benchmarks.
+- Isolated tasks contain confirmed child crashes as `TaskCrashed`, release admission, and never restart or retry the task. They do not provide durable jobs or a sandbox.
 - 3.14t task slowdown, resolved: the entry file's mortal `0xFFFFFFFF` constant, shared by every task, made four `dedicated_loop=True` tasks take 1.2-1.6 s each against 0.35 s alone. With the entry loaded through marshal, `examples/docs/execution.py`'s checksum took 318 / 425 / 433 ms elapsed work span at N=1 / 4 / 8 tasks (311-425 ms per task), and sum-of-squares 186 / 198 / 208 ms. Four plain threads inside one task took 390 ms against 321 ms for one.
 - Open: complete 3.14t integration acceptance, including the hang and `ws_session:send_sync/3` `undef`; the 3.14t owngil/isolated creation slowdown; the untraced ~1 s dedicated-loop completion latency.
 

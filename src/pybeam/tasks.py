@@ -31,6 +31,14 @@ class TaskOwnershipError(RuntimeError):
     pass
 
 
+class TaskCrashed(RuntimeError):
+    """The process exited: execution stopped, external effects unknown, never retried."""
+
+    def __init__(self, reason: object) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 class TaskLimits(BaseModel):
     """Finite ownership slots and aggregate encoded request bytes, not a Python heap limit."""
 
@@ -50,7 +58,8 @@ class ExecutionMode(StrEnum):
     caller-side codecs: their modules cannot import pybeam, pydantic_core or
     incompatible extensions such as numpy. Isolated uses a child OS process that contains
     os.abort(), costing roughly 24-40 MiB/context and 76 µs per call in probes.
-    Worker and owngil are available for tasks; isolated is not yet supported.
+    All three modes support tasks. Isolated tasks never restart or retry after
+    losing their child; TaskCrashed reports stopped execution with unknown effects.
     """
 
     WORKER = "worker"
@@ -65,11 +74,12 @@ class TaskFunction[Q, R]:
     the shared driver. It still uses the main interpreter, not an isolation VM.
     Construct loop-bound resources inside the body and finalize them before return.
 
-    Owngil requires a plain top-level async byte function in a module without
-    pybeam/pydantic or incompatible extensions. The caller encodes requests and
-    decodes results; entries receive and return JSON bytes, not Q/R objects.
-    No nested PyBeam supervisors can run inside these entries. Cancellation is
-    cooperative and CPU/native-blocked entry loops delay it.
+    Owngil and isolated require a plain top-level async byte function. Owngil
+    entry modules cannot import pybeam/pydantic or incompatible extensions.
+    The caller encodes requests and decodes results; entries receive and return
+    JSON bytes, not Q/R objects. Nested PyBeam supervisors cannot run inside
+    owngil entries. Cancellation is cooperative and CPU/native-blocked entry
+    loops delay it.
     """
 
     @overload
@@ -79,7 +89,7 @@ class TaskFunction[Q, R]:
         request: TypeAdapter[Q],
         result: TypeAdapter[R],
         *,
-        execution: Literal[ExecutionMode.OWNGIL],
+        execution: Literal[ExecutionMode.OWNGIL, ExecutionMode.ISOLATED],
         dedicated_loop: bool = False,
     ) -> None: ...
 
@@ -104,25 +114,21 @@ class TaskFunction[Q, R]:
         dedicated_loop: bool = False,
     ) -> None:
         execution = ExecutionMode(execution)
-        if execution == ExecutionMode.ISOLATED:
-            raise CapabilityUnavailable(
-                "isolated tasks are unavailable: the fork rejects isolated named tasks; "
-                "the isolated bootstrap fix (h0rv/erlang-python PR #5) and "
-                "child-exit accounting are required"
+        if execution != ExecutionMode.WORKER and dedicated_loop:
+            raise ValueError(
+                "dedicated_loop is worker-only; named tasks own their interpreter loop"
             )
-        if execution == ExecutionMode.OWNGIL and dedicated_loop:
-            raise ValueError("dedicated_loop is worker-only; owngil owns its interpreter loop")
         self._function = function
         self._entry: FunctionType | None = None
-        if execution == ExecutionMode.OWNGIL:
+        if execution != ExecutionMode.WORKER:
             if not isinstance(function, FunctionType) or not iscoroutinefunction(function):
-                raise TypeError("owngil tasks require a plain async Python function")
+                raise TypeError(execution.value + " tasks require a plain async Python function")
             if (
                 not isinstance(function.__module__, str)
                 or not function.__qualname__.isidentifier()
                 or not all(part.isidentifier() for part in function.__module__.split("."))
             ):
-                raise TypeError("owngil entries must be importable top-level functions")
+                raise TypeError(execution.value + " entries must be importable top-level functions")
             self._entry = function
         self._execution = execution
         self._dedicated_loop = dedicated_loop
@@ -144,7 +150,7 @@ class TaskFunction[Q, R]:
 
         function = self._function
         if self._entry is not None:
-            raise TypeError("owngil entries cannot run as worker bodies")
+            raise TypeError(self._execution.value + " entries cannot run as worker bodies")
 
         async def invoke(payload: bytes) -> bytes:
             token = _body_owners.set(owners)
@@ -214,6 +220,7 @@ class TaskRef[T]:
         self.observed = False
 
     async def _receive(self) -> _Success[T] | _Failure:
+        from erlang.tasks import TaskCrashed as NativeTaskCrashed
         from erlang.tasks import UncertainInflight, outcome
 
         try:
@@ -221,6 +228,8 @@ class TaskRef[T]:
                 case True, value:
                     return _Success(self._decode(value))
                 case False, error:
+                    if isinstance(error, NativeTaskCrashed):
+                        return _Failure(TaskCrashed(error.reason))
                     return _Failure(error)
                 case unexpected:
                     assert_never(unexpected)
@@ -312,7 +321,8 @@ class TaskSupervisor:
     Only an external owner may close the supervisor, not its bodies or descendants.
     This is not Python TaskGroup and never retries effects or restarts a job.
     Cancellation cannot undo completed effects or interrupt a blocked C body.
-    A native VM crash is not isolated to a task.
+    Only isolated tasks contain native child crashes; worker/owngil crashes can
+    kill the VM. A lost isolated child is never retried.
     """
 
     def __init__(self, limits: TaskLimits) -> None:
@@ -370,7 +380,9 @@ class TaskSupervisor:
             if function._entry is None:
                 submission = start(group, self._gate, factory, payload)
             else:
-                submission = start(group, self._gate, function._entry, payload, mode="owngil")
+                submission = start(
+                    group, self._gate, function._entry, payload, mode=function.execution.value
+                )
             pending = asyncio.create_task(submission)
             try:
                 pid = await _owned(pending)
