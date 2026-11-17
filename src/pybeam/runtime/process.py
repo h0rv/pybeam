@@ -24,7 +24,8 @@ class _Shutdown:
 
 
 def _send(process: subprocess.Popen[bytes], number: int) -> None:
-    with suppress(ProcessLookupError):
+    # macOS reports EPERM for a group whose remaining members are all exiting.
+    with suppress(ProcessLookupError, PermissionError):
         os.killpg(process.pid, number)
 
 
