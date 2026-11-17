@@ -113,22 +113,12 @@ jobs:
         # Deselected release gates need a reviewed platform wheel with GenStage
         # and an exact-byte prepared distribution profile, not this source build.
         run: |
-          fails=0
-          for i in $(seq 1 4); do
-            uv run --locked --all-extras pytest --run-frameworks --run-runtime -q -s \
-              tests/test_runtime_native.py -m 'runtime and not browser' \
-              --basetemp="$RUNNER_TEMP/native-tests-$i" 2>&1 | grep -E "DIAG|passed|failed|Error" || true
-            [ "${PIPESTATUS[0]}" = 0 ] || fails=$((fails+1))
-          done
-          uv run --locked --all-extras pytest -s \
+          uv run --locked --all-extras pytest \
             --run-frameworks --run-runtime -m 'runtime and not browser' \
             --deselect=tests/test_genstage_wheel.py::test_installed_genstage_without_developer_environment \
             --deselect=tests/test_runtime_bytecode_native.py::test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged \
-            -q -rs --timeout=180 --timeout-method=signal -o faulthandler_timeout=120 \
-            --basetemp="$RUNNER_TEMP/native-tests" 2>&1 | grep -E "DIAG|passed|failed|FAILED|Error" || true
-          [ "${PIPESTATUS[0]}" = 0 ] || fails=$((fails+1))
-          echo "fails=$fails"
-          exit 1
+            -vv -rs --timeout=180 --timeout-method=signal -o faulthandler_timeout=120 \
+            --basetemp="$RUNNER_TEMP/native-tests"
       - name: Upload regression diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
