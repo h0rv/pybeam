@@ -4,6 +4,7 @@ from genstage_callbacks import Outcome, process
 from genstage_owned import raises
 
 import pybeam
+from pybeam.codec import Json
 from pybeam.integrations.genstage.pipeline import CallbackFailed, stream
 from pybeam.runtime.optional import start_optional
 
@@ -22,7 +23,7 @@ async def main() -> None:
     for _ in range(8):
         async with stream(16, process) as events:
             async for payload in events:
-                assert Outcome.model_validate_json(payload).id == 0
+                assert Json(Outcome).decode(payload).id == 0
                 break
         assert await contexts() == baseline
 

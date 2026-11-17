@@ -13,6 +13,7 @@ from typing import Literal
 
 import psutil
 from examples.distributed.models import WalkthroughProof
+from pybeam.codec import Json
 from pybeam.runtime.guardian import ImmediateStop
 from pydantic import TypeAdapter, ValidationError
 
@@ -82,7 +83,7 @@ def check_lease(descriptor: int) -> None:
         return
     try:
         lease = Lease.model_validate_json(payload)
-        registry = Registry.model_validate_json(
+        registry = Json(Registry).decode(
             (Path(lease.trial_directory) / "ownership.json").read_text()
         )
         if registry.phase == "confirmed" and all(
@@ -119,7 +120,7 @@ def trial(config: Config, directory: Path, lock_fd: int, control: Control | None
     (directory / "config.json").write_text(config.model_dump_json(indent=2) + "\n")
     record(directory, set(), "tracking")
     write_lease(lock_fd, Lease(trial_directory=str(directory.resolve())))
-    parent = identity(psutil.Process())
+    parent = identity(os.getpid())
     with (directory / "guardian.log").open("wb") as log:
         guardian = subprocess.Popen(  # noqa: S603
             [
@@ -127,7 +128,7 @@ def trial(config: Config, directory: Path, lock_fd: int, control: Control | None
                 "-m",
                 "benchmarks.guardian",
                 str(directory),
-                parent.model_dump_json(),
+                Json(type(parent)).encode(parent).decode(),
                 "" if control is None else control.model_dump_json(),
                 str(lock_fd),
             ],
@@ -158,7 +159,7 @@ def recover_guardian(directory: Path, returncode: int | None) -> Outcome:
     owned = set[Identity]()
     phase = "uncertain"
     try:
-        registry = Registry.model_validate_json((directory / "ownership.json").read_text())
+        registry = Json(Registry).decode((directory / "ownership.json").read_text())
         owned.update(registry.owned)
         phase = registry.phase
     except OSError, ValueError:
@@ -195,7 +196,7 @@ def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> 
         if config.purpose != "walkthrough":
             raise ValueError("Nonmeasurement outcome cannot satisfy a benchmark")
         if outcome.status == "walkthrough":
-            WalkthroughProof.model_validate_json((directory / "adapter.json").read_text())
+            Json(WalkthroughProof).decode((directory / "adapter.json").read_text())
         else:
             if (
                 isinstance(config.stop_policy, ImmediateStop)
@@ -203,7 +204,7 @@ def summarize(index: int, directory: Path, config: Config, outcome: Outcome) -> 
                 or outcome.cleanup_state != "confirmed"
             ):
                 raise ValueError("Cancelled outcome lacks a cooperative managed policy")
-            registry = Registry.model_validate_json((directory / "ownership.json").read_bytes())
+            registry = Json(Registry).decode((directory / "ownership.json").read_bytes())
             parsed = parse_cleanup(directory, set(registry.owned), outcome.returncode)
             if isinstance(parsed, UnacknowledgedExit):
                 raise ValueError(parsed.reason)

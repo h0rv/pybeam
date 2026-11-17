@@ -3,8 +3,8 @@ from types import ModuleType
 from typing import Literal
 
 import pytest
-from pydantic import TypeAdapter
 
+from pybeam.codec import Json
 from pybeam.tasks import ExecutionMode, TaskCrashed, TaskFunction, TaskLimits, TaskSupervisor
 from tests.test_tasks import byte_entry
 
@@ -64,18 +64,16 @@ def native(monkeypatch: pytest.MonkeyPatch) -> TasksModule:
 async def test_tasks__dispatch_named_mode_with_caller_codecs(
     native: TasksModule, execution: Literal[ExecutionMode.OWNGIL, ExecutionMode.ISOLATED]
 ) -> None:
-    function = TaskFunction(byte_entry, TypeAdapter(bytes), TypeAdapter(bytes), execution=execution)
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=execution)
     async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
         ref = await sup.start(function, b"")
         assert await ref == b""
-        assert native.calls == [(byte_entry, b'""', execution.value)]
+        assert native.calls == [(byte_entry, Json(bytes).encode(b""), execution.value)]
 
 
 async def test_tasks__expose_and_cache_crash_exception(native: TasksModule) -> None:
     native.failure = NativeTaskCrashed(("signal", 6))
-    function = TaskFunction(
-        byte_entry, TypeAdapter(bytes), TypeAdapter(bytes), execution=ExecutionMode.ISOLATED
-    )
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=ExecutionMode.ISOLATED)
     async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
         ref = await sup.start(function, b"payload")
         error = await ref.exception()
@@ -88,9 +86,7 @@ async def test_tasks__expose_and_cache_crash_exception(native: TasksModule) -> N
 
 async def test_tasks__preserve_other_backend_errors(native: TasksModule) -> None:
     native.failure = ValueError("remote error")
-    function = TaskFunction(
-        byte_entry, TypeAdapter(bytes), TypeAdapter(bytes), execution=ExecutionMode.ISOLATED
-    )
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=ExecutionMode.ISOLATED)
     async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
         ref = await sup.start(function, b"payload")
         assert await ref.exception() is native.failure

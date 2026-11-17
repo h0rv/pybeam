@@ -1,3 +1,5 @@
+import os
+import signal
 import subprocess
 import sys
 import threading
@@ -7,6 +9,7 @@ from typing import BinaryIO, Literal
 
 import psutil
 import pytest
+from pybeam.codec import Json
 
 from benchmarks import runner
 from benchmarks.contract import Budget, Config, Identity
@@ -72,9 +75,7 @@ def test_guardian_death__cleans_registered_ids_under_lock_and_blocks_uncertainty
             try:
                 if mode == "known":
                     wait_for(directory / "test-child.json")
-                    registry = Registry.model_validate_json(
-                        (directory / "ownership.json").read_text()
-                    )
+                    registry = Json(Registry).decode((directory / "ownership.json").read_text())
                     assert len(registry.owned) >= 2
                     adapter = next(
                         value
@@ -83,22 +84,18 @@ def test_guardian_death__cleans_registered_ids_under_lock_and_blocks_uncertainty
                     )
                     process = resolve(adapter)
                     assert process is not None
-                    parent = process.parent()
-                    assert parent is not None
-                    guardian = identity(parent)
+                    guardian = identity(process.parent)
                 else:
                     wait_for(directory / "startup-owned.json")
-                    registry = Registry.model_validate_json(
-                        (directory / "startup-owned.json").read_text()
-                    )
+                    registry = Json(Registry).decode((directory / "startup-owned.json").read_text())
                     assert registry.phase == "spawning"
-                    guardian = Identity.model_validate_json(
+                    guardian = Json(Identity).decode(
                         (directory / "startup-guardian.json").read_text()
                     )
                 captured.update(registry.owned)
                 target = resolve(guardian)
                 assert target is not None
-                target.kill()
+                os.kill(target.pid, signal.SIGKILL)
                 assert entered.wait(timeout=10)
                 with pytest.raises(RuntimeError, match="shared load lock"), measurement_lock():
                     pass
@@ -130,7 +127,7 @@ def test_guardian_death__cleans_registered_ids_under_lock_and_blocks_uncertainty
 
 def resolve_command(value: Identity) -> list[str]:
     process = resolve(value)
-    return [] if process is None else process.cmdline()
+    return [] if process is None else psutil.Process(process.pid).cmdline()
 
 
 @pytest.mark.parametrize("phase", ["tracking", "spawning", "uncertain", "confirmed"])
@@ -140,7 +137,7 @@ def test_lease__never_releases_load_with_active_or_uncertain_ownership(
     phase: Literal["tracking", "spawning", "uncertain", "confirmed"],
 ) -> None:
     monkeypatch.setattr(runner, "LOAD_LOCK", tmp_path / "load.lock")
-    record(tmp_path, {identity(psutil.Process())}, phase)
+    record(tmp_path, {identity(os.getpid())}, phase)
     with measurement_lock() as descriptor:
         write_lease(descriptor, Lease(trial_directory=str(tmp_path)))
     with pytest.raises(ContaminatedLoad), measurement_lock():

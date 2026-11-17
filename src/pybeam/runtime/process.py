@@ -24,7 +24,8 @@ class _Shutdown:
 
 
 def _send(process: subprocess.Popen[bytes], number: int) -> None:
-    with suppress(ProcessLookupError):
+    # macOS reports EPERM for a group whose remaining members are all exiting.
+    with suppress(ProcessLookupError, PermissionError):
         os.killpg(process.pid, number)
 
 
@@ -179,9 +180,9 @@ def launch(
                 )
             while True:
                 if guardian is not None:
-                    from pybeam.runtime.ownership import Identity, resolve
+                    from pybeam.runtime.ownership import IDENTITY, resolve
 
-                    if resolve(Identity.model_validate_json(guardian)) is None:
+                    if resolve(IDENTITY.decode(guardian)) is None:
                         raise BootstrapError(
                             "Guardian exited; managed execution ownership is uncertain"
                         )
@@ -224,13 +225,11 @@ def launch(
                             )
                     return entry_status
                 if not announced and ready.exists() and "PYBEAM_CLUSTER_READY" in environment:
-                    import psutil
-
-                    from pybeam.runtime.ownership import durable_write, identity
+                    from pybeam.runtime.ownership import IDENTITY, durable_write, identity
 
                     durable_write(
                         Path(environment["PYBEAM_CLUSTER_READY"]),
-                        identity(psutil.Process(process.pid)).model_dump_json(),
+                        IDENTITY.encode(identity(process.pid)).decode(),
                     )
                     announced = True
                 now = time.monotonic()

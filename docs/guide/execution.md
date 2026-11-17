@@ -31,9 +31,8 @@ Tasks run in `worker` or `owngil` mode; actors run in `worker`, and `isolated` i
 
 ```python
 # execution.py
-from pydantic import TypeAdapter
-
 from pybeam import run
+from pybeam.codec import Json
 from pybeam.tasks import (
     ExecutionMode,
     TaskFunction,
@@ -52,8 +51,8 @@ async def checksum(iterations: int) -> int:
 async def main() -> None:
     job = TaskFunction(
         checksum,
-        TypeAdapter(int),
-        TypeAdapter(int),
+        Json(int),
+        Json(int),
         execution=ExecutionMode.WORKER,
         dedicated_loop=True,
     )

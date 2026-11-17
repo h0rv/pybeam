@@ -12,7 +12,7 @@ def run_native(tmp_path: Path, body: str) -> subprocess.CompletedProcess[str]:
     )
     script = tmp_path / "main.py"
     script.write_text(
-        "import asyncio\nfrom pydantic import TypeAdapter\nimport pybeam\n"
+        "import asyncio\nfrom pybeam.codec import Json\nimport pybeam\n"
         "from pybeam.submissions import Overloaded\nasync def main():\n"
         + body
         + '\n    print("native-submission-ok")\npybeam.run(main)\n'

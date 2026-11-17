@@ -4,7 +4,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from pybeam.mailbox import UnboundedMailbox
 from pybeam.supervision.config import (
@@ -19,23 +18,20 @@ from pybeam.supervision.config import (
 
 @pytest.mark.parametrize("count", [-1, -100])
 def test_budget_rejects_negative_count(count: int) -> None:
-    with pytest.raises(ValidationError) as caught:
+    with pytest.raises(ValueError):
         RestartBudget(max_restarts=count)
-    assert caught.value.errors()[0]["type"] == "greater_than_equal"
 
 
 @pytest.mark.parametrize("window", [0, -1])
 def test_budget_rejects_nonpositive_window(window: int) -> None:
-    with pytest.raises(ValidationError) as caught:
+    with pytest.raises(ValueError):
         RestartBudget(window_seconds=window)
-    assert caught.value.errors()[0]["type"] == "greater_than"
 
 
 @pytest.mark.parametrize("grace", [-1, 4294967296])
 def test_shutdown_rejects_outside_otp_timer_range(grace: int) -> None:
-    with pytest.raises(ValidationError) as caught:
+    with pytest.raises(ValueError):
         Shutdown(grace)
-    assert caught.value.errors()[0]["type"] in {"greater_than_equal", "less_than_equal"}
 
 
 def test_configuration_is_frozen_and_precise() -> None:
@@ -72,15 +68,11 @@ def test_numeric_configuration__rejects_coercion(
     value: str, constructor: str, location: str
 ) -> None:
     script = (
-        "from pydantic import ValidationError\n"
         "from pybeam.mailbox import UnboundedMailbox\n"
         "from pybeam.supervision.config import RestartBudget, Shutdown, SupervisorConfig\n"
         "try:\n    "
         + constructor.format(value)
-        + "\n"
-        "except ValidationError as error:\n"
-        "    assert error.errors()[0]['loc'] == ({!r},)\n".format(location)
-        + "    assert error.errors()[0]['type'] == 'int_type'\n"
+        + "\nexcept ValueError as error:\n    assert {!r} in str(error)\n".format(location)
         + "else:\n    raise AssertionError('invalid numeric value accepted')\n"
     )
     subprocess.run([sys.executable, "-c", script], check=True, timeout=10)

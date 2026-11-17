@@ -3,9 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -24,13 +22,18 @@ from starlette.templating import Jinja2Templates
 from benchmarks.runner import TrialSummary
 from examples.showcase.catalog import ROOT, catalog
 from examples.showcase.jobs import Job, Jobs, session_directory
+from pybeam.codec import Json
 
 
-class Settings(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid", frozen=True)
-    port: Annotated[int, Field(ge=1024, le=65535)] = 38921
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Settings:
+    port: int = 38921
     trusted_hornbeam_root: Path | None = None
     trusted_native_root: Path | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.port) is not int or not 1024 <= self.port <= 65535:
+            raise ValueError("port must be an integer from 1024 to 65535")
 
 
 @dataclass(frozen=True)
@@ -191,7 +194,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             if job.proof is None:
                 raise HTTPException(409, "No completed sanitized walkthrough proof")
             return Response(
-                job.proof.model_dump_json(),
+                Json(type(job.proof)).encode(job.proof).decode(),
                 media_type="application/json",
                 headers={
                     "Content-Disposition": "attachment; filename=walkthrough-" + job.id + ".json"

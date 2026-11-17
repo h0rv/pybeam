@@ -1,24 +1,20 @@
 import asyncio
 import os
 
-from pydantic import BaseModel, TypeAdapter
 from pydantic import __version__ as pydantic_version
 from pydantic_core import __version__ as core_version
 
 import pybeam
-
-
-class Value(BaseModel):
-    value: int
+from pybeam.codec import Json
 
 
 async def double(payload: bytes) -> bytes:
-    request = Value.model_validate_json(payload)
-    return Value(value=request.value * 2).model_dump_json().encode()
+    request = Json(dict[str, int]).decode(payload)
+    return Json(dict[str, int]).encode({"value": request["value"] * 2})
 
 
 async def imports(payload: bytes) -> bytes:
-    return TypeAdapter(dict[str, str | int]).dump_json(
+    return Json(dict[str, str | int]).encode(
         {
             "pydantic": pydantic_version,
             "pydantic_core": core_version,

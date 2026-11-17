@@ -3,7 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import psutil
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,6 +14,7 @@ from benchmarks.tests.test_runner import wait_for
 from examples.showcase.app import create_app
 from examples.showcase.catalog import ROOT, catalog
 from examples.showcase.jobs import Job, Jobs
+from pybeam.codec import Json
 
 BASE = "http://127.0.0.1:38921"
 
@@ -120,7 +120,7 @@ def test_guardian__control_reaps_owned_child(
     )
     stop = tmp_path / "stop.request"
     owner = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
-    control = Control(owner=identity(psutil.Process(owner.pid)), stop_file=str(stop))
+    control = Control(owner=identity(owner.pid), stop_file=str(stop))
 
     async def perform() -> Outcome:
         with measurement_lock() as descriptor:
@@ -142,7 +142,7 @@ def test_guardian__control_reaps_owned_child(
         if owner.poll() is None:
             owner.terminate()
         owner.wait(timeout=3)
-    child = Identity.model_validate_json((tmp_path / "trial/test-child.json").read_text())
+    child = Json(Identity).decode((tmp_path / "trial/test-child.json").read_text())
     assert outcome.reason == (
         "Stop requested; side effects are not rolled back"
         if mode == "stop"

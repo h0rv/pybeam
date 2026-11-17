@@ -1,32 +1,31 @@
 import hashlib
+import json
 import os
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import psutil
 import pytest
-from pydantic import BaseModel, ConfigDict
 
 from examples.distributed.profile import PROFILE, ROOT, PreparedProfile, verify_prepared
+from pybeam.codec import Json
 from pybeam.runtime.ownership import Identity, discover, identity, resolve
 
 pytestmark = pytest.mark.runtime
 
 
-class Guest(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Guest:
     dont_write_bytecode: Literal[True]
     value: Literal[12]
     snapshot: Literal[12]
 
 
-class RunProof(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RunProof:
     run: int
     guest: Guest
     births_gone: tuple[Identity, ...]
@@ -45,7 +44,7 @@ def inventory(root: Path) -> dict[str, str]:
 def test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged(
     tmp_path: Path,
 ) -> None:
-    profile = PreparedProfile.model_validate_json(PROFILE.read_bytes())
+    profile = Json(PreparedProfile).decode(PROFILE.read_bytes())
     assert len(profile.runtime_files) == 723
     runtime = ROOT / "src/pybeam/runtime/_assets"
     verify_prepared()
@@ -66,13 +65,15 @@ def test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged(
                 stderr=output,
                 start_new_session=True,
             )
-            owned = {identity(psutil.Process(process.pid))}
+            owned = {identity(process.pid)}
             deadline = time.monotonic() + 30
             while process.poll() is None:
                 discover(owned)
                 if time.monotonic() >= deadline:
                     (tmp_path / "retained-ownership.json").write_text(
-                        "[" + ",".join(value.model_dump_json() for value in owned) + "]"
+                        "["
+                        + ",".join(Json(type(value)).encode(value).decode() for value in owned)
+                        + "]"
                     )
                     pytest.fail("Ordinary managed actor deadline; ownership retained, no retry")
                 time.sleep(0.01)
@@ -82,7 +83,7 @@ def test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged(
             for line in log.read_text().splitlines()
             if line.startswith("IMMUTABLE_BUNDLE ")
         )
-        guest = Guest.model_validate_json(raw)
+        guest = Json(Guest).decode(raw)
         assert all(resolve(value) is None for value in owned)
         assert inventory(runtime) == expected
         verify_prepared()
@@ -92,6 +93,6 @@ def test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged(
             )
         )
         (tmp_path / ("run-" + str(run) + ".proof.json")).write_text(
-            proofs[-1].model_dump_json(indent=2)
+            json.dumps(Json(type(proofs[-1])).dump(proofs[-1]), indent=2)
         )
     assert len(proofs) == 2
