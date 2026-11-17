@@ -56,8 +56,7 @@ def _command(assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> li
     paths = (
         "["
         + ",".join(
-            "<<" + ",".join(str(byte) for byte in path.encode("utf-8")) + ">>"
-            for path in python_paths
+            "<<" + ",".join(str(byte) for byte in os.fsencode(path)) + ">>" for path in python_paths
         )
         + "]"
     )
@@ -127,7 +126,8 @@ def launch(
                 "python_paths": python_paths,
                 "ready": str(ready),
                 "completed": str(completed),
-            }
+            },
+            ensure_ascii=True,
         )
         guardian = environment.get("PYBEAM_GUARDIAN_IDENTITY")
         state = _Shutdown()

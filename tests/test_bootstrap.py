@@ -164,6 +164,41 @@ def test_process__command_registers_utf8_python_paths_as_data() -> None:
     assert "-erlang_python" not in process._command(assets)
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")
+def test_process__command_registers_surrogate_escaped_paths_as_bytes() -> None:
+    assets = RuntimeAssets(Path("erl"), ())
+    command = process._command(assets, python_paths=("", os.fsdecode(b"entry-\xff")))
+    position = command.index("-erlang_python")
+    assert command[position : position + 3] == [
+        "-erlang_python",
+        "paths",
+        "[<<>>,<<101,110,116,114,121,45,255>>]",
+    ]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX surrogate-escaped filesystem paths")
+def test_process__bootstrap_roundtrips_surrogate_escaped_paths(
+    fake_runtime: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    entry = fake_runtime.parent / os.fsdecode(b"entry-\xff") / "main.py"
+    search = str(fake_runtime.parent / os.fsdecode(b"search-\xfe"))
+    monkeypatch.setattr(sys, "path", [search])
+    fake_runtime.write_text(
+        "import json, os\nfrom pathlib import Path\n"
+        "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
+        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
+        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "print(json.dumps([p['argv'], p['python_paths']]))\n"
+    )
+    assert _launch(entry) == 0
+    assert json.loads(capfd.readouterr().out) == [
+        [str(entry), "a", "--flag"],
+        [str(entry.parent), search],
+    ]
+
+
 def test_process__merges_asset_environment_without_losing_caller_environment(
     fake_runtime: Path,
     monkeypatch: pytest.MonkeyPatch,
