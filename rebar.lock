@@ -1,4 +1,4 @@
 [{<<"erlang_python">>,
   {git,"https://github.com/h0rv/erlang-python.git",
-       {ref,"f924f05782c2a1abd44011c68da42f7e601a2397"}},
+       {ref,"79fd8106cf83e2463bf27abbdc59e2b72424d4dd"}},
   0}].
