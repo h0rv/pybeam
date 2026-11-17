@@ -56,13 +56,13 @@ def _linux_boot() -> float:
 
 def _linux(pid: int) -> Process | None:
     try:
-        text = Path("/proc/" + str(pid) + "/stat").read_text()
+        data = Path("/proc/" + str(pid) + "/stat").read_bytes()
     except FileNotFoundError, ProcessLookupError:
         return None
-    # The command name is parenthesized and may itself contain spaces or parentheses.
-    fields = text[text.rindex(")") + 2 :].split()
+    # The command name is parenthesized, arbitrary bytes, and may contain spaces or parentheses.
+    fields = data[data.rindex(b")") + 2 :].split()
     ticks = int(fields[19]) / os.sysconf("SC_CLK_TCK")
-    return Process(pid, int(fields[1]), _linux_boot() + ticks, fields[0] in {"Z", "X"})
+    return Process(pid, int(fields[1]), _linux_boot() + ticks, fields[0] in {b"Z", b"X"})
 
 
 class _BsdInfo(ctypes.Structure):
