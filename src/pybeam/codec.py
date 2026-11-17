@@ -283,9 +283,9 @@ class _Array(_Node):
             case "tuple":
                 return tuple(items)
             case "set":
-                return set(items)
+                return set(_hashable(items))
             case "frozenset":
-                return frozenset(items)
+                return frozenset(_hashable(items))
 
     @override
     def dump(self, value: object) -> object:
@@ -294,6 +294,17 @@ class _Array(_Node):
         if not isinstance(value, list | tuple | set | frozenset):
             raise _Invalid("expected " + self.collection + ", got " + _describe(value))
         return [_index(self.item.dump, item, index) for index, item in enumerate(value)]
+
+
+def _hashable(items: list[object]) -> list[object]:
+    for index, item in enumerate(items):
+        try:
+            hash(item)
+        except TypeError as error:
+            invalid = _Invalid("set members must be hashable, got " + _describe(item))
+            invalid.path.append("[" + str(index) + "]")
+            raise invalid from error
+    return items
 
 
 class _Tuple(_Node):
@@ -339,9 +350,20 @@ class _Dict(_Node):
                 return int(key)
             except ValueError as error:
                 raise _Invalid("expected an integer key, got " + repr(key)) from error
-        if isinstance(self.key, _Enum | _Literal):
-            return self.key.load(key)
-        return key
+        match self.key:
+            case _Literal():
+                options: tuple[object, ...] = self.key.values
+            case _Enum():
+                options = tuple(self.key.cls)
+            case _:
+                return key
+        for option in options:
+            try:
+                if self._dump_key(option) == key:
+                    return option
+            except _Invalid:
+                continue
+        raise _Invalid("unexpected key " + repr(key))
 
     def _dump_key(self, key: object) -> str:
         dumped = self.key.dump(key)
@@ -497,10 +519,8 @@ def _build(form: object, memo: dict[object, _Node]) -> _Node:
         case _ if container is frozenset:
             return _Array(item, "frozenset", (frozenset,))
         case _ if container is tuple:
-            if not arguments or (len(arguments) == 2 and arguments[1] is Ellipsis):
+            if origin is None or (len(arguments) == 2 and arguments[1] is Ellipsis):
                 return _Array(item, "tuple", (tuple,))
-            if arguments == ((),):
-                return _Tuple(())
             return _Tuple(tuple(_build(entry, memo) for entry in arguments))
         case _ if container is dict or container is Mapping:
             key = _build(arguments[0], memo) if arguments else _Str()

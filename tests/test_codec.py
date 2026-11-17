@@ -105,3 +105,24 @@ def test_construction__rejects_unsupported_types() -> None:
         Json(complex)
     with pytest.raises(TypeError, match="keys"):
         Json(dict[float, int])
+
+
+def test_mapping_keys__integer_enums_and_literals_round_trip() -> None:
+    by_level = Json(dict[Level, str])
+    assert by_level.decode(by_level.encode({Level.LOW: "x"})) == {Level.LOW: "x"}
+    by_literal = Json(dict[Literal[1, "a"], int])
+    assert by_literal.decode(by_literal.encode({1: 2, "a": 3})) == {1: 2, "a": 3}
+    with pytest.raises(CodecError, match="unexpected key"):
+        by_level.decode(b'{"2":"x"}')
+
+
+def test_union__unhashable_set_members_fall_through_to_later_options() -> None:
+    assert Json(set[object] | list[object]).decode(b"[[1]]") == [[1]]
+    with pytest.raises(CodecError, match="hashable"):
+        Json(set[object]).decode(b"[[1]]")
+
+
+def test_tuple__empty_shape_rejects_items() -> None:
+    assert Json(tuple[()]).decode(b"[]") == ()
+    with pytest.raises(CodecError):
+        Json(tuple[()]).decode(b"[1]")
