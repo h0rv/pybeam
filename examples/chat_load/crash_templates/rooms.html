@@ -12,13 +12,13 @@
   {% set interrupted = live.focus_interrupted(key) %}
   <section class="chat-panel" data-side="{{ key }}" aria-label="{{ side.title }} live conversation">
     <div class="side-heading"><h3>{{ side.title }}</h3><span>{{ side.rooms | sum(attribute='connected') }}/{{ live.settings.rooms * live.settings.clients }} online</span></div>
-    <p class="process-boundary">{% if key == 'usual' %}The native crash runs in a web worker that also holds chat connections.{% else %}The request sends native-crash work to a separate child process.{% endif %}</p>
+    <p class="process-boundary">{% if key == 'usual' %}The crash runs in a web worker that also holds chat connections.{% else %}The crash runs in a separate child process, away from chat connections.{% endif %}</p>
     <div class="connection-event {{ 'problem' if interrupted or client.state != 'connected' else '' }}">{% if interrupted %}{% if client.state == 'connected' %}Disconnected, then reconnected.{% else %}Disconnected. Reconnecting…{% endif %}{% elif client.state != 'connected' %}Waiting for a connection…{% else %}Connected{% if impact %} · no disconnect for this user{% endif %}.{% endif %}</div>
     <ol class="messages" aria-label="{{ side.title }} real message acknowledgements">
     {% for message in client.messages %}
       <li class="message {{ message.state }}">
         <span>{{ message.text }}</span>
-        <small>{% if message.state == 'confirmed' %}Confirmed by server{% elif message.state == 'unconfirmed' %}Connection lost · send unconfirmed{% else %}Waiting for server · {{ message.age(now) }}{% endif %}</small>
+        <small>{% if message.state == 'confirmed' %}Confirmed by server{% elif message.state == 'unconfirmed' %}Connection lost · send unconfirmed{% else %}Waiting for server · <span class="duration">{{ message.age(now) }}</span>{% endif %}</small>
       </li>
     {% else %}<li class="empty">Waiting for this user's first message…</li>{% endfor %}
     </ol>

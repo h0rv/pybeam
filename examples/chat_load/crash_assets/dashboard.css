@@ -57,6 +57,7 @@ button:disabled { opacity: .55; cursor: default; }
 .messages { list-style: none; margin: 0; padding: 8px 0 16px; height: 250px; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; overflow: hidden; }
 .message { align-self: flex-end; max-width: 95%; padding: 8px 12px; border-radius: 8px 8px 0 8px; background: var(--bubble); font-size: 14px; }
 .message small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.duration { white-space: nowrap; }
 .message.pending small, .message.unconfirmed small { color: var(--fault); }
 .message.unconfirmed { background: var(--fault-bg); }
 .empty { color: var(--muted); font-size: 14px; margin-block: auto; }
