@@ -18,7 +18,7 @@
     }
   </style>
   <path class="axis" d="M20 38V789"/>
-  <text x="20" y="24" class="note" text-anchor="start">0.01 s</text>
+  <text x="20" y="24" class="note" text-anchor="start">0.01</text>
   <path class="axis" d="M67.5 38V789"/>
   <text x="67.5" y="24" class="note" text-anchor="middle">0.1</text>
   <path class="axis" d="M115 38V789"/>
