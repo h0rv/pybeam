@@ -98,6 +98,14 @@ live updates across views. This works on Uvicorn and PyBEAM's native web server.
 Keep the returned `ViewSubscription` and await its `aclose()` on disconnect.
 Do not subscribe during the initial HTTP render.
 
+For presence, call `await services.presence(socket, topic, key, payload, convert)`
+during connected mount. It delegates to Hornbeam's `Beam.presence` and passes
+full snapshots of `tuple[PresenceEntry, ...]` to `convert`. Keep the returned
+`ViewPresence` and await `aclose()` on disconnect to acknowledge local untracking.
+Its `wait()` method observes consumer completion or failure without taking
+cancellation ownership. Like `subscribe`, it accepts `max_bytes=65536`; an
+overflow fails the stream rather than silently truncating a snapshot.
+
 On Uvicorn, sockets share the application's limit of 32 active subscriptions
 and rely on `aclose()` for disconnect cleanup. The native server owns
 subscriptions per connection and can also clean them up when the connection dies.
@@ -117,8 +125,19 @@ separate tabs. Enter a post and select **Send**. Both tabs append the post and
 show which node served the sender. Send a second post from the other tab to
 see the reverse direction. Press Ctrl+C in the terminal to stop both nodes.
 
+The **Who is online** list shows one entry per connected tab, labeled with its
+node and a short tab identifier, plus a count. Open another tab, then close it
+to see the list grow and shrink on both nodes. Stopping a node also removes its
+tabs from the remaining node's list. A new tab receives the current presence
+snapshot, but no earlier posts.
+
 This is a loopback-only local demo, not a deployment configuration. Each
-connected tab keeps its latest 20 posts in memory. A new tab starts empty;
+connected tab keeps its latest 20 posts in memory. A new tab's post list starts empty;
 reloading clears that tab's list. Messages are not durable: disconnected tabs
 and nodes that are down miss posts, with no replay when they reconnect.
 There is no authentication; anyone who can access the local ports can post.
+Presence is eventually consistent across nodes and is not durable. Join and
+leave updates can take time to reach other tabs, especially while a node failure
+is being detected. The list is not an instantaneous or authoritative record of
+who is connected; restarting the presence engine closes existing presence
+streams rather than restoring their entries.

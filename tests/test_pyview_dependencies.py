@@ -14,7 +14,7 @@ from pyview.pyview import PyView
 from starlette.types import Message, Scope
 from starlette.websockets import WebSocket
 
-from pybeam.integrations.hornbeam import Beam, Services
+from pybeam.integrations.hornbeam import Beam, PresenceEntry, Services
 from pybeam.integrations.pyview.dependencies import BeamProvider, services
 from tests.fakes import FakeServices, ServiceState
 
@@ -123,6 +123,32 @@ async def test_subscription_uses_available_owner_and_closes(scope: Scope, owner:
         assert not state.channels
     with pytest.raises(RuntimeError, match="active application lifespan"):
         await instance.subscribe(socket, "topic", notification)
+
+
+@pytest.mark.parametrize(
+    ("scope", "owner"),
+    [
+        ({"type": "websocket", "extensions": {"hornbeam.owner": "socket-owner"}}, "socket-owner"),
+        ({"type": "websocket"}, "application"),
+    ],
+)
+async def test_presence_uses_available_owner_and_closes(scope: Scope, owner: str) -> None:
+    state = ServiceState()
+
+    async def connect() -> Services:
+        return FakeServices(state, owner="application")
+
+    def snapshot(entries: tuple[PresenceEntry, ...]) -> InfoEvent:
+        return InfoEvent("online", entries)
+
+    instance = BeamProvider(connect)
+    async with instance.lifespan(object()):
+        socket = connected_socket(scope)
+        socket.connected = False
+        view = await instance.presence(socket, "online", "tab", b"A", snapshot, max_bytes=1024)
+        assert state.calls == [("presence", [owner, "online", "tab", 1024])]
+        await view.aclose()
+        assert not state.presences
 
 
 async def test_subscription_rejects_invalid_native_scope_owner() -> None:

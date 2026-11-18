@@ -121,13 +121,15 @@ def interrupted(_number: int, _frame: FrameType | None) -> None:
     raise Stopped
 
 
-def main() -> None:
+def main(
+    *, runtime: Path = ROOT / "_build" / "hornbeam", ports: tuple[int, int] = (8771, 8772)
+) -> None:
     previous = {
         number: signal.signal(number, interrupted) for number in (signal.SIGINT, signal.SIGTERM)
     }
     try:
-        with running() as processes:
-            print("Open http://127.0.0.1:8771/ and http://127.0.0.1:8772/", flush=True)
+        with running(runtime=runtime, ports=ports) as processes:
+            print("Open http://127.0.0.1:{}/ and http://127.0.0.1:{}/".format(*ports), flush=True)
             print("Press Ctrl+C to stop both nodes.", flush=True)
             while all(process.poll() is None for process in processes):
                 time.sleep(0.1)

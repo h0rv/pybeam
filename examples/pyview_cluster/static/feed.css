@@ -17,3 +17,5 @@ li { padding: .75rem 0; border-bottom: 1px solid var(--divider); overflow-wrap: 
 li p { margin: 0 0 .25rem; white-space: pre-wrap; }
 small { font-size: 1rem; }
 [role="status"]:empty { display: none; }
+.presence-roster, .phx-connected .presence-connection { display: none; }
+.phx-connected .presence-roster { display: block; }

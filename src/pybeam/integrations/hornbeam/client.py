@@ -3,7 +3,12 @@ from contextlib import contextmanager
 from types import TracebackType
 from typing import Self
 
-from pybeam.integrations.hornbeam.contracts import ByteStore, Services, Subscription
+from pybeam.integrations.hornbeam.contracts import (
+    ByteStore,
+    PresenceSubscription,
+    Services,
+    Subscription,
+)
 from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
 
 
@@ -20,8 +25,8 @@ def _subscription_errors() -> Generator[None]:
         raise SubscriptionOverflow(str(error)) from error
 
 
-class _Subscription:
-    def __init__(self, native: Subscription) -> None:
+class _Subscription[T]:
+    def __init__(self, native: Subscription[T]) -> None:
         self._native = native
 
     async def __aenter__(self) -> Self:
@@ -41,11 +46,11 @@ class _Subscription:
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> bytes:
+    async def __anext__(self) -> T:
         with _subscription_errors():
             return await anext(self._native)
 
-    async def receive(self) -> bytes:
+    async def receive(self) -> T:
         with _subscription_errors():
             return await self._native.receive()
 
@@ -88,3 +93,10 @@ class Beam:
 
     async def subscription_count(self) -> int:
         return await self._native.subscription_count()
+
+    def presence(
+        self, topic: str, key: str, payload: bytes, *, max_bytes: int = 65536
+    ) -> PresenceSubscription:
+        """Track an owned entry and receive bounded, non-durable presence snapshots."""
+        with _subscription_errors():
+            return _Subscription(self._native.presence(topic, key, payload, max_bytes=max_bytes))

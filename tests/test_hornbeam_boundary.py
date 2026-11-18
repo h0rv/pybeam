@@ -30,6 +30,25 @@ async def test_native_closed__should_translate_real_exception_identity() -> None
     assert not isinstance(caught.value, NativeClosed)
 
 
+async def test_presence_closed__should_translate_real_exception_identity() -> None:
+    subscription = Beam(NativeBeam(owner=object())).presence("online", "one", b"A")
+    with pytest.raises(SubscriptionClosed) as caught:
+        await subscription.receive()
+    assert isinstance(caught.value.__cause__, NativeClosed)
+
+
+async def test_presence_overflow__should_translate_and_untrack() -> None:
+    state = ServiceState()
+    native = NativeOverflow("presence byte budget exhausted")
+    async with Beam(FakeServices(state, owner="socket")).presence("online", "one", b"A") as stream:
+        assert await anext(stream)
+        next(iter(state.presences.values())).queue.put_nowait(native)
+        with pytest.raises(SubscriptionOverflow) as caught:
+            await stream.receive()
+        assert caught.value.__cause__ is native
+    assert not state.presences
+
+
 @pytest.mark.parametrize("iterate", [False, True])
 async def test_native_overflow__should_translate_and_keep_cleanup_ownership(iterate: bool) -> None:
     state = ServiceState()

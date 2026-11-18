@@ -1,9 +1,11 @@
 import os
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
 from string.templatelib import Template
 from typing import TYPE_CHECKING, Annotated, Literal, override
+from uuid import uuid4
 
 from markupsafe import Markup
 from pydantic import BaseModel, Field, ValidationError
@@ -18,15 +20,16 @@ from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.hornbeam import PresenceEntry, Services
 from pybeam.integrations.pyview.dependencies import services
-from pybeam.integrations.pyview.subscriptions import ViewSubscription
+from pybeam.integrations.pyview.subscriptions import ViewPresence, ViewSubscription
 
 if TYPE_CHECKING:
     from pyview.meta import PyViewMeta
     from starlette.requests import Request
 
 TOPIC = "demo:feed"
+PRESENCE_TOPIC = "demo:feed:online"
 NODE = os.environ.get("PYBEAM_FEED_NODE", "A")
 
 
@@ -38,9 +41,25 @@ class Post(Message):
     node: Literal["A", "B"]
 
 
+class Location(BaseModel):
+    node: Literal["A", "B"]
+
+
+@dataclass(frozen=True)
+class OnlineTab:
+    key: str
+    node: Literal["A", "B"]
+
+
+@dataclass(frozen=True)
+class Roster:
+    tabs: tuple[OnlineTab, ...]
+
+
 @dataclass
 class FeedState:
     posts: list[Post] = field(default_factory=list)
+    online: tuple[OnlineTab, ...] = ()
     error: str = ""
 
 
@@ -48,10 +67,19 @@ def notification(payload: bytes) -> InfoEvent:
     return InfoEvent(TOPIC, Post.model_validate_json(payload))
 
 
+def presence_notification(entries: tuple[PresenceEntry, ...]) -> InfoEvent:
+    tabs = tuple(
+        OnlineTab(entry.key, Location.model_validate_json(entry.payload).node) for entry in entries
+    )
+    return InfoEvent(PRESENCE_TOPIC, Roster(tabs))
+
+
 class FeedView(TemplateView[FeedState], LiveView[FeedState]):
     def __init__(self) -> None:
         super().__init__()
         self.subscription: ViewSubscription | None = None
+        self.presence: ViewPresence | None = None
+        self._streams = AsyncExitStack()
 
     @override
     async def mount(
@@ -61,7 +89,20 @@ class FeedView(TemplateView[FeedState], LiveView[FeedState]):
     ) -> None:
         socket.context = FeedState()
         if is_connected(socket):
-            self.subscription = await services.subscribe(socket, TOPIC, notification)
+            try:
+                self.subscription = await services.subscribe(socket, TOPIC, notification)
+                self._streams.push_async_callback(self.subscription.aclose)
+                self.presence = await services.presence(
+                    socket,
+                    PRESENCE_TOPIC,
+                    uuid4().hex,
+                    Location.model_validate({"node": NODE}).model_dump_json().encode(),
+                    presence_notification,
+                )
+                self._streams.push_async_callback(self.presence.aclose)
+            except BaseException:
+                await self._streams.aclose()
+                raise
 
     async def handle_event(
         self,
@@ -83,15 +124,17 @@ class FeedView(TemplateView[FeedState], LiveView[FeedState]):
 
     @override
     async def handle_info(self, event: InfoEvent, socket: LiveViewSocket[FeedState]) -> None:
-        if event.name != TOPIC or not isinstance(event.payload, Post):
+        if event.name == TOPIC and isinstance(event.payload, Post):
+            socket.context.posts.append(event.payload)
+            del socket.context.posts[:-20]
+        elif event.name == PRESENCE_TOPIC and isinstance(event.payload, Roster):
+            socket.context.online = event.payload.tabs
+        else:
             raise ValueError("unexpected feed notification")
-        socket.context.posts.append(event.payload)
-        del socket.context.posts[:-20]
 
     @override
     async def disconnect(self, socket: LiveViewSocket[FeedState]) -> None:
-        if self.subscription is not None:
-            await self.subscription.aclose()
+        await self._streams.aclose()
 
     @override
     def template(self, assigns: FeedState, meta: PyViewMeta) -> Template:
@@ -100,6 +143,10 @@ class FeedView(TemplateView[FeedState], LiveView[FeedState]):
             for post in assigns.posts
         ]
         empty = t"<p>No posts received in this tab yet.</p>" if not posts else t""
+        online = [
+            t"<li>{'Node ' + tab.node + ', tab ' + tab.key[:8]}</li>" for tab in assigns.online
+        ]
+        online_count = "Online tabs: {}".format(len(assigns.online))
         return t"""<main>
             <h1>Two-node feed</h1>
             <p>This tab is served by node {NODE}.</p>
@@ -109,6 +156,12 @@ class FeedView(TemplateView[FeedState], LiveView[FeedState]):
                 <button type="submit">Send</button>
             </form>
             <p role="status">{assigns.error}</p>
+            <h2>Who is online</h2>
+            <p class="presence-connection" role="status">Disconnected. Reconnecting…</p>
+            <div class="presence-roster">
+                <p aria-live="polite">{online_count}</p>
+                <ul aria-label="Online tabs">{online}</ul>
+            </div>
             <h2>Posts received in this tab</h2>
             {empty}
             <ol aria-live="polite">{posts}</ol>
@@ -129,7 +182,7 @@ app = PyView(
     ],
 )
 app.rootTemplate = defaultRootTemplate(
-    css=Markup('<link rel="stylesheet" href="/feed-static/feed.css">'),
+    css=Markup('<link rel="stylesheet" href="/feed-static/feed.css?v=presence">'),
     title="Two-node feed",
     title_suffix="",
 )

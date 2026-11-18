@@ -3,7 +3,16 @@ from pydantic import ValidationError
 from pyview.events import InfoEvent
 from pyview.live_socket import UnconnectedSocket
 
-from examples.pyview_cluster.main import TOPIC, FeedState, FeedView, Post, notification
+from examples.pyview_cluster.main import (
+    TOPIC,
+    FeedState,
+    FeedView,
+    OnlineTab,
+    Post,
+    notification,
+    presence_notification,
+)
+from pybeam.integrations.hornbeam import PresenceEntry
 from tests.fakes import FakeServices, ServiceState
 
 
@@ -52,3 +61,28 @@ async def test_feed__keeps_latest_twenty_and_rejects_unexpected_events() -> None
 def test_feed__invalid_payload_is_rejected(payload: bytes) -> None:
     with pytest.raises(ValidationError):
         notification(payload)
+
+
+async def test_feed__presence_replaces_roster_and_accepts_empty_snapshot() -> None:
+    view = FeedView()
+    socket = UnconnectedSocket[FeedState]()
+    await view.mount(socket, {})
+    assert socket.context.online == ()
+    assert view.presence is None
+    entries = (
+        PresenceEntry("one", "ref-1", b'{"node":"A"}'),
+        PresenceEntry("two", "ref-2", b'{"node":"B"}'),
+    )
+    await view.handle_info(presence_notification(entries), socket)
+    assert socket.context.online == (OnlineTab("one", "A"), OnlineTab("two", "B"))
+    await view.handle_info(presence_notification(entries[1:]), socket)
+    assert socket.context.online == (OnlineTab("two", "B"),)
+    await view.handle_info(presence_notification(()), socket)
+    assert socket.context.online == ()
+    assert socket.context.posts == []
+
+
+@pytest.mark.parametrize("payload", [b"", b"not json", b'{"node":"C"}'])
+def test_feed__invalid_presence_payload_is_rejected(payload: bytes) -> None:
+    with pytest.raises(ValidationError):
+        presence_notification((PresenceEntry("one", "ref-1", payload),))

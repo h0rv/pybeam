@@ -1,11 +1,15 @@
 from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
 from pyview.events import InfoEvent
 from pyview.live_socket import ConnectedLiveViewSocket, LiveViewSocket
 
 from pybeam.integrations.hornbeam import Services
 from pybeam.integrations.hornbeam.dependencies import BeamProvider as ServicesProvider
-from pybeam.integrations.pyview.subscriptions import ViewSubscription
+from pybeam.integrations.pyview.subscriptions import ViewPresence, ViewSubscription
+
+if TYPE_CHECKING:
+    from pybeam.integrations.hornbeam import PresenceEntry
 
 
 class BeamProvider(ServicesProvider):
@@ -24,13 +28,42 @@ class BeamProvider(ServicesProvider):
         max_bytes: int = 65536,
     ) -> ViewSubscription:
         """Use the socket's native owner when present, otherwise the lifespan owner."""
-        scope = socket.websocket.scope
+        return await ViewSubscription.start(
+            self._socket_services(socket.websocket.scope),
+            socket,
+            topic,
+            convert,
+            max_bytes=max_bytes,
+        )
+
+    async def presence[T](
+        self,
+        socket: ConnectedLiveViewSocket[T],
+        topic: str,
+        key: str,
+        payload: bytes,
+        convert: Callable[[tuple[PresenceEntry, ...]], InfoEvent],
+        *,
+        max_bytes: int = 65536,
+    ) -> ViewPresence:
+        """Track this view and forward full snapshots using the subscription ownership rules."""
+        return await ViewPresence.start(
+            self._socket_services(socket.websocket.scope),
+            socket,
+            topic,
+            key,
+            payload,
+            convert,
+            max_bytes=max_bytes,
+        )
+
+    def _socket_services(self, scope: Mapping[str, object]) -> Services:
         extensions: object = scope.get("extensions", {})
         if isinstance(extensions, Mapping) and "hornbeam.owner" not in extensions:
             beam = self.services
         else:
             beam = self.for_scope(scope)
-        return await ViewSubscription.start(beam, socket, topic, convert, max_bytes=max_bytes)
+        return beam
 
 
 services = BeamProvider()
