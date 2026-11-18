@@ -27,9 +27,30 @@ def test_cluster__names_the_node_by_the_address_that_routes_to_peers() -> None:
     assert "secret" not in "".join(joined.options)
 
 
-def test_cluster__uses_ipv6_distribution_for_ipv6_peers() -> None:
-    assert "inet6_tcp" in discovery.Cluster("app.internal", "fdaa::3").options
-    assert "inet6_tcp" not in discovery.Cluster("app.internal", "10.0.0.3").options
+def test_cluster__listens_only_on_the_peer_address() -> None:
+    ipv6 = discovery.Cluster("app.internal", "fdaa::3").options
+    ipv4 = discovery.Cluster("app.internal", "10.0.0.3").options
+    assert "inet6_tcp" in ipv6
+    assert "{64938,0,0,0,0,0,0,3}" in ipv6
+    assert "inet6_tcp" not in ipv4
+    assert "{10,0,0,3}" in ipv4
+
+
+def test_cluster__prefers_ipv4_and_skips_unroutable_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    answers = [
+        (socket.AF_INET6, socket.SOCK_DGRAM, 0, "", ("::1", 4370, 0, 0)),
+        (socket.AF_INET, socket.SOCK_DGRAM, 0, "", ("255.255.255.255", 4370)),
+        (socket.AF_INET, socket.SOCK_DGRAM, 0, "", ("127.0.0.1", 4370)),
+    ]
+
+    def resolve(*_: object, **__: object) -> list[object]:
+        return list(answers)
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    joined = discovery.cluster({"PYBEAM_CLUSTER": "app.internal", "PYBEAM_COOKIE": "x"}, 0.0)
+    assert joined == discovery.Cluster("app.internal", "127.0.0.1")
 
 
 def test_cluster__waits_for_the_name_until_the_startup_timeout(

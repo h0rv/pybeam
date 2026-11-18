@@ -1,3 +1,4 @@
+import ipaddress
 import socket
 import time
 from collections.abc import Mapping
@@ -27,7 +28,7 @@ _JOIN = (
 class Cluster:
     """Join every `pybeam` node that a DNS name resolves to.
 
-    Nodes listen on TCP port 4370 without EPMD and trust any peer that presents
+    Nodes listen on TCP port 4370 of the address that routes to peers, without EPMD, and trust any peer that presents
     the shared cookie. The name is resolved again every five seconds; nodes that
     disappear from DNS are not disconnected.
     """
@@ -41,8 +42,26 @@ class Cluster:
 
     @property
     def options(self) -> tuple[str, ...]:
-        family = ("-proto_dist", "inet6_tcp") if ":" in self.address else ()
-        return ("-start_epmd", "false", "-erl_epmd_port", str(PORT), *family, "-eval", _JOIN)
+        address = ipaddress.ip_address(self.address)
+        if address.version == 4:
+            family: tuple[str, ...] = ()
+            words = address.packed
+        else:
+            family = ("-proto_dist", "inet6_tcp")
+            words = tuple(int(word, 16) for word in address.exploded.split(":"))
+        interface = "{" + ",".join(str(word) for word in words) + "}"
+        return (
+            "-start_epmd",
+            "false",
+            "-erl_epmd_port",
+            str(PORT),
+            *family,
+            "-kernel",
+            "inet_dist_use_interface",
+            interface,
+            "-eval",
+            _JOIN,
+        )
 
 
 def _address(query: str) -> str | None:
@@ -50,10 +69,15 @@ def _address(query: str) -> str | None:
         answers = socket.getaddrinfo(query, PORT, type=socket.SOCK_DGRAM)
     except socket.gaierror:
         return None
+    # Every node must pick the same family, so prefer IPv4 whenever the name has it.
+    answers.sort(key=lambda answer: answer[0] != socket.AF_INET)
     for family, kind, _, _, target in answers:
         with socket.socket(family, kind) as probe:
-            # UDP connect sends nothing; it selects the interface that routes to peers.
-            probe.connect(target)
+            try:
+                # UDP connect sends nothing; it selects the interface that routes to peers.
+                probe.connect(target)
+            except OSError:
+                continue
             host = probe.getsockname()[0]
         if isinstance(host, str):
             return host
