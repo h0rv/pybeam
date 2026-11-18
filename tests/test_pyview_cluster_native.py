@@ -77,6 +77,8 @@ def joined(port: int) -> Generator[ViewClient]:
     page = JoinPage()
     response = httpx.get(base + "/", timeout=5)
     response.raise_for_status()
+    assert '<title data-suffix="">Two-node feed</title>' in response.text
+    assert '<link rel="stylesheet" href="/feed-static/feed.css">' in response.text
     page.feed(response.text)
     assert page.token and page.topic and page.session
     with connect("ws://127.0.0.1:" + str(port) + "/live/websocket", open_timeout=5) as connection:
@@ -127,29 +129,24 @@ def test_feed__two_nodes_exchange_posts_and_shutdown(
     assert isinstance(profile, str)
     ports = free_port(), free_port()
     with (tmp_path / "cluster.log").open("wb") as output:
-        with running(runtime=Path(profile), ports=ports, output=output) as processes:
-            wait_ready(ports)
-            with joined(ports[0]) as a, joined(ports[1]) as b:
-                a.send("hello from A")
-                assert "A" in b.expect("hello from A")
-                a.expect("hello from A")
-                b.send("hello from B")
-                assert "B" in a.expect("hello from B")
-                b.expect("hello from B")
-                a.send("<script>not markup</script>")
-                assert "&lt;script&gt;" in b.expect("not markup")
-                with joined(ports[0]):
-                    pass
-            with httpx.Client(timeout=2) as client:
+        for _ in range(2):
+            with running(runtime=Path(profile), ports=ports, output=output) as processes:
+                wait_ready(ports)
                 for port in ports:
-                    deadline = time.monotonic() + 5
-                    while True:
-                        response = client.get("http://127.0.0.1:" + str(port) + "/subscriptions")
-                        if response.text == "0":
-                            break
-                        assert time.monotonic() < deadline, "Socket subscription was not cleaned up"
-                        time.sleep(0.02)
-        assert all(process.returncode == 0 for process in processes)
-    for port in ports:
-        with pytest.raises(httpx.TransportError):
-            httpx.get("http://127.0.0.1:" + str(port) + "/health", timeout=0.5)
+                    response = httpx.get("http://127.0.0.1:" + str(port) + "/subscriptions")
+                    assert response.status_code == 404
+                with joined(ports[0]) as a, joined(ports[1]) as b:
+                    a.send("hello from A")
+                    assert "A" in b.expect("hello from A")
+                    a.expect("hello from A")
+                    b.send("hello from B")
+                    assert "B" in a.expect("hello from B")
+                    b.expect("hello from B")
+                    a.send("<script>not markup</script>")
+                    assert "&lt;script&gt;" in b.expect("not markup")
+                    with joined(ports[0]):
+                        pass
+            assert all(process.returncode == 0 for process in processes)
+            for port in ports:
+                with pytest.raises(httpx.TransportError):
+                    httpx.get("http://127.0.0.1:" + str(port) + "/health", timeout=0.5)

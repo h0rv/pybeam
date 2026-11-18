@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass, field
-from html import escape
 from importlib.resources import files
 from pathlib import Path
 from string.templatelib import Template
@@ -13,6 +12,7 @@ from pyview.events import InfoEvent
 from pyview.live_socket import LiveViewSocket, is_connected
 from pyview.live_view import LiveView, Session
 from pyview.pyview import PyView
+from pyview.template import defaultRootTemplate
 from pyview.template.template_view import TemplateView
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Mount, Route
@@ -24,7 +24,6 @@ from pybeam.integrations.pyview.subscriptions import ViewSubscription
 
 if TYPE_CHECKING:
     from pyview.meta import PyViewMeta
-    from pyview.template import RootTemplateContext
     from starlette.requests import Request
 
 TOPIC = "demo:feed"
@@ -121,38 +120,17 @@ async def health(_request: Request) -> Response:
     return PlainTextResponse("ok")
 
 
-async def subscriptions(_request: Request) -> Response:
-    return PlainTextResponse(str(await services.services.subscription_count()))
-
-
 app = PyView(
     lifespan=services.lifespan,
     routes=[
         Route("/health", health),
-        Route("/subscriptions", subscriptions),
         Mount("/static", StaticFiles(directory=str(files("pyview").joinpath("static")))),
         Mount("/feed-static", StaticFiles(directory=Path(__file__).parent / "static")),
     ],
 )
-default_root = app.rootTemplate
-
-
-def root_template(context: RootTemplateContext) -> str:
-    return default_root(
-        {
-            **context,
-            "id": escape(context["id"], quote=True),
-            "csrf_token": escape(context["csrf_token"], quote=True),
-            "session": escape(context["session"] or "", quote=True),
-            "title": "Two-node feed",
-            "additional_head_elements": [
-                *context["additional_head_elements"],
-                Markup('<link rel="stylesheet" href="/feed-static/feed.css">'),
-                Markup('<link rel="icon" href="data:,">'),
-            ],
-        }
-    )
-
-
-app.rootTemplate = root_template
+app.rootTemplate = defaultRootTemplate(
+    css=Markup('<link rel="stylesheet" href="/feed-static/feed.css">'),
+    title="Two-node feed",
+    title_suffix="",
+)
 app.add_live_view("/", FeedView)
