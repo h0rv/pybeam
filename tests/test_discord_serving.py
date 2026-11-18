@@ -9,6 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 from playwright.sync_api import sync_playwright
+from websockets.sync.client import connect
 
 ROOT = Path(__file__).resolve().parents[1]
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -31,7 +32,7 @@ def native_http_server(request: pytest.FixtureRequest, tmp_path: Path) -> Genera
     log = tmp_path / "native-serving.log"
     with log.open("wb") as output:
         process = subprocess.Popen(
-            [sys.executable, "tests/native/discord_serving.py", "--port", str(port)],
+            [sys.executable, "-m", "tests.native.discord_serving", "--port", str(port)],
             cwd=ROOT,
             stdout=output,
             stderr=subprocess.STDOUT,
@@ -72,6 +73,24 @@ def test_uvicorn__serves_inside_managed_native_loop(native_http_server: NativeSe
         response = client.get(native_http_server.url + "/health")
     assert response.status_code == 200
     assert response.text == "native-loop-ok"
+
+
+@pytest.mark.runtime
+def test_uvicorn__http_uses_lifespan_resources(native_http_server: NativeServer) -> None:
+    with httpx.Client(base_url=native_http_server.url, timeout=5) as client:
+        for _ in range(2):
+            response = client.get("/resource")
+            assert response.status_code == 200, native_http_server.log.read_text()
+            assert response.text == "same-loop"
+
+
+@pytest.mark.runtime
+def test_uvicorn__websocket_uses_lifespan_resources(native_http_server: NativeServer) -> None:
+    for _ in range(2):
+        with connect(
+            native_http_server.url.replace("http://", "ws://") + "/resource-ws", open_timeout=5
+        ) as client:
+            assert client.recv(timeout=5) == "same-loop", native_http_server.log.read_text()
 
 
 @pytest.mark.runtime

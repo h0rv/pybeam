@@ -1,7 +1,9 @@
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
 from typing import get_type_hints
+from uuid import uuid4
 
 from pybeam.codec import Json
 
@@ -19,6 +21,10 @@ class ActorStateError(RuntimeError):
 
 class ActorStateConflictError(ActorStateError):
     """Another writer advanced the stored version. Restart before writing again."""
+
+
+class ActorStateOwnershipError(ActorStateError):
+    """This actor lost ownership of its saved state and cannot commit writes."""
 
 
 _OBJECT = Json(dict[str, object])
@@ -76,21 +82,70 @@ async def _call(name: str, *args: object) -> object:
         raise ActorStateError("Actor state operation failed: " + name) from error
     if isinstance(result, tuple) and len(result) == 2 and result[0] == "error":
         reason = result[1]
+        if reason == "not_owner":
+            raise ActorStateOwnershipError("Actor lost ownership of its saved state")
         if isinstance(reason, tuple) and len(reason) == 3 and reason[0] == "version_conflict":
             raise ActorStateConflictError("Stored actor version changed: " + repr(reason[1:]))
         raise ActorStateError("Actor state operation failed: " + repr(reason))
     return result
 
 
+async def _finish[T](pending: asyncio.Task[T]) -> T:
+    while not pending.done():
+        try:
+            await asyncio.shield(pending)
+        except asyncio.CancelledError:
+            continue
+    return pending.result()
+
+
+async def _cancel_claim(ref: bytes, pending: asyncio.Task[object]) -> None:
+    try:
+        await _call("_actor_state_cancel", ref)
+    finally:
+        with suppress(ActorStateError):
+            await pending
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimedSnapshot:
+    spec: SnapshotSpec
+    token: bytes
+
+    @classmethod
+    async def acquire(cls, spec: SnapshotSpec, replicas: tuple[bytes, ...]) -> ClaimedSnapshot:
+        if await _call("_actor_state_open", str(spec.directory), list(replicas)) != "ok":
+            raise ActorStateError("Invalid actor state open response")
+        ref = uuid4().bytes
+        pending = asyncio.create_task(_call("_actor_state_claim", spec.key, ref))
+        try:
+            result = await asyncio.shield(pending)
+            if (
+                isinstance(result, tuple)
+                and len(result) == 2
+                and result[0] == "ok"
+                and isinstance(result[1], bytes)
+                and result[1]
+            ):
+                return cls(spec, result[1])
+            raise ActorStateError("Invalid actor state claim response")
+        except BaseException:
+            await _finish(asyncio.create_task(_cancel_claim(ref, pending)))
+            raise
+
+    async def release(self) -> None:
+        if await _call("_actor_state_release", self.token) != "ok":
+            raise ActorStateError("Invalid actor state release response")
+
+
 class Snapshot:
-    def __init__(self, spec: SnapshotSpec) -> None:
-        self.spec = spec
+    def __init__(self, claimed: ClaimedSnapshot) -> None:
+        self.spec = claimed.spec
+        self.token = claimed.token
         self.version = 0
         self.writable = True
 
     async def restore(self, state: object) -> None:
-        if await _call("_actor_state_open", str(self.spec.directory)) != "ok":
-            raise ActorStateError("Invalid actor state open response")
         result = await _call("_actor_state_read", self.spec.key)
         if result == "missing":
             return
@@ -111,7 +166,9 @@ class Snapshot:
 
     async def _commit(self, payload: bytes) -> int:
         try:
-            result = await _call("_actor_state_write", self.spec.key, self.version, payload)
+            result = await _call(
+                "_actor_state_write", self.spec.key, self.version, payload, self.token
+            )
             if result != ("ok", self.version + 1):
                 raise ActorStateError("Invalid actor state write response")
             self.version += 1

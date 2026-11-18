@@ -19,6 +19,7 @@ export const pages = [
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
+  { source: "docs/guide/integrations/htmx.md", path: "integrations/htmx/", label: "HTMX", examples: [] },
   { source: "docs/guide/internals/index.md", path: "internals/", label: "Overview", examples: [] },
   { source: "docs/guide/internals/measurements.md", path: "internals/measurements/", label: "Measurements", examples: [] },
   { source: "docs/guide/internals/watch-for.md", path: "internals/watch-for/", label: "What to watch for", examples: [] },
@@ -29,8 +30,8 @@ export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 2) },
   { label: "Guides", pages: navigation.slice(2, 10) },
-  { label: "Integrations", pages: navigation.slice(10, 13) },
-  { label: "How PyBEAM works", pages: navigation.slice(13) },
+  { label: "Integrations", pages: navigation.slice(10, 14) },
+  { label: "How PyBEAM works", pages: navigation.slice(14) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",
