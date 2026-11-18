@@ -95,7 +95,15 @@ def notification(payload: bytes) -> InfoEvent:
     return InfoEvent("topic", payload)
 
 
-async def test_subscription_uses_socket_owner_and_closes() -> None:
+@pytest.mark.parametrize(
+    ("scope", "owner"),
+    [
+        ({"type": "websocket", "extensions": {"hornbeam.owner": "socket-owner"}}, "socket-owner"),
+        ({"type": "websocket"}, "application"),
+        ({"type": "websocket", "extensions": {"websocket.http.response": {}}}, "application"),
+    ],
+)
+async def test_subscription_uses_available_owner_and_closes(scope: Scope, owner: str) -> None:
     state = ServiceState()
     beam = FakeServices(state, owner="application")
 
@@ -103,14 +111,12 @@ async def test_subscription_uses_socket_owner_and_closes() -> None:
         return beam
 
     instance = BeamProvider(connect)
-    socket = connected_socket(
-        {"type": "websocket", "extensions": {"hornbeam.owner": "socket-owner"}}
-    )
+    socket = connected_socket(scope)
     async with instance.lifespan(object()):
         assert instance(socket) is beam
         subscription = await instance.subscribe(socket, "topic", notification, max_bytes=1024)
         try:
-            assert state.calls == [("subscribe", ["socket-owner", "topic", 1024])]
+            assert state.calls == [("subscribe", [owner, "topic", 1024])]
             assert len(state.channels) == 1
         finally:
             await subscription.aclose()
@@ -119,20 +125,14 @@ async def test_subscription_uses_socket_owner_and_closes() -> None:
         await instance.subscribe(socket, "topic", notification)
 
 
-@pytest.mark.parametrize("extensions", [None, {}, {"hornbeam.owner": None}])
-async def test_subscription_requires_native_scope_owner(
-    extensions: dict[str, object] | None,
-) -> None:
+async def test_subscription_rejects_invalid_native_scope_owner() -> None:
     beam = Beam(NativeBeam(owner="application"))
 
     async def connect() -> Services:
         return beam
 
     instance = BeamProvider(connect)
-    scope: Scope = {"type": "websocket"}
-    if extensions is not None:
-        scope["extensions"] = extensions
-    socket = connected_socket(scope)
+    socket = connected_socket({"type": "websocket", "extensions": {"hornbeam.owner": None}})
     async with instance.lifespan(object()):
         assert instance(socket) is beam
         with pytest.raises(RuntimeProtocolError, match="scope has no"):
