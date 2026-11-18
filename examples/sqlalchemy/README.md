@@ -44,25 +44,8 @@ registry belongs to this single application in one interpreter, not to a
 distributed service or an isolated-process task. Shutdown must drain callers
 before disposing engines. Cancellation or a lost reply does not prove rollback.
 
-## Hornbeam serving constraint
+## Serving
 
 The entrypoint uses `pybeam.integrations.hornbeam.run` with managed Uvicorn.
 This keeps lifespan and HTTP handlers on the managed driver loop. It is not
 Hornbeam's native ASGI HTTP server.
-
-On the pinned Linux CPython 3.14.10 runtime, Hornbeam's native ASGI server
-passes the sync-engine HTTP checks but segfaults while starting the async
-engine. The native runtime test preserves that specific crash as a strict
-expected failure, not a compatibility pass. GDB places the fault beneath
-SQLAlchemy's greenlet bridge. A thread-affinity problem in erlang-python's
-pooled-loop runner is the leading explanation; the exact corrupting transition
-has not been traced. The execution boundary needs investigation in
-erlang-python, coordinated with Hornbeam. The same ORM operations pass through
-the managed entrypoint.
-
-On macOS, native Hornbeam ASGI with the async engine intermittently drops connections under concurrent writes at the same greenlet/execution boundary as the Linux SIGSEGV, tracked in erlang-python.
-
-Use the managed entrypoint for this example; do not treat native Hornbeam async
-SQLAlchemy support as verified. These checks cover conventional Python 3.14.10
-on Linux, not free-threaded Python, other drivers, external databases, or native
-crash isolation.
