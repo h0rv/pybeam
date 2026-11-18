@@ -157,8 +157,11 @@ class FeedView(TemplateView[FeedState], LiveView[FeedState]):
             </form>
             <p role="status">{assigns.error}</p>
             <h2>Who is online</h2>
-            <p aria-live="polite">{online_count}</p>
-            <ul aria-label="Online tabs">{online}</ul>
+            <p class="presence-connection" role="status">Disconnected. Reconnecting…</p>
+            <div class="presence-roster">
+                <p aria-live="polite">{online_count}</p>
+                <ul aria-label="Online tabs">{online}</ul>
+            </div>
             <h2>Posts received in this tab</h2>
             {empty}
             <ol aria-live="polite">{posts}</ol>
@@ -179,7 +182,7 @@ app = PyView(
     ],
 )
 app.rootTemplate = defaultRootTemplate(
-    css=Markup('<link rel="stylesheet" href="/feed-static/feed.css">'),
+    css=Markup('<link rel="stylesheet" href="/feed-static/feed.css?v=presence">'),
     title="Two-node feed",
     title_suffix="",
 )

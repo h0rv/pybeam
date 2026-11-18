@@ -88,7 +88,12 @@ def joined(port: int) -> Generator[ViewClient]:
     response = httpx.get(base + "/", timeout=5)
     response.raise_for_status()
     assert '<title data-suffix="">Two-node feed</title>' in response.text
-    assert '<link rel="stylesheet" href="/feed-static/feed.css">' in response.text
+    assert '<link rel="stylesheet" href="/feed-static/feed.css?v=presence">' in response.text
+    assert (
+        '<p class="presence-connection" role="status">Disconnected. Reconnecting…</p>'
+        in response.text
+    )
+    assert '<div class="presence-roster">' in response.text
     page.feed(response.text)
     assert page.token and page.topic and page.session
     with connect("ws://127.0.0.1:" + str(port) + "/live/websocket", open_timeout=5) as connection:
