@@ -2,7 +2,9 @@ import argparse
 import asyncio
 import json
 import math
+import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -13,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PositiveInt
 
 from benchmarks.metrics import percentile
 from benchmarks.runner import measurement_lock
@@ -22,8 +24,9 @@ from benchmarks.web.ws import Command, Reply
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE = "pybeam-web:jammy"
 PORT = 18764
-type Variant = Literal["hornbeam", "managed", "uvicorn", "uvicorn2"]
+type Variant = Literal["hornbeam", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"]
 VARIANTS: tuple[Variant, ...] = ("hornbeam", "managed", "uvicorn", "uvicorn2")
+HOST_VARIANTS: tuple[Variant, ...] = ("hornbeam", "uvicorn", "uvicorn-standard")
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,7 @@ class Settings:
     seconds: int
     repeats: int
     steps: tuple[int, ...]
+    host_http: bool = False
 
 
 def execute(args: list[str], *, timeout: float = 120) -> str:
@@ -63,9 +67,19 @@ def server_command(variant: Variant, app: str = "benchmarks.web.app:app") -> lis
             ]
         case "managed":
             return [python, str(ROOT / "benchmarks/web/managed.py"), "--app", app]
-        case "uvicorn" | "uvicorn2":
+        case "uvicorn" | "uvicorn2" | "uvicorn-standard":
             workers = "2" if variant == "uvicorn2" else "1"
-            return [python, "-m", "benchmarks.web.plain", "--workers", workers, "--app", app]
+            standard = ["--standard"] if variant == "uvicorn-standard" else []
+            return [
+                python,
+                "-m",
+                "benchmarks.web.plain",
+                "--workers",
+                workers,
+                *standard,
+                "--app",
+                app,
+            ]
 
 
 def container_command(
@@ -103,27 +117,33 @@ def container_command(
     ]
 
 
+def wait_for_server(app: str, name: str, process: subprocess.Popen[bytes] | None = None) -> None:
+    deadline = time.monotonic() + 30
+    endpoint = "/" if app == "benchmarks.web.app:app" else "/ping"
+    expected = b'{"message":"hello"}' if endpoint == "/" else b"ok"
+    with httpx.Client(timeout=1) as client:
+        while True:
+            if process is not None and process.poll() is not None:
+                raise RuntimeError("Server exited during startup; see " + name + ".log")
+            try:
+                response = client.get("http://127.0.0.1:" + str(PORT) + endpoint)
+                response.raise_for_status()
+                if response.content != expected:
+                    raise RuntimeError("Unexpected HTTP response: " + response.text)
+                return
+            except httpx.TransportError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Server startup timed out: " + name) from None
+                time.sleep(0.1)
+
+
 @contextmanager
 def server(
     variant: Variant, name: str, output: Path, app: str = "benchmarks.web.app:app"
 ) -> Generator[None]:
     execute(container_command(variant, name, app))
     try:
-        deadline = time.monotonic() + 30
-        with httpx.Client(timeout=1) as client:
-            while True:
-                try:
-                    endpoint = "/" if app == "benchmarks.web.app:app" else "/ping"
-                    response = client.get("http://127.0.0.1:" + str(PORT) + endpoint)
-                    response.raise_for_status()
-                    expected = b'{"message":"hello"}' if endpoint == "/" else b"ok"
-                    if response.content != expected:
-                        raise RuntimeError("Unexpected HTTP response: " + response.text)
-                    break
-                except httpx.TransportError:
-                    if time.monotonic() >= deadline:
-                        raise RuntimeError("Container startup timed out: " + name) from None
-                    time.sleep(0.1)
+        wait_for_server(app, name)
         yield
     finally:
         execute([required("docker"), "stop", "--time", "10", name], timeout=20)
@@ -140,6 +160,40 @@ def server(
             execute([required("docker"), "inspect", "--format", "{{json .State}}", name])
         )
         execute([required("docker"), "rm", name])
+
+
+@contextmanager
+def host_server(variant: Variant, name: str, output: Path) -> Generator[None]:
+    app = "benchmarks.web.app:app"
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        probe.bind(("127.0.0.1", PORT))
+    env = dict(
+        os.environ,
+        PYTHONPATH=str(ROOT) + ":" + str(ROOT / "src"),
+        PYTHONDONTWRITEBYTECODE="1",
+        WEB_PORT=str(PORT),
+    )
+    with (
+        (output / (name + ".log")).open("wb") as log,
+        subprocess.Popen(  # noqa: S603
+            [required("taskset"), "-c", "0-1", *server_command(variant, app)],
+            cwd=ROOT / "benchmarks/web",
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        ) as process,
+    ):
+        try:
+            wait_for_server(app, name, process)
+            yield
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
 
 
 def http_load(
@@ -323,6 +377,13 @@ class HttpResult(BaseModel):
     summary: Summary
 
 
+class CleanHttpResult(HttpResult):
+    status_codes: dict[Literal["200"], PositiveInt] = Field(
+        alias="statusCodeDistribution", min_length=1
+    )
+    errors: dict[str, int] = Field(alias="errorDistribution", max_length=0)
+
+
 def run(settings: Settings) -> None:
     with measurement_lock():
         run_locked(settings)
@@ -330,19 +391,25 @@ def run(settings: Settings) -> None:
 
 def run_locked(settings: Settings) -> None:
     settings.output.mkdir(parents=True, exist_ok=False)
+    variants = HOST_VARIANTS if settings.host_http else VARIANTS
+    start_server = host_server if settings.host_http else server
+    result_model = CleanHttpResult if settings.host_http else HttpResult
     rates: list[float] = []
     for repeat in range(settings.repeats):
-        for variant in VARIANTS:
+        offset = repeat % len(variants) if settings.host_http else 0
+        for variant in variants[offset:] + variants[:offset]:
             name = "web-" + variant + "-" + str(repeat)
-            with server(variant, name, settings.output):
+            with start_server(variant, name, settings.output):
                 warmup = settings.output / (name + ".warmup.json")
                 http_load(warmup, 2, 16)
                 for concurrency in (64, 256):
                     path = settings.output / (name + ".http" + str(concurrency) + ".json")
                     http_load(path, settings.seconds, concurrency)
-                    result = HttpResult.model_validate_json(path.read_text())
+                    result = result_model.model_validate_json(path.read_text())
                     rates.append(result.summary.requests_per_second)
                     print(name, "http", concurrency, result.summary.requests_per_second, flush=True)
+    if settings.host_http:
+        return
     fixed_rate = max(1, math.floor(min(rates) / 2))
     print("fixed_rate", fixed_rate, flush=True)
     for repeat in range(settings.repeats):
@@ -361,12 +428,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--host-http", action="store_true", help="CPU-pinned HTTP only, no Docker")
     args = parser.parse_args()
     settings = Settings(
         output=Path(args.output).resolve(),
-        seconds=2 if args.smoke else 30,
+        seconds=2 if args.smoke else (10 if args.host_http else 30),
         repeats=1 if args.smoke else 3,
         steps=(40, 200) if args.smoke else (1000, 5000, 10000, 20000, 30000, 50000),
+        host_http=args.host_http,
     )
     if settings.output.is_relative_to(ROOT):
         raise ValueError("Keep raw measurements outside the repository")

@@ -7,6 +7,7 @@ import uvicorn
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, choices=(1, 2), required=True)
+    parser.add_argument("--standard", action="store_true")
     parser.add_argument("--app", default="benchmarks.web.app:app")
     args = parser.parse_args()
     uvicorn.run(
@@ -14,8 +15,8 @@ def main() -> None:
         host="127.0.0.1",
         port=int(os.environ["WEB_PORT"]),
         workers=int(args.workers),
-        loop="asyncio",
-        http="h11",
+        loop="uvloop" if args.standard else "asyncio",
+        http="httptools" if args.standard else "h11",
         ws="websockets",
         ws_per_message_deflate=False,
         ws_ping_interval=None,
