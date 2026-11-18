@@ -11,8 +11,13 @@ from pybeam.runtime.ownership import resolve
 pytestmark = pytest.mark.runtime
 
 
+def preserve_logs(cluster: LocalCluster, destination: Path) -> None:
+    for log in cluster.directory.glob("*.log"):
+        (destination / log.name).write_bytes(log.read_bytes())
+
+
 def test_pyview_subscription__cross_node_bytes_and_cleanup(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and a built Hornbeam profile")
@@ -35,7 +40,8 @@ def test_pyview_subscription__cross_node_bytes_and_cleanup(
         monkeypatch.setenv("PYBEAM_PUBSUB_CONTROL_PORT", str(listener.getsockname()[1]))
         monkeypatch.setenv("PYBEAM_HORNBEAM_SERVICES", "1")
         cluster = LocalCluster(distribution, config=Config(development_runtime=Path(profile)))
-        with cluster:
+        with cluster, ExitStack() as diagnostics:
+            diagnostics.callback(preserve_logs, cluster, tmp_path)
             connections = {}
             for _ in range(2):
                 connection, _ = listener.accept()

@@ -325,7 +325,10 @@ def test_process__ready_and_zero_exit_do_not_imply_cleanup_acknowledgment(
     fake_runtime.write_text(
         "import json, os\nfrom pathlib import Path\n"
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
-        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
+        "Path(p['ready']).touch()\n"
+        "pending = Path(p['completed']).with_suffix('.tmp')\n"
+        "pending.write_text('0')\n"
+        "pending.replace(p['completed'])\n"
     )
     with pytest.raises(CleanupError, match="not acknowledged") as failure:
         _launch(fake_runtime)
@@ -430,6 +433,24 @@ async def test_loader__registers_and_invokes_once(
     calls.unlink()
     assert await loader.invoke() == (exit_code or 0)
     assert not calls.exists()
+
+
+async def test_loader__completion_does_not_consume_runtime_pending_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def main() -> None:
+        pass
+
+    completed = tmp_path / "completed"
+    session = loader._Session(ready=tmp_path / "ready", completed=completed, entry=main)
+    monkeypatch.setattr(loader, "_state", loader._Loader(session=session))
+    runtime_pending = completed.with_name(completed.name + ".tmp")
+    runtime_pending.write_text("143")
+
+    assert await loader.invoke() == 0
+    assert completed.read_text() == "0"
+    runtime_pending.replace(completed)
+    assert completed.read_text() == "143"
 
 
 @pytest.mark.skipif(

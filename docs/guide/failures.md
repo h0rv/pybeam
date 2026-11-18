@@ -128,6 +128,27 @@ current state, not events since that ID. Implement history lookup explicitly if
 you need replay. See [Messaging](messaging.md) and the
 [PyView integration](integrations/pyview.md).
 
+## Allow time for SSE disconnect cleanup
+
+An SSE subscription closes when PyBEAM detects that its client is gone, not
+necessarily when the browser loses its network connection. With PyBEAM's native
+web server on Linux, real-client checks measured these subscription cleanup times:
+
+| Client loss | Idle stream | Stream receiving updates |
+| --- | --- | --- |
+| Client process killed | Up to 15.2 seconds | Under 0.02 seconds |
+| Network cut without a clean disconnect | 35.7–45.1 seconds | 20.4–20.7 seconds |
+
+Both request-owned subscriptions and subscriptions opened through lifespan
+services were released, and their stream generators finished. These are observed
+times, not a deadline for every deployment. FastAPI's SSE responses already send
+keepalive comments while idle; this pattern needs no new PyBEAM setting. A custom
+stream that never writes cannot detect silent network loss this way.
+
+If a proxy keeps its connection to PyBEAM open after the client disappears,
+cleanup can wait until the proxy's own timeout. Choose proxy timeouts that fit
+your application's cleanup needs.
+
 ## Know what survives a failure
 
 | Failure or boundary | Lost or stopped | What survives or recovers |

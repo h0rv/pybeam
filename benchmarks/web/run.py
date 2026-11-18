@@ -48,7 +48,7 @@ def required(name: str) -> str:
     return path
 
 
-def server_command(variant: Variant) -> list[str]:
+def server_command(variant: Variant, app: str = "benchmarks.web.app:app") -> list[str]:
     python = str(ROOT / ".venv/bin/python")
     match variant:
         case "hornbeam":
@@ -59,15 +59,18 @@ def server_command(variant: Variant) -> list[str]:
                 "127.0.0.1:" + str(PORT),
                 str(ROOT),
                 str(ROOT / ".venv/lib/python3.14/site-packages"),
+                app,
             ]
         case "managed":
-            return [python, str(ROOT / "benchmarks/web/managed.py")]
+            return [python, str(ROOT / "benchmarks/web/managed.py"), "--app", app]
         case "uvicorn" | "uvicorn2":
             workers = "2" if variant == "uvicorn2" else "1"
-            return [python, "-m", "benchmarks.web.plain", "--workers", workers]
+            return [python, "-m", "benchmarks.web.plain", "--workers", workers, "--app", app]
 
 
-def container_command(variant: Variant, name: str) -> list[str]:
+def container_command(
+    variant: Variant, name: str, app: str = "benchmarks.web.app:app"
+) -> list[str]:
     home = str(Path.home())
     path = str(Path(required("erl")).parent) + ":/usr/local/bin:/usr/bin:/bin"
     return [
@@ -96,21 +99,25 @@ def container_command(variant: Variant, name: str) -> list[str]:
         "-e",
         "WEB_PORT=" + str(PORT),
         IMAGE,
-        *server_command(variant),
+        *server_command(variant, app),
     ]
 
 
 @contextmanager
-def server(variant: Variant, name: str, output: Path) -> Generator[None]:
-    execute(container_command(variant, name))
+def server(
+    variant: Variant, name: str, output: Path, app: str = "benchmarks.web.app:app"
+) -> Generator[None]:
+    execute(container_command(variant, name, app))
     try:
         deadline = time.monotonic() + 30
         with httpx.Client(timeout=1) as client:
             while True:
                 try:
-                    response = client.get("http://127.0.0.1:" + str(PORT) + "/")
+                    endpoint = "/" if app == "benchmarks.web.app:app" else "/ping"
+                    response = client.get("http://127.0.0.1:" + str(PORT) + endpoint)
                     response.raise_for_status()
-                    if response.content != b'{"message":"hello"}':
+                    expected = b'{"message":"hello"}' if endpoint == "/" else b"ok"
+                    if response.content != expected:
                         raise RuntimeError("Unexpected HTTP response: " + response.text)
                     break
                 except httpx.TransportError:
@@ -135,7 +142,9 @@ def server(variant: Variant, name: str, output: Path) -> Generator[None]:
         execute([required("docker"), "rm", name])
 
 
-def http_load(path: Path, seconds: int, concurrency: int, rate: int | None = None) -> None:
+def http_load(
+    path: Path, seconds: int, concurrency: int, rate: int | None = None, endpoint: str = "/"
+) -> None:
     command = [
         required("taskset"),
         "-c",
@@ -162,7 +171,7 @@ def http_load(path: Path, seconds: int, concurrency: int, rate: int | None = Non
     ]
     if rate is not None:
         command += ["-q", str(rate)]
-    execute([*command, "http://127.0.0.1:" + str(PORT) + "/"], timeout=seconds + 30)
+    execute([*command, "http://127.0.0.1:" + str(PORT) + endpoint], timeout=seconds + 30)
 
 
 class ContainerState(BaseModel):

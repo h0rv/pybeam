@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" role="img" aria-labelledby="title desc">
+<title id="title">GET /ping p99 during background pushes</title>
+<desc id="desc">Dots are medians; lines span minimum to maximum. Labels give median (min-max) and successful repeat count.</desc>
+<style>svg{background:#fff;color:#202124;font:16px sans-serif}text{fill:currentColor}.axis{stroke:#8b9097}.hornbeam{stroke:#0969da;fill:#0969da}.uvicorn{stroke:#a34800;fill:#a34800}@media(prefers-color-scheme:dark){svg{background:#151719;color:#edf0f2}.hornbeam{stroke:#75b7ff;fill:#75b7ff}.uvicorn{stroke:#ffb86c;fill:#ffb86c}}</style>
+<text x="16" y="28" font-size="21">GET /ping p99 during background pushes</text>
+<text x="16" y="54">ms, 100 requests/s · median (min-max); n = completed repeats</text>
+<text x="16" y="93">Hornbeam · 0</text>
+<g class="hornbeam"><path stroke-width="3" d="M290.567122759652,88H376.7901413475423"/><circle cx="354.3485972981283" cy="88" r="4"/></g>
+<text x="610" y="93">7.252 (4.048-8.380); n=3</text>
+<text x="16" y="129">Uvicorn · 0</text>
+<g class="uvicorn"><path stroke-width="3" d="M231.21089812063377,124H281.143794401294"/><circle cx="275.8824496687408" cy="124" r="4"/></g>
+<text x="610" y="129">3.310 (1.066-3.574); n=3</text>
+<text x="16" y="165">Hornbeam · 250</text>
+<g class="hornbeam"><path stroke-width="3" d="M262.9145505377359,160H323.0560558572344"/><circle cx="301.6405078669626" cy="160" r="4"/></g>
+<text x="610" y="165">4.604 (2.659-5.680); n=3</text>
+<text x="16" y="201">Uvicorn · 250</text>
+<g class="uvicorn"><path stroke-width="3" d="M246.3898796644199,196H265.8865913064791"/><circle cx="256.8898191975095" cy="196" r="4"/></g>
+<text x="610" y="201">2.356 (1.828-2.808); n=3</text>
+<text x="16" y="237">Hornbeam · 500</text>
+<g class="hornbeam"><path stroke-width="3" d="M291.5545653469513,232H364.7512276294419"/><circle cx="313.92383905239956" cy="232" r="4"/></g>
+<text x="610" y="237">5.221 (4.097-7.775); n=3</text>
+<text x="16" y="273">Uvicorn · 500</text>
+<g class="uvicorn"><path stroke-width="3" d="M236.7417986968465,268H295.60590429027053"/><circle cx="278.8748121177894" cy="268" r="4"/></g>
+<text x="610" y="273">3.460 (1.344-4.301); n=3</text>
+<text x="16" y="309">Hornbeam · 1000</text>
+<g class="hornbeam"><path stroke-width="3" d="M371.5720274569317,304H380.17373097394983"/><circle cx="376.5307562958867" cy="304" r="4"/></g>
+<text x="610" y="309">8.367 (8.118-8.550); n=3</text>
+<text x="16" y="345">Uvicorn · 1000</text>
+<g class="uvicorn"><path stroke-width="3" d="M236.72981666791028,340H441.66998180763926"/><circle cx="270.72874415958796" cy="340" r="4"/></g>
+<text x="610" y="345">3.051 (1.343-11.640); n=3</text>
+<text x="16" y="381">Hornbeam · 2000</text>
+<g class="hornbeam"><path stroke-width="3" d="M426.9636335846491,376H546.3636363636363"/><circle cx="469.11167430101864" cy="376" r="4"/></g>
+<text x="610" y="381">13.018 (10.901-16.900); n=3</text>
+<text x="16" y="417">Uvicorn · 2000</text>
+<g class="uvicorn"><path stroke-width="3" d="M233.52048395734408,412H463.664488697739"/><circle cx="398.39276423809883" cy="412" r="4"/></g>
+<text x="610" y="417">9.465 (1.182-12.745); n=3</text>
+<path class="axis" d="M210,437H580"/>
+<text x="210" y="460">0</text>
+<text x="540" y="460">18.6</text>
+</svg>

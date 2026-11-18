@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HTTP during a runaway calculation · PyBEAM</title>
+    <link rel="stylesheet" href="/assets/view.css">
+    <script type="module" src="/assets/view.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>PyBEAM</p>
+        <h1>HTTP during a runaway calculation</h1>
+        <p>Two clients keep sending requests while a busy loop is found, stopped and replaced.</p>
+        <button id="run" type="button">Run walkthrough</button>
+        <noscript>This walkthrough needs JavaScript to display measurements.</noscript>
+      </header>
+
+      <section aria-labelledby="status">
+        <h2 id="status" role="status">Ready</h2>
+        <p id="counts">No measurements yet.</p>
+        <figure>
+          <svg id="chart" viewBox="0 0 900 285" role="img" aria-labelledby="chart-title chart-description">
+            <title id="chart-title">HTTP response latency</title>
+            <desc id="chart-description">No requests have been sent yet.</desc>
+            <g id="axes"></g>
+            <g id="markers"></g>
+            <path id="maximum" class="maximum" fill="none"></path>
+            <path id="median" class="median" fill="none"></path>
+          </svg>
+          <figcaption>Response latency in ms · <span class="median-key">median</span> and <span class="maximum-key">maximum</span> per 250 ms</figcaption>
+        </figure>
+      </section>
+
+      <div class="details">
+        <section aria-labelledby="events-title">
+          <h2 id="events-title">What happened</h2>
+          <ol id="events"><li>Start the walkthrough to observe the calculation.</li></ol>
+        </section>
+        <section aria-labelledby="calculation-title">
+          <h2 id="calculation-title">Calculation</h2>
+          <p id="calculation">The runaway job starts after two seconds of HTTP traffic.</p>
+          <div id="frame" hidden>
+            <p id="location"></p>
+            <pre><code id="source"></code></pre>
+            <p id="cpu"></p>
+          </div>
+          <p id="result" hidden></p>
+        </section>
+      </div>
+
+      <footer>Isolated process; replacement applies to new jobs, not running frames.</footer>
+    </main>
+  </body>
+</html>

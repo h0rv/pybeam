@@ -1,16 +1,18 @@
+import argparse
 import asyncio
 import os
 
 from pybeam.integrations.hornbeam import run
 from uvicorn import Config, Server
 
-from benchmarks.web.app import app
-
 
 async def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--app", default="benchmarks.web.app:app")
+    args = parser.parse_args()
     server = Server(
         Config(
-            app,
+            str(args.app),
             host="127.0.0.1",
             port=int(os.environ["WEB_PORT"]),
             loop="none",

@@ -7,9 +7,10 @@ import uvicorn
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, choices=(1, 2), required=True)
+    parser.add_argument("--app", default="benchmarks.web.app:app")
     args = parser.parse_args()
     uvicorn.run(
-        "benchmarks.web.app:app",
+        str(args.app),
         host="127.0.0.1",
         port=int(os.environ["WEB_PORT"]),
         workers=int(args.workers),

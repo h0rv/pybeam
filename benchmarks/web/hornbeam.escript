@@ -1,9 +1,11 @@
 #!/usr/bin/env escript
 %%! +S 2:2
 main([Build, Bind, Root, Site]) ->
+    main([Build, Bind, Root, Site, "benchmarks.web.app:app"]);
+main([Build, Bind, Root, Site, App]) ->
     logger:set_primary_config(level, warning),
-    Paths = filelib:wildcard(filename:join([Build, "lib/*/ebin"])) ++
-            filelib:wildcard(filename:join([Build, "checkouts/*/ebin"])),
+    Paths = filelib:wildcard(filename:join([Build, "checkouts/*/ebin"])) ++
+            filelib:wildcard(filename:join([Build, "lib/*/ebin"])),
     ok = code:add_paths(Paths),
     application:load(hornbeam),
     application:set_env(erlang_python, num_contexts, 2),
@@ -15,6 +17,6 @@ main([Build, Bind, Root, Site]) ->
                 timeout => 30000, websocket_timeout => 3600000,
                 websocket_protocol => asgi,
                 pythonpath => [Root, filename:join(Root, "src"), Site]},
-    ok = hornbeam:start("benchmarks.web.app:app", Options),
+    ok = hornbeam:start(App, Options),
     io:format("WEB_READY~n"),
     timer:sleep(infinity).
