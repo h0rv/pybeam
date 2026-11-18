@@ -56,6 +56,26 @@ def test_distribution__actual_nodes_handlers_tasks_loss_and_fresh_restart() -> N
     assert all(resolve(value) is None for value in journal.owned)
 
 
+def test_distribution__join_budget_starts_after_peer_application_is_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    restart = LocalCluster.restart
+
+    def delayed_restart(cluster: LocalCluster, alias: str) -> Identity:
+        if alias == "b" and alias not in cluster.nodes:
+            time.sleep(10.5)
+        return restart(cluster, alias)
+
+    monkeypatch.setattr(LocalCluster, "restart", delayed_restart)
+    config, distribution = configuration()
+    cluster = LocalCluster(distribution, config=config)
+    with cluster:
+        first = Json(Reply).decode(wait_file(cluster.directory / "first.json"))
+        assert first.status == "ok"
+        assert first.worker_dead
+    clean(cluster)
+
+
 def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
     config, distribution = configuration()
     cluster = LocalCluster(distribution, config=config)
