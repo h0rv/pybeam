@@ -207,6 +207,19 @@ class _OwnedTask(UnobservedTask, Protocol):
     async def _failure(self) -> BaseException | None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class TaskSnapshot:
+    """A bounded diagnostic sample of one isolated child, not BEAM reductions.
+
+    CPU time covers the entire child process, including imports and diagnostics.
+    Compare two samples of the same os_pid to measure CPU use over an interval.
+    """
+
+    os_pid: int
+    cpu_seconds: float
+    stacks: str
+
+
 class TaskRef[T]:
     def __init__(
         self,
@@ -216,8 +229,10 @@ class TaskRef[T]:
         observed: Callable[[], None],
         shutdown_ms: int,
         job: object | None = None,
+        execution: ExecutionMode = ExecutionMode.WORKER,
     ) -> None:
         self._job = object() if job is None else job
+        self._execution = execution
         self.pid = pid
         self._shutdown_ms = shutdown_ms
         self._group = group
@@ -289,6 +304,45 @@ class TaskRef[T]:
 
     def __await__(self) -> Generator[object, None, T]:
         return self.result().__await__()
+
+    async def inspect(self) -> TaskSnapshot:
+        """Sample an isolated child's Python stacks even when its loop is busy.
+
+        Only isolated tasks support this operation. A native call holding the
+        child's GIL can prevent inspection; it cannot prevent terminate().
+        Completed tasks no longer have a child to inspect.
+        """
+        from erlang.tasks import thread_snapshot
+
+        if self._execution != ExecutionMode.ISOLATED:
+            raise ValueError("Task inspection requires isolated execution")
+        os_pid, cpu_ns, stacks = await thread_snapshot(self._group, self.pid)
+        return TaskSnapshot(
+            os_pid, cpu_ns / 1_000_000_000, stacks.decode("utf-8", errors="replace")
+        )
+
+    async def terminate(self) -> None:
+        """Force an isolated child to exit and observe its settled task outcome.
+
+        Does not run Python finalizers, undo side effects, restart, or retry.
+        result() retains the original outcome (normally TaskCrashed). Completion
+        can win the race with termination. A deadline is uncertainty, not proof
+        of exit. Embedded worker and own-GIL tasks cannot be safely terminated.
+        """
+        from erlang.tasks import UncertainInflight, terminate
+
+        self._check_wait_owner()
+        if self._execution != ExecutionMode.ISOLATED:
+            raise ValueError("Forced termination requires isolated execution")
+        try:
+            async with asyncio.timeout(self._shutdown_ms / 1000):
+                if self._pending is None or not self._pending.done():
+                    await terminate(self._group, self.pid)
+                error = await self.exception()
+        except TimeoutError as error:
+            raise UncertainInflight("Task termination did not confirm child exit") from error
+        if isinstance(error, UncertainInflight):
+            raise error
 
     async def cancel(self) -> bool:
         """Request cooperative cancellation and await actual Python cleanup and PID exit.
@@ -406,7 +460,15 @@ class TaskSupervisor:
         def observed() -> None:
             self._refs.pop(pid, None)
 
-        ref = TaskRef(group, pid, function.decode, observed, self._limits.shutdown_ms, job)
+        ref = TaskRef(
+            group,
+            pid,
+            function.decode,
+            observed,
+            self._limits.shutdown_ms,
+            job,
+            execution=function.execution,
+        )
         self._refs[pid] = ref
         if cancelled:
             await ref.cancel()

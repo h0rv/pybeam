@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from types import ModuleType
 from typing import Literal
@@ -15,14 +16,27 @@ class NativeTaskCrashed(RuntimeError):
         super().__init__(reason)
 
 
+class NativeUncertainInflight(RuntimeError):
+    pass
+
+
 class TasksModule(ModuleType):
     TaskCrashed = NativeTaskCrashed
-    UncertainInflight = RuntimeError
+    UncertainInflight = NativeUncertainInflight
 
     def __init__(self) -> None:
         super().__init__("erlang.tasks")
         self.calls: list[tuple[object, bytes, str]] = []
         self.failure: BaseException | None = None
+        self.termination_blocked = False
+
+    async def thread_snapshot(self, group: object, pid: object) -> tuple[int, int, bytes]:
+        return 1234, 125_000_000, b"bounded stack\xff"
+
+    async def terminate(self, group: object, pid: object) -> None:
+        if self.termination_blocked:
+            await asyncio.Event().wait()
+        self.failure = NativeTaskCrashed(("signal", 9))
 
     async def open_group(self, count: int, max_bytes: int) -> tuple[object, object]:
         return object(), object()
@@ -90,3 +104,45 @@ async def test_tasks__preserve_other_backend_errors(native: TasksModule) -> None
     async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
         ref = await sup.start(function, b"payload")
         assert await ref.exception() is native.failure
+
+
+@pytest.mark.parametrize("execution", [ExecutionMode.WORKER, ExecutionMode.OWNGIL])
+async def test_tasks__reject_inspection_and_termination_without_isolation(
+    native: TasksModule, execution: ExecutionMode
+) -> None:
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=execution)
+    async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
+        ref = await sup.start(function, b"payload")
+        with pytest.raises(ValueError, match="isolated execution"):
+            await ref.inspect()
+        with pytest.raises(ValueError, match="isolated execution"):
+            await ref.terminate()
+        assert await ref == b"payload"
+
+
+async def test_tasks__decode_bounded_snapshot_and_preserve_terminated_outcome(
+    native: TasksModule,
+) -> None:
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=ExecutionMode.ISOLATED)
+    async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=1000)) as sup:
+        ref = await sup.start(function, b"payload")
+        snapshot = await ref.inspect()
+        assert snapshot.os_pid == 1234
+        assert snapshot.cpu_seconds == 0.125
+        assert snapshot.stacks == "bounded stack\ufffd"
+        await ref.terminate()
+        error = await ref.exception()
+        assert isinstance(error, TaskCrashed)
+        with pytest.raises(TaskCrashed) as raised:
+            await ref.result()
+        assert raised.value is error
+
+
+async def test_tasks__termination_deadline_is_uncertain_not_success(native: TasksModule) -> None:
+    native.termination_blocked = True
+    function = TaskFunction(byte_entry, Json(bytes), Json(bytes), execution=ExecutionMode.ISOLATED)
+    async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=100, shutdown_ms=10)) as sup:
+        ref = await sup.start(function, b"payload")
+        with pytest.raises(NativeUncertainInflight, match="did not confirm child exit"):
+            await ref.terminate()
+        assert await ref == b"payload"
