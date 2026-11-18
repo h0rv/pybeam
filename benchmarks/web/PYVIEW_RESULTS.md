@@ -65,8 +65,8 @@ timer removal after socket closure; disconnect cleanup was not benchmarked.
 ```sh
 mise install
 mise exec -- uv sync --locked --all-extras
-git -C ../hornbeam fetch origin fix/ws-session-table-owner
-git -C ../hornbeam switch --detach 09de9b7f7c3953f4d04901f33b0722f05b22da44
+git -C ../hornbeam fetch origin main
+git -C ../hornbeam switch --detach 87cfb301c5d2958e9626d727fba786239a76b0be
 mkdir -p _checkouts
 ln -s ../../hornbeam _checkouts/hornbeam
 mise exec -- uv run --locked python tools/build_native.py
@@ -77,9 +77,9 @@ docker build -t pybeam-web:jammy benchmarks/web
 Create the checkout link only if it does not already exist; if it exists, verify
 its target. The native build uses `_checkouts/hornbeam`, overriding `rebar.config`'s
 Hornbeam pin. The benchmark launcher gives checkout BEAM files precedence over
-stale copies in `lib/`. The Python package pin in `pyproject.toml` is unchanged:
-it is not the Erlang server build source. Other native dependencies retain the
-PyBEAM pins, including erlang-python below.
+stale copies in `lib/`. The Python package pin in `pyproject.toml` matches the
+native pin, but is not the Erlang server build source. Other native dependencies
+retain the PyBEAM pins, including erlang-python below.
 
 Builds need a C compiler and mise tools. The image mounts home read/write
 at its original path: use only a trusted image. This is contributor setup,
@@ -101,7 +101,8 @@ and failure tracebacks stay outside Git.
   Starlette 1.10.0, Uvicorn 0.54.0, websockets 16.1.1.
 - PyBEAM base: `f58a0210a31075416c8bd8fd4db39c2dfce30568`, with checkout-first
   launch-path selection committed alongside this document.
-- Hornbeam: `09de9b7f7c3953f4d04901f33b0722f05b22da44`;
+- Hornbeam rerun pin: `87cfb301c5d2958e9626d727fba786239a76b0be` (merged session-table
+  fix). Measurements are retained from the pre-merge run without a benchmark rerun;
   erlang-python: `40e5c41e898f77c424ac54a038305fc90bb1d7d8`;
   erlang-ws: `09bea3e650187aaeeaba1a8c734338bdeedfe136`;
   erlang-h1: `40889c592e5c7ef9e1cb8e6e5560d96d6cb5fa7a`.

@@ -331,7 +331,7 @@ source = { editable = "../" }
 requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "==0.163.0" },
     { name = "fastapi", marker = "extra == 'showcase'", specifier = "==0.163.0" },
-    { name = "hornbeam", marker = "extra == 'hornbeam'", git = "https://github.com/h0rv/hornbeam.git?rev=a04541d1d5667640ed59fafc1b5b60a5575b38c0" },
+    { name = "hornbeam", marker = "extra == 'hornbeam'", git = "https://github.com/h0rv/hornbeam.git?rev=87cfb301c5d2958e9626d727fba786239a76b0be" },
     { name = "jinja2", marker = "extra == 'fastapi'", specifier = ">=3.1.6,<4" },
     { name = "jinja2", marker = "extra == 'showcase'", specifier = ">=3.1.6,<4" },
     { name = "litestar", extras = ["jinja"], marker = "extra == 'litestar'", specifier = "==2.25.0" },
