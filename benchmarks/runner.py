@@ -43,6 +43,7 @@ from benchmarks.ownership import (
     write_lease,
 )
 from benchmarks.provenance import capture
+from benchmarks.pybeam_reference import unsupported
 from benchmarks.pybeam_reference_build import BuildManifest, verify
 
 type Quantile = Literal["p50", "p95", "p99"]
@@ -283,7 +284,11 @@ def run(config: Config, output: Path, control: Control | None = None) -> Summary
     with measurement_lock() as descriptor:
         output.mkdir(parents=True, exist_ok=False)
         native_snapshot = None
-        if config.backend == "pybeam" and config.native_source is not None:
+        if (
+            config.backend == "pybeam"
+            and config.native_source is not None
+            and unsupported(config) is None
+        ):
             native = Path(config.native_source).resolve()
             manifest = BuildManifest.model_validate_json(
                 (native / "_build/pybeam-reference-build.json").read_text()

@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 from pybeam.codec import Json
 
-from benchmarks.contract import Budget, Config, Identity, Outcome, ResourceSample
+from benchmarks.contract import Budget, Config, Identity, Outcome, ResourceSample, Workload
 from benchmarks.ownership import resolve
-from benchmarks.runner import measurement_lock, run, summarize, trial
+from benchmarks.runner import Summary, measurement_lock, run, summarize, trial
 
 
 @pytest.fixture
@@ -41,6 +41,49 @@ def test_runner__writes_raw_evidence_and_repeats(config: Config, tmp_path: Path)
     assert (tmp_path / "result/provenance.json").exists()
     samples = (tmp_path / "result/trial-0/resources.jsonl").read_text().splitlines()
     assert all(ResourceSample.model_validate_json(line) for line in samples)
+
+
+@pytest.mark.parametrize(
+    "workload",
+    [
+        Workload(),
+        Workload(id="rooms.churn", queue_bound_scope="client_admission_only"),
+        Workload(activity="hot_10_percent", queue_bound_scope="client_admission_only"),
+    ],
+)
+def test_runner__unsupported_pybeam_records_outcome_without_native_build(
+    config: Config, tmp_path: Path, workload: Workload
+) -> None:
+    selected = Config(
+        backend="pybeam",
+        adapter_command=(sys.executable, "-m", "benchmarks.pybeam_reference"),
+        python_source=config.python_source,
+        native_source=config.python_source,
+        workload=workload,
+        repeats=1,
+    )
+    output = tmp_path / "result"
+    result = run(selected, output)
+    outcome = Outcome.model_validate_json((output / "trial-0/outcome.json").read_text())
+    assert outcome.status == "unsupported"
+    assert outcome.reason is not None
+    assert result.trials[0].outcome == outcome
+    assert result.throughput_repeat_statistics is None
+    assert Summary.model_validate_json((output / "summary.json").read_text()) == result
+    assert not (output / "trial-0/native-build-manifest.json").exists()
+
+
+def test_runner__supported_pybeam_requires_native_build(config: Config, tmp_path: Path) -> None:
+    selected = Config(
+        backend="pybeam",
+        adapter_command=(sys.executable, "-m", "benchmarks.pybeam_reference"),
+        python_source=config.python_source,
+        native_source=config.python_source,
+        workload=Workload(queue_bound_scope="client_admission_only"),
+        repeats=1,
+    )
+    with pytest.raises(FileNotFoundError, match=r"pybeam-reference-build\.json"):
+        run(selected, tmp_path / "result")
 
 
 def test_lock__serializes_workstreams() -> None:
