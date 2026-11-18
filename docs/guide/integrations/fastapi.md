@@ -2,6 +2,10 @@
 
 Share an atomic counter across requests. The dependency opens one connection during the application lifespan and selects the request's scope.
 
+```sh
+uv add 'python-beam[fastapi]'
+```
+
 ```python
 # fastapi_app.py
 import asyncio

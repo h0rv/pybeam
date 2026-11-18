@@ -12,7 +12,7 @@ A segfault or `os.abort()` in a worker context ends the whole VM: every actor, t
 
 ## Shared globals on 3.14t
 
-Worker contexts share the main interpreter, so module globals, imported modules and caches are shared by every actor and task. Actor method bodies run on one loop thread and do not race each other. Code on other threads does: `asyncio.to_thread` calls, dedicated-loop tasks and contexts called directly.
+Worker contexts share the main interpreter, so module globals, imported modules and caches are shared by every actor and task. Different actors can run on different worker threads and race on those shared objects. An actor serializes its own calls, not calls to other actors or code in `asyncio.to_thread`.
 
 - The GIL on 3.14 does not make a read-modify-write atomic, but on 3.14t threads run at the same time, so races on unsynchronized shared state show up more often.
 - Threads that change the same object contend for it on 3.14t, which can erase the parallel speedup.
@@ -42,8 +42,8 @@ A context is not free to start.
 | Created | Time | Memory |
 | --- | --- | --- |
 | One worker context | 1.1–1.2 ms | under 0.1 MiB |
-| One actor, including its context | 2.3–3.0 ms | 50–60 KiB and one OS thread |
+| One actor in the pre-pool implementation | 2.3–3.0 ms | 50–60 KiB and one OS thread |
 | One isolated context | 61–132 ms | 21–27 MiB |
 
-- Create long-lived actors at startup and reuse them rather than spawning one per request. 10,000 actors took about 24 s to start.
+- Create long-lived actors at startup and reuse them rather than spawning one per request. The earlier pre-pool implementation took about 24 s to start 10,000 actors; current pooled-actor costs have not been measured here.
 - Cap concurrency with `TaskLimits` and `max_children`. Starting a task when its slots are full raises `Overloaded` instead of queuing it.

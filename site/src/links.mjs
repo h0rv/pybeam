@@ -14,7 +14,7 @@ export const pages = [
   { source: "docs/guide/chat-rooms.md", path: "chat-rooms/", label: "Example: chat rooms", examples: ["examples/docs/chat_rooms.py"] },
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
-  { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_body.py", "examples/docs/durable_tasks.py"] },
+  { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_tasks.py"] },
   { source: "docs/guide/execution.md", path: "execution/", label: "Blocking and CPU work", examples: ["examples/docs/execution.py"] },
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },

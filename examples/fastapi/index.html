@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shared counter · FastAPI</title>
+  <title>Shared PyBEAM counter · FastAPI</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="{{ url_for('static', path='missing.min.css') }}">
   <style>
@@ -34,7 +34,8 @@
     <p id="confirmation" role="status"></p>
     <p><a href="{{ url_for('counter') }}">Read current count</a></p>
   </section>
-  <p>Everyone on this server shares the count. Restarting the server resets it.</p>
+  <p>Everyone on this server shares the count. Restarting the server resets it.
+     This demo has no authentication.</p>
 </main>
 </body>
 </html>

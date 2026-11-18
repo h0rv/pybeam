@@ -2,6 +2,10 @@
 
 Keep a shared counter behind a PyView page. Each click updates the counter atomically and renders the result with PyView's template engine.
 
+```sh
+uv add 'python-beam[pyview]' uvicorn
+```
+
 ```python
 # pyview_app.py
 import asyncio
