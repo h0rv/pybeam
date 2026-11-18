@@ -348,18 +348,20 @@ def test_host_http_rejects_unclean_load(statuses: dict[str, int], errors: dict[s
         )
 
 
+@pytest.mark.parametrize("compare_baseline", [False, True])
 def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, compare_baseline: bool
 ) -> None:
     monkeypatch.setattr("benchmarks.runner.LOAD_LOCK", tmp_path / "load.lock")
     launches: list[str] = []
     loads: list[int] = []
+    baseline = tmp_path / "baseline" if compare_baseline else None
 
     @contextmanager
     def host_server(
         variant: Variant, name: str, output: Path, hornbeam_baseline: Path | None
     ) -> Generator[None]:
-        assert hornbeam_baseline is None
+        assert hornbeam_baseline == baseline
         launches.append(variant)
         yield
 
@@ -372,16 +374,10 @@ def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
 
     monkeypatch.setattr("benchmarks.web.run.host_server", host_server)
     monkeypatch.setattr("benchmarks.web.run.http_load", http_load)
-    run(Settings(tmp_path / "results", 30, 3, (), host_http=True))
-    assert launches == [
-        "hornbeam",
-        "uvicorn",
-        "uvicorn-standard",
-        "uvicorn",
-        "uvicorn-standard",
-        "hornbeam",
-        "uvicorn-standard",
-        "hornbeam",
-        "uvicorn",
-    ]
+    run(Settings(tmp_path / "results", 30, 3, (), host_http=True, hornbeam_baseline=baseline))
+    first, second = (
+        ("hornbeam-baseline", "hornbeam") if compare_baseline else ("hornbeam", "uvicorn")
+    )
+    third = "uvicorn-standard"
+    assert launches == [first, second, third, second, third, first, third, first, second]
     assert loads == [16, 64, 256] * len(launches)

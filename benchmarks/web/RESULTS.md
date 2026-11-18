@@ -7,12 +7,14 @@ This measures serving only, not shared state, persistence, or application work.
 
 ## Native HTTP throughput
 
-Skipping task success replies that Hornbeam doesn't use raised median
-throughput by 10–14%. Hornbeam still trailed Uvicorn with uvloop/httptools by
-8–14%. The baseline varied most at 64 connections; all trials returned only
-HTTP 200 responses.
+After the runtime and Hornbeam changes merged, Hornbeam trailed Uvicorn with
+uvloop/httptools by 8% at 64 connections and 9% at 256 connections on pooled
+median throughput. The two batches disagreed on which Hornbeam build was
+faster. All trials returned only HTTP 200 responses, but VM CPU contention
+varied during the runs, so this comparison does not isolate the effect of
+skipping success replies.
 
-![Hornbeam before and after skipping success replies, compared with optimized Uvicorn. Dots show medians; lines show the range over three repeats.](host-http-task-replies.svg)
+![Hornbeam baseline and updated build versus optimized Uvicorn. Dots show medians and lines show the full range across six trials.](host-http-task-replies.svg)
 
 [Reproduce the task-reply comparison](#task-reply-comparison-appendix).
 
@@ -272,7 +274,9 @@ whole-runtime CPU breakdown. The remaining gap and c256 timeouts are unattribute
 
 Use a clean checkout of this benchmark and run from its root. The measurements
 used PyBEAM `543e792467d1e7c806e13432cc7a3dd4ff03bc59`, Ubuntu 22.04,
-OTP 29.1.2, and CPython 3.14.10. Both builds use the same Python executable.
+OTP 29.1.2, and CPython 3.14.10 with Uvicorn 0.54.0. Both builds use the same
+Python executable. The second batch saw up to 14% VM CPU steal in a
+one-second host sample. The chart includes all trials from both batches.
 
 ```sh
 set -e
@@ -302,11 +306,13 @@ build() {
 build "$work/baseline" baseline \
   297881ca7961e633f29739c861e818fbb9765d9a 71b35223f89f589d535eaf261dd955428dcb042f
 build "$PWD" candidate \
-  d0b821265ef693861a133c16e54b99d33df805bc 5bc45276b1afb9d0a5fe9d1fb63afe1622aeb733
+  2a52be4ed5467239a339143e98e9722bc7c6a114 54fdf367d91d9b7f0d9813af64ce1f10599c63d9
 
-mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
-  --host-http --hornbeam-baseline "$work/baseline/_build/hornbeam" \
-  --output "$work/results"
+for batch in 1 2; do
+  mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
+    --host-http --hornbeam-baseline "$work/baseline/_build/hornbeam" \
+    --output "$work/results-$batch"
+done
 ```
 
 ## Host run appendix
