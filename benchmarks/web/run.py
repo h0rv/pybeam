@@ -4,12 +4,13 @@ import json
 import math
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
 import time
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator, Callable, Generator, Mapping
+from contextlib import ExitStack, asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -199,20 +200,30 @@ def server(
         execute([required("docker"), "rm", name])
 
 
-@contextmanager
-def host_server(
-    variant: Variant, name: str, output: Path, hornbeam_baseline: Path | None = None
-) -> Generator[None]:
-    app = "benchmarks.web.app:app"
+def check_host_port() -> None:
     with socket.socket() as probe:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(("127.0.0.1", PORT))
+
+
+@contextmanager
+def spawn_host_server(
+    variant: Variant,
+    name: str,
+    output: Path,
+    hornbeam_baseline: Path | None = None,
+    *,
+    extra_env: Mapping[str, str] | None = None,
+) -> Generator[subprocess.Popen[bytes]]:
+    check_host_port()
     env = dict(
         os.environ,
         PYTHONPATH=str(ROOT) + ":" + str(ROOT / "src"),
         PYTHONDONTWRITEBYTECODE="1",
         WEB_PORT=str(PORT),
     )
+    if extra_env is not None:
+        env.update(extra_env)
     with (
         (output / (name + ".log")).open("wb") as log,
         subprocess.Popen(  # noqa: S603
@@ -220,24 +231,63 @@ def host_server(
                 required("taskset"),
                 "-c",
                 "0-1",
-                *server_command(variant, app, hornbeam_baseline=hornbeam_baseline),
+                *server_command(variant, hornbeam_baseline=hornbeam_baseline),
             ],
             cwd=ROOT if variant == "granian" else ROOT / "benchmarks/web",
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
+            start_new_session=True,
         ) as process,
     ):
         try:
-            wait_for_server(app, name, process)
-            yield
+            yield process
         finally:
             if process.poll() is None:
-                process.terminate()
-                try:
+                with suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGTERM)
+                with suppress(subprocess.TimeoutExpired):
                     process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            with suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+
+
+async def _finish_in_thread[T](operation: Callable[[], T]) -> T:
+    task = asyncio.create_task(asyncio.to_thread(operation))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # The thread can still acquire or release a process after cancellation.
+        while not task.done():
+            with suppress(asyncio.CancelledError):
+                await asyncio.shield(task)
+        task.result()
+        raise
+
+
+@asynccontextmanager
+async def spawn_host_server_async(
+    variant: Variant,
+    name: str,
+    output: Path,
+    *,
+    extra_env: Mapping[str, str] | None = None,
+) -> AsyncGenerator[subprocess.Popen[bytes]]:
+    stack = ExitStack()
+    try:
+        server = spawn_host_server(variant, name, output, extra_env=extra_env)
+        yield await _finish_in_thread(lambda: stack.enter_context(server))
+    finally:
+        await _finish_in_thread(stack.close)
+
+
+@contextmanager
+def host_server(
+    variant: Variant, name: str, output: Path, hornbeam_baseline: Path | None = None
+) -> Generator[None]:
+    with spawn_host_server(variant, name, output, hornbeam_baseline) as process:
+        wait_for_server("benchmarks.web.app:app", name, process)
+        yield
 
 
 def http_load(
@@ -294,16 +344,26 @@ def memory(name: str) -> int | None:
             time.sleep(0.05)
 
 
-async def exchange(process: asyncio.subprocess.Process, command: Command) -> Reply:
-    if process.stdin is None or process.stdout is None:
-        raise RuntimeError("Worker pipes are unavailable")
+async def send_command(process: asyncio.subprocess.Process, command: Command) -> None:
+    if process.stdin is None:
+        raise RuntimeError("Worker input pipe is unavailable")
     process.stdin.write((command.model_dump_json() + "\n").encode())
     await process.stdin.drain()
+
+
+async def read_reply(process: asyncio.subprocess.Process) -> Reply:
+    if process.stdout is None:
+        raise RuntimeError("Worker output pipe is unavailable")
     async with asyncio.timeout(120):
         line = await process.stdout.readline()
     if not line:
         raise RuntimeError("WebSocket load worker exited: " + str(process.returncode))
     return Reply.model_validate_json(line)
+
+
+async def exchange(process: asyncio.subprocess.Process, command: Command) -> Reply:
+    await send_command(process, command)
+    return await read_reply(process)
 
 
 def memory_delta(baseline: int, peak: int | None, held: int) -> float | None:
@@ -318,11 +378,9 @@ async def broadcast(workers: list[asyncio.subprocess.Process], command: Command)
     return [task.result() for task in tasks]
 
 
-async def websocket_load(name: str, settings: Settings, path: Path) -> None:
+@asynccontextmanager
+async def websocket_workers() -> AsyncGenerator[list[asyncio.subprocess.Process]]:
     workers: list[asyncio.subprocess.Process] = []
-    baseline = await asyncio.to_thread(memory, name)
-    if baseline is None:
-        raise RuntimeError("Server exited before WebSocket baseline")
     try:
         for index in range(4):
             workers.append(
@@ -342,6 +400,24 @@ async def websocket_load(name: str, settings: Settings, path: Path) -> None:
                     cwd=ROOT,
                 )
             )
+        yield workers
+    finally:
+        async with asyncio.TaskGroup() as group:
+            for process in workers:
+                group.create_task(stop_worker(process))
+
+
+async def websocket_load(name: str, settings: Settings, path: Path) -> None:
+    await measure_websockets(name, settings, path, lambda: memory(name))
+
+
+async def measure_websockets(
+    name: str, settings: Settings, path: Path, memory_sample: Callable[[], int | None]
+) -> None:
+    baseline = await asyncio.to_thread(memory_sample)
+    if baseline is None:
+        raise RuntimeError("Server exited before WebSocket baseline")
+    async with websocket_workers() as workers:
         with path.open("w") as output:
             for target in settings.steps:
                 started = time.monotonic()
@@ -350,7 +426,7 @@ async def websocket_load(name: str, settings: Settings, path: Path) -> None:
                 errors = [error for reply in replies for error in reply.errors]
                 held_start = sum(reply.held for reply in replies)
                 latencies: list[float] = []
-                measured_memory = await asyncio.to_thread(memory, name)
+                measured_memory = await asyncio.to_thread(memory_sample)
                 peak = measured_memory
                 hold_start = time.monotonic()
                 deadline = hold_start + settings.seconds
@@ -360,9 +436,9 @@ async def websocket_load(name: str, settings: Settings, path: Path) -> None:
                     held_min = min(held_min, sum(reply.held for reply in samples))
                     latencies.extend(value for reply in samples for value in reply.latency_ms)
                     errors.extend(error for reply in samples for error in reply.errors)
-                    measured_memory = await asyncio.to_thread(memory, name)
+                    measured_memory = await asyncio.to_thread(memory_sample)
                     if measured_memory is None:
-                        errors.append("server container exited")
+                        errors.append("server exited")
                         break
                     peak = measured_memory if peak is None else max(peak, measured_memory)
                     await asyncio.sleep(min(1, max(0, deadline - time.monotonic())))
@@ -389,10 +465,6 @@ async def websocket_load(name: str, settings: Settings, path: Path) -> None:
                 print(name, "ws", json.dumps(record), flush=True)
                 if held_min != target or errors:
                     break
-    finally:
-        async with asyncio.TaskGroup() as group:
-            for process in workers:
-                group.create_task(stop_worker(process))
 
 
 async def stop_worker(process: asyncio.subprocess.Process) -> None:

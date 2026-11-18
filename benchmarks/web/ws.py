@@ -15,7 +15,7 @@ from websockets.protocol import State
 
 class Command(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    action: Literal["open", "sample", "close"]
+    action: Literal["open", "sample", "reset", "close"]
     target: int = Field(default=0, ge=0, le=50000)
 
 
@@ -115,6 +115,8 @@ class Pool:
             async with asyncio.TaskGroup() as group:
                 for socket in self.sockets[start : start + 256]:
                     group.create_task(socket.close())
+        self.sockets.clear()
+        self.offset = 0
 
 
 async def worker(url: str, source: str) -> None:
@@ -127,6 +129,9 @@ async def worker(url: str, source: str) -> None:
                     reply = await pool.ramp(command.target)
                 case "sample":
                     reply = await pool.sample()
+                case "reset":
+                    reply = Reply(held=pool.held())
+                    await pool.close()
                 case "close":
                     break
             print(reply.model_dump_json(), flush=True)
