@@ -6,32 +6,26 @@ prototype, not production-ready.
 
 ## Record work and run workers
 
-Put the body in an importable module. It must be a plain top-level async function
-that accepts bytes and returns bytes. Every worker needs the same application code.
+The body must be a plain top-level async function that accepts bytes and returns
+bytes. It can live beside `main` when you start the file with `pybeam.run`.
+Every worker needs the same application code, including after a restart.
 
-```python
-# durable_body.py
-import asyncio
-from pathlib import Path
-
-
-async def write_report(payload: bytes) -> bytes:
-    await asyncio.to_thread(Path("report.txt").write_bytes, payload)
-    return b""
-```
-
-The entry point records a report and owns two workers until you stop it.
+This example records a report and owns two workers until you stop it.
 Writing the same file contents again is safe for this example; design your own
 external effects to tolerate retries too.
 
 ```python
 # durable_tasks.py
 import asyncio
-
-from durable_body import write_report
+from pathlib import Path
 
 import pybeam
 from pybeam.queues import DurableTasks
+
+
+async def write_report(payload: bytes) -> bytes:
+    await asyncio.to_thread(Path("report.txt").write_bytes, payload)
+    return b""
 
 
 async def main() -> None:
@@ -54,6 +48,10 @@ Task recorded; workers running.
 Press Ctrl-C to stop. Results are discarded; successful execution acknowledges
 the task. Exiting `serve` stops this node's workers and releases their claims when
 possible. Otherwise, their leases expire.
+
+For independently deployed workers, put the body in an importable module shared
+by every worker. Stored tasks refer to the function by module and name; keep
+those names available while queued tasks can still run.
 
 ## Storage and retries
 

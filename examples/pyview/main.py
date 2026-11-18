@@ -117,17 +117,17 @@ class CounterView(TemplateView[CounterState], LiveView[CounterState]):
     @override
     def template(self, assigns: CounterState, meta: PyViewMeta) -> Template:
         return t"""<main>
-            <h1>Shared BEAM counter</h1>
-            <p>Open two tabs. Increment in one. Both update from BEAM without a reload.</p>
+            <h1>Shared PyBEAM counter</h1>
+            <p>Open two tabs. Increment in one. Both update without a reload.</p>
             <p id="counter">{assigns.count}</p>
             <form phx-submit="increment" phx-change="amount">
                 <label>Amount <input id="amount" name="amount" type="number" min="1" max="10" value="{assigns.amount}" required></label>
                 <button type="submit">Increment</button>
             </form>
             <p role="status">{assigns.error}</p>
-            <p>PyView uses its own live renderer. Notifications trigger fresh reads from BEAM ETS.</p>
+            <p>PyView uses its own live renderer. Notifications trigger fresh counter reads.</p>
             <p>Watch the terminal for increments, publications, and subscription activity.</p>
-            <p>This public counter is node-local, not persistent, and has no authentication.</p>
+            <p>Everyone connected to this app shares the counter. Restarting the app clears it. This demo has no authentication.</p>
         </main>"""
 
 
@@ -138,7 +138,7 @@ def root_template(context: RootTemplateContext) -> str:
             "id": escape(context["id"], quote=True),
             "csrf_token": escape(context["csrf_token"], quote=True),
             "session": escape(context["session"] or "", quote=True),
-            "title": escape(context["title"] or "Shared BEAM counter"),
+            "title": escape(context["title"] or "Shared PyBEAM counter"),
             "additional_head_elements": [
                 *context["additional_head_elements"],
                 Markup('<link rel="stylesheet" href="/demo-static/missing.min.css">'),

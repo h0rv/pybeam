@@ -3,24 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shared BEAM counter · FastAPI</title>
+  <title>Shared PyBEAM counter · FastAPI</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="{{ url_for('static', path='missing.min.css') }}">
-  <style>#count { display: block; font-size: 3rem; font-weight: bold; }</style>
-  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
-  <script src="{{ url_for('static', path='sse.js') }}" defer></script>
+  <style>
+    #count { display: block; font-size: 3rem; font-weight: bold; line-height: 1.2; }
+    form { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem; }
+    input[type="number"] { inline-size: 5rem; }
+  </style>
+  <script src="{{ url_for('static', path='htmx.min.js') }}"></script>
+  <script src="{{ url_for('static', path='sse.js') }}"></script>
 </head>
 <body>
 <main>
   <header>
-    <p>Hornbeam + FastAPI</p>
-    <h1>One counter, two tabs</h1>
-    <p>Open this page in two tabs. Increment in one. Both tabs update without a reload.</p>
+    <h1>Shared counter</h1>
+    <p>Increment in one tab and watch the count in both tabs.</p>
     <p><a href="{{ url_for('index') }}" target="_blank" rel="noopener">Open a second tab</a></p>
   </header>
   <section aria-labelledby="counter-heading">
-    <h2 id="counter-heading">Shared count</h2>
-    <div hx-sse:connect="{{ url_for('events') }}" hx-swap="innerHTML" aria-live="polite">
+    <h2 id="counter-heading">Count</h2>
+    <div id="counter-region" hx-sse:connect="{{ url_for('events') }}" hx-swap="innerHTML" aria-live="polite">
       {% include 'counter.html' %}
     </div>
     <form action="{{ url_for('increment') }}" method="post"
@@ -31,14 +34,8 @@
     <p id="confirmation" role="status"></p>
     <p><a href="{{ url_for('counter') }}">Read current count</a></p>
   </section>
-  <section aria-labelledby="how-heading">
-    <h2 id="how-heading">What happens</h2>
-    <p>FastAPI increments a shared counter in BEAM ETS, then publishes a notification.
-       Each connected tab receives fresh HTML after a new read from BEAM, not from the notification payload.</p>
-    <p>Watch the terminal for increments, publications, and subscription connections, updates, and disconnects.</p>
-    <p>This counter is shared by everyone on one BEAM node. It is node-local, not persistent.
-       Restarting the node clears it. This public demo has no authentication or production authorization.</p>
-  </section>
+  <p>Everyone on this server shares the count. Restarting the server resets it.
+     This demo has no authentication.</p>
 </main>
 </body>
 </html>

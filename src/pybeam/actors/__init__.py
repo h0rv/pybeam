@@ -12,3 +12,4 @@ from pybeam.actors.groups import context_counts as context_counts
 from pybeam.actors.groups import spawn as spawn
 from pybeam.actors.state import ActorStateConflictError as ActorStateConflictError
 from pybeam.actors.state import ActorStateError as ActorStateError
+from pybeam.actors.state import ActorStateOwnershipError as ActorStateOwnershipError
