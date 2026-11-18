@@ -19,6 +19,7 @@ from benchmarks.runner import measurement_lock
 from benchmarks.web.app import app
 from benchmarks.web.managed import main as managed_main
 from benchmarks.web.run import (
+    CleanHttpResult,
     Settings,
     Variant,
     container_command,
@@ -164,13 +165,17 @@ def test_containers_have_identical_limits(monkeypatch: pytest.MonkeyPatch) -> No
             assert flag in command
 
 
-@pytest.mark.parametrize("variant", ["hornbeam", "managed", "uvicorn", "uvicorn2"])
+@pytest.mark.parametrize(
+    "variant", ["hornbeam", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"]
+)
 @pytest.mark.parametrize("application", ["benchmarks.web.app:app", "benchmarks.web.pyview_app:app"])
 def test_server_commands_forward_app(
     monkeypatch: pytest.MonkeyPatch, variant: Variant, application: str
 ) -> None:
     monkeypatch.setattr("benchmarks.web.run.required", lambda name: "/usr/bin/" + name)
-    assert server_command(variant, application)[-1] == application
+    command = server_command(variant, application)
+    assert command[-1] == application
+    assert ("--standard" in command) == (variant == "uvicorn-standard")
 
 
 @pytest.mark.asyncio
@@ -326,3 +331,54 @@ def test_busy_load_lock_prevents_web_run(monkeypatch: pytest.MonkeyPatch, tmp_pa
     ):
         run(settings)
     assert not settings.output.exists()
+
+
+@pytest.mark.parametrize(
+    ("statuses", "errors"),
+    [({}, {}), ({"500": 50}, {}), ({"200": 49}, {"timeout": 1})],
+)
+def test_host_http_rejects_unclean_load(statuses: dict[str, int], errors: dict[str, int]) -> None:
+    with pytest.raises(ValidationError):
+        CleanHttpResult.model_validate(
+            {
+                "summary": {"requestsPerSec": 100},
+                "statusCodeDistribution": statuses,
+                "errorDistribution": errors,
+            }
+        )
+
+
+def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("benchmarks.runner.LOAD_LOCK", tmp_path / "load.lock")
+    launches: list[str] = []
+    loads: list[int] = []
+
+    @contextmanager
+    def host_server(variant: Variant, name: str, output: Path) -> Generator[None]:
+        launches.append(variant)
+        yield
+
+    def http_load(path: Path, seconds: int, concurrency: int) -> None:
+        loads.append(concurrency)
+        path.write_text(
+            '{"summary":{"requestsPerSec":100},"statusCodeDistribution":{"200":100},'
+            '"errorDistribution":{}}'
+        )
+
+    monkeypatch.setattr("benchmarks.web.run.host_server", host_server)
+    monkeypatch.setattr("benchmarks.web.run.http_load", http_load)
+    run(Settings(tmp_path / "results", 30, 3, (), host_http=True))
+    assert launches == [
+        "hornbeam",
+        "uvicorn",
+        "uvicorn-standard",
+        "uvicorn",
+        "uvicorn-standard",
+        "hornbeam",
+        "uvicorn-standard",
+        "hornbeam",
+        "uvicorn",
+    ]
+    assert loads == [16, 64, 256] * len(launches)
