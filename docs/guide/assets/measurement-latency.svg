@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="340" height="276" viewBox="0 0 340 276" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="242" viewBox="0 0 760 242" role="img" aria-labelledby="title desc">
   <title id="title">Empty context call: median latency</title>
-  <desc id="desc">worker · 3.14: 28–36 µs. worker · 3.14t: 41–42 µs. isolated · both builds: 52–401 µs. Linear axis.</desc>
+  <desc id="desc">Empty context call: median latency. worker · 3.14: 28–36 µs. worker · 3.14t: 41–42 µs. isolated · both builds: 52–401 µs. Linear axis.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -8,31 +8,35 @@
     .heading { font-size: 19px; font-weight: 600; }
     .note { fill: #57606a; font-size: 15px; }
     .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
     .axis { stroke: #d0d7de; }
     @media (prefers-color-scheme: dark) {
       svg { color: #e6edf3; }
       rect, path { stroke: #8b949e; }
       .note { fill: #adb6c0; }
       .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
       .axis { stroke: #30363d; }
     }
   </style>
-  <path class="axis" d="M20 38V231"/>
-  <text x="20" y="24" class="note" text-anchor="start">0 µs</text>
-  <path class="axis" d="M104.44444444444444 38V231"/>
-  <text x="104.44444444444444" y="24" class="note" text-anchor="middle">200</text>
-  <path class="axis" d="M188.88888888888889 38V231"/>
-  <text x="188.88888888888889" y="24" class="note" text-anchor="middle">400</text>
-  <text x="20" y="60">worker · 3.14</text>
-  <rect class="bar" x="20" y="70" width="11.822222222222223" height="12"/>
-  <path d="M31.822222222222223 76H35.2m0 -6v12"/>
-  <text x="225" y="82" class="note">28–36 µs</text>
-  <text x="20" y="122">worker · 3.14t</text>
-  <rect class="bar" x="20" y="132" width="17.311111111111117" height="12"/>
-  <path d="M37.31111111111112 138H37.733333333333334m0 -6v12"/>
-  <text x="225" y="144" class="note">41–42 µs</text>
-  <text x="20" y="184">isolated · both builds</text>
-  <rect class="bar" x="20" y="194" width="21.955555555555556" height="12"/>
-  <path d="M41.955555555555556 200H189.3111111111111m0 -6v12"/>
-  <text x="225" y="206" class="note">52–401 µs</text>
+  <rect class="bar" x="220" y="12" width="24" height="14"/><text x="252" y="25" class="note">3.14</text>
+  <rect class="bar-alt" x="322" y="12" width="24" height="14"/><text x="354" y="25" class="note">3.14t</text>
+  <path class="axis" d="M220 73V194"/>
+  <text x="220" y="64" class="note" text-anchor="middle">0</text>
+  <path class="axis" d="M397.77777777777777 73V194"/>
+  <text x="397.77777777777777" y="64" class="note" text-anchor="middle">200</text>
+  <path class="axis" d="M575.5555555555555 73V194"/>
+  <text x="575.5555555555555" y="64" class="note" text-anchor="middle">400</text>
+  <text x="204" y="115" text-anchor="end">worker</text>
+  <rect class="bar" x="220" y="90" width="24.888888888888886" height="14"/>
+  <path d="M244.88888888888889 97H252m0 -6v12"/>
+  <text x="262" y="102" class="note">28–36 µs</text>
+  <rect class="bar-alt" x="220" y="112" width="36.44444444444446" height="14"/>
+  <path d="M256.44444444444446 119H257.3333333333333m0 -6v12"/>
+  <text x="267.3333333333333" y="124" class="note">41–42 µs</text>
+  <text x="204" y="169" text-anchor="end">isolated · both builds</text>
+  <rect class="bar" x="220" y="154" width="46.22222222222223" height="14"/>
+  <path d="M266.22222222222223 161H576.4444444444445m0 -6v12"/>
+  <text x="586.4444444444445" y="166" class="note">52–401 µs</text>
+  <text x="220" y="230" class="note">µs</text>
 </svg>

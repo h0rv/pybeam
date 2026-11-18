@@ -4,15 +4,27 @@ These probes compare execution costs on one machine, not production limits. Bars
 
 ## Contexts
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Time to create one worker or isolated context on a logarithmic axis.](../assets/measurement-create.svg)
+
+</div>
 
 Workers used under 0.1 MiB per context on both builds; isolated contexts used 21–22 MiB on conventional Python and 26–27 MiB on free-threaded Python. When one of four isolated contexts aborted, the other three survived and a replacement was ready in 64–134 ms; aborting a worker killed the VM.
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Median empty round-trip latency for worker and isolated contexts called directly by BEAM processes.](../assets/measurement-latency.svg)
+
+</div>
 
 ## CPU jobs
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Wall time for 8 and 64 CPU jobs in worker and isolated contexts on conventional and free-threaded Python.](../assets/measurement-cpu.svg)
+
+</div>
 
 Each job runs a 3,000,000-step integer loop, about 0.33 s alone. Free-threaded workers used all 8 CPUs; conventional workers took turns, while isolated contexts overlapped on both builds.
 
@@ -20,19 +32,35 @@ Each job runs a 3,000,000-step integer loop, about 0.33 s alone. Free-threaded w
 
 These historical actors each owned a worker context and shared one event loop. The charts do **not** describe the current worker pool's memory, thread count or timings.
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Memory added by 10,000 historical actors compared with blocked Python threads and asyncio tasks.](../assets/measurement-memory.svg)
+
+</div>
 
 Actors and blocked threads each added 10,000 OS threads; blocked asyncio tasks added none. Spawning actors did not fail at 10,000, the last checkpoint.
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Time to start 10,000 historical actors, blocked Python threads and asyncio tasks on a logarithmic axis.](../assets/measurement-start.svg)
+
+</div>
 
 ### Method bodies
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Concurrent actor call wall time by method body and Python build on a logarithmic axis.](../assets/measurement-calls.svg)
+
+</div>
 
 Calls run together with `asyncio.gather`: sleeps last 0.05 s, and the CPU job runs 2,000,000 loop steps (about 0.12 s alone). Blocking and CPU work serialized on the shared loop; “offloaded” means `await asyncio.to_thread(...)`, which restored overlap.
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Time per empty actor method call across 1,000 sequential calls on one actor.](../assets/measurement-noop.svg)
+
+</div>
 
 At 10,000 concurrent calls, one caller loop failed with `RuntimeError: Native callback queue full`; the native callback limit was 8,192 per loop.
 
@@ -44,13 +72,21 @@ With the GIL, asyncio, threads and `worker` ran the jobs one at a time. Free-thr
 
 ## Blast radius: one job aborts
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Replacement time after one of four jobs aborts, labelled with the number of surviving jobs for each process boundary.](../assets/measurement-blast.svg)
+
+</div>
 
 An `os.abort()` in asyncio or threads kills the app; in `worker`, it kills the VM, so neither has a replacement timing. A new prefork pool does not recover its interrupted jobs.
 
 ## Fan in: many processes, eight contexts
 
+<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
+
 ![Completion time for 10,000, 100,000 and one million BEAM processes calling eight worker or isolated contexts on a logarithmic axis.](../assets/measurement-fanin.svg)
+
+</div>
 
 Each process makes one empty call, with at most 32 calls in flight. A million waiting processes used about 2.7 GB (2.7 KB each); the worker ceiling of about 32,000–43,000 calls per second was not traced.
 
@@ -115,3 +151,9 @@ done
 ```
 
 Repeat the threads, worker and isolated fan-out commands with the free-threaded interpreter and matching native build. Crash commands intentionally abort child processes or VMs; run them in a disposable development environment with core dumps disabled (`ulimit -c 0`).
+
+<style>
+.measurement-chart { overflow-x: auto; }
+.measurement-chart img { width: 100%; min-width: 680px; max-inline-size: none; height: auto; }
+.measurement-chart:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>

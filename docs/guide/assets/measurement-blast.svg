@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="340" height="338" viewBox="0 0 340 338" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="287" viewBox="0 0 760 287" role="img" aria-labelledby="title desc">
   <title id="title">Replacement time after one job aborts</title>
-  <desc id="desc">Process per job · 3/3 survive: 80 ms. Prefork pool · 0/3 survive: 53 ms. isolated · 3/3 survive: 70 ms. Separate nodes · 3/3 survive: 254 ms. Linear axis.</desc>
+  <desc id="desc">Replacement time after one job aborts. Process per job · 3/3 survive: 80 ms. Prefork pool · 0/3 survive: 53 ms. isolated · 3/3 survive: 70 ms. Separate nodes · 3/3 survive: 254 ms. Linear axis.</desc>
   <style>
     svg { color: #24292f; font-family: system-ui, sans-serif; }
     rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
@@ -8,33 +8,36 @@
     .heading { font-size: 19px; font-weight: 600; }
     .note { fill: #57606a; font-size: 15px; }
     .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
     .axis { stroke: #d0d7de; }
     @media (prefers-color-scheme: dark) {
       svg { color: #e6edf3; }
       rect, path { stroke: #8b949e; }
       .note { fill: #adb6c0; }
       .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
       .axis { stroke: #30363d; }
     }
   </style>
-  <path class="axis" d="M20 38V293"/>
-  <text x="20" y="24" class="note" text-anchor="start">0 ms</text>
-  <path class="axis" d="M83.33333333333333 38V293"/>
-  <text x="83.33333333333333" y="24" class="note" text-anchor="middle">100</text>
-  <path class="axis" d="M146.66666666666666 38V293"/>
-  <text x="146.66666666666666" y="24" class="note" text-anchor="middle">200</text>
-  <path class="axis" d="M210 38V293"/>
-  <text x="210" y="24" class="note" text-anchor="middle">300</text>
-  <text x="20" y="60">Process per job · 3/3 survive</text>
-  <rect class="bar" x="20" y="70" width="50.66666666666666" height="12"/>
-  <text x="225" y="82" class="note">80 ms</text>
-  <text x="20" y="122">Prefork pool · 0/3 survive</text>
-  <rect class="bar" x="20" y="132" width="33.56666666666667" height="12"/>
-  <text x="225" y="144" class="note">53 ms</text>
-  <text x="20" y="184">isolated · 3/3 survive</text>
-  <rect class="bar" x="20" y="194" width="44.33333333333334" height="12"/>
-  <text x="225" y="206" class="note">70 ms</text>
-  <text x="20" y="246">Separate nodes · 3/3 survive</text>
-  <rect class="bar" x="20" y="256" width="160.86666666666667" height="12"/>
-  <text x="225" y="268" class="note">254 ms</text>
+  <path class="axis" d="M220 38V239"/>
+  <text x="220" y="29" class="note" text-anchor="middle">0</text>
+  <path class="axis" d="M353.3333333333333 38V239"/>
+  <text x="353.3333333333333" y="29" class="note" text-anchor="middle">100</text>
+  <path class="axis" d="M486.66666666666663 38V239"/>
+  <text x="486.66666666666663" y="29" class="note" text-anchor="middle">200</text>
+  <path class="axis" d="M620 38V239"/>
+  <text x="620" y="29" class="note" text-anchor="middle">300</text>
+  <text x="204" y="62" text-anchor="end">Process per job<tspan x="204" dy="19" class="note">3/3 survive</tspan></text>
+  <rect class="bar" x="220" y="55" width="106.66666666666669" height="14"/>
+  <text x="336.6666666666667" y="67" class="note">80 ms</text>
+  <text x="204" y="110" text-anchor="end">Prefork pool<tspan x="204" dy="19" class="note">0/3 survive</tspan></text>
+  <rect class="bar" x="220" y="103" width="70.66666666666669" height="14"/>
+  <text x="300.6666666666667" y="115" class="note">53 ms</text>
+  <text x="204" y="158" text-anchor="end">isolated<tspan x="204" dy="19" class="note">3/3 survive</tspan></text>
+  <rect class="bar" x="220" y="151" width="93.33333333333331" height="14"/>
+  <text x="323.3333333333333" y="163" class="note">70 ms</text>
+  <text x="204" y="206" text-anchor="end">Separate nodes<tspan x="204" dy="19" class="note">3/3 survive</tspan></text>
+  <rect class="bar" x="220" y="199" width="338.66666666666674" height="14"/>
+  <text x="568.6666666666667" y="211" class="note">254 ms</text>
+  <text x="220" y="275" class="note">ms</text>
 </svg>
