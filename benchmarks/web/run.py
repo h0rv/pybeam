@@ -25,10 +25,10 @@ ROOT = Path(__file__).resolve().parents[2]
 IMAGE = "pybeam-web:jammy"
 PORT = 18764
 type Variant = Literal[
-    "hornbeam", "hornbeam-baseline", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"
+    "granian", "hornbeam", "hornbeam-baseline", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"
 ]
 VARIANTS: tuple[Variant, ...] = ("hornbeam", "managed", "uvicorn", "uvicorn2")
-HOST_VARIANTS: tuple[Variant, ...] = ("hornbeam", "uvicorn", "uvicorn-standard")
+HOST_VARIANTS: tuple[Variant, ...] = ("hornbeam", "uvicorn-standard", "granian")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +80,30 @@ def server_command(
             ]
         case "managed":
             return [python, str(ROOT / "benchmarks/web/managed.py"), "--app", app]
+        case "granian":
+            return [
+                python,
+                "-m",
+                "granian",
+                "--interface",
+                "asgi",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(PORT),
+                "--http",
+                "1",
+                "--workers",
+                "1",
+                "--loop",
+                "uvloop",
+                "--backlog",
+                "4096",
+                "--no-access-log",
+                "--log-level",
+                "warning",
+                app,
+            ]
         case "uvicorn" | "uvicorn2" | "uvicorn-standard":
             workers = "2" if variant == "uvicorn2" else "1"
             standard = ["--standard"] if variant == "uvicorn-standard" else []
@@ -198,7 +222,7 @@ def host_server(
                 "0-1",
                 *server_command(variant, app, hornbeam_baseline=hornbeam_baseline),
             ],
-            cwd=ROOT / "benchmarks/web",
+            cwd=ROOT if variant == "granian" else ROOT / "benchmarks/web",
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,

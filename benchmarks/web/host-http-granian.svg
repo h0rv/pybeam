@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 316" width="780" height="316" role="img" aria-labelledby="title desc">
+  <title id="title">Loopback HTTP/1.1 throughput</title>
+  <desc id="desc">Granian had the highest median throughput at 64 and 256 concurrent connections. Hornbeam trailed Uvicorn at both concurrencies. Dots show medians; lines show the full range across three trials.</desc>
+  <style>
+    svg { color: #202124; font: 16px system-ui, sans-serif; }
+    text { fill: currentColor; }
+    .paper { fill: #fff; }
+    .grid { stroke: #d1d5db; fill: none; }
+    .peer { color: #50555d; }
+    .hornbeam { color: #155a9f; }
+    .range { stroke: currentColor; stroke-width: 2; }
+    .median { fill: currentColor; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #eceef0; }
+      .paper { fill: #151719; }
+      .grid { stroke: #515761; }
+      .peer { color: #b8bec6; }
+      .hornbeam { color: #8cc5ff; }
+    }
+  </style>
+  <rect class="paper" width="780" height="316"/>
+  <text x="18" y="30" font-size="21" font-weight="600">Loopback HTTP/1.1 throughput</text>
+  <text x="18" y="54">Requests per second · median and range across three trials</text>
+  <path class="grid" d="M245,100V172 M355,100V172 M465,100V172 M575,100V172 M685,100V172
+                        M245,208V282 M355,208V282 M465,208V282 M575,208V282 M685,208V282"/>
+  <text x="18" y="89" font-weight="600">64 concurrent connections</text>
+  <text x="18" y="116">Hornbeam</text>
+  <g class="hornbeam">
+    <path class="range" d="M471.3,111H517.1"/>
+    <circle class="median" cx="497.2" cy="111" r="4"/>
+  </g>
+  <text x="762" y="116" text-anchor="end">11,465</text>
+  <text x="18" y="141">Uvicorn · uvloop/httptools</text>
+  <g class="peer">
+    <path class="range" d="M498.1,136H562.2"/>
+    <circle class="median" cx="561.2" cy="136" r="4"/>
+  </g>
+  <text x="762" y="141" text-anchor="end">14,371</text>
+  <text x="18" y="166">Granian · uvloop</text>
+  <g class="peer">
+    <path class="range" d="M573.5,161H629.7"/>
+    <circle class="median" cx="596.3" cy="161" r="4"/>
+  </g>
+  <text x="762" y="166" text-anchor="end">15,968</text>
+  <text x="18" y="197" font-weight="600">256 concurrent connections</text>
+  <text x="18" y="224">Hornbeam</text>
+  <g class="hornbeam">
+    <path class="range" d="M451.2,219H498.7"/>
+    <circle class="median" cx="482.6" cy="219" r="4"/>
+  </g>
+  <text x="762" y="224" text-anchor="end">10,799</text>
+  <text x="18" y="249">Uvicorn · uvloop/httptools</text>
+  <g class="peer">
+    <path class="range" d="M462.2,244H521.7"/>
+    <circle class="median" cx="515.8" cy="244" r="4"/>
+  </g>
+  <text x="762" y="249" text-anchor="end">12,308</text>
+  <text x="18" y="274">Granian · uvloop</text>
+  <g class="peer">
+    <path class="range" d="M578.9,269H638.2"/>
+    <circle class="median" cx="628.3" cy="269" r="4"/>
+  </g>
+  <text x="762" y="274" text-anchor="end">17,421</text>
+  <text x="245.0" y="304" text-anchor="middle" font-size="14">0</text>
+  <text x="355.0" y="304" text-anchor="middle" font-size="14">5k</text>
+  <text x="465.0" y="304" text-anchor="middle" font-size="14">10k</text>
+  <text x="575.0" y="304" text-anchor="middle" font-size="14">15k</text>
+  <text x="685.0" y="304" text-anchor="middle" font-size="14">20k</text>
+</svg>

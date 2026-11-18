@@ -166,7 +166,7 @@ def test_containers_have_identical_limits(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.mark.parametrize(
-    "variant", ["hornbeam", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"]
+    "variant", ["granian", "hornbeam", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"]
 )
 @pytest.mark.parametrize("application", ["benchmarks.web.app:app", "benchmarks.web.pyview_app:app"])
 def test_server_commands_forward_app(
@@ -176,6 +176,19 @@ def test_server_commands_forward_app(
     command = server_command(variant, application)
     assert command[-1] == application
     assert ("--standard" in command) == (variant == "uvicorn-standard")
+
+
+def test_granian_uses_asgi_http1_and_uvloop() -> None:
+    command = server_command("granian")
+    assert command[1:3] == ["-m", "granian"]
+    for flag, value in (
+        ("--interface", "asgi"),
+        ("--http", "1"),
+        ("--loop", "uvloop"),
+        ("--workers", "1"),
+    ):
+        assert command[command.index(flag) + 1] == value
+    assert "--no-access-log" in command
 
 
 @pytest.mark.asyncio
@@ -375,9 +388,10 @@ def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
     monkeypatch.setattr("benchmarks.web.run.host_server", host_server)
     monkeypatch.setattr("benchmarks.web.run.http_load", http_load)
     run(Settings(tmp_path / "results", 30, 3, (), host_http=True, hornbeam_baseline=baseline))
-    first, second = (
-        ("hornbeam-baseline", "hornbeam") if compare_baseline else ("hornbeam", "uvicorn")
+    first, second, third = (
+        ("hornbeam-baseline", "hornbeam", "uvicorn-standard")
+        if compare_baseline
+        else ("hornbeam", "uvicorn-standard", "granian")
     )
-    third = "uvicorn-standard"
     assert launches == [first, second, third, second, third, first, third, first, second]
     assert loads == [16, 64, 256] * len(launches)

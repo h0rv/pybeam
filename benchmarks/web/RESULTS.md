@@ -1,11 +1,57 @@
 # ASGI serving benchmark
 
-One application returns 19-byte JSON from `GET /` and echoes text on `/ws`.
-The four launch paths are A: Hornbeam; B: Uvicorn in PyBEAM's managed runtime;
-C: standalone Uvicorn, one worker; C2: standalone Uvicorn, two workers.
-This measures serving only, not shared state, persistence, or application work.
+One FastAPI application returns 19-byte JSON from `GET /` and echoes text on
+`/ws`. The host benchmark measures serving over loopback HTTP/1.1, not shared
+state, persistence, or application work.
 
 ## Native HTTP throughput
+
+Hornbeam's median throughput was 20% below Uvicorn with uvloop/httptools
+and 28% below Granian at 64 connections. At 256 connections, the gaps
+were 12% and 38%. All 18 measured trials returned only HTTP 200 responses.
+Variable VM contention makes these gaps specific to this run.
+
+![Median and full range of HTTP requests per second for Hornbeam, Uvicorn, and Granian at 64 and 256 concurrent connections.](host-http-granian.svg)
+
+### Reproduce the comparison with Granian
+
+Use a clean PyBEAM checkout on Linux with CPUs 0–7 and the Hornbeam revision
+in the [appendix](#granian-comparison-appendix). Run from the PyBEAM root:
+
+```sh
+mise install
+mise install oha@1.17.0
+mise exec -- uv sync --locked --all-extras
+mise exec -- uv pip install --python .venv/bin/python \
+  uvloop==0.23.0 httptools==0.8.0 granian==2.8.8
+export PYBEAM_BUILD_PYTHON="$PWD/.venv/bin/python"
+export PYTHON_CONFIG="$(dirname "$(realpath "$PYBEAM_BUILD_PYTHON")")/python3.14-config"
+export ERL_FLAGS='+S 2:2' CMAKE_BUILD_PARALLEL_LEVEL=2
+
+hornbeam="$(realpath ../hornbeam-web-granian)"
+mise exec -- sh -c 'cd "$1" && exec rebar3 compile' sh "$hornbeam"
+mkdir -p _build
+ln -s "$hornbeam/_build/default" _build/hornbeam
+mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
+  --host-http --output "$HOME/web-http-granian"
+```
+
+Pick an output directory that does not exist. Each server gets CPUs 0–1
+and the load generator gets CPUs 4–7. The runner rotates the server order
+over three repeats and measures 64 and 256 connections for 10 seconds each
+after a 16-connection warm-up. Only error-free HTTP 200 trials count.
+
+```sh
+for server in hornbeam uvicorn-standard granian; do
+  for clients in 64 256; do
+    printf '%s c%s (median, min, max): ' "$server" "$clients"
+    jq -sr 'map(.summary.requestsPerSec) | sort | [.[1], .[0], .[2]] | @tsv' \
+      "$HOME"/web-http-granian/web-"$server"-?.http"$clients".json
+  done
+done
+```
+
+### Earlier task-reply comparison
 
 After the runtime and Hornbeam changes merged, Hornbeam trailed Uvicorn with
 uvloop/httptools by 8% at 64 connections and 9% at 256 connections on pooled
@@ -27,10 +73,11 @@ WebSocket, or production-capacity result.
 
 ![Sustained requests per second at 64 and 256 concurrent connections. Dots show medians; lines show the range over three repeats.](host-http-throughput.svg)
 
-### Reproduce the host run
+### Reproduce the earlier asyncio/h11 comparison
 
-From a clean PyBEAM checkout on Linux with CPUs 0–7, prepare the Hornbeam
-checkout in the [appendix](#host-run-appendix), then run:
+Use the [earlier host runner](https://github.com/h0rv/pybeam/tree/499831a/benchmarks/web)
+from a clean PyBEAM checkout on Linux with CPUs 0–7. Prepare Hornbeam as in the
+[appendix](#host-run-appendix), then run:
 
 ```sh
 mise install
@@ -60,6 +107,9 @@ done
 ```
 
 ## Reproduce the container benchmark
+
+The four launch paths are A: Hornbeam; B: Uvicorn in PyBEAM's managed runtime;
+C: standalone Uvicorn, one worker; C2: standalone Uvicorn, two workers.
 
 Run from the repository root on a Linux host with CPUs 0–7, container-engine
 access, and sibling runtime checkouts as described in
@@ -269,6 +319,24 @@ The managed transport made 26,867 receive attempts for about 13,400 requests,
 versus 20,478 for about 20,400 standalone requests: its drain-until-EAGAIN loop
 adds receive attempts. These measurements identify contributors, not a complete
 whole-runtime CPU breakdown. The remaining gap and c256 timeouts are unattributed.
+
+## Granian comparison appendix
+
+The host run used Ubuntu 22.04.5 on an eight-vCPU Intel Xeon VM with OTP
+29.1.2. All servers used the same CPython 3.14.10 build. Uvicorn 0.54.0
+used uvloop and httptools; Granian used uvloop and its default asyncio
+task implementation. Both ran one worker without access logging. Hornbeam
+used two BEAM schedulers and one Python event loop. VM CPU steal reached
+15% in a one-second sample during the run.
+
+Use a sibling [Hornbeam fork](https://github.com/h0rv/hornbeam) clone to
+prepare the checkout:
+
+```sh
+git -C ../hornbeam fetch origin main
+git -C ../hornbeam worktree add --detach "$(realpath -m ../hornbeam-web-granian)" \
+  d3b7850aacad81145b5d9d314dbe27e367cdcdc5
+```
 
 ## Task-reply comparison appendix
 
