@@ -32,11 +32,11 @@ class ArchiveManifest(StrictModel):
         "pybeam_reference_smoke.json",
     ],
 )
-def test_shipped_configuration__uses_this_checkout_and_private_native_assets(name: str) -> None:
+def test_shipped_configuration__uses_this_checkout_and_canonical_native_assets(name: str) -> None:
     config = Config.model_validate_json((ROOT / "benchmarks" / name).read_text())
     assert (ROOT / config.python_source).resolve() == ROOT
     if config.backend == "pybeam":
-        assert config.native_source == "../erlang-python"
+        assert config.native_source == "_build/hornbeam/lib/erlang_python"
     else:
         assert config.native_source is None
     assert config.adapter_command[0] == "benchmarks/.venv/bin/python"

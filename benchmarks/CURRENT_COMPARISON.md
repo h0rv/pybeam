@@ -66,46 +66,19 @@ Python-only jobs have null native configuration. PyBEAM still requires its actua
 
 It includes the nullable schema and does not depend on the reference backends. Its offline gates passed 11 focused tests, with Chrome correctly skipped without opt-in. No timed load was launched after the requested clock pause.
 
-### Recorded commands
+### Public reproduction
+
+From a fresh Git checkout, install [mise](https://mise.jdx.dev/getting-started.html) and a C/C++ compiler with make, then run these commands from the repository root. Do not run `mise run setup` or add sibling checkout overrides. The native build uses at most two compiler jobs; dependency installation alone does not build it.
 
 ```sh
-uv sync --extra showcase
-uv sync --project benchmarks
-uv run --project benchmarks python -m benchmarks.pybeam_reference_build \
-  ../native-benchmark-current --python /opt/homebrew/opt/python@3.14/bin/python3.14
-uv run --project benchmarks python -m benchmarks.native_reference --build
-uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
-uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
-uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json \
-  --native-source ../native-benchmark-current
-uv run --extra showcase python -m examples.showcase \
-  --trusted-native-root ../native-benchmark-current
+mise trust
+mise install
+mise exec -- uv sync --locked --project benchmarks
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.canonical_build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.native_reference --build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
 ```
 
-### Reproduction boundary
-
-Python and pure OTP references work in-repo; PyBEAM still needs a private pinned build manifest that the canonical builder does not produce (see [build boundary](CONTRACT.md#current-build-boundary)).
-
-### Optional private PyBEAM rerun
-
-This needs a separate clean checkout at the builder's pinned native revision, with no shared or escaping build outputs. These commands deliberately build private benchmark assets, not the canonical runtime:
-
-```sh
-NATIVE="$HOME/repos/native-benchmark-current"
-PYTHON="$(mise exec -- uv python find 3.14.10)"
-mise exec -- uv run --project benchmarks python -m benchmarks.pybeam_reference_build "$NATIVE" --python "$PYTHON"
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json --native-source "$NATIVE"
-```
-
-### In-repository reproduction
-
-Run serially from the repository root; omit `--output` to create fresh result directories without overwriting archived evidence. These commands run new smoke observations, not identical historical values.
-
-```sh
-mise exec -- uv sync --project benchmarks --locked
-mise exec -- uv run --project benchmarks python -m benchmarks --help
-mise exec -- uv run --project benchmarks python -m benchmarks.native_reference --build
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
-mise exec -- uv run --project benchmarks python -m pytest -c benchmarks/pyproject.toml benchmarks/tests -q
-```
+These short serial checks run 100 events per trial, three trials per backend. They create new ignored result directories; they do not regenerate identical historical values or overwrite archived evidence. `--native-source` still selects an explicit matching native checkout; the showcase requires `--trusted-native-root _build/hornbeam/lib/erlang_python`.

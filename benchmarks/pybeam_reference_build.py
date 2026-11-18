@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,7 +10,25 @@ from tools.build_native import compiler_environment
 from benchmarks.contract import LoadedAsset, Source, StrictModel
 from benchmarks.provenance import source
 
-BASELINE = "a1ca04bfcaea817654ec7d1972f210c7a60075c4"
+ROOT = Path(__file__).resolve().parents[1]
+NATIVE_DIRECTORY = Path("_build/hornbeam/lib/erlang_python")
+
+
+def locked_revision(lock: Path = ROOT / "rebar.lock") -> str:
+    pattern: re.Pattern[str] = re.compile(
+        r'\{<<"erlang_python">>,\s*\{git,\s*"[^"]+",\s*'
+        r'\{ref,\s*"([0-9a-f]{40})"\}\}'
+    )
+    entries = tuple(pattern.finditer(lock.read_text()))
+    if len(entries) != 1:
+        raise ValueError("Expected one pinned erlang_python Git revision in rebar.lock")
+    revision = entries[0].group(1)
+    if not isinstance(revision, str):
+        raise ValueError("Native revision must be a string")
+    return revision
+
+
+BASELINE = locked_revision()
 CANONICAL_NATIVE = Path(__file__).resolve().parents[2] / "erlang-python"
 
 
@@ -30,13 +49,39 @@ def asset(path: Path) -> LoadedAsset:
     )
 
 
-def verify(manifest: BuildManifest, native: Path) -> None:
-    current = source(native)
-    if current != manifest.native or current.dirty or current.sha != BASELINE:
+def verify(manifest: BuildManifest, native: Path, *, expected_revision: str | None = None) -> None:
+    native = native.resolve(strict=True)
+    generated = generated_paths(manifest, native)
+    current = source(native, generated_paths=generated) if generated else source(native)
+    if (
+        current != manifest.native
+        or current.dirty
+        or current.sha != (locked_revision() if expected_revision is None else expected_revision)
+    ):
         raise ValueError("Native source does not match the clean pinned current runtime build")
+    for path in (
+        Path(manifest.runtime_directory),
+        Path(manifest.cmake_cache.path),
+        *(Path(item.path) for item in manifest.assets),
+    ):
+        if not path.is_absolute() or not path.resolve().is_relative_to(native):
+            raise ValueError("Build asset escapes the native checkout: " + str(path))
+    if not manifest.assets:
+        raise ValueError("Build manifest has no native assets")
     for item in (*manifest.assets, manifest.python_executable, manifest.cmake_cache):
         if asset(Path(item.path)) != item:
             raise ValueError("Build asset changed: " + item.path)
+
+
+def generated_paths(manifest: BuildManifest, native: Path) -> frozenset[str]:
+    path = native / "ebin/erlang_python.app"
+    if Path(manifest.runtime_directory).resolve() != native or not any(
+        Path(item.path) == path for item in manifest.assets
+    ):
+        return frozenset()
+    if asset(path) not in manifest.assets:
+        raise ValueError("Build asset changed: " + str(path))
+    return frozenset({"ebin/erlang_python.app"})
 
 
 def private_outputs(native: Path) -> None:

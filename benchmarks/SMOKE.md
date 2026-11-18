@@ -52,18 +52,19 @@ Ruff lint and format checks passed. Strict ty passed with warnings treated as er
 uv run --project benchmarks python -m benchmarks run --output benchmarks/results/contract-baseline-af2e257
 ```
 
-### Reproduction boundary
+### Public reproduction
 
-Python and pure OTP references work in-repo; PyBEAM still needs a private pinned build manifest that the canonical builder does not produce (see [build boundary](CONTRACT.md#current-build-boundary)).
-
-Per-repeat rates are absent from the retained smoke note; the rate chart shows the recorded mean only (sample standard deviation 302.76 events/s). Its local raw directory is not present in this checkout.
-
-### In-repository reproduction
-
-Run serially from the repository root; omit `--output` to create fresh result directories without overwriting archived evidence. These commands run new smoke observations, not identical historical values.
+From a fresh Git checkout, install [mise](https://mise.jdx.dev/getting-started.html) and a C/C++ compiler with make, then run these commands from the repository root. Do not run `mise run setup` or add sibling checkout overrides. The native build uses at most two compiler jobs; dependency installation alone does not build it.
 
 ```sh
-mise exec -- uv sync --project benchmarks --locked
-mise exec -- uv run --project benchmarks python -m benchmarks run
-mise exec -- uv run --project benchmarks python -m pytest -c benchmarks/pyproject.toml benchmarks/tests -q
+mise trust
+mise install
+mise exec -- uv sync --locked --project benchmarks
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.canonical_build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.native_reference --build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
 ```
+
+These short serial checks run 100 events per trial, three trials per backend. They create new ignored result directories; they do not regenerate identical historical values or overwrite archived evidence. `--native-source` still selects an explicit matching native checkout; the showcase requires `--trusted-native-root _build/hornbeam/lib/erlang_python`.

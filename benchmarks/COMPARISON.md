@@ -68,7 +68,7 @@ Each directory retains strict adapter results, raw typed receipts, resource samp
 
 The full benchmark suite passed 103 tests in 9.19 seconds. It includes the existing 31 guardian/contract tests and the new references and oracle negative controls. Ruff check and format passed from `benchmarks/`. Strict ty passed with the repository, `src`, and `typings` search paths. Regenerating all four JSON schemas produced no changes. This integration did not rerun the showcase UI or browser suite.
 
-The source worktrees `bench-python`, `bench-beam`, and `bench-pybeam` are no longer dependencies after the follow-up configuration portability fixes and evidence archive. Their changes are committed here and raw trials are retained here. This task does not delete them. Keep `benchmark-integration` and the private `native-bench-pybeam` assets for reruns. The completed trial records no longer require the original three adapter worktrees.
+The source worktrees `bench-python`, `bench-beam`, and `bench-pybeam` are no longer dependencies after the follow-up configuration portability fixes and evidence archive. Their changes are committed here and raw trials are retained here. This task does not delete them. Those historical assets are not required for new public runs. The completed trial records no longer require the original three adapter worktrees.
 
 ### Recorded commands
 
@@ -78,30 +78,19 @@ benchmarks/.venv/bin/python -m benchmarks run --config benchmarks/examples/seria
 benchmarks/.venv/bin/python -m benchmarks run --config benchmarks/examples/serial_erlang.json --output benchmarks/results/serial-erlang-4a2219c
 ```
 
-### Reproduction boundary
+### Public reproduction
 
-Python and pure OTP references work in-repo; PyBEAM still needs a private pinned build manifest that the canonical builder does not produce (see [build boundary](CONTRACT.md#current-build-boundary)).
-
-### Optional private PyBEAM rerun
-
-This needs a separate clean checkout at the builder's pinned native revision, with no shared or escaping build outputs. These commands deliberately build private benchmark assets, not the canonical runtime:
+From a fresh Git checkout, install [mise](https://mise.jdx.dev/getting-started.html) and a C/C++ compiler with make, then run these commands from the repository root. Do not run `mise run setup` or add sibling checkout overrides. The native build uses at most two compiler jobs; dependency installation alone does not build it.
 
 ```sh
-NATIVE="$HOME/repos/native-benchmark-current"
-PYTHON="$(mise exec -- uv python find 3.14.10)"
-mise exec -- uv run --project benchmarks python -m benchmarks.pybeam_reference_build "$NATIVE" --python "$PYTHON"
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json --native-source "$NATIVE"
+mise trust
+mise install
+mise exec -- uv sync --locked --project benchmarks
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.canonical_build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.native_reference --build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
 ```
 
-### In-repository reproduction
-
-Run serially from the repository root; omit `--output` to create fresh result directories without overwriting archived evidence. These commands run new smoke observations, not identical historical values.
-
-```sh
-mise exec -- uv sync --project benchmarks --locked
-mise exec -- uv run --project benchmarks python -m benchmarks --help
-mise exec -- uv run --project benchmarks python -m benchmarks.native_reference --build
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
-mise exec -- uv run --project benchmarks python -m pytest -c benchmarks/pyproject.toml benchmarks/tests -q
-```
+These short serial checks run 100 events per trial, three trials per backend. They create new ignored result directories; they do not regenerate identical historical values or overwrite archived evidence. `--native-source` still selects an explicit matching native checkout; the showcase requires `--trusted-native-root _build/hornbeam/lib/erlang_python`.
