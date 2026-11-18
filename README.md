@@ -17,4 +17,8 @@ Start with [Get started](docs/guide/index.md), or read [Why PyBEAM](docs/guide/w
 
 Try the [Discord demo](examples/discord_demo/README.md) and the [showcase](examples/showcase).
 
+The [live-operations walkthrough](examples/soul/README.md) inspects and stops
+runaway Python work while HTTP traffic continues, then replaces the calculation
+used by new jobs.
+
 To work on PyBEAM itself, see [Development](docs/development.md).
