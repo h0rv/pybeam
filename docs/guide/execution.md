@@ -1,10 +1,10 @@
 # Blocking and CPU work
 
-Tasks share one event loop by default. While one of them runs a blocking call or a long CPU loop, every other task on that loop waits, just as in plain asyncio. Actor calls run on a node-wide pool of Python workers, each with its own loop, so a blocking actor method does not hold up other actors.
+Tasks share one event loop by default. While one of them runs a blocking call or a long CPU loop, every other task on that loop waits, just as in plain asyncio. Actor calls use a bounded pool of Python workers with separate loops. A blocking method occupies one worker; calls queue when all workers are busy.
 
 - Wrap a blocking call in `await asyncio.to_thread(...)`. The default executor runs a few calls at once, so many blocking calls still queue.
 - Give a CPU-bound task its own loop with `dedicated_loop=True`.
-- Run code that might crash the process, such as an unreliable C extension, with `execution=ExecutionMode.ISOLATED`. A crash then fails only that task. Isolated tasks run in separate Python processes: each takes up to about 130 ms to start, uses about 25 MiB, and its function must be a top-level `async def` that takes and returns `bytes`.
+- Run code that might crash the process, such as an unreliable C extension, with `execution=ExecutionMode.ISOLATED`. Isolated tasks run in separate Python processes; their functions must be importable top-level `async def` functions that take and return `bytes`. A child crash raises `TaskCrashed` and is not retried. External effects remain unknown. Process isolation adds startup and memory overhead; it is not a security sandbox.
 
 Actors have no `dedicated_loop` option and need none: each call already runs on a pooled worker. Parallel Python CPU work requires free-threaded Python. Don't keep loop-bound objects such as `asyncio.Lock` in actor state across calls, because the next call may run on another worker. Create and finalize those resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
@@ -58,7 +58,7 @@ $ uv run execution.py
 637018976
 ```
 
-On standard Python 3.14 the four tasks take turns. On free-threaded Python 3.14t they run at once; in a local run four took 0.43 s against 0.32 s for one. On 3.14t, module-level variables are shared by every task at the same time, and tasks that change the same object slow each other down, so keep mutable data inside each task. Time your own workload before you count on parallel tasks.
+On standard Python 3.14 the four CPU tasks take turns. Free-threaded Python can run them in parallel when dependencies support it. Keep mutable data inside each task rather than in shared module globals. Time your own workload before relying on a speedup.
 
 For how this works and the measurements behind it, see [How PyBEAM works](internals/index.md).
 

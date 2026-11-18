@@ -22,7 +22,7 @@ These limits bound actors, admitted requests and encoded request bytes. They do 
 
 ## From an existing OTP application
 
-Include `erlang_python` in the host application's dependencies. The host's Python environment must provide `pybeam`, its Python dependencies and the application's module.
+Include `erlang_python` in the host application's dependencies. The host's Python environment must provide PyBEAM, its Python dependencies and the application's module.
 
 `pybeam_otp_host.erl` uses the existing `py_context` API. Supply the application's trusted Python package directories, including its installed Python dependencies when those are not already on the interpreter's search path:
 
@@ -37,4 +37,4 @@ The helper creates a context linked to the caller, adds the trusted paths before
 
 While a context's managed loop is running, use `py_context:submit_await`, not `py_context:call`. The host helper shows the complete call and cleanup sequence.
 
-This example uses a supervised actor with its own execution context. It does not demonstrate pooled execution or parallel Python bytecode. A timeout does not undo completed library work. Input is limited to 65,536 JSON bytes and 512 finite samples.
+This example uses a supervised actor. It does not measure parallel Python execution. A timeout does not undo completed library work. Input is limited to 65,536 JSON bytes and 512 finite samples.

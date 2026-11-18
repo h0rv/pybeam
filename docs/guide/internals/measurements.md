@@ -26,7 +26,9 @@ On 3.14t, worker contexts ran on all 8 CPUs. On 3.14 they took turns. `time.slee
 
 ## Actors
 
-Each actor owns a worker context and its method bodies run on the shared event loop.
+These actor measurements predate pooled dispatch. In that version, each actor
+owned a worker context and its method bodies ran on the shared event loop. They
+do not describe the current worker pool's memory use, thread count or timings.
 
 | 10,000 of | Memory added | OS threads | Start time |
 | --- | --- | --- | --- |
@@ -48,7 +50,7 @@ N actors are called at once with `asyncio.gather`. The CPU job is a 2,000,000-st
 | `await asyncio.to_thread(cpu_job)` | 8 | 1.0 s | 0.17 s |
 | Empty method, 1,000 calls in a row on one actor | 1 | 0.41–0.82 ms per call | 0.61 ms per call |
 
-- Blocking and CPU work serialized every actor on both builds, because all method bodies share one loop thread.
+- Blocking and CPU work serialized every actor on both builds in this older implementation, because all method bodies shared one loop thread.
 - `asyncio.to_thread` restored overlap, up to the default executor's 12 threads on 8 CPUs.
 - 10,000 concurrent calls from one caller loop failed with `RuntimeError: Native callback queue full`. erlang-python reserves at most 8,192 native callbacks per loop.
 
