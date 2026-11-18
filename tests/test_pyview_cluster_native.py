@@ -1,4 +1,5 @@
 import json
+import socket
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -122,11 +123,20 @@ def wait_ready(ports: tuple[int, int]) -> None:
 def test_feed__two_nodes_exchange_posts_and_shutdown(
     request: pytest.FixtureRequest,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and a built Hornbeam profile")
     profile: object = request.config.getoption("hornbeam_runtime")
     assert isinstance(profile, str)
+    inetrc = tmp_path / "inetrc"
+    hostname = json.dumps(socket.gethostname().split(".")[0])
+    inetrc.write_text(
+        "{lookup, [file]}.\n{host, {127,0,0,2}, ["
+        + hostname
+        + ']}.\n{host, {127,0,0,1}, ["localhost"]}.\n'
+    )
+    monkeypatch.setenv("ERL_INETRC", str(inetrc))
     ports = free_port(), free_port()
     with (tmp_path / "cluster.log").open("wb") as output:
         for _ in range(2):

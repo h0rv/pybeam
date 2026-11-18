@@ -50,7 +50,6 @@ def running(
     for key in ("ERL_FLAGS", "ERL_AFLAGS", "ERL_ZFLAGS"):
         environment.pop(key, None)
     cookie = secrets.token_hex(32)
-    host = socket.gethostname().split(".")[0]
     epmd = subprocess.Popen(  # noqa: S603
         ["epmd", "-port", str(epmd_port), "-address", "127.0.0.1"],  # noqa: S607
         env=environment,
@@ -77,14 +76,12 @@ def running(
             flags = (
                 "-sname pybeam_feed_"
                 + alias
-                + " -setcookie "
+                + "@localhost -setcookie "
                 + cookie
                 + " -start_epmd false -kernel inet_dist_use_interface '{127,0,0,1}'"
                 + " sync_nodes_optional \"['pybeam_feed_"
                 + peer
-                + "@"
-                + host
-                + "']\" sync_nodes_timeout 5000"
+                + "@localhost']\" sync_nodes_timeout 5000"
             )
             processes.append(
                 subprocess.Popen(  # noqa: S603
