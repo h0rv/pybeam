@@ -2,6 +2,7 @@
 import type { MarkdownInstance } from "astro";
 import Layout from "../Layout.astro";
 import { pages } from "../links.mjs";
+import CrashReplay from "../CrashReplay.astro";
 
 export async function getStaticPaths() {
   const files = import.meta.glob<MarkdownInstance<Record<string, unknown>>>(
@@ -20,4 +21,5 @@ const { Content, title, headings, source } = Astro.props;
 ---
 <Layout title={title} headings={headings} source={source}>
   <Content />
+  {source === "docs/guide/crash-test.md" && <CrashReplay />}
 </Layout>

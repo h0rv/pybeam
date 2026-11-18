@@ -1,0 +1,167 @@
+---
+import recording from "./crash-replay.json";
+
+const sides = ["usual", "pybeam"] as const;
+const format = (value: number | string, unit = "") =>
+  typeof value === "number" ? value.toFixed(unit === " ms" ? 2 : 0) + unit : value;
+const rows = [
+  { label: "Reply p99", values: recording.baselineP99, unit: " ms" },
+];
+const faultRows = [
+  { label: `Users cut off (of ${recording.otherRoomSockets})`, values: recording.disconnected, unit: "" },
+  { label: "Sends with no reply", values: recording.unacknowledged, unit: "" },
+  { label: "Reply p99", values: recording.faultP99, unit: " ms" },
+];
+---
+<div data-crash-replay>
+  <p class="replay-context">Recorded measurements · {recording.trials} trials</p>
+  <p>
+    Step through the published native-crash results. This is a static walkthrough,
+    not a live test or a recording of individual messages.
+    Values are medians with minimum–maximum ranges across three trials.
+  </p>
+
+  <table class="replay-boundaries">
+    <caption>Each outline is a process boundary</caption>
+    <thead><tr><th scope="col">Usual stack</th><th scope="col">PyBEAM</th></tr></thead>
+    <tbody><tr>
+      <td>
+        <div class="process-boundary">
+          <strong>Web worker</strong>
+          <span>Chat connections</span>
+          <span>Crashing request</span>
+        </div>
+        <p>One of eight workers. Users from different rooms share it.</p>
+      </td>
+      <td>
+        <div class="process-boundary">
+          <strong>Chat server</strong>
+          <span>Chat connections</span>
+        </div>
+        <div class="process-boundary">
+          <strong>Separate child process</strong>
+          <span>Crashing request</span>
+        </div>
+      </td>
+    </tr></tbody>
+  </table>
+
+  <div data-replay-stage="0">
+    <h2 id="before-the-crash" tabindex="-1">Before the crash</h2>
+    <p>
+      Both stacks receive the same workload: eight rooms with four connected users
+      each, sending four messages per second per user. No background jobs run.
+      We watch the 28 users in rooms other than the fault target.
+    </p>
+    <table>
+      <caption>Other-room replies during the 3-second baseline</caption>
+      <thead><tr><th scope="col">Metric</th><th scope="col">Usual stack</th><th scope="col">PyBEAM</th></tr></thead>
+      <tbody>{rows.map(({ label, values, unit }) => <tr>
+        <th scope="row">{label}</th>
+        {sides.map((side) => <td>
+          <strong>{format(values[side].median, unit)}</strong>
+          <span class="replay-range">{format(values[side].min, unit)}–{format(values[side].max, unit)}</span>
+        </td>)}
+      </tr>)}</tbody>
+    </table>
+  </div>
+
+  <div data-replay-stage="1">
+    <h2 id="during-the-crash" tabindex="-1">A request crashes its process</h2>
+    <p>
+      The request calls <code>os.abort()</code>, like a native extension crashing.
+      In the usual stack, the web worker dies with its connections. In PyBEAM,
+      the separate task process dies; the chat server stays running.
+    </p>
+    <table>
+      <caption>Other-room impact during the 3-second fault window</caption>
+      <thead><tr><th scope="col">Metric</th><th scope="col">Usual stack</th><th scope="col">PyBEAM</th></tr></thead>
+      <tbody>{faultRows.map(({ label, values, unit }) => <tr>
+        <th scope="row">{label}</th>
+        {sides.map((side) => <td>
+          <strong>{format(values[side].median, unit)}</strong>
+          <span class="replay-range">{format(values[side].min, unit)}–{format(values[side].max, unit)}</span>
+        </td>)}
+      </tr>)}</tbody>
+    </table>
+    <p>
+      <strong>Unbounded</strong> means some scheduled sends still had no reply
+      after an 8-second drain, including sends missed during reconnection.
+      It does not mean the server stayed down forever.
+    </p>
+  </div>
+
+  <div data-replay-stage="2">
+    <h2 id="after-the-crash" tabindex="-1">A healthy server does not erase an interruption</h2>
+    <p>
+      Every post-fault health check returned HTTP 200 on both stacks. Other-room
+      HTTP probes had no failures, even though some chat connections disconnected
+      in the usual stack.
+    </p>
+    <p>
+      A replacement web worker can serve new connections; it cannot preserve the
+      dead worker’s existing connections. Running dangerous work in a separate
+      process kept that crash away from PyBEAM’s chat connections in these trials.
+    </p>
+    <p>
+      This compares failure boundaries, not maximum throughput. Zero observed
+      disconnects is not a guarantee of zero latency impact or durable messages.
+      Neither example retries lost jobs or persists room counters.
+    </p>
+    <p>
+      A conventional Python application can isolate dangerous work in a separate
+      process too. The difference here is where these two examples run that work,
+      not immunity to crashes.
+    </p>
+  </div>
+
+  <div class="replay-controls" data-replay-controls hidden>
+    <button type="button" data-replay-next>Show the crash</button>
+    <span data-replay-position>Before the crash</span>
+  </div>
+
+  <details class="replay-method">
+    <summary>How to read these measurements</summary>
+    <p>
+      Bold values are medians; the line below is the minimum–maximum across three
+      trials, not one run. Reply p99 is the 99th percentile of acknowledgement
+      latency. The fault window starts when the client sends the crash request;
+      late replies keep their full latency.
+    </p>
+    <p>
+      Linux x86-64, eight CPUs shared with the loopback client. Stacks were loaded
+      sequentially, with the dashboard stopped: PyBEAM on Python 3.14.10t; the
+      usual stack on Python 3.14.10 with eight web workers and a shared key/value
+      cache. Worker assignment and the machine affect the results.
+    </p>
+    <p><a href={recording.source}>Published measurements and reproduction instructions</a></p>
+  </details>
+</div>
+
+<script>
+  import "./crash-replay.js";
+</script>
+
+<style>
+  .replay-context { font-weight: 650; margin-block-start: 1.5rem; }
+  table { inline-size: 100%; display: table; table-layout: auto; overflow-wrap: normal; }
+  caption { text-align: start; font-weight: 650; padding-block: .75rem; }
+  th, td { vertical-align: top; padding: .65rem .5rem; }
+  .replay-boundaries th { inline-size: 50%; }
+  .process-boundary { display: grid; gap: .35rem; border: 1px solid var(--graphical-fg); padding: .75rem; }
+  .process-boundary + .process-boundary { margin-block-start: .75rem; }
+  .replay-range { display: block; color: var(--muted-fg); }
+  .replay-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-block: 1.5rem; }
+  [hidden] { display: none !important; }
+  button { padding: .6rem 1rem; min-block-size: 2.75rem; border: 1px solid var(--fg); border-radius: 0; color: var(--bg); background: var(--fg); cursor: pointer; }
+  button:hover { color: var(--fg); background: var(--box-bg); }
+  button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+  h2:focus { outline: 2px solid var(--accent); outline-offset: 4px; }
+  [data-replay-position] { color: var(--muted-fg); }
+  .replay-method { margin-block-start: 1.5rem; border-block-start: 1px solid var(--graphical-fg); padding-block-start: 1rem; }
+  summary { cursor: pointer; }
+  @media (max-width: 28rem) {
+    th, td { padding-inline: .25rem; }
+    .replay-boundaries th { inline-size: 50%; }
+  }
+</style>

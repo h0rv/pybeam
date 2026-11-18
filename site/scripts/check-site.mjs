@@ -30,7 +30,14 @@ for (const file of htmlFiles) {
     assert.doesNotMatch(html, /<pre\b/);
   } else {
     const blocks = [...html.matchAll(/<pre\b/g)].length;
-    assert.ok(blocks > 0 || page.startsWith("internals/"), `Every guide needs an executable example: ${page}`);
+    assert.ok(blocks > 0 || page.startsWith("internals/") || html.includes("data-crash-replay"), `Every guide needs an executable example or replay: ${page}`);
+    if (page === "crash-test/index.html") {
+      assert.equal([...html.matchAll(/data-replay-stage="[012]"/g)].length, 3, "All replay stages render without JavaScript");
+      assert.match(html, /data-replay-controls hidden/, "Replay controls need JavaScript");
+      for (const measurement of ["3.32 ms", "3.27 ms", "4.51 ms", "unbounded", "4.52 ms", "2.86 ms", "8.73 ms"]) {
+        assert.ok(html.includes(measurement), `Missing recorded measurement: ${measurement}`);
+      }
+    }
     for (const [block] of html.matchAll(/<pre\b[\s\S]*?<\/pre>/g)) {
       assert.match(block, /astro-code/, `Code must pass through Shiki: ${page}`);
       const colors = new Set([...block.matchAll(/(?:color|--shiki-dark):\s*(#[a-f\d]{6})/gi)].map((match) => match[1]));

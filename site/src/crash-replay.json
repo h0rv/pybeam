@@ -1,0 +1,21 @@
+{
+  "source": "https://github.com/h0rv/pybeam/blob/82ea1a183562da701bc8ffbf861b47738d35ee75/examples/chat_load/README.md#measured-limits",
+  "trials": 3,
+  "otherRoomSockets": 28,
+  "baselineP99": {
+    "usual": { "median": 3.32, "min": 3.27, "max": 4.51 },
+    "pybeam": { "median": 4.28, "min": 3.61, "max": 4.46 }
+  },
+  "faultP99": {
+    "usual": { "median": "unbounded", "min": 3.74, "max": "unbounded" },
+    "pybeam": { "median": 4.52, "min": 2.86, "max": 8.73 }
+  },
+  "disconnected": {
+    "usual": { "median": 9, "min": 3, "max": 9 },
+    "pybeam": { "median": 0, "min": 0, "max": 0 }
+  },
+  "unacknowledged": {
+    "usual": { "median": 12, "min": 3, "max": 12 },
+    "pybeam": { "median": 0, "min": 0, "max": 0 }
+  }
+}

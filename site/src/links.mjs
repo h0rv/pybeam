@@ -12,6 +12,7 @@ export const pages = [
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
   { source: "docs/guide/state.md", path: "state/", label: "Shared state", examples: ["examples/docs/state.py"] },
   { source: "docs/guide/chat-rooms.md", path: "chat-rooms/", label: "Example: chat rooms", examples: ["examples/docs/chat_rooms.py"] },
+  { source: "docs/guide/crash-test.md", path: "crash-test/", label: "Crash test replay", examples: [] },
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_body.py", "examples/docs/durable_tasks.py"] },
@@ -28,9 +29,9 @@ export const pages = [
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 2) },
-  { label: "Guides", pages: navigation.slice(2, 10) },
-  { label: "Integrations", pages: navigation.slice(10, 13) },
-  { label: "How PyBEAM works", pages: navigation.slice(13) },
+  { label: "Guides", pages: navigation.slice(2, 11) },
+  { label: "Integrations", pages: navigation.slice(11, 14) },
+  { label: "How PyBEAM works", pages: navigation.slice(14) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",

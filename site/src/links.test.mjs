@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["why/", "", "actors/", "supervision/", "state/", "chat-rooms/", "messaging/", "background/", "durable-tasks/", "execution/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "internals/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["why/", "", "actors/", "supervision/", "state/", "chat-rooms/", "crash-test/", "messaging/", "background/", "durable-tasks/", "execution/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "internals/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -89,7 +89,7 @@ test("each concept has complete source-associated Python examples", () => {
   for (const { source, examples } of pages) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     const snippets = [...markdown.matchAll(/```python\n([\s\S]*?)```/g)].map((match) => match[1]);
-    assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/"), source);
+    assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || source === "docs/guide/crash-test.md", source);
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);
@@ -129,10 +129,10 @@ test("state and supervision teach distinct operations without another introducti
 
 test("navigation groups getting started, guides, integrations and internals", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Why PyBEAM", "Get started", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "FastAPI", "Litestar", "PyView", "Overview", "Measurements", "What to watch for",
+    "Why PyBEAM", "Get started", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Crash test replay", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "FastAPI", "Litestar", "PyView", "Overview", "Measurements", "What to watch for",
   ]);
   assert.deepEqual(navigationSections.map(({ label }) => label), ["Get started", "Guides", "Integrations", "How PyBEAM works"]);
-  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 8, 3, 3]);
+  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 9, 3, 3]);
   assert.ok(navigationSections.at(-1).pages.every(({ source }) => source.startsWith("docs/guide/internals/")));
   assert.deepEqual(navigationSections.flatMap(({ pages }) => pages), navigation);
   assert.equal(redirects["web/"], "integrations/fastapi/");
