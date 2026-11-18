@@ -11,7 +11,6 @@ export const pages = [
   { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
   { source: "docs/guide/state.md", path: "state/", label: "Shared state", examples: ["examples/docs/state.py"] },
-  { source: "docs/guide/chat-rooms.md", path: "chat-rooms/", label: "Example: chat rooms", examples: ["examples/docs/chat_rooms.py"] },
   { source: "docs/guide/messaging.md", path: "messaging/", label: "Messaging", examples: ["examples/docs/messaging.py", "examples/docs/subscriptions.py"] },
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_tasks.py"] },
@@ -22,7 +21,10 @@ export const pages = [
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
   { source: "docs/guide/integrations/htmx.md", path: "integrations/htmx/", label: "HTMX", examples: [] },
+  { source: "docs/guide/examples/chat-rooms.md", path: "examples/chat-rooms/", label: "Chat rooms", examples: ["examples/docs/chat_rooms.py"] },
   { source: "docs/guide/internals/index.md", path: "internals/", label: "Overview", examples: [] },
+  { source: "docs/guide/internals/calls.md", path: "internals/calls/", label: "Calls", examples: [] },
+  { source: "docs/guide/internals/parallelism.md", path: "internals/parallelism/", label: "Parallel Python", examples: [] },
   { source: "docs/guide/internals/measurements.md", path: "internals/measurements/", label: "Measurements", examples: [] },
   { source: "docs/guide/internals/watch-for.md", path: "internals/watch-for/", label: "What to watch for", examples: [] },
   { source: "docs/guide/genstage.md", path: "genstage/", label: "Finite GenStage sample", hidden: true, examples: ["examples/docs/genstage_transform.py", "examples/docs/genstage.py"] },
@@ -31,8 +33,9 @@ export const pages = [
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 2) },
-  { label: "Guides", pages: navigation.slice(2, 12) },
-  { label: "Integrations", pages: navigation.slice(12, 16) },
+  { label: "Guides", pages: navigation.slice(2, 11) },
+  { label: "Integrations", pages: navigation.slice(11, 15) },
+  { label: "Examples", pages: navigation.slice(15, 16) },
   { label: "How PyBEAM works", pages: navigation.slice(16) },
 ];
 export const redirects = {
@@ -41,6 +44,7 @@ export const redirects = {
   "runtime/": "",
   "subscriptions/": "messaging/#notify-readers-of-a-changed-key",
   "limits/": "",
+  "chat-rooms/": "examples/chat-rooms/",
 };
 
 export function pagePath(source) {

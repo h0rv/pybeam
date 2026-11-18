@@ -1,4 +1,4 @@
-# Example: chat rooms
+# Chat rooms
 
 In plain asyncio, mutating shared room dictionaries across an `await` needs a lock per room; spreading them across processes usually adds an external store and pub/sub. Here each room owns its members, recent messages and reactions, and runs one method at a time. In `post`, `sleep(0)` stands in for awaiting moderation. Twenty-four simulated clients share three rooms.
 
@@ -136,5 +136,5 @@ Each room retains six messages and at most eight member identities, including of
 - Run across machines: these actors live on one node; this API cannot place them on other machines.
 - Isolate Python memory: arguments and results are copied as JSON, but actors run in one Python process. Each call runs on a pooled worker with its own loop; parallel Python CPU work requires free-threaded Python 3.14t.
 - Roll back failed methods: a method that raises keeps changes made before the raise.
-- Restore saved state: a crashed room restarts from its constructor, empty here. There is no automatic restore. [Supervision](supervision.md) is not storage; Hornbeam's [shared store](state.md) is in-memory too.
-- Implement typing indicators or WebSockets. For notifications, see [Messaging](messaging.md).
+- Restore saved state: a crashed room restarts from its constructor, empty here. There is no automatic restore. [Supervision](../supervision.md) is not storage; Hornbeam's [shared store](../state.md) is in-memory too.
+- Implement typing indicators or WebSockets. For notifications, see [Messaging](../messaging.md).
