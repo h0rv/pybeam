@@ -356,7 +356,10 @@ def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
     loads: list[int] = []
 
     @contextmanager
-    def host_server(variant: Variant, name: str, output: Path) -> Generator[None]:
+    def host_server(
+        variant: Variant, name: str, output: Path, hornbeam_baseline: Path | None
+    ) -> Generator[None]:
+        assert hornbeam_baseline is None
         launches.append(variant)
         yield
 
