@@ -346,6 +346,7 @@ provides-extras = ["genstage", "showcase", "hornbeam", "fastapi", "litestar", "p
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22,<1" },
     { name = "hatchling", specifier = ">=1.27,<2" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "hypothesis", specifier = ">=6,<7" },
@@ -356,6 +357,7 @@ dev = [
     { name = "pytest", specifier = ">=9,<10" },
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.14,<1" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0,<3" },
     { name = "ty", specifier = ">=0.0.104" },
     { name = "types-psutil", specifier = ">=7,<8" },
     { name = "typing-extensions", specifier = ">=4.14.1,<5" },

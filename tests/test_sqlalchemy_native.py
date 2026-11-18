@@ -79,6 +79,7 @@ async def exercise_http(base_url: str, modes: tuple[str, ...] = ("sync", "async"
             assert after[mode]["checkouts"] >= 16
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Startup SIGSEGV was observed on Linux only")
 @pytest.mark.xfail(
     strict=True,
     raises=HornbeamAsyncStartupCrash,
@@ -124,6 +125,15 @@ def test_sqlalchemy__hornbeam_native_sync_engine(
 ) -> None:
     with runtime_server_factory("tests.fixtures.sqlalchemy_sync_app:app") as server:
         asyncio.run(exercise_http(server.base_url, ("sync",)))
+    assert "http-pools-disposed" in server.log_path.read_text()
+
+
+@pytest.mark.skipif(sys.platform == "linux", reason="Linux startup crash has a separate probe")
+def test_sqlalchemy__hornbeam_native_async_engine(
+    runtime_server_factory: ServerFactory,
+) -> None:
+    with runtime_server_factory("tests.fixtures.sqlalchemy_app:app") as server:
+        asyncio.run(exercise_http(server.base_url))
     assert "http-pools-disposed" in server.log_path.read_text()
 
 
