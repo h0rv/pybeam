@@ -4,6 +4,7 @@ import resource
 import socket
 import subprocess
 import sys
+import time
 from collections.abc import AsyncGenerator, Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,16 +20,19 @@ from benchmarks.runner import measurement_lock
 from benchmarks.web.app import app
 from benchmarks.web.managed import main as managed_main
 from benchmarks.web.run import (
+    ROOT,
     CleanHttpResult,
     Settings,
     Variant,
     container_command,
+    exchange,
     memory,
     memory_delta,
     run,
     server_command,
     stop_worker,
 )
+from benchmarks.web.scale import port_released, wait_for_recovery
 from benchmarks.web.ws import Command, Pool, ensure_client_fds
 
 
@@ -82,6 +86,66 @@ async def test_empty_pool() -> None:
     assert reply.held == 0
     assert not reply.latency_ms
     assert not reply.errors
+
+
+@pytest.mark.asyncio
+async def test_worker_reopens_after_reset(web_url: str) -> None:
+    worker = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "benchmarks.web.ws",
+        "--url",
+        "ws://" + web_url + "/ws",
+        "--source",
+        "127.0.0.2",
+        cwd=ROOT,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+    )
+    try:
+        assert (await exchange(worker, Command(action="open", target=4))).held == 4
+        assert (await exchange(worker, Command(action="reset"))).held == 4
+        assert (await exchange(worker, Command(action="sample"))).held == 0
+        assert (await exchange(worker, Command(action="open", target=4))).held == 4
+        sample = await exchange(worker, Command(action="sample"))
+        assert len(sample.latency_ms) == 4
+        assert not sample.errors
+    finally:
+        await stop_worker(worker)
+
+
+@pytest.mark.asyncio
+async def test_recovery_retries_while_previous_listener_is_busy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    busy_errnos = iter((errno.EADDRINUSE, errno.EADDRINUSE))
+
+    def check_port() -> None:
+        if (number := next(busy_errnos, None)) is not None:
+            raise OSError(number, "address in use")
+
+    monkeypatch.setattr("benchmarks.web.scale.check_host_port", check_port)
+    monkeypatch.setattr("benchmarks.web.scale.PROBE_INTERVAL", 0)
+    started = time.monotonic()
+    recovery = await wait_for_recovery(port_released, started)
+    assert recovery.failed_probes == 2
+    assert recovery.seconds is not None and recovery.seconds >= 0
+
+    expired = await wait_for_recovery(port_released, started - 60)
+    assert expired.seconds is None
+    assert expired.failed_probes == 0
+
+
+@pytest.mark.asyncio
+async def test_recovery_does_not_swallow_other_socket_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def check_port() -> None:
+        raise PermissionError(errno.EACCES, "permission denied")
+
+    monkeypatch.setattr("benchmarks.web.scale.check_host_port", check_port)
+    with pytest.raises(PermissionError):
+        await port_released()
 
 
 @pytest.mark.parametrize(
