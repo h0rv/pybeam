@@ -113,7 +113,7 @@ Consume and verify the existing workflow's GenStage, streaming, Pydantic AI, Dis
 
 This directory is an experiment. It does not change PyBEAM APIs or the MVP gate. The first adapter is a small correctness smoke check, not a full Python reference implementation. Workflow `wf_7847dc24a4af` owns the application and integration workload prototypes. Do not copy those implementations here.
 
-The original contract used conventional Python 3.14 and a separate environment without installing the root package or building native assets; the current editable dependency is described below. There is no claim that a native source installation passed. Any later native build must use a private build directory. The legacy reference reuses the read-only private assets in `../native-bench-pybeam`. Its adapter verifies the actual manifest and files before and after each trial. Keep compilation parallelism at most two. Do not change the canonical checkout or fix native fixture failures in this experiment.
+The original contract used conventional Python 3.14 and a separate environment without installing the root package or building native assets; the current editable dependency is described below. The original report did not establish a public native source installation. The legacy reference reuses the read-only private assets in `../native-bench-pybeam`. Its adapter verifies the actual manifest and files before and after each trial. Keep compilation parallelism at most two. Do not fix native runtime failures merely to make a benchmark pass.
 
 The managed PyBEAM launcher currently starts its own VM session internally. This contract does not claim that a polling watchdog can guarantee discovery if such an unregistered VM outlives a host that dies immediately. An adapter unable to use guardian-owned creation must return unsupported for that launch path.
 
@@ -125,7 +125,7 @@ They are never part of the default smoke run.
 
 ### Current build boundary
 
-The benchmark project uses its own Python 3.14 environment and lockfile, with an editable dependency on this checkout. Dependency installation does not build the NIF. `tools/build_native.py` runs `rebar3 as hornbeam compile`; it does not emit `_build/pybeam-reference-build.json`. The benchmark private builder requires clean native baseline `a1ca04bfcaea817654ec7d1972f210c7a60075c4`, its matching Python configuration, and private outputs; it refuses the canonical native checkout. Keep compilation parallelism at most two.
+`python -m benchmarks.canonical_build` runs `tools/build_native.py` and records the rebar-fetched erlang-python application in the existing benchmark manifest format. Current runs require the clean revision in `rebar.lock`, source fingerprints, matching Python/CMake hashes and native asset hashes. Archived records retain their original provenance and are not rewritten.
 
 ### Recorded commands
 
@@ -137,32 +137,19 @@ uv run --project benchmarks ty check --project benchmarks --extra-search-path . 
 uv run --project benchmarks python -m benchmarks schema
 ```
 
-### Reproduction boundary
+### Public reproduction
 
-Python and pure OTP references can run from this checkout. The canonical native builder does not produce the pinned private build manifest required by the PyBEAM benchmark adapter, so an in-repo PyBEAM benchmark is not yet supported.
-
-The quick runner and builder help checks succeeded, the in-repo OTP reference compiled, and an in-repo PyBEAM capability check returned `Matching current native build assets unavailable or changed. Build explicitly.` No timed benchmarks were rerun for this documentation update.
-
-### Optional private PyBEAM rerun
-
-This needs a separate clean checkout at the builder's pinned native revision, with no shared or escaping build outputs. These commands deliberately build private benchmark assets, not the canonical runtime:
+From a fresh Git checkout, install [mise](https://mise.jdx.dev/getting-started.html) and a C/C++ compiler with make, then run these commands from the repository root. Do not run `mise run setup` or add sibling checkout overrides. The native build uses at most two compiler jobs; dependency installation alone does not build it.
 
 ```sh
-NATIVE="$HOME/repos/native-benchmark-current"
-PYTHON="$(mise exec -- uv python find 3.14.10)"
-mise exec -- uv run --project benchmarks python -m benchmarks.pybeam_reference_build "$NATIVE" --python "$PYTHON"
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json --native-source "$NATIVE"
+mise trust
+mise install
+mise exec -- uv sync --locked --project benchmarks
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.canonical_build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks.native_reference --build
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_pybeam.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
+mise exec -- uv run --locked --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
 ```
 
-### In-repository reproduction
-
-Run serially from the repository root; omit `--output` to create fresh result directories without overwriting archived evidence. These commands run new smoke observations, not identical historical values.
-
-```sh
-mise exec -- uv sync --project benchmarks --locked
-mise exec -- uv run --project benchmarks python -m benchmarks --help
-mise exec -- uv run --project benchmarks python -m benchmarks.native_reference --build
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_python.json
-mise exec -- uv run --project benchmarks python -m benchmarks run --config benchmarks/examples/serial_erlang.json
-mise exec -- uv run --project benchmarks python -m pytest -c benchmarks/pyproject.toml benchmarks/tests -q
-```
+These short serial checks run 100 events per trial, three trials per backend. They create new ignored result directories; they do not regenerate identical historical values or overwrite archived evidence. `--native-source` still selects an explicit matching native checkout; the showcase requires `--trusted-native-root _build/hornbeam/lib/erlang_python`.

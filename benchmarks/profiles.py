@@ -53,7 +53,7 @@ def unavailable(name: BenchmarkName, native: Path | None) -> str | None:
             )
     if name == "pybeam":
         if native is None:
-            return "No trusted private native checkout configured. Use --trusted-native-root."
+            return "No trusted native checkout configured. Use --trusted-native-root."
         try:
             manifest = BuildManifest.model_validate_json(
                 (native / "_build/pybeam-reference-build.json").read_text()

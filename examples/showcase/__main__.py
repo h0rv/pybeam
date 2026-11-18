@@ -30,7 +30,7 @@ def main() -> None:
     parser.add_argument(
         "--trusted-native-root",
         type=Path,
-        help="Explicit private a1ca04b native checkout with verified benchmark build manifest. "
+        help="Explicit native checkout at the rebar.lock revision with a verified build manifest. "
         "No build or source changes are performed by the website.",
     )
     args = parser.parse_args()
