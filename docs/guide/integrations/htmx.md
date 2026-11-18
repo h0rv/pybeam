@@ -1,8 +1,8 @@
 # HTMX forms and server-sent events
 
-The [shared counter example](../../../examples/fastapi/README.md) shows how to
-combine an HTMX form with server-sent events. When you increment the count in
-one tab, that tab shows a confirmation and both tabs update without navigating.
+Pair an HTMX 4 form with a server-sent event stream fed by PyBEAM pub/sub. In
+the [shared counter example](../../../examples/fastapi/README.md), an increment
+in one tab shows a confirmation there and updates both tabs without navigating.
 
 ## Give the form and the stream separate targets
 

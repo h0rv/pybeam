@@ -5,7 +5,9 @@ import { test } from "node:test";
 import { repositoryRoot } from "./links.mjs";
 
 test("internals describe leased workers and worker-local actor loops consistently", () => {
-  const markdown = readFileSync(join(repositoryRoot, "docs/guide/internals/index.md"), "utf8");
+  const markdown = ["index", "calls", "parallelism"]
+    .map((name) => readFileSync(join(repositoryRoot, `docs/guide/internals/${name}.md`), "utf8"))
+    .join("\n");
   assert.doesNotMatch(markdown, /Each actor owns|Actors do not run Python in parallel|every actor method body|not implemented/);
   assert.match(markdown, /Worker context[^\n]*node-wide pool/);
   assert.match(markdown, /Actor calls[^\n]*own loop/);
