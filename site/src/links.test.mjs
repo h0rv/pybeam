@@ -89,7 +89,7 @@ test("each concept has complete source-associated Python examples", () => {
   for (const { source, examples } of pages) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     const snippets = [...markdown.matchAll(/```python\n([\s\S]*?)```/g)].map((match) => match[1]);
-    assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || source === "docs/guide/failures.md", source);
+    assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/"), source);
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);

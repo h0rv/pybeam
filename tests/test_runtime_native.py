@@ -297,3 +297,31 @@ def test_native__shared_services_survive_actor_restart(service_server: RunningSe
         assert response.json() == {"count": 5}
         assert client.get(path).content == b"survives actor"
         assert client.get("/counter").json() == count
+
+
+async def test_native__reconnect_docs_example(
+    runtime_server_factory: ServerFactory,
+) -> None:
+    with runtime_server_factory("tests.fixtures.reconnect_app:app") as server:
+        url = "ws://127.0.0.1:{}/counter".format(server.port)
+        async with httpx.AsyncClient(base_url=server.base_url) as client:
+            async with async_connect(url + "?token=demo-token") as first:
+                assert Json(CounterReply).decode(await first.recv()).count == 0
+                await wait_subscription_count(server, 1)
+                (await client.post("/increment")).raise_for_status()
+                assert Json(CounterReply).decode(await first.recv()).count == 1
+            await wait_subscription_count(server, 0)
+            (await client.post("/increment")).raise_for_status()
+            async with async_connect(url + "?token=revoked") as rejected:
+                with pytest.raises(ConnectionClosed) as closed:
+                    await rejected.recv()
+                assert closed.value.rcvd is not None
+                assert closed.value.rcvd.code == 1008
+            await wait_subscription_count(server, 0)
+            async with async_connect(url + "?token=demo-token") as fresh:
+                assert Json(CounterReply).decode(await fresh.recv()).count == 2
+                with pytest.raises(TimeoutError):
+                    await asyncio.wait_for(fresh.recv(), timeout=0.2)
+                (await client.post("/increment")).raise_for_status()
+                assert Json(CounterReply).decode(await fresh.recv()).count == 3
+            await wait_subscription_count(server, 0)

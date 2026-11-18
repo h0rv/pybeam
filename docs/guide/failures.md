@@ -29,14 +29,80 @@ When your handler rejects a WebSocket with close code `1008`, the client complet
 the handshake and then receives that close code, rather than an HTTP rejection.
 Do not send a view before authorization succeeds.
 
-For a view driven by shared state and change notifications:
+This example uses a fixed demo token for a shared counter. Replace the token check
+with your application's authentication and data authorization before using it for
+private data. The increment endpoint is public in this example.
 
-1. Authenticate the connection and authorize the data it may access.
-2. Subscribe to changes for that authorized data.
-3. Read current shared state and render a fresh authorized view.
-4. On each notification, read the state again rather than treating the message as
-   the source of truth.
-5. End the subscription when the connection ends.
+```python
+# reconnect.py
+import asyncio
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from uvicorn import Config, Server
+
+from pybeam.integrations.fastapi.dependencies import Beam, provider
+from pybeam.integrations.hornbeam import run
+
+app = FastAPI(lifespan=provider.lifespan)
+
+
+@app.post("/increment")
+async def increment(beam: Beam) -> dict[str, int]:
+    count = await beam.incr("visits", namespace="reconnect")
+    await beam.publish("reconnect:changed", b"invalidate")
+    return {"count": count}
+
+
+async def send_updates(socket: WebSocket, beam: Beam) -> None:
+    async with beam.subscribe("reconnect:changed", max_bytes=4096) as changes:
+        count = await beam.incr("visits", 0, namespace="reconnect")
+        await socket.send_json({"count": count})
+        async for _message in changes:
+            count = await beam.incr("visits", 0, namespace="reconnect")
+            await socket.send_json({"count": count})
+
+
+@app.websocket("/counter")
+async def counter(socket: WebSocket, beam: Beam) -> None:
+    if socket.query_params.get("token") != "demo-token":
+        await socket.close(code=1008)
+        return
+    await socket.accept()
+    try:
+        async with asyncio.TaskGroup() as tasks:
+            sending = tasks.create_task(send_updates(socket, beam))
+            try:
+                async for _message in socket.iter_text():
+                    pass
+            finally:
+                sending.cancel()
+    except* WebSocketDisconnect:
+        pass
+
+
+async def main() -> None:
+    config = Config(app, host="127.0.0.1", port=8770, loop="none", http="h11")
+    server = Server(config)
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        if server.started:
+            await server.shutdown()
+        raise
+
+
+if __name__ == "__main__":
+    run(main)
+```
+
+```console
+$ uv run reconnect.py
+```
+
+The server listens on port 8770. Connect a WebSocket client to
+`ws://127.0.0.1:8770/counter?token=demo-token`, then send HTTP POST requests to
+`http://127.0.0.1:8770/increment` to receive updated counts. Disconnect and reconnect
+to receive the current count. Stop the server with Ctrl+C.
 
 Subscribing before the initial read avoids a gap between reading state and
 starting to receive notifications. A notification may refer to a change already
@@ -50,7 +116,7 @@ and authorize reads of that history. See [Messaging](messaging.md).
 
 | Failure or boundary | Lost or stopped | What survives or recovers |
 | --- | --- | --- |
-| Actor crash followed by a supervised restart | The actor's unsaved in-memory changes. An ordinary actor starts again from its constructor state. | Shared counters and store values on the still-running node. An actor restored from explicitly saved state recovers its saved values, not later unsaved changes. |
+| Actor crash followed by a supervised restart | The actor's unsaved in-memory changes. An ordinary actor starts again from its constructor state. Calls already running or queued for the crashed actor fail with `RuntimeError`; they are not carried over to the replacement actor. | Shared counters and store values on the still-running node. An actor restored from explicitly saved state recovers its saved values, not later unsaved changes. |
 | Runtime stop or node loss | That node's in-memory shared counters and store values, and its live connections and subscriptions. | Explicitly saved actor state survives a whole-runtime process kill when its saved files remain available. Durable task records can recover as described below. |
 | WebSocket disconnect | The connection and its subscription; messages published during the gap are not replayed. | Shared state on the running node. A new authorized connection can read it to build a fresh view. |
 | Client falls behind its subscription's unread-message limit | The subscription fails and is released instead of retaining an unbounded backlog. A nonreading WebSocket can also be disconnected. | Shared state remains available for a fresh read after reconnecting. |
