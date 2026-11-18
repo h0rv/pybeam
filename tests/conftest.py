@@ -22,6 +22,8 @@ FRAMEWORK_TESTS = frozenset(
         "test_chat_crash_test.py",
         "test_chat_load.py",
         "test_chat_load_native.py",
+        "test_fastapi_celery.py",
+        "test_fastapi_celery_native.py",
         "test_discord_demo.py",
         "test_discord_demo_browser.py",
         "test_fastapi.py",

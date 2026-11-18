@@ -16,6 +16,8 @@ def python_files() -> list[Path]:
         if path.suffix in {".py", ".pyi"}
         and "__pycache__" not in path.parts
         and not path.is_relative_to(ASSETS)
+        and not path.is_relative_to(ROOT / "examples/chat_load/conventional")
+        and not path.is_relative_to(ROOT / "examples/fastapi_celery/original")
     )
 
 
