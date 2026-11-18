@@ -16,3 +16,11 @@ class RootTemplateContext(TypedDict):
     additional_head_elements: list[Markup]
 
 type RootTemplate = Callable[[RootTemplateContext], str]
+
+def defaultRootTemplate(
+    css: Markup | None = None,
+    content_wrapper: Callable[[RootTemplateContext, Markup], Markup] | None = None,
+    title: str | None = None,
+    title_suffix: str | None = " | LiveView",
+    head_content: Markup | None = None,
+) -> RootTemplate: ...

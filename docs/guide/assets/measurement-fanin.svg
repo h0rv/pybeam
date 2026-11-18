@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="514" viewBox="0 0 760 514" role="img" aria-labelledby="title desc">
+  <title id="title">Empty calls through eight contexts</title>
+  <desc id="desc">Empty calls through eight contexts. 10k · worker · 3.14: 0.33 s. 10k · worker · 3.14t: 0.21–0.24 s. 10k · isolated · 3.14: 0.19 s. 10k · isolated · 3.14t: 0.17–0.31 s. 100k · worker · 3.14: 2.7 s. 100k · worker · 3.14t: 2.5–3.3 s. 100k · isolated · 3.14: 2.6 s. 100k · isolated · 3.14t: 1.7–2.7 s. 1M · worker · 3.14: 28.0 s. 1M · worker · 3.14t: 23.3–31.3 s. 1M · isolated · 3.14: 21.5 s. 1M · isolated · 3.14t: 20.6–32.9 s. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <rect class="bar" x="220" y="12" width="24" height="14"/><text x="252" y="25" class="note">3.14</text>
+  <rect class="bar-alt" x="322" y="12" width="24" height="14"/><text x="354" y="25" class="note">3.14t</text>
+  <path class="axis" d="M220 73V466"/>
+  <text x="220" y="64" class="note" text-anchor="middle">0.1</text>
+  <path class="axis" d="M353.3333333333333 73V466"/>
+  <text x="353.3333333333333" y="64" class="note" text-anchor="middle">1</text>
+  <path class="axis" d="M486.66666666666663 73V466"/>
+  <text x="486.66666666666663" y="64" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M620 73V466"/>
+  <text x="620" y="64" class="note" text-anchor="middle">100</text>
+  <text x="204" y="115" text-anchor="end">10k · worker</text>
+  <rect class="bar" x="220" y="90" width="69.1351919837183" height="14"/>
+  <text x="299.1351919837183" y="102" class="note">330 ms</text>
+  <rect class="bar-alt" x="220" y="112" width="42.96257263118923" height="14"/>
+  <path d="M262.96257263118923 119H270.6948322282141m0 -6v12"/>
+  <text x="280.6948322282141" y="124" class="note">210–240 ms</text>
+  <text x="204" y="179" text-anchor="end">10k · isolated</text>
+  <rect class="bar" x="220" y="154" width="37.167146793710515" height="14"/>
+  <text x="267.1671467937105" y="166" class="note">190 ms</text>
+  <rect class="bar-alt" x="220" y="176" width="30.72652285043651" height="14"/>
+  <path d="M250.7265228504365 183H285.5148925112363m0 -6v12"/>
+  <text x="295.5148925112363" y="188" class="note">170–310 ms</text>
+  <text x="204" y="243" text-anchor="end">100k · worker</text>
+  <rect class="bar" x="220" y="218" width="190.84850188786498" height="14"/>
+  <text x="420.848501887865" y="230" class="note">2.70 s</text>
+  <rect class="bar-alt" x="220" y="240" width="186.3920011562717" height="14"/>
+  <path d="M406.3920011562717 247H422.4685253170517m0 -6v12"/>
+  <text x="432.4685253170517" y="252" class="note">2.50–3.30 s</text>
+  <text x="204" y="307" text-anchor="end">100k · isolated</text>
+  <rect class="bar" x="220" y="282" width="188.66311306277572" height="14"/>
+  <text x="418.6631130627757" y="294" class="note">2.60 s</text>
+  <rect class="bar-alt" x="220" y="304" width="164.05985618376985" height="14"/>
+  <path d="M384.05985618376985 311H410.848501887865m0 -6v12"/>
+  <text x="420.848501887865" y="316" class="note">1.70–2.70 s</text>
+  <text x="204" y="371" text-anchor="end">1M · worker</text>
+  <rect class="bar" x="220" y="346" width="326.28773751229596" height="14"/>
+  <text x="556.287737512296" y="358" class="note">28.0 s</text>
+  <rect class="bar-alt" x="220" y="368" width="315.6474561368025" height="14"/>
+  <path d="M535.6474561368025 375H552.7392450061931m0 -6v12"/>
+  <text x="562.7392450061931" y="380" class="note">23.3–31.3 s</text>
+  <text x="204" y="435" text-anchor="end">1M · isolated</text>
+  <rect class="bar" x="220" y="410" width="310.9917946554141" height="14"/>
+  <text x="540.9917946554141" y="422" class="note">21.5 s</text>
+  <rect class="bar-alt" x="220" y="432" width="308.5156293825537" height="14"/>
+  <path d="M528.5156293825537 439H555.6261197266632m0 -6v12"/>
+  <text x="565.6261197266632" y="444" class="note">20.6–32.9 s</text>
+  <text x="220" y="502" class="note">s · logarithmic scale</text>
+</svg>

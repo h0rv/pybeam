@@ -1,0 +1,78 @@
+name: Wheel smoke test
+
+on:
+  workflow_call:
+    inputs:
+      published-version:
+        description: Expected version on public PyPI; omit to use the local wheel artifact
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-22.04
+          - target: macos-arm64
+            runner: xcode-27
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: examples/docs/hello.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v4
+        if: inputs.published-version == ''
+        with:
+          name: dist-${{ matrix.target }}
+          path: ${{ runner.temp }}/wheel-smoke/wheels
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.13.8'
+          enable-cache: false
+      - name: Install by package name and run the getting-started example
+        shell: bash
+        env:
+          PUBLISHED_VERSION: ${{ inputs.published-version }}
+        run: |
+          smoke="$RUNNER_TEMP/wheel-smoke"
+          mkdir -p "$smoke/home" "$smoke/project"
+          cp examples/docs/hello.py "$smoke/project/"
+          uv_dir="$(dirname "$(command -v uv)")"
+          env -i HOME="$smoke/home" PATH="$uv_dir:/usr/bin:/bin" \
+            UV_NO_CONFIG=1 UV_NO_BUILD=1 UV_PYTHON_PREFERENCE=only-managed \
+            /bin/bash --noprofile --norc -euxo pipefail -s "$PUBLISHED_VERSION" <<'BASH'
+          cd "$HOME/../project"
+          uname -smr
+          if [[ "$(uname -s)" == Darwin ]]; then sw_vers; else getconf GNU_LIBC_VERSION; fi
+          for tool in erl escript rebar3 mise; do
+            if command -v "$tool"; then
+              echo "Unexpected developer tool on PATH: $tool" >&2
+              exit 1
+            fi
+          done
+          uv --version
+          uv python install 3.14.10
+          if [[ -n "$1" ]]; then
+            export UV_DEFAULT_INDEX=https://pypi.org/simple/
+          else
+            export UV_OFFLINE=1 UV_NO_INDEX=1 UV_FIND_LINKS="$HOME/../wheels"
+            ls -1 "$UV_FIND_LINKS"
+          fi
+          uv init --bare --python 3.14.10
+          uv add python-beam
+          if [[ -n "$1" ]]; then
+            uv pip show python-beam | grep -Fx "Version: $1"
+          fi
+          uv run hello.py | tee hello.out
+          printf 'Hello from Python\n' > expected.out
+          diff -u expected.out hello.out
+          BASH
