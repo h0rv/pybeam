@@ -4,18 +4,20 @@
 uv run --extra fastapi python -m examples.soul.main
 ```
 
-Two HTTP clients send requests to a FastAPI app while a calculation enters a
-non-yielding Python loop. The walkthrough samples that child's Python stacks and
-CPU time, stops it, then selects a corrected calculation for new jobs. The HTTP
-server and its stateful request counter stay running. Response counts, latency,
-child CPU time, and actor identity come from the current run; the program fails
-if traffic stops, requests fail, or the serving actor restarts.
+Open <http://127.0.0.1:8765> and choose **Run walkthrough**. The chart measures
+HTTP latency as a calculation enters a non-yielding loop, is found, is stopped,
+and is replaced for new jobs. Event times line up with the chart; inspection
+shows only the calculation's own source frame and sampled CPU time.
+
+Two clients send requests to the FastAPI app throughout the sequence. Completion
+requires zero failed requests, unchanged serving-process identity, and a request
+counter matching every response. Nothing is retried. Light and dark modes follow
+your system setting. Stop and rerun the command to replay with fresh measurements.
 
 The bug is in `entries.py`: decrementing a negative upper bound never reaches
 zero. `TaskRef.inspect()` reveals the running loop without asking it to cooperate.
 `TaskRef.terminate()` stops its isolated child and waits for the task's settled
 outcome. The replacement rejects negative bounds and computes valid sums directly.
-No request or task is automatically retried.
 
 This follows the inspect → stop → repair sequence in Saša Jurić's
 [The Soul of Erlang and Elixir](https://www.youtube.com/watch?v=JvBT4XBdoUE),

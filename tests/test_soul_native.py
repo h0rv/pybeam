@@ -1,4 +1,5 @@
 from pathlib import Path
+from textwrap import indent
 
 import pytest
 
@@ -16,15 +17,44 @@ def test_soul__http_survives_inspection_stop_and_replacement(
         pytest.skip("Requires --run-runtime --run-frameworks and the paired runtime")
     result = run_native(
         tmp_path,
-        "    from examples.soul.main import main as walkthrough\n    await walkthrough()\n",
+        indent(
+            """from examples.soul.main import View, live_view
+import httpx
+async with live_view(0) as demo:
+    async with httpx.AsyncClient(base_url="http://" + demo.address) as client:
+        assert (await client.get("/")).status_code == 200
+        assert (await client.post("/run")).status_code == 202
+        assert (await client.post("/run")).status_code == 409
+        await demo.finished.wait()
+        response = await client.get("/state")
+        assert response.status_code == 200
+        view = Json(View).decode(response.content)
+        assert view.phase == "complete", view.error
+        assert view.completed > 0 and view.failures == 0
+        assert view.cpu_seconds > 0
+        assert view.frame is not None
+        assert view.frame.location.startswith("entries.py:")
+        assert "in iterative_sum" in view.frame.location
+        assert view.result == "500,000,000,500,000,000"
+        assert len(view.samples) > 5
+        assert all(point.milliseconds > 0 for point in view.samples)
+        assert [event.label for event in view.events] == [
+            "Started sum(-1)", "Found the non-yielding loop",
+            "Stopped only the calculation", "Selected the corrected entry",
+        ]
+        edges = [0, *(event.seconds for event in view.events), float("inf")]
+        for low, high in zip(edges, edges[1:]):
+            assert any(low < point.seconds < high for point in view.samples)
+        assert b"_erlang" not in response.content
+        assert b"os_pid" not in response.content
+        assert b"INFO REPORT" not in response.content
+        assert b"/home/" not in response.content
+        print("soul-view-ok")
+""",
+            "    ",
+        ),
     )
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
-    assert "Before the bug:" in output
-    assert "Sum(-1) does not yield:" in output
-    assert "in iterative_sum" in output
-    assert "Stopped child; task outcome ('signal', 9)" in output
-    assert "Replacement sum(1,000,000,000) = 500000000500000000" in output
-    assert "After replacing the entry for new calculations:" in output
-    assert "VM PID unchanged" in output
+    assert "soul-view-ok" in output
     assert "Traceback (most recent call last)" not in output
