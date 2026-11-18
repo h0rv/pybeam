@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 from fastapi import FastAPI
 
-from examples.sqlalchemy.main import app
+from examples.sqlalchemy.main import get_database, router
 from examples.sqlalchemy.store import Base, Database, databases
 from tests.native.sqlalchemy_pool import Connections
 
@@ -14,7 +14,7 @@ counters: dict[str, Connections] = {}
 
 
 @asynccontextmanager
-async def resources(*, asynchronous: bool = True) -> AsyncGenerator[None]:
+async def resources(*, asynchronous: bool = True) -> AsyncGenerator[Database]:
     with TemporaryDirectory() as directory:
         db = Database(Path(directory))
         for mode, engine in (("sync", db.sync), ("async", db.asynchronous.sync_engine)):
@@ -27,7 +27,7 @@ async def resources(*, asynchronous: bool = True) -> AsyncGenerator[None]:
             else:
                 await asyncio.to_thread(Base.metadata.create_all, db.sync)
             databases["notes"] = db
-            yield
+            yield db
         finally:
             databases.clear()
             await db.close()
@@ -37,17 +37,32 @@ async def resources(*, asynchronous: bool = True) -> AsyncGenerator[None]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    async with resources():
-        yield
+    async with resources() as db:
+
+        async def get_test_database() -> Database:
+            return db
+
+        app.dependency_overrides[get_database] = get_test_database
+        try:
+            yield
+        finally:
+            app.dependency_overrides.clear()
 
 
 @asynccontextmanager
 async def sync_lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    async with resources(asynchronous=False):
-        yield
+    async with resources(asynchronous=False) as db:
+
+        async def get_test_database() -> Database:
+            return db
+
+        app.dependency_overrides[get_database] = get_test_database
+        try:
+            yield
+        finally:
+            app.dependency_overrides.clear()
 
 
-@app.get("/pool-stats")
 async def pool_stats() -> dict[str, dict[str, int]]:
     return {
         mode: {"opened": count.opened, "checkouts": count.checkouts, "closed": count.closed}
@@ -55,4 +70,6 @@ async def pool_stats() -> dict[str, dict[str, int]]:
     }
 
 
-app.router.lifespan_context = lifespan
+app = FastAPI(lifespan=lifespan)
+app.include_router(router)
+app.get("/pool-stats")(pool_stats)

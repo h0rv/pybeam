@@ -2,12 +2,21 @@ import argparse
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from examples.sqlalchemy.store import Command, Mode, Notebook, add_note, database, databases
+from examples.sqlalchemy.store import (
+    Command,
+    Database,
+    Mode,
+    Notebook,
+    add_note,
+    database,
+    databases,
+)
 from pybeam import ActorGroup
 from pybeam.codec import Json
 from pybeam.integrations.hornbeam import run
@@ -20,35 +29,40 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         yield
 
 
-app = FastAPI(lifespan=lifespan)
+async def get_database() -> Database:
+    return databases["notes"]
 
 
-@app.get("/health")
+DatabaseDep = Annotated[Database, Depends(get_database)]
+router = APIRouter()
+
+
+@router.get("/health")
 async def health() -> str:
     return "ok"
 
 
-@app.get("/notes/{mode}")
-async def read(mode: Mode) -> list[str]:
-    return await databases["notes"].read(mode)
+@router.get("/notes/{mode}")
+async def read(mode: Mode, db: DatabaseDep) -> list[str]:
+    return await db.read(mode)
 
 
-@app.post("/notes")
-async def add(command: Command) -> str:
+@router.post("/notes")
+async def add(command: Command, db: DatabaseDep) -> str:
     try:
-        return await add_note(command)
+        return await db.add(command)
     except (ValueError, IntegrityError) as error:
         raise HTTPException(409, "Transaction rolled back") from error
 
 
-@app.post("/actors")
+@router.post("/actors")
 async def actor_add(command: Command) -> str:
     async with ActorGroup() as actors:
         notebook = await actors.spawn(Notebook)
         return await notebook.add(command)
 
 
-@app.post("/tasks/{mode}")
+@router.post("/tasks/{mode}")
 async def fan_out(mode: Mode, prefix: str) -> list[str]:
     function = TaskFunction(add_note, Json(Command), Json(str), dedicated_loop=True)
     async with TaskSupervisor(TaskLimits(capacity=4, max_bytes=4096, shutdown_ms=5000)) as tasks:
@@ -56,12 +70,16 @@ async def fan_out(mode: Mode, prefix: str) -> list[str]:
         return [await ref for ref in refs]
 
 
-async def main() -> None:
+app = FastAPI(lifespan=lifespan)
+app.include_router(router)
+
+
+async def main(*, application: FastAPI = app) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=args.port, loop="none", http="h11")
+        uvicorn.Config(application, host="127.0.0.1", port=args.port, loop="none", http="h11")
     )
     await server.serve()
 

@@ -1,3 +1,8 @@
-from tests.fixtures.sqlalchemy_app import app, sync_lifespan
+from fastapi import FastAPI
 
-app.router.lifespan_context = sync_lifespan
+from examples.sqlalchemy.main import router
+from tests.fixtures.sqlalchemy_app import pool_stats, sync_lifespan
+
+app = FastAPI(lifespan=sync_lifespan)
+app.include_router(router)
+app.get("/pool-stats")(pool_stats)
