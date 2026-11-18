@@ -25,7 +25,13 @@ def task_program(tmp_path: Path, source: str) -> None:
 
 
 def named_program(tmp_path: Path, source: str, mode: str = "owngil") -> None:
-    for name in ("owngil_entries", "owngil_bad_import", "isolated_bad_import", "isolated_entries"):
+    for name in (
+        "owngil_entries",
+        "owngil_bad_import",
+        "isolated_bad_import",
+        "isolated_entries",
+        "runaway_entry",
+    ):
         fixture = Path(__file__).parent / "native" / (name + ".py")
         (tmp_path / (name + ".py")).write_text(fixture.read_text())
     task_program(
@@ -68,6 +74,55 @@ def test_tasks__named_caller_codecs_and_entry_script_module_path(tmp_path: Path,
             assert isinstance(await ref.exception(), CodecError)
     """,
         mode,
+    )
+
+
+def test_tasks__inspect_and_terminate_runaway_then_reuse_admission(tmp_path: Path) -> None:
+    named_program(
+        tmp_path,
+        """
+        import os
+        from pathlib import Path
+        from pybeam.tasks import TaskCrashed
+        from runaway_entry import runaway
+        from owngil_entries import echo
+        entered = Path('entered')
+        async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=1024, shutdown_ms=3000)) as sup:
+            bad = TaskFunction(runaway, Json(str), Json(bytes), execution=execution)
+            ref = await sup.start(bad, str(entered.resolve()))
+            async with asyncio.timeout(5):
+                while not entered.exists():
+                    await asyncio.sleep(0.01)
+            first = await ref.inspect()
+            assert 'runaway' in first.stacks
+            await asyncio.sleep(0.05)
+            second = await ref.inspect()
+            assert first.os_pid == second.os_pid
+            assert second.cpu_seconds > first.cpu_seconds
+            await ref.terminate()
+            error = await ref.exception()
+            assert isinstance(error, TaskCrashed), error
+            assert error.reason == ('signal', 9), error.reason
+            try:
+                os.kill(first.os_pid, 0)
+            except ProcessLookupError:
+                pass
+            else:
+                raise AssertionError('Child process survived terminate()')
+            await ref.terminate()
+            try:
+                await ref.result()
+            except TaskCrashed as observed:
+                assert observed is error
+            else:
+                raise AssertionError('Termination lost the task outcome')
+            good = TaskFunction(echo, Json(bytes), Json(bytes), execution=execution)
+            done = await sup.start(good, b'next')
+            assert await done == b'next'
+            await done.terminate()
+            assert await done == b'next'
+        """,
+        "isolated",
     )
 
 

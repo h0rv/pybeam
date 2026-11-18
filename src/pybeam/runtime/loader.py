@@ -159,7 +159,7 @@ async def invoke() -> int:
     except BaseException as error:
         session.load_status = _status(error)
     finally:
-        pending = session.completed.with_suffix(".tmp")
+        pending = session.completed.with_name(session.completed.name + ".python.tmp")
         pending.write_text(str(session.load_status))
         pending.replace(session.completed)
         sys.stdout.flush()
