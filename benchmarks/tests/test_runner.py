@@ -19,7 +19,6 @@ def config() -> Config:
     root = Path(__file__).resolve().parents[2]
     return Config(
         python_source=str(root),
-        native_source=str(root.parent / "erlang-python"),
         repeats=1,
     )
 
