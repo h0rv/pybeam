@@ -1,7 +1,9 @@
 import asyncio
+import time
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+import httpx
 import pytest
 from litestar import Litestar
 from litestar.channels import ChannelsPlugin
@@ -20,6 +22,7 @@ from examples.litestar.main import (
 )
 from pybeam.integrations.litestar.channels import BeamChannelsBackend, MergeQueueOverflow
 from pybeam.integrations.litestar.store import BeamStore
+from tests.conftest import ServerFactory
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState as FakeBridge
 
@@ -31,6 +34,61 @@ if TYPE_CHECKING:
     from litestar.types import HTTPDisconnectEvent, Message
 
     from pybeam.integrations.hornbeam import Subscription
+
+
+@pytest.mark.runtime
+def test_store_channels__real_clients_share_state_and_cleanup(
+    runtime_server_factory: ServerFactory,
+) -> None:
+    with (
+        runtime_server_factory("tests.fixtures.litestar_channels_app:app") as server,
+        httpx.Client(base_url=server.base_url, timeout=5) as first,
+        httpx.Client(base_url=server.base_url, timeout=5) as second,
+    ):
+
+        def wait_subscriptions(expected: int) -> None:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                response = first.get("/subscriptions")
+                response.raise_for_status()
+                if response.json() == {"count": expected}:
+                    return
+                time.sleep(0.01)
+            pytest.fail("Native subscriptions did not reach {}".format(expected))
+
+        assert first.get("/status").text == "draft"
+        assert second.get("/status").text == "draft"
+        with first.stream("GET", "/events") as subscriber:
+            assert subscriber.status_code == 200
+            messages = subscriber.iter_lines()
+            assert next(messages) == "data: subscribed"
+            assert next(messages) == ""
+            with second.stream("GET", "/events") as other:
+                assert other.status_code == 200
+                other_messages = other.iter_lines()
+                assert next(other_messages) == "data: subscribed"
+                assert next(other_messages) == ""
+                wait_subscriptions(1)
+                published = second.post("/publish")
+                assert published.status_code == 200
+                assert published.text == "published"
+                assert next(messages) == "data: changed"
+                assert next(messages) == ""
+                assert next(other_messages) == "data: changed"
+                assert next(other_messages) == ""
+                assert first.get("/status").text == "published"
+            wait_subscriptions(1)
+        wait_subscriptions(0)
+        with second.stream("GET", "/events") as subscriber:
+            messages = subscriber.iter_lines()
+            assert next(messages) == "data: subscribed"
+            assert next(messages) == ""
+            wait_subscriptions(1)
+            assert first.post("/publish").status_code == 200
+            assert next(messages) == "data: changed"
+        wait_subscriptions(0)
+        assert second.post("/publish").status_code == 200
+        assert first.get("/health").json() == {"ok": True}
 
 
 def setup_backend(*, max_pending: int = 128) -> tuple[FakeBridge, BeamChannelsBackend]:

@@ -92,7 +92,15 @@ Open [localhost:8769](http://127.0.0.1:8769/) in your browser. The counter start
 
 Each view reads the shared counter when it mounts or increments. Other open views do not refresh automatically in this example. Values live in memory and are lost when the program stops. Stop the server with Ctrl+C.
 
-The [full PyView example](../../../examples/pyview/main.py) calls `await services.subscribe(socket, topic, convert)` during connected mount for live updates across views. This returns a `ViewSubscription` owned by the socket's connection. The server must supply connection ownership; an unowned scope raises instead of using application ownership. Retain the handle and await its `aclose()` on disconnect. Do not create subscriptions during the initial HTTP render.
+The [full PyView example](../../../examples/pyview/main.py) calls
+`await services.subscribe(socket, topic, convert)` during connected mount for
+live updates across views. This works on Uvicorn and PyBEAM's native web server.
+Keep the returned `ViewSubscription` and await its `aclose()` on disconnect.
+Do not subscribe during the initial HTTP render.
+
+On Uvicorn, sockets share the application's limit of 32 active subscriptions
+and rely on `aclose()` for disconnect cleanup. The native server owns
+subscriptions per connection and can also clean them up when the connection dies.
 
 ## Send posts between two local nodes
 

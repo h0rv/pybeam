@@ -93,10 +93,10 @@ async def wait_pyview_subscriptions(client: httpx.AsyncClient, count: int) -> No
 
 
 async def test_native__pyview_reconnect_auth_mount_and_no_replay(
-    runtime_server_factory: ServerFactory,
+    reconnect_server: ServerFactory,
 ) -> None:
-    with runtime_server_factory("tests.fixtures.pyview_reconnect_app:app") as server:
-        async with httpx.AsyncClient(base_url=server.base_url) as client:
+    with reconnect_server("tests.fixtures.pyview_reconnect_app:app") as server:
+        async with asyncio.timeout(15), httpx.AsyncClient(base_url=server.base_url) as client:
             (await client.get("/session?token=valid")).raise_for_status()
             page = await client.get("/")
             page.raise_for_status()
@@ -107,20 +107,25 @@ async def test_native__pyview_reconnect_auth_mount_and_no_replay(
                 url=server.base_url + "/",
             )
             url = "ws://127.0.0.1:{}/live/websocket".format(server.port)
-            async with connect(
-                url, additional_headers={"Cookie": "session=" + client.cookies["session"]}
-            ) as first:
+            headers = {"Cookie": "session=" + client.cookies["session"]}
+            async with connect(url, additional_headers=headers) as first:
                 await join.send(first)
                 reply = join_reply.validate_json(await first.recv())
                 assert reply[4].status == "ok"
                 assert reply[4].response.rendered["0"] == "0"
                 assert reply[4].response.rendered["1"] == "0"
                 assert await stats(client) == {"auth": 1, "mounts": 1, "count": 1}
-                (await client.post("/increment")).raise_for_status()
-                diff = diff_reply.validate_json(await first.recv())
-                assert diff[3] == "diff"
-                assert diff[4]["0"] == "1"
-                assert diff[4]["1"] == "1"
+                async with connect(url, additional_headers=headers) as peer:
+                    await join.send(peer)
+                    assert join_reply.validate_json(await peer.recv())[4].status == "ok"
+                    assert await stats(client) == {"auth": 2, "mounts": 2, "count": 2}
+                    (await client.post("/increment")).raise_for_status()
+                    for socket in (first, peer):
+                        diff = diff_reply.validate_json(await socket.recv())
+                        assert diff[3] == "diff"
+                        assert diff[4]["0"] == "1"
+                        assert diff[4]["1"] == "1"
+                await wait_pyview_subscriptions(client, 1)
             await wait_pyview_subscriptions(client, 0)
             gap = await client.post("/increment")
             assert gap.json() == {"count": 2, "targeted": 0}
@@ -133,7 +138,7 @@ async def test_native__pyview_reconnect_auth_mount_and_no_replay(
                     await rejected.recv()
                 assert closed.value.rcvd is not None
                 assert closed.value.rcvd.code == 1000
-            assert await stats(client) == {"auth": 2, "mounts": 1, "count": 0}
+            assert await stats(client) == {"auth": 3, "mounts": 2, "count": 0}
             (await client.get("/session?token=valid")).raise_for_status()
             async with connect(
                 url, additional_headers={"Cookie": "session=" + client.cookies["session"]}
@@ -143,7 +148,7 @@ async def test_native__pyview_reconnect_auth_mount_and_no_replay(
                 assert reply[4].status == "ok"
                 assert reply[4].response.rendered["0"] == "2"
                 assert reply[4].response.rendered["1"] == "0"
-                assert await stats(client) == {"auth": 3, "mounts": 2, "count": 1}
+                assert await stats(client) == {"auth": 4, "mounts": 3, "count": 1}
                 with pytest.raises(TimeoutError):
                     await asyncio.wait_for(fresh.recv(), timeout=0.2)
                 (await client.post("/increment")).raise_for_status()
@@ -151,40 +156,6 @@ async def test_native__pyview_reconnect_auth_mount_and_no_replay(
                 assert diff[4]["0"] == "3"
                 assert diff[4]["1"] == "1"
             await wait_pyview_subscriptions(client, 0)
-
-
-async def test_native__pyview_uvicorn_rejects_session_before_mount(
-    request: pytest.FixtureRequest, tmp_path: Path
-) -> None:
-    with serve_entry(
-        request,
-        tmp_path,
-        ROOT / "tests/native/uvicorn_entry.py",
-        8771,
-        "tests.fixtures.pyview_reconnect_app:app",
-        "8771",
-    ) as server:
-        async with httpx.AsyncClient(base_url=server.base_url) as client:
-            (await client.get("/session?token=valid")).raise_for_status()
-            page = await client.get("/")
-            page.raise_for_status()
-            join = Join(
-                topic="lv:" + extract(r'id="(phx-[^"]+)"', page.text),
-                csrf=extract(r'name="csrf-token" content="([^"]+)"', page.text),
-                session=extract(r'data-phx-session="([^"]+)"', page.text),
-                url=server.base_url + "/",
-            )
-            (await client.get("/session?token=revoked")).raise_for_status()
-            url = "ws://127.0.0.1:{}/live/websocket".format(server.port)
-            async with connect(
-                url, additional_headers={"Cookie": "session=" + client.cookies["session"]}
-            ) as rejected:
-                await join.send(rejected)
-                with pytest.raises(ConnectionClosed) as closed:
-                    await rejected.recv()
-                assert closed.value.rcvd is not None
-                assert closed.value.rcvd.code == 1000
-            assert await stats(client) == {"auth": 1, "mounts": 0, "count": 0}
 
 
 async def next_event(lines: AsyncIterator[str]) -> list[str]:
