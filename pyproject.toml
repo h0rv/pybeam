@@ -48,6 +48,8 @@ dev = [
   "playwright>=1.58,<2",
   "hatchling>=1.27,<2",
   "patchelf==0.19.3.0 ; sys_platform == 'linux'",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "aiosqlite>=0.22,<1",
 ]
 
 [build-system]
