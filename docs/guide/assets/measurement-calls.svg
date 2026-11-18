@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="514" viewBox="0 0 760 514" role="img" aria-labelledby="title desc">
+  <title id="title">Actor method wall time: concurrent calls</title>
+  <desc id="desc">Actor method wall time: concurrent calls. sleep async · 100 · 3.14: 0.071–0.086 s. sleep async · 100 · 3.14t: 0.10 s. sleep async · 8,000 · 3.14: 2.8–4.3 s. sleep async · 8,000 · 3.14t: 12.8 s. sleep blocking · 32 · 3.14: 1.62 s. sleep blocking · 32 · 3.14t: 1.65 s. sleep offloaded · 32 · 3.14: 0.16 s. sleep offloaded · 32 · 3.14t: 0.17 s. CPU · 8 · 3.14: 0.96 s. CPU · 8 · 3.14t: 1.06 s. CPU offloaded · 8 · 3.14: 1.0 s. CPU offloaded · 8 · 3.14t: 0.17 s. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <rect class="bar" x="220" y="12" width="24" height="14"/><text x="252" y="25" class="note">3.14</text>
+  <rect class="bar-alt" x="322" y="12" width="24" height="14"/><text x="354" y="25" class="note">3.14t</text>
+  <path class="axis" d="M220 73V466"/>
+  <text x="220" y="64" class="note" text-anchor="middle">0.01</text>
+  <path class="axis" d="M320 73V466"/>
+  <text x="320" y="64" class="note" text-anchor="middle">0.1</text>
+  <path class="axis" d="M420 73V466"/>
+  <text x="420" y="64" class="note" text-anchor="middle">1</text>
+  <path class="axis" d="M520 73V466"/>
+  <text x="520" y="64" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M620 73V466"/>
+  <text x="620" y="64" class="note" text-anchor="middle">100</text>
+  <text x="204" y="115" text-anchor="end">sleep async · 100</text>
+  <rect class="bar" x="220" y="90" width="85.1258348719075" height="14"/>
+  <path d="M305.1258348719075 97H313.4498451243568m0 -6v12"/>
+  <text x="323.4498451243568" y="102" class="note">71.0–86.0 ms</text>
+  <rect class="bar-alt" x="220" y="112" width="100" height="14"/>
+  <text x="330" y="124" class="note">100 ms</text>
+  <text x="204" y="179" text-anchor="end">sleep async · 8,000</text>
+  <rect class="bar" x="220" y="154" width="244.71580313422191" height="14"/>
+  <path d="M464.7158031342219 161H483.34684555795866m0 -6v12"/>
+  <text x="493.34684555795866" y="166" class="note">2.80–4.30 s</text>
+  <rect class="bar-alt" x="220" y="176" width="310.72099696478676" height="14"/>
+  <text x="540.7209969647868" y="188" class="note">12.8 s</text>
+  <text x="204" y="243" text-anchor="end">sleep blocking · 32</text>
+  <rect class="bar" x="220" y="218" width="220.95150145426305" height="14"/>
+  <text x="450.95150145426305" y="230" class="note">1.62 s</text>
+  <rect class="bar-alt" x="220" y="240" width="221.74839442139063" height="14"/>
+  <text x="451.7483944213906" y="252" class="note">1.65 s</text>
+  <text x="204" y="307" text-anchor="end">sleep offloaded · 32</text>
+  <rect class="bar" x="220" y="282" width="120.4119982655925" height="14"/>
+  <text x="350.4119982655925" y="294" class="note">160 ms</text>
+  <rect class="bar-alt" x="220" y="304" width="123.04489213782739" height="14"/>
+  <text x="353.0448921378274" y="316" class="note">170 ms</text>
+  <text x="204" y="371" text-anchor="end">CPU · 8</text>
+  <rect class="bar" x="220" y="346" width="198.22712330395683" height="14"/>
+  <text x="428.22712330395683" y="358" class="note">960 ms</text>
+  <rect class="bar-alt" x="220" y="368" width="202.530586526477" height="14"/>
+  <text x="432.530586526477" y="380" class="note">1.06 s</text>
+  <text x="204" y="435" text-anchor="end">CPU offloaded · 8</text>
+  <rect class="bar" x="220" y="410" width="200" height="14"/>
+  <text x="430" y="422" class="note">1.00 s</text>
+  <rect class="bar-alt" x="220" y="432" width="123.04489213782739" height="14"/>
+  <text x="353.0448921378274" y="444" class="note">170 ms</text>
+  <text x="220" y="502" class="note">s · logarithmic scale</text>
+</svg>

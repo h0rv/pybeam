@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="553" viewBox="0 0 800 553" role="img" aria-labelledby="title desc">
+<title id="title">Empty calls with blocked pool workers</title><desc id="desc">Fixed 8 · blocked 0, p50: 29 µs; Fixed 8 · blocked 0, p99: 48 µs; Fixed 8 · blocked 0, Maximum: 200 µs; Fixed 8 · blocked 8, p50: 28 µs; Fixed 8 · blocked 8, p99: 175 µs; Fixed 8 · blocked 8, Maximum: 180000 µs; Fixed 8 · blocked 32, p50: 29 µs; Fixed 8 · blocked 32, p99: 169 µs; Fixed 8 · blocked 32, Maximum: 781000 µs; Peak 9 · blocked 8, p50: 29 µs; Peak 9 · blocked 8, p99: 96 µs; Peak 9 · blocked 8, Maximum: 1500 µs; Peak 33 · blocked 32, p50: 29 µs; Peak 33 · blocked 32, p99: 62 µs; Peak 33 · blocked 32, Maximum: 21600 µs. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Empty calls with blocked pool workers</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">p50</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">p99</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">Maximum</text>
+<text x="215" y="123" text-anchor="end">Fixed 8 · blocked 0</text>
+<rect class="s0" x="230" y="95" width="36.99183983191648" height="14"/>
+<text x="273.9918398319165" y="107">29.0 µs</text>
+<rect class="s1" x="230" y="116" width="54.49929899004695" height="14"/>
+<text x="291.49929899004695" y="128">48.0 µs</text>
+<rect class="s2" x="230" y="137" width="104.0823996531185" height="14"/>
+<text x="341.0823996531185" y="149">200 µs</text>
+<text x="215" y="202" text-anchor="end">Fixed 8 · blocked 8</text>
+<rect class="s0" x="230" y="174" width="35.772642507377554" height="14"/>
+<text x="272.77264250737755" y="186">28.0 µs</text>
+<rect class="s1" x="230" y="195" width="99.44304389490355" height="14"/>
+<text x="336.44304389490355" y="207">175 µs</text>
+<rect class="s2" x="230" y="216" width="340.4218004082645" height="14"/>
+<text x="577.4218004082645" y="228">180 ms</text>
+<text x="215" y="281" text-anchor="end">Fixed 8 · blocked 32</text>
+<rect class="s0" x="230" y="253" width="36.99183983191648" height="14"/>
+<text x="273.9918398319165" y="265">29.0 µs</text>
+<rect class="s1" x="230" y="274" width="98.23093636909391" height="14"/>
+<text x="335.2309363690939" y="286">169 µs</text>
+<rect class="s2" x="230" y="295" width="391.412082710184" height="14"/>
+<text x="628.412082710184" y="307">781 ms</text>
+<text x="215" y="360" text-anchor="end">Peak 9 · blocked 8</text>
+<rect class="s0" x="230" y="332" width="36.99183983191648" height="14"/>
+<text x="273.9918398319165" y="344">29.0 µs</text>
+<rect class="s1" x="230" y="353" width="78.58169864316551" height="14"/>
+<text x="315.5816986431655" y="365">96.0 µs</text>
+<rect class="s2" x="230" y="374" width="174.0873007244545" height="14"/>
+<text x="411.0873007244545" y="386">1.50 ms</text>
+<text x="215" y="439" text-anchor="end">Peak 33 · blocked 32</text>
+<rect class="s0" x="230" y="411" width="36.99183983191648" height="14"/>
+<text x="273.9918398319165" y="423">29.0 µs</text>
+<rect class="s1" x="230" y="432" width="63.39133515986032" height="14"/>
+<text x="300.3913351598603" y="444">62.0 µs</text>
+<rect class="s2" x="230" y="453" width="266.75630009207447" height="14"/>
+<text x="503.75630009207447" y="465">21.6 ms</text><path d="M230,495H630"/>
+<path d="M230,495v5"/><text x="230" y="519" text-anchor="start">10</text><path d="M310,495v5"/><text x="310" y="519" text-anchor="middle">100</text><path d="M390,495v5"/><text x="390" y="519" text-anchor="middle">1k</text><path d="M470,495v5"/><text x="470" y="519" text-anchor="middle">10k</text><path d="M550,495v5"/><text x="550" y="519" text-anchor="middle">100k</text><path d="M630,495v5"/><text x="630" y="519" text-anchor="end">1M</text>
+<text x="630" y="543" text-anchor="end">µs · log scale</text></svg>

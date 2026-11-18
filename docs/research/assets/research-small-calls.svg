@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="854" viewBox="0 0 800 854" role="img" aria-labelledby="title desc">
+<title id="title">Smaller async and blocking actor calls</title><desc id="desc">Async wait · 1, GIL: 0.051–0.052 s; Async wait · 1, Free-threaded: 0.051 s; Async wait · 10, GIL: 0.054 s; Async wait · 10, Free-threaded: 0.053 s; Async wait · 100, GIL: 0.071–0.086 s; Async wait · 100, Free-threaded: 0.1 s; Async wait · 1,000, GIL: 0.33–0.51 s; Async wait · 1,000, Free-threaded: 0.52 s; Async wait · 4,000, GIL: 1.6–2.1 s; Async wait · 4,000, Free-threaded: 3.5 s; Blocking wait · 1, GIL: 0.053 s; Blocking wait · 1, Free-threaded: 0.062 s; Blocking wait · 8, GIL: 0.41 s; Blocking wait · 8, Free-threaded: 0.41 s; Threaded wait · 8, GIL: 0.054 s; Threaded wait · 8, Free-threaded: 0.065 s; Threaded wait · 100, GIL: 0.46 s; Threaded wait · 100, Free-threaded: 0.49 s; CPU body · 1, GIL: 0.12 s; CPU body · 1, Free-threaded: 0.14 s; Threaded CPU · 1, GIL: 0.12 s; Threaded CPU · 1, Free-threaded: 0.16 s; Async beside blocking, GIL: 0.311 s; Async beside blocking, Free-threaded: 0.317 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Smaller async and blocking actor calls</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">Async wait · 1</text>
+<rect class="s0" x="230" y="95" width="5.099999999999995" height="14"/>
+<path d="M235.1,102H235.2m0,-5v10"/>
+<text x="242.2" y="107">51.0–52.0 ms</text>
+<rect class="s1" x="230" y="116" width="5.099999999999995" height="14"/>
+<text x="242.1" y="128">51.0 ms</text>
+<text x="215" y="170.5" text-anchor="end">Async wait · 10</text>
+<rect class="s0" x="230" y="153" width="5.400000000000008" height="14"/>
+<text x="242.4" y="165">54.0 ms</text>
+<rect class="s1" x="230" y="174" width="5.300000000000013" height="14"/>
+<text x="242.3" y="186">53.0 ms</text>
+<text x="215" y="228.5" text-anchor="end">Async wait · 100</text>
+<rect class="s0" x="230" y="211" width="7.100000000000007" height="14"/>
+<path d="M237.1,218H238.6m0,-5v10"/>
+<text x="245.6" y="223">71.0–86.0 ms</text>
+<rect class="s1" x="230" y="232" width="10.000000000000002" height="14"/>
+<text x="247" y="244">100 ms</text>
+<text x="215" y="286.5" text-anchor="end">Async wait · 1,000</text>
+<rect class="s0" x="230" y="269" width="33.00000000000002" height="14"/>
+<path d="M263,276H281m0,-5v10"/>
+<text x="288" y="281">330–510 ms</text>
+<rect class="s1" x="230" y="290" width="52.000000000000014" height="14"/>
+<text x="289" y="302">520 ms</text>
+<text x="215" y="344.5" text-anchor="end">Async wait · 4,000</text>
+<rect class="s0" x="230" y="327" width="160.00000000000003" height="14"/>
+<path d="M390,334H440m0,-5v10"/>
+<text x="447" y="339">1.60–2.10 s</text>
+<rect class="s1" x="230" y="348" width="350" height="14"/>
+<text x="587" y="360">3.50 s</text>
+<text x="215" y="402.5" text-anchor="end">Blocking wait · 1</text>
+<rect class="s0" x="230" y="385" width="5.300000000000013" height="14"/>
+<text x="242.3" y="397">53.0 ms</text>
+<rect class="s1" x="230" y="406" width="6.199999999999997" height="14"/>
+<text x="243.2" y="418">62.0 ms</text>
+<text x="215" y="460.5" text-anchor="end">Blocking wait · 8</text>
+<rect class="s0" x="230" y="443" width="41.00000000000001" height="14"/>
+<text x="278" y="455">410 ms</text>
+<rect class="s1" x="230" y="464" width="41.00000000000001" height="14"/>
+<text x="278" y="476">410 ms</text>
+<text x="215" y="518.5" text-anchor="end">Threaded wait · 8</text>
+<rect class="s0" x="230" y="501" width="5.400000000000008" height="14"/>
+<text x="242.4" y="513">54.0 ms</text>
+<rect class="s1" x="230" y="522" width="6.500000000000009" height="14"/>
+<text x="243.5" y="534">65.0 ms</text>
+<text x="215" y="576.5" text-anchor="end">Threaded wait · 100</text>
+<rect class="s0" x="230" y="559" width="45.999999999999986" height="14"/>
+<text x="283" y="571">460 ms</text>
+<rect class="s1" x="230" y="580" width="49" height="14"/>
+<text x="286" y="592">490 ms</text>
+<text x="215" y="634.5" text-anchor="end">CPU body · 1</text>
+<rect class="s0" x="230" y="617" width="12.000000000000012" height="14"/>
+<text x="249" y="629">120 ms</text>
+<rect class="s1" x="230" y="638" width="13.999999999999996" height="14"/>
+<text x="251" y="650">140 ms</text>
+<text x="215" y="692.5" text-anchor="end">Threaded CPU · 1</text>
+<rect class="s0" x="230" y="675" width="12.000000000000012" height="14"/>
+<text x="249" y="687">120 ms</text>
+<rect class="s1" x="230" y="696" width="16.000000000000007" height="14"/>
+<text x="253" y="708">160 ms</text>
+<text x="215" y="750.5" text-anchor="end">Async beside blocking</text>
+<rect class="s0" x="230" y="733" width="31.100000000000005" height="14"/>
+<text x="268.1" y="745">311 ms</text>
+<rect class="s1" x="230" y="754" width="31.700000000000028" height="14"/>
+<text x="268.70000000000005" y="766">317 ms</text><path d="M230,796H630"/>
+<path d="M230,796v5"/><text x="230" y="820" text-anchor="start">0</text><path d="M330,796v5"/><text x="330" y="820" text-anchor="middle">1</text><path d="M430,796v5"/><text x="430" y="820" text-anchor="middle">2</text><path d="M530,796v5"/><text x="530" y="820" text-anchor="middle">3</text><path d="M630,796v5"/><text x="630" y="820" text-anchor="end">4</text>
+<text x="630" y="844" text-anchor="end">s</text></svg>
