@@ -1,5 +1,8 @@
 # PyView
 
+For per-connection authorization, fresh mounts, and missed-message boundaries, see
+[Startup, reconnects, and failures](../failures.md#rebuild-a-view-after-reconnect).
+
 Keep a shared counter behind a PyView page. Each click updates the counter atomically and renders the result with PyView's template engine.
 
 ```sh

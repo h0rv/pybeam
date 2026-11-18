@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["why/", "", "actors/", "supervision/", "state/", "chat-rooms/", "messaging/", "background/", "durable-tasks/", "execution/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "integrations/htmx/", "internals/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["why/", "", "actors/", "supervision/", "state/", "chat-rooms/", "messaging/", "background/", "durable-tasks/", "execution/", "failures/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "integrations/htmx/", "internals/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -134,10 +134,10 @@ test("state and supervision teach distinct operations without another introducti
 
 test("navigation groups getting started, guides, integrations and internals", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Why PyBEAM", "Get started", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "FastAPI", "Litestar", "PyView", "HTMX", "Overview", "Measurements", "What to watch for",
+    "Why PyBEAM", "Get started", "Actors", "Supervision", "Shared state", "Example: chat rooms", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "Startup and failures", "FastAPI", "Litestar", "PyView", "HTMX", "Overview", "Measurements", "What to watch for",
   ]);
   assert.deepEqual(navigationSections.map(({ label }) => label), ["Get started", "Guides", "Integrations", "How PyBEAM works"]);
-  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 8, 4, 3]);
+  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [2, 9, 4, 3]);
   assert.ok(navigationSections.at(-1).pages.every(({ source }) => source.startsWith("docs/guide/internals/")));
   assert.deepEqual(navigationSections.flatMap(({ pages }) => pages), navigation);
   assert.equal(redirects["web/"], "integrations/fastapi/");
