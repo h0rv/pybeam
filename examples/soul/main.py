@@ -314,6 +314,7 @@ async def live_view(port: int) -> AsyncGenerator[Demo]:
                     finally:
                         running.cancel()
                         server.should_exit = True
+                        await serving
             finally:
                 app.dependency_overrides.clear()
 

@@ -59,6 +59,16 @@ async with httpx.AsyncClient() as client:
         assert not fresh.samples and fresh.completed == 0
         assert not replay.finished.is_set()
         print("soul-immediate-restart-ok")
+ready = asyncio.Event()
+async def idle_server():
+    async with live_view(0):
+        ready.set()
+        await asyncio.Future()
+async with asyncio.TaskGroup() as group:
+    idle = group.create_task(idle_server())
+    await ready.wait()
+    idle.cancel()
+print("soul-cancelled-server-cleanup-ok")
 """,
             "    ",
         ),
@@ -67,4 +77,5 @@ async with httpx.AsyncClient() as client:
     assert result.returncode == 0, output
     assert "soul-view-ok" in output
     assert "soul-immediate-restart-ok" in output
+    assert "soul-cancelled-server-cleanup-ok" in output
     assert "Traceback (most recent call last)" not in output
