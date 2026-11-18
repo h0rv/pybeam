@@ -73,11 +73,15 @@ def test_tasks__managed_submit_serve_and_crash(
 
 
 @pytest.mark.runtime
+@pytest.mark.parametrize("managed_main", [False, True], ids=["importable", "managed-main"])
 def test_tasks__three_nodes_rerun_after_worker_node_dies(
-    request: pytest.FixtureRequest, tmp_path: Path
+    request: pytest.FixtureRequest, tmp_path: Path, managed_main: bool
 ) -> None:
-    require_runtime(request)
-    assets = discover_assets(Config())
+    if not request.config.getoption("run_runtime"):
+        pytest.skip("Requires --run-runtime")
+    profile = request.config.getoption("hornbeam_runtime")
+    assert isinstance(profile, str)
+    assets = discover_assets(Config(development_runtime=Path(profile)))
     paths = json.dumps([str(ROOT / "src"), str(ROOT), *site.getsitepackages()])
     output = tmp_path / "completed"
     output.mkdir()
@@ -91,16 +95,25 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
         Paths = lists:append([["-pa", P] || P <- code:get_path()]),
         Args = ["+S", "2:2", "+A", "2", "-setcookie", atom_to_list(erlang:get_cookie())]
                ++ BOOT_ARGS ++ Paths,
+        Names = [durable_py_a, durable_py_b, durable_py_c],
+        ReplicaNames = [list_to_binary(atom_to_list(N) ++ "@127.0.0.1") || N <- Names],
         Peers = [begin
+            Dir = filename:join(DIRECTORY, integer_to_list(I)),
+            Bootstrap = iolist_to_binary(json:encode(#{
+                argv => [list_to_binary(ENTRY), iolist_to_binary(json:encode(ReplicaNames))],
+                ready => list_to_binary(filename:join(Dir, "ready")),
+                completed => list_to_binary(filename:join(Dir, "completed"))})),
             {ok, Peer, Node} = peer:start(#{name => Name, host => "127.0.0.1",
                 longnames => true, connection => standard_io,
+                env => [{"PYBEAM_BOOTSTRAP", binary_to_list(Bootstrap)}],
                 exec => EXECUTABLE, args => Args}),
             {Peer, Node}
-        end || Name <- [durable_py_a, durable_py_b, durable_py_c]],
+        end || {Name, I} <- lists:zip(Names, lists:seq(0, 2))],
         try
             [pong = peer:call(P, net_adm, ping, [N])
              || {P, Local} <- Peers, {_, N} <- Peers, N =/= Local],
             Nodes = [atom_to_binary(N) || {_, N} <- Peers],
+            Nodes = ReplicaNames,
             Contexts = [begin
                 Dir = filename:join(DIRECTORY, integer_to_list(I)),
                 ok = peer:call(P, file, set_cwd, [Dir]),
@@ -116,6 +129,11 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
                 ok = peer:call(P, py_callback, register, [durable_body_started,
                     fun([Payload]) -> Parent ! {started, node(), Payload}, ok end]),
                 {ok, Ctx} = peer:call(P, py_context, new, [#{mode => worker}]),
+                case MANAGED_MAIN of
+                    true ->
+                        {ok, _} = peer:call(P, py_context, call, [Ctx, 'pybeam.runtime.loader', load, []]);
+                    false -> ok
+                end,
                 ok = peer:call(P, py_context, start_loop, [Ctx, #{owner => Parent}]),
                 {monitors, Monitors} = peer:call(P, erlang, process_info, [Ctx, monitors]),
                 true = lists:member({process, Parent}, Monitors),
@@ -124,25 +142,50 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
             Opens = [begin
                 Ref = make_ref(),
                 spawn(fun() -> Parent ! {Ref, peer:call(P, py_context, submit_await,
-                    [Ctx, 'tests.fixtures.durable_tasks', cluster_submit,
+                    [Ctx, ENTRY_MODULE, cluster_submit,
                          [Nodes, list_to_binary(OUTPUT), I, 1], #{}, 60000], 65000)} end),
                 Ref
             end || {{P, Ctx}, I} <- lists:zip(Contexts, lists:seq(0, 2))],
             [receive {Ref, Reply} -> {ok, true} = Reply
              after 65000 -> error(open_timeout) end || Ref <- Opens],
             [{First, _}, _, {Dead, DeadNode}] = Peers,
-            {ok, SubmitCtx} = peer:call(First, py_context, new, [#{mode => worker}]),
-            {ok, true} = peer:call(First, py_context, submit_await,
-                [SubmitCtx, 'tests.fixtures.durable_tasks', cluster_submit,
+            Submitter = case MANAGED_MAIN of true -> Dead; false -> First end,
+            {ok, SubmitCtx} = peer:call(Submitter, py_context, new, [#{mode => worker}]),
+            {ok, true} = peer:call(Submitter, py_context, submit_await,
+                [SubmitCtx, ENTRY_MODULE, cluster_submit,
                  [Nodes, list_to_binary(OUTPUT), 3, 27], #{}, 15000], 20000),
-            [{ok, _} = peer:call(P, py_context, submit, [Ctx, 'tests.fixtures.durable_tasks',
-                cluster_serve, [Nodes]]) || {P, Ctx} <- Contexts],
-            [receive {ready, N} -> ok after 40000 -> error({not_ready, N}) end || {_, N} <- Peers],
+            ServingContexts = case MANAGED_MAIN of
+                true -> [lists:nth(3, Contexts)];
+                false -> Contexts
+            end,
+            [begin
+                {Module, Function, Arguments} = case MANAGED_MAIN of
+                    true -> {'pybeam.runtime.loader', invoke, []};
+                    false -> {ENTRY_MODULE, cluster_serve, [Nodes]}
+                end,
+                {ok, _} = peer:call(P, py_context, submit, [Ctx, Module, Function, Arguments])
+             end || {P, Ctx} <- ServingContexts],
+            ServingNodes = case MANAGED_MAIN of
+                true -> [DeadNode];
+                false -> [N || {_, N} <- Peers]
+            end,
+            [receive {ready, N} -> ok after 40000 -> error({not_ready, N}) end || N <- ServingNodes],
             Held = [receive {started, DeadNode, Payload} -> Payload
                     after 5000 -> error(no_dead_node_leases) end || _ <- [1, 2]],
             [false = filelib:is_file(binary_to_list(Payload)) || Payload <- Held],
             DeadPid = peer:call(Dead, os, getpid, []),
             os:cmd("kill -9 " ++ DeadPid),
+            case MANAGED_MAIN of
+                true ->
+                    [{ok, _} = peer:call(P, py_context, submit,
+                        [Ctx, 'pybeam.runtime.loader', invoke, []])
+                     || {P, Ctx} <- Contexts, P =/= Dead],
+                    [receive {ready, N} -> ok after 40000 -> error({not_ready, N}) end
+                     || {P, N} <- Peers, P =/= Dead],
+                    [ok = file:write_file(filename:join(OUTPUT, integer_to_list(I) ++ ".release"), <<>>)
+                     || I <- lists:seq(0, 29)];
+                false -> ok
+            end,
             Wait = fun Again(0) -> error(tasks_not_completed);
                        Again(Left) ->
                            case lists:all(fun(I) -> filelib:is_file(
@@ -153,8 +196,18 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
                    end,
             ok = Wait(500),
             [{ok, true} = peer:call(P, py_context, submit_await,
-                [Ctx, 'tests.fixtures.durable_tasks', cluster_stop, [], #{}, 15000], 20000)
+                [Ctx, ENTRY_MODULE, cluster_stop, [], #{}, 15000], 20000)
              || {P, Ctx} <- Contexts, P =/= Dead],
+            case MANAGED_MAIN of
+                true ->
+                    [begin
+                        {ok, Content} = file:read_file(binary_to_list(Payload)),
+                        [<<"__main__">>, SurvivorPid] = binary:split(Content, <<" ">>),
+                        false = SurvivorPid =:= list_to_binary(DeadPid)
+                     end || Payload <- Held],
+                    io:format("TASKS_MAIN_RECOVERED dead_leases=~p~n", [length(Held)]);
+                false -> ok
+            end,
             io:format("TASKS_CLUSTER_COMPLETED 30 dead_leases=~p~n", [length(Held)])
         after
             [try peer:stop(P) catch _:_ -> ok end || {P, _} <- Peers]
@@ -167,6 +220,9 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
         "DIRECTORY": json.dumps(str(tmp_path)),
         "OUTPUT": json.dumps(str(output)),
         "PYTHON_PATHS": paths,
+        "MANAGED_MAIN": "true" if managed_main else "false",
+        "ENTRY_MODULE": "'__main__'" if managed_main else "'tests.fixtures.durable_tasks'",
+        "ENTRY": json.dumps(str(ROOT / "tests/fixtures/durable_tasks_main.py")),
     }
     for key, value in replacements.items():
         expression = expression.replace(key, value)
@@ -195,3 +251,6 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
     (tmp_path / "controller.stderr").write_text(result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "TASKS_CLUSTER_COMPLETED 30 dead_leases=2" in result.stdout
+    if managed_main:
+        assert "TASKS_MAIN_RECOVERED dead_leases=2" in result.stdout
+        print("TASKS_MAIN_RECOVERED dead_leases=2")

@@ -1,10 +1,14 @@
 # durable_tasks.py
 import asyncio
-
-from durable_body import write_report
+from pathlib import Path
 
 import pybeam
 from pybeam.queues import DurableTasks
+
+
+async def write_report(payload: bytes) -> bytes:
+    await asyncio.to_thread(Path("report.txt").write_bytes, payload)
+    return b""
 
 
 async def main() -> None:

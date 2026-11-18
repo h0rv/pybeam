@@ -16,7 +16,7 @@ from pybeam.actors.codec import (
     decode_reply,
     encode_failure,
 )
-from pybeam.actors.state import Snapshot, SnapshotSpec
+from pybeam.actors.state import ClaimedSnapshot, Snapshot
 
 
 class ActorStateAccessError(AttributeError):
@@ -179,7 +179,7 @@ class Definition:
         return reference
 
     def factory(
-        self, payload: bytes, *, max_bytes: int = 1_048_576, snapshot: SnapshotSpec | None = None
+        self, payload: bytes, *, max_bytes: int = 1_048_576, snapshot: ClaimedSnapshot | None = None
     ) -> Callable[[], Container]:
         def construct() -> Container:
             try:
@@ -213,7 +213,7 @@ class Container:
         methods: tuple[Method, ...],
         *,
         max_bytes: int = 1_048_576,
-        snapshot: SnapshotSpec | None = None,
+        snapshot: ClaimedSnapshot | None = None,
     ) -> None:
         self._construction = construction
         self._methods = methods

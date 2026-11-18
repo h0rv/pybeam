@@ -2,6 +2,10 @@
 
 Use Litestar's store API to share values across requests. `BeamStore` keeps each store's keys in its own namespace.
 
+```sh
+uv add 'python-beam[litestar]' uvicorn
+```
+
 ```python
 # litestar_app.py
 import asyncio

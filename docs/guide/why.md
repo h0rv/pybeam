@@ -1,6 +1,6 @@
 # Why PyBEAM
 
-When concurrent requests share data, an async Python app usually needs locks, a Redis server for counters and pub/sub, and restart logic you write yourself. PyBEAM provides these primitives in your Python program, without extra infrastructure.
+When concurrent requests share data, you need to coordinate updates and decide what happens after a failure. PyBEAM provides actors, atomic counters, pub/sub and supervision inside your Python application, without a separate broker.
 
 ## No locks
 
@@ -23,28 +23,26 @@ Two WebSocket clients connect to your app and need to see the same count.
 
 ## Compared with plain asyncio
 
-Asyncio tasks are fast and cheap. A million sleeping tasks took about 2.2 GB on Python 3.10 ([2023 benchmark](https://pkolaczk.github.io/memory-consumption-of-async/)) and 1.3 GB on Python 3.13 ([2024 rerun](https://hez2010.github.io/async-runtimes-benchmarks-2024)), and Textual measured about 260,000 tasks created, run and finished per second ([Textual](https://textual.textualize.io/blog/2023/03/08/overhead-of-python-asyncio-tasks/)). A PyBEAM actor costs more: one thread and about 50–60 KiB, so 10,000 idle actors used about 600 MiB in a local run.
-
-What you get for that is ownership and recovery. Tasks on an asyncio loop share mutable objects, and a failed task stays failed unless you write the restart. A PyBEAM actor owns its state, receives copies of its arguments, and is replaced by its supervisor when it fails.
+Tasks on an asyncio loop can share mutable objects. A failed task stays failed unless your application restarts it. A PyBEAM actor owns its state, receives copies of its arguments, and is replaced by its group when it fails. That ownership and recovery adds overhead; PyBEAM is not a faster replacement for asyncio.
 
 | Need | Plain asyncio | PyBEAM |
 | --- | --- | --- |
-| Mutable state shared by tasks | Locks around every access | Actor methods run one at a time |
-| Shared counter | Redis or a lock | Atomic `incr` |
-| Notify other connections | Redis pub/sub or a broker | `publish` and `subscribe` |
+| Mutable state shared by tasks | Coordinate access where operations can interleave | Actor methods run one at a time |
+| Shared counter | Coordinate local updates or use an external store | Atomic `incr` |
+| Notify other connections | Manage local queues or use a broker | `publish` and `subscribe` |
 | Recover from a failure | Your own restart code | Supervisor restarts the actor |
 
 ## When to use PyBEAM
 
-PyBEAM spends memory and call overhead on scheduling, supervision and distribution. That trade pays off when concurrent work shares state or must recover from failures: web apps with shared state, live updates, and long-running services. For local processing in one process, such as a script or a batch job, plain asyncio is cheaper and simpler.
+Consider PyBEAM when concurrent work shares state or needs supervised recovery: web apps with shared counters, live updates, and long-running services. For a script or batch job that needs none of those capabilities, start with plain asyncio.
 
 ## How it works
 
-PyBEAM runs your program on Erlang's virtual machine, which provides the actors, supervision and messaging. You write ordinary asyncio code and need no Erlang. Actor calls run on a pool of Python workers, so a blocking call in one actor does not hold up the others; tasks share one loop by default, and [Blocking and CPU work](execution.md) shows what to do there. [How PyBEAM works](internals/index.md) explains the runtime in depth.
+You write ordinary async Python. PyBEAM starts and stops its runtime for you. See [Blocking and CPU work](execution.md) before adding blocking operations, or [How PyBEAM works](internals/index.md) for implementation details.
 
 ## Limits
 
-- State and messages live in memory and do not survive a restart. Keep durable data in your database.
+- Actor state, shared values and pub/sub messages live in memory and do not survive a restart. Keep application data in your database; [durable tasks](durable-tasks.md) separately record retryable work.
 - A timeout stops waiting; it does not undo the call. Retrying can repeat its effects.
 - A restarted actor starts from its constructor. The old state and any in-flight calls are lost.
 
