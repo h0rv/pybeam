@@ -41,17 +41,17 @@
 <path class="grid" d="M80,104.00H682"/>
 <text x="72" y="109.0" font-size="13" text-anchor="end" font-weight="400">20</text>
 <text x="180.33" y="240" font-size="15" text-anchor="middle" font-weight="400">1,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 12.56 (10.92–12.83); n=3</title><path class="range" d="M156.33,144.50V155.31"/><circle cx="156.33" cy="146.06" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 14.23 (11.7–14.29); n=3</title><path class="range" d="M180.33,136.28V150.87"/><rect x="176.33" y="132.63" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 19.21 (18.33–19.38); n=3</title><path class="range" d="M204.33,107.50V113.43"/><path d="M204.33,103.46l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 11.02 (10.76–11.75); n=3</title><path class="range" d="M156.33,150.60V156.18"/><circle cx="156.33" cy="154.71" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 14.07 (13.98–14.55); n=3</title><path class="range" d="M180.33,134.81V138.01"/><rect x="176.33" y="133.51" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 17.4 (15.96–18.42); n=3</title><path class="range" d="M204.33,112.93V126.84"/><path d="M204.33,113.68l5,5 -5,5 -5,-5z"/></g>
 <text x="381.0" y="240" font-size="15" text-anchor="middle" font-weight="400">5,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 11.16 (10.23–11.46); n=3</title><path class="range" d="M357.00,152.23V159.19"/><circle cx="357.0" cy="153.96" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 13.21 (13.18–14.32); n=3</title><path class="range" d="M381.00,136.10V142.52"/><rect x="377.00" y="138.34" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 18.75 (17.92–19.02); n=3</title><path class="range" d="M405.00,109.56V115.77"/><path d="M405.00,106.09l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 11.02 (10.09–11.58); n=3</title><path class="range" d="M357.00,151.58V160.01"/><circle cx="357.0" cy="154.76" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 14.25 (12.95–14.43); n=3</title><path class="range" d="M381.00,135.45V143.86"/><rect x="377.00" y="132.48" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 18.23 (18.2–18.32); n=3</title><path class="range" d="M405.00,113.51V114.19"/><path d="M405.00,109.02l5,5 -5,5 -5,-5z"/></g>
 <text x="581.67" y="240" font-size="15" text-anchor="middle" font-weight="400">10,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 8.805 (7.678–9.791); n=3</title><path class="range" d="M557.67,161.68V173.62"/><circle cx="557.67" cy="167.25" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 11 (10.55–11.02); n=3</title><path class="range" d="M581.67,154.75V157.40"/><rect x="577.67" y="150.86" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 18.6 (17.86–19.15); n=3</title><path class="range" d="M605.67,108.78V116.11"/><path d="M605.67,106.93l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 9.776 (7.607–9.927); n=3</title><path class="range" d="M557.67,160.91V174.02"/><circle cx="557.67" cy="161.77" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 10.82 (9.39–11.47); n=3</title><path class="range" d="M581.67,152.19V163.95"/><rect x="577.67" y="151.85" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 17.85 (17.7–17.91); n=3</title><path class="range" d="M605.67,115.84V117.01"/><path d="M605.67,111.17l5,5 -5,5 -5,-5z"/></g>
 <text x="20" y="266" font-size="15" text-anchor="start" font-weight="600">p99 response time (ms)</text>
 <path class="grid" d="M80,396.00H682"/>
 <text x="72" y="401.0" font-size="13" text-anchor="end" font-weight="400">0</text>
@@ -62,36 +62,40 @@
 <path class="grid" d="M80,283.00H682"/>
 <text x="72" y="288.0" font-size="13" text-anchor="end" font-weight="400">6,000</text>
 <text x="180.33" y="419" font-size="15" text-anchor="middle" font-weight="400">1,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 98.25 (95.4–124.5); n=3</title><path class="range" d="M156.33,393.66V394.20"/><circle cx="156.33" cy="394.15" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 45.55 (36.41–58.16); n=3</title><path class="range" d="M180.33,394.90V395.31"/><rect x="176.33" y="391.14" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 63.28 (60.43–64.09); n=3</title><path class="range" d="M204.33,394.79V394.86"/><path d="M204.33,389.81l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 134.8 (123.6–182.2); n=3</title><path class="range" d="M156.33,392.57V393.67"/><circle cx="156.33" cy="393.46" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 43.05 (36.81–47.78); n=3</title><path class="range" d="M180.33,395.10V395.31"/><rect x="176.33" y="391.19" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 104.6 (97.85–104.8); n=3</title><path class="range" d="M204.33,394.03V394.16"/><path d="M204.33,389.03l5,5 -5,5 -5,-5z"/></g>
 <text x="381.0" y="419" font-size="15" text-anchor="middle" font-weight="400">5,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 2215 (2031–2380); n=3</title><path class="range" d="M357.00,351.17V357.75"/><circle cx="357.0" cy="354.29" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 43.81 (34.67–51.2); n=3</title><path class="range" d="M381.00,395.04V395.35"/><rect x="377.00" y="391.17" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 316.3 (292.6–332.4); n=3</title><path class="range" d="M405.00,389.74V390.49"/><path d="M405.00,385.04l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 2077 (1950–2079); n=3</title><path class="range" d="M357.00,356.84V359.27"/><circle cx="357.0" cy="356.88" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 42.56 (37.03–55.17); n=3</title><path class="range" d="M381.00,394.96V395.30"/><rect x="377.00" y="391.20" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 341.3 (315.2–419.8); n=3</title><path class="range" d="M405.00,388.09V390.06"/><path d="M405.00,384.57l5,5 -5,5 -5,-5z"/></g>
 <text x="581.67" y="419" font-size="15" text-anchor="middle" font-weight="400">10,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 3872 (2931–3950); n=3</title><path class="range" d="M557.67,321.61V340.80"/><circle cx="557.67" cy="323.08" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 5720 (4804–5954); n=3</title><path class="range" d="M581.67,283.86V305.52"/><rect x="577.67" y="284.26" width="8" height="8"/></g>
-<g class="mark granian"><title>granian: 597 (567.8–659.2); n=3</title><path class="range" d="M605.67,383.58V385.31"/><path d="M605.67,379.76l5,5 -5,5 -5,-5z"/></g>
+<g class="mark hornbeam"><title>hornbeam: 4056 (3897–4308); n=3</title><path class="range" d="M557.67,314.87V322.61"/><circle cx="557.67" cy="319.61" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 4812 (4702–5470); n=3</title><path class="range" d="M581.67,292.99V307.44"/><rect x="577.67" y="301.38" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 796.1 (656–898); n=3</title><path class="range" d="M605.67,379.09V383.65"/><path d="M605.67,376.01l5,5 -5,5 -5,-5z"/></g>
 <text x="20" y="445" font-size="15" text-anchor="start" font-weight="600">Failed requests (%)</text>
 <path class="grid" d="M80,575.00H682"/>
 <text x="72" y="580.0" font-size="13" text-anchor="end" font-weight="400">0</text>
-<path class="grid" d="M80,537.33H682"/>
-<text x="72" y="542.33" font-size="13" text-anchor="end" font-weight="400">10</text>
-<path class="grid" d="M80,499.67H682"/>
-<text x="72" y="504.67" font-size="13" text-anchor="end" font-weight="400">20</text>
+<path class="grid" d="M80,552.40H682"/>
+<text x="72" y="557.4" font-size="13" text-anchor="end" font-weight="400">5</text>
+<path class="grid" d="M80,529.80H682"/>
+<text x="72" y="534.8" font-size="13" text-anchor="end" font-weight="400">10</text>
+<path class="grid" d="M80,507.20H682"/>
+<text x="72" y="512.2" font-size="13" text-anchor="end" font-weight="400">15</text>
+<path class="grid" d="M80,484.60H682"/>
+<text x="72" y="489.6" font-size="13" text-anchor="end" font-weight="400">20</text>
 <path class="grid" d="M80,462.00H682"/>
-<text x="72" y="467.0" font-size="13" text-anchor="end" font-weight="400">30</text>
+<text x="72" y="467.0" font-size="13" text-anchor="end" font-weight="400">25</text>
 <text x="180.33" y="598" font-size="15" text-anchor="middle" font-weight="400">1,000 clients</text>
 <g class="mark hornbeam"><title>hornbeam: 0 (0–0); n=3</title><path class="range" d="M156.33,575.00V575.00"/><circle cx="156.33" cy="575.0" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 0.8605 (0.8568–1.078); n=3</title><path class="range" d="M180.33,570.94V571.77"/><rect x="176.33" y="567.76" width="8" height="8"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 0.8766 (0.8346–0.8782); n=3</title><path class="range" d="M180.33,571.03V571.23"/><rect x="176.33" y="567.04" width="8" height="8"/></g>
 <g class="mark granian"><title>granian: 0 (0–0); n=3</title><path class="range" d="M204.33,575.00V575.00"/><path d="M204.33,570.00l5,5 -5,5 -5,-5z"/></g>
 <text x="381.0" y="598" font-size="15" text-anchor="middle" font-weight="400">5,000 clients</text>
 <g class="mark hornbeam"><title>hornbeam: 0 (0–0); n=3</title><path class="range" d="M357.00,575.00V575.00"/><circle cx="357.0" cy="575.0" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 6.525 (6.042–6.544); n=3</title><path class="range" d="M381.00,550.35V552.24"/><rect x="377.00" y="546.42" width="8" height="8"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 6.055 (5.989–6.642); n=3</title><path class="range" d="M381.00,544.98V547.93"/><rect x="377.00" y="543.63" width="8" height="8"/></g>
 <g class="mark granian"><title>granian: 0 (0–0); n=3</title><path class="range" d="M405.00,575.00V575.00"/><path d="M405.00,570.00l5,5 -5,5 -5,-5z"/></g>
 <text x="581.67" y="598" font-size="15" text-anchor="middle" font-weight="400">10,000 clients</text>
-<g class="mark hornbeam"><title>hornbeam: 13.27 (1.207–29.21); n=3</title><path class="range" d="M557.67,464.97V570.45"/><circle cx="557.67" cy="525.02" r="4"/></g>
-<g class="mark uvicorn-standard"><title>uvicorn-standard: 9.776 (8.209–12.06); n=3</title><path class="range" d="M581.67,529.58V544.08"/><rect x="577.67" y="534.18" width="8" height="8"/></g>
+<g class="mark hornbeam"><title>hornbeam: 13.51 (0.7087–20.55); n=3</title><path class="range" d="M557.67,482.10V571.80"/><circle cx="557.67" cy="513.94" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 11.46 (11.36–12.21); n=3</title><path class="range" d="M581.67,519.81V523.67"/><rect x="577.67" y="519.21" width="8" height="8"/></g>
 <g class="mark granian"><title>granian: 0 (0–0); n=3</title><path class="range" d="M605.67,575.00V575.00"/><path d="M605.67,570.00l5,5 -5,5 -5,-5z"/></g>
 </svg>

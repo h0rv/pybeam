@@ -6,28 +6,32 @@ application: a small JSON response and a WebSocket text echo.
 ## Results
 
 **WebSockets.** All three kept 20,000 connections open. Hornbeam timed out on
-33–106 echoes per run at that step; Uvicorn and Granian had no echo errors.
-The chart omits failed steps rather than reporting latency for successful
-echoes alone.
+33–106 echoes per run before [batching path subscriptions](https://github.com/h0rv/hornbeam/pull/23).
+Afterward, two runs were clean and one had 51 echo timeouts. Neither peer
+timed out. Hornbeam's median ramp for the last 10,000 sockets fell from 3.26
+to 2.70 seconds, between Granian (2.16 seconds) and Uvicorn (8.31 seconds).
+Hornbeam's p99 echo latency was 1.8–2.1 seconds in the clean runs; neither
+peer exceeded 46 ms.
 
-![WebSocket p99 echo time and incremental server memory across clean trials.](scale-websockets.svg)
+![WebSocket ramp time, p99 echo latency, and incremental server memory across clean trials.](scale-websockets.svg)
 
-**HTTP.** At 10,000 concurrent clients, Granian delivered 18,600 successful
+**HTTP.** At 10,000 concurrent clients, Granian delivered 17,800 successful
 responses per second at the median, with no failed attempts. Uvicorn delivered
-11,000 per second with 9.8% failed attempts; Hornbeam delivered 8,800 per
-second with 13.3% failed attempts. These are connection targets, not verified
+10,800 per second with 11.5% failed attempts; Hornbeam delivered 9,800 per
+second with 13.5% failed attempts. These are connection targets, not verified
 counts of established sockets.
 
 ![HTTP goodput, p99 response time, and failed attempts by client target.](scale-http.svg)
 
-**Process crash.** Losing the serving process closed all 5,000 original
-WebSockets in every trial. Median time to reopen and echo on the original
-client count was 1.60 seconds for Granian, 2.98 seconds for Hornbeam, and
-3.27 seconds for Uvicorn.
+**Process crash.** Every listener address was reusable within 110 ms, and
+no original WebSockets remained open when checked. Median time to reconnect
+5,000 clients and verify echoes was 1.31 seconds for Granian, 2.24 for
+Hornbeam, and 3.15 for Uvicorn.
 
 ![Time from SIGKILL to listener release, first valid HTTP and WebSocket responses, and return to the original WebSocket load.](scale-crash.svg)
 
-Dots show medians and lines show the full range across three trials.
+Dots show medians and lines show the full range across three trials, excluding
+WebSocket steps with any failures.
 
 ## Reproduce the run
 
@@ -49,22 +53,24 @@ crash results, and server logs.
   count of established sockets. Goodput is HTTP 200 responses divided by the
   load generator's elapsed time, including its final drain.
 - **WebSockets:** four client processes open sockets in batches, then hold each
-  target for at least 10 seconds. Each round sends one echo on up to 100
-  rotating sockets per client process. A step is clean only if the full target
-  stays open at every sample and no handshake or echo fails. The ramp stops at
-  the first failed step. Memory is peak sampled proportional set size (PSS) of
-  the server process tree, not client or kernel socket memory.
+  target for at least 10 seconds. Ramp time measures how long it takes to add
+  the sockets for that step, not the cumulative run. Each round sends one echo
+  on up to 100 rotating sockets per client process, with a three-second timeout.
+  A step is clean only if the full target stays open at every sample and no
+  handshake or echo fails. The ramp stops at the first failed step. Memory is
+  peak sampled proportional set size (PSS) of the server process tree, not
+  client or kernel socket memory.
 - **Crash:** after a clean echo burst with 5,000 open WebSockets, the harness
   dispatches another burst, sends `SIGKILL` to the whole serving process group,
-  and starts a new instance on the same port once the listener releases it.
+  and probes for the first successful bind before restarting on the same port.
   All timings start at the signal. HTTP and WebSocket recovery require a valid
   response and a fresh echoed message, respectively. Full recovery includes
   opening new connections to the original target and checking another echo
   burst. Clients don't reconnect automatically; the harness does it.
 
 The crash test measures single-instance process loss and external restart,
-not worker-level fault isolation, durable state, or failover to a replica.
-The workloads are loopback without TLS or application I/O.
+not graceful shutdown, worker-level fault isolation, durable state, or
+failover to a replica. The workloads use loopback without TLS or application I/O.
 
 ## Appendix
 
@@ -80,7 +86,7 @@ mise exec -- uv pip install --python .venv/bin/python \
   uvloop==0.23.0 httptools==0.8.0 granian==2.8.8
 
 git clone https://github.com/h0rv/hornbeam.git ../hornbeam-web-scale
-git -C ../hornbeam-web-scale checkout --detach d3b7850aacad81145b5d9d314dbe27e367cdcdc5
+git -C ../hornbeam-web-scale checkout --detach 874df8dd82912ae627cf2a7b6f91f784ae88d8e0
 hornbeam_dir="$(realpath ../hornbeam-web-scale)"
 python_config="$(mise where python@3.14.10)/bin/python3.14-config"
 mise --cd "$hornbeam_dir" exec python@3.14.10 erlang@29.1.2 rebar@3.28.0 cmake@4.5.0 -- \
@@ -89,7 +95,9 @@ mkdir -p _build
 ln -sT "$hornbeam_dir/_build/default" _build/hornbeam
 ```
 
-Hornbeam's standalone build pins erlang-python to
+To rerun the pre-fix baseline, build Hornbeam at
+`d3b7850aacad81145b5d9d314dbe27e367cdcdc5` instead and use a different output directory.
+Both standalone builds pin erlang-python to
 `54fdf367d91d9b7f0d9813af64ce1f10599c63d9`. Check that
 `ldd _build/hornbeam/lib/erlang_python/priv/py_nif.so` resolves
 `libpython3.14.so` before running.
@@ -104,7 +112,7 @@ backpressure limit of 65,536 so admission does not cap the ramp.
 
 The test rotates server order across three repeats and starts a fresh
 instance for each phase. The kernel's listener backlog limit was 4,096 and
-the process open-file limit was 65,536. Host CPU steal reached 7% in one-second
+the process open-file limit was 65,536. Host CPU steal reached 10% in one-second
 samples; treat the ranges as observations on this VM, not performance bounds.
 
 The HTTP generator is oha 1.17.0. It warms each instance for two seconds at
