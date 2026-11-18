@@ -54,6 +54,19 @@ for server in hornbeam uvicorn-standard granian; do
 done
 ```
 
+To measure a Hornbeam change, build the candidate into `_build/hornbeam` and
+keep a separate baseline build. With the same Python environment as above,
+run all four variants together:
+
+```sh
+mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
+  --host-http --hornbeam-baseline "$HOME/hornbeam-baseline/_build/default" \
+  --output "$HOME/web-http-before-after"
+```
+
+Add `hornbeam-baseline` to the summary loop and use the new output directory
+to include its median and range.
+
 ### Earlier task-reply comparison
 
 After the runtime and Hornbeam changes merged, Hornbeam trailed Uvicorn with
@@ -348,13 +361,15 @@ used PyBEAM `543e792467d1e7c806e13432cc7a3dd4ff03bc59`, Ubuntu 22.04,
 OTP 29.1.2, and CPython 3.14.10 with Uvicorn 0.54.0. Both builds use the same
 Python executable. The second batch saw up to 14% VM CPU steal in a
 one-second host sample. The chart includes all trials from both batches.
+The current runner also measures Granian when you rerun this comparison.
 
 ```sh
 set -e
 mise install
 mise install oha@1.17.0
 mise exec -- uv sync --locked --all-extras
-mise exec -- uv pip install --python .venv/bin/python uvloop==0.23.0 httptools==0.8.0
+mise exec -- uv pip install --python .venv/bin/python \
+  uvloop==0.23.0 httptools==0.8.0 granian==2.8.8
 export PYBEAM_BUILD_PYTHON="$PWD/.venv/bin/python"
 export PYTHON_CONFIG="$(dirname "$(realpath "$PYBEAM_BUILD_PYTHON")")/python3.14-config"
 export ERL_FLAGS='+S 2:2' CMAKE_BUILD_PARALLEL_LEVEL=2
