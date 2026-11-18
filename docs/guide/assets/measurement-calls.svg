@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="834" viewBox="0 0 340 834" role="img" aria-labelledby="title desc">
+  <title id="title">Actor method wall time: concurrent calls</title>
+  <desc id="desc">sleep async · 100 · 3.14: 0.071–0.086 s. sleep async · 100 · 3.14t: 0.10 s. sleep async · 8,000 · 3.14: 2.8–4.3 s. sleep async · 8,000 · 3.14t: 12.8 s. sleep blocking · 32 · 3.14: 1.62 s. sleep blocking · 32 · 3.14t: 1.65 s. sleep offloaded · 32 · 3.14: 0.16 s. sleep offloaded · 32 · 3.14t: 0.17 s. CPU · 8 · 3.14: 0.96 s. CPU · 8 · 3.14t: 1.06 s. CPU offloaded · 8 · 3.14: 1.0 s. CPU offloaded · 8 · 3.14t: 0.17 s. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <path class="axis" d="M20 38V789"/>
+  <text x="20" y="24" class="note" text-anchor="start">0.01 s</text>
+  <path class="axis" d="M67.5 38V789"/>
+  <text x="67.5" y="24" class="note" text-anchor="middle">0.1</text>
+  <path class="axis" d="M115 38V789"/>
+  <text x="115" y="24" class="note" text-anchor="middle">1</text>
+  <path class="axis" d="M162.5 38V789"/>
+  <text x="162.5" y="24" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M210 38V789"/>
+  <text x="210" y="24" class="note" text-anchor="middle">100</text>
+  <text x="20" y="60">sleep async · 100 · 3.14</text>
+  <rect class="bar" x="20" y="70" width="40.43477156415607" height="12"/>
+  <path d="M60.43477156415607 76H64.38867643406947m0 -6v12"/>
+  <text x="225" y="82" class="note">0.071–0.086 s</text>
+  <text x="20" y="122">sleep async · 100 · 3.14t</text>
+  <rect class="bar" x="20" y="132" width="47.5" height="12"/>
+  <text x="225" y="144" class="note">0.10 s</text>
+  <text x="20" y="184">sleep async · 8,000 · 3.14</text>
+  <rect class="bar" x="20" y="194" width="116.24000648875543" height="12"/>
+  <path d="M136.24000648875543 200H145.08975164003039m0 -6v12"/>
+  <text x="225" y="206" class="note">2.8–4.3 s</text>
+  <text x="20" y="246">sleep async · 8,000 · 3.14t</text>
+  <rect class="bar" x="20" y="256" width="147.59247355827375" height="12"/>
+  <text x="225" y="268" class="note">12.8 s</text>
+  <text x="20" y="308">sleep blocking · 32 · 3.14</text>
+  <rect class="bar" x="20" y="318" width="104.95196319077496" height="12"/>
+  <text x="225" y="330" class="note">1.62 s</text>
+  <text x="20" y="370">sleep blocking · 32 · 3.14t</text>
+  <rect class="bar" x="20" y="380" width="105.33048735016055" height="12"/>
+  <text x="225" y="392" class="note">1.65 s</text>
+  <text x="20" y="432">sleep offloaded · 32 · 3.14</text>
+  <rect class="bar" x="20" y="442" width="57.19569917615644" height="12"/>
+  <text x="225" y="454" class="note">0.16 s</text>
+  <text x="20" y="494">sleep offloaded · 32 · 3.14t</text>
+  <rect class="bar" x="20" y="504" width="58.44632376546801" height="12"/>
+  <text x="225" y="516" class="note">0.17 s</text>
+  <text x="20" y="556">CPU · 8 · 3.14</text>
+  <rect class="bar" x="20" y="566" width="94.1578835693795" height="12"/>
+  <text x="225" y="578" class="note">0.96 s</text>
+  <text x="20" y="618">CPU · 8 · 3.14t</text>
+  <rect class="bar" x="20" y="628" width="96.20202860007659" height="12"/>
+  <text x="225" y="640" class="note">1.06 s</text>
+  <text x="20" y="680">CPU offloaded · 8 · 3.14</text>
+  <rect class="bar" x="20" y="690" width="95" height="12"/>
+  <text x="225" y="702" class="note">1.0 s</text>
+  <text x="20" y="742">CPU offloaded · 8 · 3.14t</text>
+  <rect class="bar" x="20" y="752" width="58.44632376546801" height="12"/>
+  <text x="225" y="764" class="note">0.17 s</text>
+  <text x="20" y="818" class="note">Logarithmic scale</text>
+</svg>

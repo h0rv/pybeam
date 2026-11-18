@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="276" viewBox="0 0 340 276" role="img" aria-labelledby="title desc">
+  <title id="title">Time to start 10,000 actors, threads or tasks</title>
+  <desc id="desc">Actors: ≈24 s. Threads: 1.2 s. asyncio tasks: 0.03 s. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <path class="axis" d="M20 38V231"/>
+  <text x="20" y="24" class="note" text-anchor="start">0.01 s</text>
+  <path class="axis" d="M67.5 38V231"/>
+  <text x="67.5" y="24" class="note" text-anchor="middle">0.1</text>
+  <path class="axis" d="M115 38V231"/>
+  <text x="115" y="24" class="note" text-anchor="middle">1</text>
+  <path class="axis" d="M162.5 38V231"/>
+  <text x="162.5" y="24" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M210 38V231"/>
+  <text x="210" y="24" class="note" text-anchor="middle">100</text>
+  <text x="20" y="60">Actors</text>
+  <rect class="bar" x="20" y="70" width="160.56003398130127" height="12"/>
+  <text x="225" y="82" class="note">≈24 s</text>
+  <text x="20" y="122">Threads</text>
+  <rect class="bar" x="20" y="132" width="98.76110918726218" height="12"/>
+  <text x="225" y="144" class="note">1.2 s</text>
+  <text x="20" y="184">asyncio tasks</text>
+  <rect class="bar" x="20" y="194" width="22.663259599183966" height="12"/>
+  <text x="225" y="206" class="note">0.03 s</text>
+  <text x="20" y="260" class="note">Logarithmic scale</text>
+</svg>

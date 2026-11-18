@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="338" viewBox="0 0 340 338" role="img" aria-labelledby="title desc">
+  <title id="title">Replacement time after one job aborts</title>
+  <desc id="desc">Process per job · 3/3 survive: 80 ms. Prefork pool · 0/3 survive: 53 ms. isolated · 3/3 survive: 70 ms. Separate nodes · 3/3 survive: 254 ms. Linear axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <path class="axis" d="M20 38V293"/>
+  <text x="20" y="24" class="note" text-anchor="start">0 ms</text>
+  <path class="axis" d="M83.33333333333333 38V293"/>
+  <text x="83.33333333333333" y="24" class="note" text-anchor="middle">100</text>
+  <path class="axis" d="M146.66666666666666 38V293"/>
+  <text x="146.66666666666666" y="24" class="note" text-anchor="middle">200</text>
+  <path class="axis" d="M210 38V293"/>
+  <text x="210" y="24" class="note" text-anchor="middle">300</text>
+  <text x="20" y="60">Process per job · 3/3 survive</text>
+  <rect class="bar" x="20" y="70" width="50.66666666666666" height="12"/>
+  <text x="225" y="82" class="note">80 ms</text>
+  <text x="20" y="122">Prefork pool · 0/3 survive</text>
+  <rect class="bar" x="20" y="132" width="33.56666666666667" height="12"/>
+  <text x="225" y="144" class="note">53 ms</text>
+  <text x="20" y="184">isolated · 3/3 survive</text>
+  <rect class="bar" x="20" y="194" width="44.33333333333334" height="12"/>
+  <text x="225" y="206" class="note">70 ms</text>
+  <text x="20" y="246">Separate nodes · 3/3 survive</text>
+  <rect class="bar" x="20" y="256" width="160.86666666666667" height="12"/>
+  <text x="225" y="268" class="note">254 ms</text>
+</svg>

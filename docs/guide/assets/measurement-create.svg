@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="214" viewBox="0 0 340 214" role="img" aria-labelledby="title desc">
+  <title id="title">Time to create one context</title>
+  <desc id="desc">worker: 1.1–1.2 ms. isolated: 61–132 ms. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <path class="axis" d="M20 38V169"/>
+  <text x="20" y="24" class="note" text-anchor="start">1 ms</text>
+  <path class="axis" d="M83.33333333333333 38V169"/>
+  <text x="83.33333333333333" y="24" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M146.66666666666666 38V169"/>
+  <text x="146.66666666666666" y="24" class="note" text-anchor="middle">100</text>
+  <path class="axis" d="M210 38V169"/>
+  <text x="210" y="24" class="note" text-anchor="middle">1,000</text>
+  <text x="20" y="60">worker</text>
+  <rect class="bar" x="20" y="70" width="2.6215367266875873" height="12"/>
+  <path d="M22.621536726687587 76H25.014812249682905m0 -6v12"/>
+  <text x="225" y="82" class="note">1.1–1.2 ms</text>
+  <text x="20" y="122">isolated</text>
+  <rect class="bar" x="20" y="132" width="113.07088955068193" height="12"/>
+  <path d="M133.07088955068193 138H154.30301564303716m0 -6v12"/>
+  <text x="225" y="144" class="note">61–132 ms</text>
+  <text x="20" y="198" class="note">Logarithmic scale</text>
+</svg>

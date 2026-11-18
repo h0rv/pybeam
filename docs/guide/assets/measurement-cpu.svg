@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="586" viewBox="0 0 340 586" role="img" aria-labelledby="title desc">
+  <title id="title">CPU jobs: completion wall time</title>
+  <desc id="desc">8 · worker · 3.14: 2.86 s. 8 · worker · 3.14t: 0.33–0.43 s. 8 · isolated · 3.14: 0.35 s. 8 · isolated · 3.14t: 0.32–0.64 s. 64 · worker · 3.14: 22.9 s. 64 · worker · 3.14t: 2.68–2.77 s. 64 · isolated · 3.14: 2.31 s. 64 · isolated · 3.14t: 2.31–2.70 s. Linear axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <path class="axis" d="M20 38V541"/>
+  <text x="20" y="24" class="note" text-anchor="start">0 s</text>
+  <path class="axis" d="M96 38V541"/>
+  <text x="96" y="24" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M172 38V541"/>
+  <text x="172" y="24" class="note" text-anchor="middle">20</text>
+  <text x="20" y="60">8 · worker · 3.14</text>
+  <rect class="bar" x="20" y="70" width="21.736000000000004" height="12"/>
+  <text x="225" y="82" class="note">2.86 s</text>
+  <text x="20" y="122">8 · worker · 3.14t</text>
+  <rect class="bar" x="20" y="132" width="2.507999999999999" height="12"/>
+  <path d="M22.508 138H23.268m0 -6v12"/>
+  <text x="225" y="144" class="note">0.33–0.43 s</text>
+  <text x="20" y="184">8 · isolated · 3.14</text>
+  <rect class="bar" x="20" y="194" width="2.66" height="12"/>
+  <text x="225" y="206" class="note">0.35 s</text>
+  <text x="20" y="246">8 · isolated · 3.14t</text>
+  <rect class="bar" x="20" y="256" width="2.4319999999999986" height="12"/>
+  <path d="M22.432 262H24.864m0 -6v12"/>
+  <text x="225" y="268" class="note">0.32–0.64 s</text>
+  <text x="20" y="308">64 · worker · 3.14</text>
+  <rect class="bar" x="20" y="318" width="174.04" height="12"/>
+  <text x="225" y="330" class="note">22.9 s</text>
+  <text x="20" y="370">64 · worker · 3.14t</text>
+  <rect class="bar" x="20" y="380" width="20.368000000000002" height="12"/>
+  <path d="M40.368 386H41.052m0 -6v12"/>
+  <text x="225" y="392" class="note">2.68–2.77 s</text>
+  <text x="20" y="432">64 · isolated · 3.14</text>
+  <rect class="bar" x="20" y="442" width="17.555999999999997" height="12"/>
+  <text x="225" y="454" class="note">2.31 s</text>
+  <text x="20" y="494">64 · isolated · 3.14t</text>
+  <rect class="bar" x="20" y="504" width="17.555999999999997" height="12"/>
+  <path d="M37.556 510H40.52m0 -6v12"/>
+  <text x="225" y="516" class="note">2.31–2.70 s</text>
+</svg>
