@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 796 324" width="796" height="324" role="img" aria-labelledby="title desc">
+  <title id="title">Loopback HTTP/1.1 throughput</title>
+  <desc id="desc">Hornbeam without ASGI success replies serves more requests per second than its baseline at median, but still trails Uvicorn. Dots show medians; lines show the range across three runs.</desc>
+  <style>
+    svg { color: #202124; font: 16px system-ui, sans-serif; }
+    text { fill: currentColor; }
+    .paper { fill: #fff; }
+    .grid { stroke: #d1d5db; fill: none; }
+    .comparison { color: #50555d; }
+    .candidate { color: #155a9f; }
+    .range { stroke: currentColor; stroke-width: 2; }
+    .median { fill: currentColor; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #eceef0; }
+      .paper { fill: #151719; }
+      .grid { stroke: #515761; }
+      .comparison { color: #b8bec6; }
+      .candidate { color: #8cc5ff; }
+    }
+  </style>
+  <rect class="paper" width="796" height="324"/>
+  <text x="18" y="29" font-size="21" font-weight="600">Loopback HTTP/1.1 throughput</text>
+  <text x="18" y="54">Requests per second · median and range of three repeats</text>
+  <path class="grid" d="M280.0,74V288 M383.8,74V288 M487.5,74V288 M591.3,74V288 M695.0,74V288"/>
+  <text x="18" y="89" font-weight="600">64 concurrent connections</text>
+  <text x="18" y="199" font-weight="600">256 concurrent connections</text>
+  <text x="18" y="117">Hornbeam · baseline</text>
+  <g class="comparison">
+    <path class="range" d="M430.9,112H608.1"/>
+    <circle class="median" cx="582.1" cy="112" r="4"/>
+  </g>
+  <text x="778" y="117" text-anchor="end">11,648</text>
+  <text x="18" y="142">Hornbeam · no success reply</text>
+  <g class="candidate">
+    <path class="range" d="M609.9,137H628.2"/>
+    <circle class="median" cx="623.9" cy="137" r="4"/>
+  </g>
+  <text x="778" y="142" text-anchor="end">13,260</text>
+  <text x="18" y="167">Uvicorn · uvloop/httptools</text>
+  <g class="comparison">
+    <path class="range" d="M677.7,162H687.3"/>
+    <circle class="median" cx="680.4" cy="162" r="4"/>
+  </g>
+  <text x="778" y="167" text-anchor="end">15,439</text>
+  <text x="18" y="227">Hornbeam · baseline</text>
+  <g class="comparison">
+    <path class="range" d="M566.7,222H599.7"/>
+    <circle class="median" cx="597.3" cy="222" r="4"/>
+  </g>
+  <text x="778" y="227" text-anchor="end">12,232</text>
+  <text x="18" y="252">Hornbeam · no success reply</text>
+  <g class="candidate">
+    <path class="range" d="M596.6,247H639.8"/>
+    <circle class="median" cx="629.1" cy="247" r="4"/>
+  </g>
+  <text x="778" y="252" text-anchor="end">13,461</text>
+  <text x="18" y="277">Uvicorn · uvloop/httptools</text>
+  <g class="comparison">
+    <path class="range" d="M655.4,272H667.7"/>
+    <circle class="median" cx="659.7" cy="272" r="4"/>
+  </g>
+  <text x="778" y="277" text-anchor="end">14,639</text>
+  <text x="280.0" y="310" text-anchor="middle" font-size="14">0</text>
+  <text x="383.8" y="310" text-anchor="middle" font-size="14">4k</text>
+  <text x="487.5" y="310" text-anchor="middle" font-size="14">8k</text>
+  <text x="591.3" y="310" text-anchor="middle" font-size="14">12k</text>
+  <text x="695.0" y="310" text-anchor="middle" font-size="14">16k</text>
+</svg>

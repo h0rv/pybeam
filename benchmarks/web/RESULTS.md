@@ -7,6 +7,17 @@ This measures serving only, not shared state, persistence, or application work.
 
 ## Native HTTP throughput
 
+Skipping task success replies that Hornbeam doesn't use raised median
+throughput by 10–14%. Hornbeam still trailed Uvicorn with uvloop/httptools by
+8–14%. The baseline varied most at 64 connections; all trials returned only
+HTTP 200 responses.
+
+![Hornbeam before and after skipping success replies, compared with optimized Uvicorn. Dots show medians; lines show the range over three repeats.](host-http-task-replies.svg)
+
+[Reproduce the task-reply comparison](#task-reply-comparison-appendix).
+
+### Earlier comparison with asyncio/h11
+
 On the small JSON route, Hornbeam served 34–48% more requests per second than
 single-worker Uvicorn with asyncio/h11, and 22% fewer than single-worker Uvicorn
 with uvloop/httptools. This is a loopback HTTP/1.1 test, not a container,
@@ -256,6 +267,47 @@ The managed transport made 26,867 receive attempts for about 13,400 requests,
 versus 20,478 for about 20,400 standalone requests: its drain-until-EAGAIN loop
 adds receive attempts. These measurements identify contributors, not a complete
 whole-runtime CPU breakdown. The remaining gap and c256 timeouts are unattributed.
+
+## Task-reply comparison appendix
+
+Use a clean checkout of this benchmark and run from its root. The measurements
+used PyBEAM `543e792467d1e7c806e13432cc7a3dd4ff03bc59`, Ubuntu 22.04,
+OTP 29.1.2, and CPython 3.14.10. Both builds use the same Python executable.
+
+```sh
+set -e
+mise install
+mise install oha@1.17.0
+mise exec -- uv sync --locked --all-extras
+mise exec -- uv pip install --python .venv/bin/python uvloop==0.23.0 httptools==0.8.0
+export PYBEAM_BUILD_PYTHON="$PWD/.venv/bin/python"
+export PYTHON_CONFIG="$(dirname "$(realpath "$PYBEAM_BUILD_PYTHON")")/python3.14-config"
+export ERL_FLAGS='+S 2:2' CMAKE_BUILD_PARALLEL_LEVEL=2
+
+work="$(mktemp -d)"
+git worktree add --detach "$work/baseline" 543e792467d1e7c806e13432cc7a3dd4ff03bc59
+git clone https://github.com/h0rv/hornbeam.git "$work/hornbeam"
+git clone https://github.com/h0rv/erlang-python.git "$work/erlang-python"
+
+build() {
+  checkout="$1"
+  git -C "$work/hornbeam" worktree add --detach "$work/hornbeam-$2" "$3"
+  git -C "$work/erlang-python" worktree add --detach "$work/runtime-$2" "$4"
+  mkdir "$checkout/_checkouts"
+  ln -s "$work/hornbeam-$2" "$checkout/_checkouts/hornbeam"
+  ln -s "$work/runtime-$2" "$checkout/_checkouts/erlang_python"
+  (cd "$checkout" && mise trust && mise exec -- rebar3 as hornbeam compile)
+}
+
+build "$work/baseline" baseline \
+  297881ca7961e633f29739c861e818fbb9765d9a 71b35223f89f589d535eaf261dd955428dcb042f
+build "$PWD" candidate \
+  d0b821265ef693861a133c16e54b99d33df805bc 5bc45276b1afb9d0a5fe9d1fb63afe1622aeb733
+
+mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
+  --host-http --hornbeam-baseline "$work/baseline/_build/hornbeam" \
+  --output "$work/results"
+```
 
 ## Host run appendix
 
