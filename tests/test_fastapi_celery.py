@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import override
 
 import httpx
@@ -16,7 +17,7 @@ from examples.fastapi_celery.app import (
     events,
     running_jobs,
 )
-from examples.fastapi_celery.compare import Plan, compare, one
+from examples.fastapi_celery.compare import Plan, compare, one, pss, sample
 from pybeam.submissions import Overloaded
 from pybeam.tasks import TaskLimits, TaskRef, TaskSupervisor, _Failure, _Success
 from tests.fakes import FakeServices, ServiceState
@@ -145,6 +146,57 @@ async def test_compare_empty_and_errors() -> None:
         outcome = await one(client, Plan("http://test"))
     assert outcome.failed
     assert outcome.overhead_ms is None
+
+
+def test_pss_shared_roots_and_exited_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    def descendants(_root: int) -> set[int]:
+        return {1, 2, 3}
+
+    def read(path: Path) -> str:
+        if path.parts[-2] == "3":
+            raise ProcessLookupError
+        assert path.name == "smaps_rollup"
+        return "Rss: 8192 kB\nPss: 1024 kB\nPss_Dirty: 512 kB\n"
+
+    monkeypatch.setattr("examples.fastapi_celery.compare.tree", descendants)
+    monkeypatch.setattr(Path, "read_text", read)
+    assert pss([1, 2]) == 2
+    assert pss([]) == 0
+
+
+def test_pss_does_not_hide_unreadable_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    def descendants(_root: int) -> set[int]:
+        return {1}
+
+    def read(_path: Path) -> str:
+        raise PermissionError("smaps_rollup denied")
+
+    monkeypatch.setattr("examples.fastapi_celery.compare.tree", descendants)
+    monkeypatch.setattr(Path, "read_text", read)
+    with pytest.raises(PermissionError, match="smaps_rollup denied"):
+        pss([1])
+
+
+async def test_memory_peaks(monkeypatch: pytest.MonkeyPatch) -> None:
+    snapshots = iter([(2, 10.0, 1.0), (3, 9.0, 1.5)])
+    proportional = iter([4.0, 5.0])
+    done = asyncio.Event()
+
+    def usage(_pids: object) -> tuple[int, float, float]:
+        snapshot = next(snapshots)
+        if snapshot[0] == 3:
+            done.set()
+        return snapshot
+
+    monkeypatch.setattr("examples.fastapi_celery.compare.usage", usage)
+    monkeypatch.setattr("examples.fastapi_celery.compare.pss", lambda _pids: next(proportional))
+    report = await sample([1], done)
+    assert report is not None
+    assert report.peak_pss_mb == 5
+    assert report.peak_rss_mb == 10
+    assert report.processes == 3
+    assert report.cpu_seconds == 0.5
+    assert await sample([], done) is None
 
 
 @pytest.mark.parametrize("status", ["SUCCESS", "FAILURE"])

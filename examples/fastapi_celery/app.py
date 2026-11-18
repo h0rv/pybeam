@@ -4,7 +4,7 @@ import secrets
 import time
 from collections.abc import AsyncGenerator
 from contextlib import aclosing, asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -18,7 +18,7 @@ from uvicorn import Config, Server
 
 from examples.chat_load.origin import require_same_origin
 from pybeam.codec import Json
-from pybeam.integrations.hornbeam import Beam, Services, run
+from pybeam.integrations.hornbeam import Beam, Services, Subscription, run
 from pybeam.submissions import Overloaded
 from pybeam.tasks import TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 
@@ -57,6 +57,7 @@ class Jobs:
     supervisor: TaskSupervisor
     tasks: asyncio.TaskGroup
     unit: float
+    stopping: asyncio.Event = field(default_factory=asyncio.Event)
 
     async def save(self, status: Status) -> None:
         payload = status.model_dump_json().encode()
@@ -148,16 +149,25 @@ async def row(
     )
 
 
+async def changed(subscription: Subscription, stopping: asyncio.Event) -> None:
+    async with asyncio.TaskGroup() as tasks:
+        update = tasks.create_task(subscription.receive())
+        stopped = tasks.create_task(stopping.wait())
+        await asyncio.wait((update, stopped), return_when=asyncio.FIRST_COMPLETED)
+        update.cancel()
+        stopped.cancel()
+
+
 async def events(task_id: str, jobs: Jobs) -> AsyncGenerator[ServerSentEvent]:
     async with jobs.beam.subscribe(topic(task_id)) as subscription:
-        while True:
+        while not jobs.stopping.is_set():
             current = await jobs.read(task_id)
             content = templates.get_template("cells.html").render(status=current)
             yield ServerSentEvent(raw_data=content)
             if current.task_status != "PENDING":
                 yield ServerSentEvent(event="done", raw_data="")
                 return
-            await subscription.receive()
+            await changed(subscription, jobs.stopping)
 
 
 @app.get("/tasks/{task_id}/events", response_class=EventSourceResponse)
@@ -175,7 +185,27 @@ async def main() -> None:
     if not 0 < args.task_unit <= 3600:
         parser.error("--task-unit must be positive and at most 3600 seconds")
     owner.unit = args.task_unit
-    await Server(Config(app, host="127.0.0.1", port=args.port, loop="none", lifespan="on")).serve()
+    server = Server(
+        Config(
+            app,
+            host="127.0.0.1",
+            port=args.port,
+            loop="none",
+            lifespan="on",
+            log_level="warning",
+            timeout_graceful_shutdown=2,
+        )
+    )
+    async with asyncio.TaskGroup() as tasks:
+        serving = tasks.create_task(server.serve())
+        try:
+            await asyncio.shield(serving)
+        except asyncio.CancelledError:
+            if owner.jobs is not None:
+                owner.jobs.stopping.set()
+            server.should_exit = True
+            await serving
+            raise
 
 
 if __name__ == "__main__":

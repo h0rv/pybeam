@@ -31,7 +31,7 @@ TASK_UNIT=1 docker compose -f examples/fastapi_celery/original/compose.yaml up -
 Open <http://127.0.0.1:8811/>; the task dashboard is at
 <http://127.0.0.1:5556/>. `TASK_UNIT` defaults to 10.
 `mise run example:fastapi-celery-original` runs the same command with defaults.
-The worker uses four processes. The port admits at most 64 concurrent tasks and
+The prefork worker defaults to the CPU count. The port admits at most 64 concurrent tasks and
 returns HTTP 503 when full; it does not provide a waiting queue.
 
 Stop containers without deleting the queue volume:
@@ -56,12 +56,13 @@ overhead includes queueing, network time and polling delay; it is not pure runti
 overhead. `--timeout` bounds each task's observation window (default 300 seconds).
 `--json` emits only JSON.
 
-On Linux, repeat `--pid PID` for the stack's root processes to sample peak total
-RSS and peak process count, including descendants. For containers, include the
+On Linux, repeat `--pid PID` for the stack's root processes to sample peak summed
+PSS, RSS, CPU time and process count, including descendants. For containers, include the
 host PIDs of all four services; a client or Compose command PID does not measure
-the containers. Run the driver outside those trees. Memory counts sum RSS, so
-shared pages can be counted more than once. Results depend on worker concurrency,
-task count and host load; this example does not equalize scheduling policies.
+the containers. Run the driver outside those trees. PSS apportions shared pages;
+RSS counts them in full for each process. Reading `smaps_rollup` requires permission
+to inspect each process; permission errors stop the measurement rather than fall
+back to RSS.
 
 ## What maps to what
 
@@ -90,70 +91,57 @@ wait for them. Neither page has authentication; bind only to loopback for local 
 
 ## Measured results
 
-Each stack received 64 concurrent type-1 tasks with a one-second task unit, three
-times. Runs alternated between stacks without restarting them after HTTP smoke
-checks. Each value below is the median of the three run-level measurements, not
-a percentile of pooled requests. Idle snapshots were taken immediately before
-each run.
+Medians of three runs per configuration: 64 concurrent type-1 submissions, one-second
+task unit, 100 ms polling. Idle snapshots precede each run; no restarts between
+repetitions. Percentiles are medians of run-level percentiles, not pooled requests.
 
-The original's prefork worker defaults to the CPU count (8 on this machine), but
-the checked-in Compose command explicitly uses 4. For this comparison, an override
-sets 64 worker processes to match the port's 64 concurrent task slots. This lets
-both stacks overlap the 64 blocking sleeps; it does not compare CPU-bound work or
-make their durability guarantees equivalent. All four original services,
-including the dashboard, are included in resource measurements.
+| Metric | Port, 64 slots | Original, 64 workers | Original, default 8 workers |
+| --- | ---: | ---: | ---: |
+| Idle PSS (MiB) | 164.7 | 2,355.9 | 510.3 |
+| Peak PSS (MiB) | 167.6 | 2,360.7 | 511.1 |
+| Peak RSS (MiB) | 189.6 | 4,914.1 | 866.8 |
+| Idle / peak processes | 3 / 3 | 68 / 68 | 12 / 12 |
+| Server CPU seconds | 1.91 | 1.20 | 3.45 |
+| Submit p50 / p99 (ms) | 216.453 / 243.542 | 115.900 / 149.537 | 122.463 / 139.918 |
+| Completion overhead p50 / p99 (ms) | 255.867 / 344.228 | 249.040 / 289.315 | 3,624.130 / 7,137.149 |
+| Failures per 64 tasks | 0 | 0 | 0 |
 
-| Metric | PyBEAM port | Original, 64 workers |
-| --- | ---: | ---: |
-| Idle summed RSS (MiB) | 179.3 | 4,893.2 |
-| Idle processes | 3 | 68 |
-| Peak summed RSS during run (MiB) | 184.2 | 4,900.8 |
-| Peak processes during run | 3 | 68 |
-| Server CPU time during run (seconds) | 1.80 | 1.18 |
-| Submit latency p50 (ms) | 165.430 | 143.470 |
-| Submit latency p99 (ms) | 183.946 | 181.475 |
-| Completion overhead p50 (ms) | 197.850 | 181.496 |
-| Completion overhead p99 (ms) | 272.315 | 267.213 |
-| Failures per 64 tasks | 0 | 0 |
+At 8 workers the original queues the 64 tasks, visible in completion overhead; its dashboard container is included in both original configurations.
 
-Summed RSS counts shared pages once per process, including prefork workers; it is
-not unique physical memory. Sampling covers server process trees, not the load
-driver or container daemon. These short runs include queueing and 100 ms polling
-delay and do not establish sustained throughput.
+PSS comes from `/proc/<pid>/smaps_rollup`; the driver and container daemon are
+excluded. These blocking-sleep runs do not establish CPU parallelism or sustained
+throughput, and the stacks retain different durability guarantees.
 
-To rerun, start the port with `--port 8810 --task-unit 1` as above. Start the
-original with this override, leaving its Compose file unchanged:
+To rerun, start the port as above. In Bash, from the repository root (`sudo` lets
+the sampler read root-owned container memory):
 
 ```sh
-TASK_UNIT=1 docker compose -f examples/fastapi_celery/original/compose.yaml -f - up -d --build <<'YAML'
+UV=$(command -v uv)
+compose=(docker compose -f examples/fastapi_celery/original/compose.yaml)
+measure() {
+  local url=$1; shift
+  local args=()
+  for pid; do args+=(--pid "$pid"); done
+  for trial in 1 2 3; do
+    sudo "$UV" run --locked --all-extras python -c 'import sys; from examples.chat_load.traffic import usage; from examples.fastapi_celery.compare import pss; pids = list(map(int, sys.argv[1:])); print("Idle PSS MiB / processes:", round(pss(pids), 1), usage(pids)[0])' "$@"
+    sudo "$UV" run --locked --all-extras python -m examples.fastapi_celery.compare "$url" --tasks 64 --type 1 --task-unit 1 "${args[@]}" --json
+  done
+}
+original() {
+  until [[ $("${compose[@]}" logs worker) == *" ready."* ]]; do sleep 1; done
+  local pids=()
+  mapfile -t pids < <("${compose[@]}" ps -q | xargs docker inspect -f '{{.State.Pid}}')
+  measure http://127.0.0.1:8811 "${pids[@]}"
+}
+measure http://127.0.0.1:8810 "$(pgrep -nf 'python -m examples[.]fastapi_celery[.]app --port 8810 --task-unit 1')"
+TASK_UNIT=1 "${compose[@]}" -f - up -d --build <<'YAML'
 services:
   worker:
     command: celery -A worker.celery worker --loglevel=info --concurrency=64
 YAML
-```
-
-Wait for the worker's `ready` log, then make the same HTTP smoke checks against
-both stacks. In Bash, from the repository root, capture the actual Python process
-and every container's host PID, then alternate three runs:
-
-```sh
-PORT_PID=$(pgrep -nf 'python -m examples[.]fastapi_celery[.]app --port 8810 --task-unit 1')
-mapfile -t ORIGINAL_PIDS < <(docker compose -f examples/fastapi_celery/original/compose.yaml ps -q | xargs docker inspect -f '{{.State.Pid}}')
-ORIGINAL_ARGS=()
-for pid in "${ORIGINAL_PIDS[@]}"; do ORIGINAL_ARGS+=(--pid "$pid"); done
-
-idle() {
-  uv run --locked --all-extras python -c 'import json; import sys; from examples.chat_load.traffic import usage; processes, rss, _ = usage(map(int, sys.argv[1:])); print(json.dumps({"processes": processes, "rss_mib": round(rss, 1)}))' "$@"
-}
-
-for trial in 1 2 3; do
-  printf '\nPort trial %s\n' "$trial"
-  idle "$PORT_PID"
-  uv run --locked --all-extras python -m examples.fastapi_celery.compare http://127.0.0.1:8810 --tasks 64 --type 1 --task-unit 1 --pid "$PORT_PID" --json
-  printf '\nOriginal trial %s\n' "$trial"
-  idle "${ORIGINAL_PIDS[@]}"
-  uv run --locked --all-extras python -m examples.fastapi_celery.compare http://127.0.0.1:8811 --tasks 64 --type 1 --task-unit 1 "${ORIGINAL_ARGS[@]}" --json
-done
+original
+TASK_UNIT=1 "${compose[@]}" up -d
+original
 ```
 
 Machine: Linux, 8 logical CPUs, 32 GiB RAM; Python 3.14.10.

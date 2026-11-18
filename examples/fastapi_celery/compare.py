@@ -2,13 +2,16 @@ import argparse
 import asyncio
 import json
 import time
+from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Literal
 
 import httpx
 from pydantic import ValidationError
 
-from examples.chat_load.traffic import Latency, Resources, sample, summarize
+from examples.chat_load.traffic import Latency, summarize, tree, usage
 from examples.fastapi_celery.app import Accepted, Status
 
 
@@ -27,6 +30,44 @@ class Outcome:
     submit_ms: float | None
     overhead_ms: float | None
     failed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class Resources:
+    processes: int
+    peak_pss_mb: float
+    peak_rss_mb: float
+    cpu_seconds: float
+
+
+def pss(pids: Sequence[int]) -> float:
+    total_kb = 0
+    for pid in {child for root in pids for child in tree(root)}:
+        try:
+            rollup = Path("/proc", str(pid), "smaps_rollup").read_text()
+        except FileNotFoundError, ProcessLookupError:
+            continue
+        total_kb += int(
+            next(line for line in rollup.splitlines() if line.startswith("Pss:")).split()[1]
+        )
+    return total_kb / 1024
+
+
+async def sample(pids: Sequence[int], done: asyncio.Event) -> Resources | None:
+    if not pids:
+        return None
+    processes, peak_rss, first = usage(pids)
+    peak_pss = pss(pids)
+    last = first
+    while not done.is_set():
+        with suppress(TimeoutError):
+            async with asyncio.timeout(0.25):
+                await done.wait()
+        count, rss, last = usage(pids)
+        processes = max(processes, count)
+        peak_rss = max(peak_rss, rss)
+        peak_pss = max(peak_pss, pss(pids))
+    return Resources(processes, round(peak_pss, 1), round(peak_rss, 1), round(last - first, 2))
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,8 +160,10 @@ def main() -> None:
     print("Failures: {} / {}".format(report.failures, plan.tasks))
     if report.resources is not None:
         print(
-            "Peak total RSS: {} MiB; peak process count: {}".format(
-                report.resources.peak_rss_mb, report.resources.processes
+            "Peak total PSS: {} MiB; peak total RSS: {} MiB; peak process count: {}".format(
+                report.resources.peak_pss_mb,
+                report.resources.peak_rss_mb,
+                report.resources.processes,
             )
         )
 

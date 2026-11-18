@@ -32,7 +32,10 @@ async def observe(url: str) -> None:
         assert status.task_result is True
 
 
-def test_native_task_get_and_push(request: pytest.FixtureRequest, tmp_path: Path) -> None:
+@pytest.mark.parametrize("shutdown", ["idle", "stream", "task"])
+def test_native_task_get_and_push(
+    request: pytest.FixtureRequest, tmp_path: Path, shutdown: str
+) -> None:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and a built runtime")
     configured: object = request.config.getoption("hornbeam_runtime")
@@ -75,6 +78,29 @@ def test_native_task_get_and_push(request: pytest.FixtureRequest, tmp_path: Path
                     assert time.monotonic() < deadline, log.read_text()
                     time.sleep(0.1)
             asyncio.run(observe(url))
+            with httpx.Client(base_url=url, timeout=10) as client:
+                if shutdown == "idle":
+                    process.terminate()
+                else:
+                    task_id = "unknown"
+                    if shutdown == "task":
+                        response = client.post("/tasks", json={"type": 1})
+                        task_id = Accepted.model_validate_json(response.content).task_id
+                    async_path = "/tasks/" + task_id + "/events"
+                    with client.stream("GET", async_path) as stream:
+                        lines = stream.iter_lines()
+                        first_event: list[str] = []
+                        for line in lines:
+                            if not line:
+                                break
+                            first_event.append(line)
+                        assert any("PENDING" in line for line in first_event)
+                        process.terminate()
+                        list(lines)
+                process.wait(timeout=15)
         finally:
-            process.terminate()
-            process.wait(timeout=15)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=15)
+    assert process.returncode == 143
+    assert log.read_text() == ""
