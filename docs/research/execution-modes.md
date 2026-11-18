@@ -280,6 +280,33 @@ A reviewed, parameterized version of these harnesses belongs in `benchmarks/` be
 
 
 
+### Four-job fan-out and blast-radius reproduction
+
+The published fan-out and crash charts record earlier erlang-python `c007eb5` probes. Set `APP` to the matching native application directory containing `ebin` and `priv/py_nif.so`, following [development runtime setup](../development.md#use-a-development-runtime).
+
+The in-repo modes lab implements both experiments; these commands rerun the same workloads, not guaranteed historical values:
+
+```sh
+mise run modes-lab
+```
+
+Open `http://127.0.0.1:38941`, choose fan-out with 4 jobs and 3,000,000 iterations, or crash with 4 jobs. Free-threaded lanes require `PYBEAM_LAB_ERLANG_PYTHON_314T` and `PYBEAM_LAB_PYTHON_314T` pointing to matching builds; `PYBEAM_LAB_ERLANG_PYTHON` selects the conventional native application directory.
+
+For direct JSON output, run each baseline and BEAM mode from the repository root:
+
+```sh
+for mode in asyncio threads spawn prefork; do
+  mise exec -- python -m examples.modes_lab.baselines fanout "$mode" 4 3000000
+  mise exec -- python -m examples.modes_lab.baselines crash "$mode" 4 0
+done
+for mode in worker isolated nodes; do
+  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" fanout "$mode" 4 3000000
+  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" crash "$mode" 4 0
+done
+```
+
+Repeat the threads, worker and isolated fan-out commands with the free-threaded interpreter and matching native build. Crash commands intentionally abort child processes or VMs; run them in a disposable development environment with core dumps disabled (`ulimit -c 0`).
+
 ### In-repository checks
 
 The original raw-context and task-probe harness files are external and missing from this repository; the following checks exercise available probes, not an exact regeneration of those historical values.

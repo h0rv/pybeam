@@ -96,64 +96,14 @@ Each process makes one empty call, with at most 32 calls in flight. A million wa
 - Actors beyond 10,000 or under container memory limits.
 - Actor throughput and memory with pooled dispatch.
 
-## Appendix: environment and reproduce
-
-### Environment and source data
-
-- Linux x86-64, 8 CPUs, 31 GiB memory; CPython 3.14.10 (GIL enabled) and 3.14.10t (free-threaded), Erlang/OTP 29.1.2.
-- CPU, actor and fan-in charts: erlang-python `d60392c`; [actor capacity methods and recorded results](../../research/actor-capacity.md). Actors: three conventional runs and one free-threaded run; plain Python: one conventional run; context matrix: one conventional and two free-threaded runs.
-- Four-job fan-out and blast-radius charts: earlier erlang-python `c007eb5` probes; [execution modes methods and evidence](../../research/execution-modes.md). These are historical comparisons, not controlled same-revision results.
-
-### Context, CPU and fan-in charts
-
-From the repository root, use a matching Python interpreter and native application build for each build being compared. Follow [development runtime setup](../../development.md#use-a-development-runtime); set `APP` to that build's erlang-python application directory containing `ebin` and `priv/py_nif.so`.
-
-```sh
-mise exec -- python docs/research/probes/capacity/modes_matrix.py "$APP"
-```
-
-The [matrix runner](../../research/probes/capacity/modes_matrix.py) regenerates CPU and fan-in measurements through the [in-repo probe](../../../examples/modes_lab/probe.escript), including context creation, RSS and empty-call latency. It also runs unsupported own-GIL rows, which are not charted here; repeat runs to obtain ranges rather than expecting identical timings.
-
-### Actor memory, start and method charts
-
-Run from the repository root with a configured `development_runtime`, separately for each matching Python/native build:
-
-```sh
-mise exec -- python docs/research/probes/capacity/server.py 38999 &
-PROBE_PORT=38999 mise exec -- uv run --locked python docs/research/probes/capacity/pybeam_actors.py
-mise exec -- python docs/research/probes/capacity/plain_python.py threads 10000
-mise exec -- python docs/research/probes/capacity/plain_python.py tasks 10000
-```
-
-Stop the background server afterward. The [actor probe](../../research/probes/capacity/pybeam_actors.py) prints spawn checkpoints and a `RESULT` JSON line; current pooled dispatch changes its results, so reproducing the historical actor numbers requires the pre-pool implementation described in the source data, not today's runtime.
-
-### Four-job fan-out and blast-radius charts
-
-The in-repo modes lab implements both experiments; these commands rerun the same workloads, not guaranteed historical values:
-
-```sh
-mise run modes-lab
-```
-
-Open `http://127.0.0.1:38941`, choose fan-out with 4 jobs and 3,000,000 iterations, or crash with 4 jobs. Free-threaded lanes require `PYBEAM_LAB_ERLANG_PYTHON_314T` and `PYBEAM_LAB_PYTHON_314T` pointing to matching builds; `PYBEAM_LAB_ERLANG_PYTHON` selects the conventional native application directory.
-
-For direct JSON output, run each baseline and BEAM mode from the repository root:
-
-```sh
-for mode in asyncio threads spawn prefork; do
-  mise exec -- python -m examples.modes_lab.baselines fanout "$mode" 4 3000000
-  mise exec -- python -m examples.modes_lab.baselines crash "$mode" 4 0
-done
-for mode in worker isolated nodes; do
-  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" fanout "$mode" 4 3000000
-  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" crash "$mode" 4 0
-done
-```
-
-Repeat the threads, worker and isolated fan-out commands with the free-threaded interpreter and matching native build. Crash commands intentionally abort child processes or VMs; run them in a disposable development environment with core dumps disabled (`ulimit -c 0`).
-
 <style>
 .measurement-chart { overflow-x: auto; }
 .measurement-chart img { width: 100%; min-width: 680px; max-inline-size: none; height: auto; }
 .measurement-chart:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 </style>
+
+## Appendix: environment and provenance
+
+- Linux x86-64, 8 CPUs, 31 GiB memory; CPython 3.14.10 (GIL enabled) and 3.14.10t (free-threaded), Erlang/OTP 29.1.2.
+- CPU, actor and fan-in charts used erlang-python `d60392c`: three conventional actor runs and one free-threaded run, one conventional plain-Python run, and one conventional plus two free-threaded context-matrix runs. See [actor capacity reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/actor-capacity.md#recorded-method-and-reproduction).
+- Four-job fan-out and blast-radius charts used earlier erlang-python `c007eb5` probes, not controlled same-revision comparisons. See [execution-mode reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/execution-modes.md#four-job-fan-out-and-blast-radius-reproduction).

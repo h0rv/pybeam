@@ -320,7 +320,9 @@ PROBE_PORT=38999 mise exec -- uv run --locked python docs/research/probes/capaci
 
 Run the last command from a directory whose `pyproject.toml` sets `development_runtime`.
 
-The PyBEAM probe prints one row per spawn checkpoint and one `RESULT` JSON line, and takes about a minute.
+The PyBEAM probe prints one row per spawn checkpoint and one `RESULT` JSON line, and takes about a minute. Stop the background server afterward.
+
+The mode grid regenerates context creation, RSS, empty-call latency, CPU and fan-in measurements through the in-repo modes-lab probe, including unsupported own-GIL rows. Repeat runs to obtain ranges rather than expecting identical timings.
 
 The mode grid and the state probe take the erlang-python application directory, for example `_build/default/lib/erlang_python`. `py_nif.so` there must be built for the Python you are measuring:
 
@@ -344,6 +346,7 @@ The historical actor values require the pre-pool runtime described above; the cu
 ```sh
 mise exec -- uv run --locked python tools/build_native.py
 APP="$PWD/_build/hornbeam/lib/erlang_python"
+mise exec -- python docs/research/probes/capacity/modes_matrix.py "$APP"
 mise exec -- python docs/research/probes/capacity/state/codecs.py
 mise exec -- uv run --locked --all-extras python docs/research/probes/capacity/web/request_path.py
 mise exec -- escript docs/research/probes/capacity/pool/inflight.escript "$APP" "$PWD/docs/research/probes/capacity/pool" 10000
