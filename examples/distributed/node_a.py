@@ -121,10 +121,14 @@ async def main() -> None:
         directory / "a.birth.json",
         Json(Identity).encode(identity(os.getpid())).decode(),
     )
+    while True:
+        if (directory / "b.identity.json").exists():
+            break
+        await asyncio.sleep(0.05)
     async with asyncio.timeout(10):
         while True:
             joined = await local(Request(op="connect", alias="b"))
-            if joined.status == "ok" and (directory / "b.identity.json").exists():
+            if joined.status == "ok":
                 break
             await asyncio.sleep(0.05)
     peer = await remote("b", Request(op="snapshot"))
