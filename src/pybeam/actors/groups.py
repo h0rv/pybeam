@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncGenerator, Callable, Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from itertools import count
@@ -17,7 +17,7 @@ from pybeam.actors.classes import (
     reference_route,
 )
 from pybeam.actors.codec import CONSTRUCTION_PROBE, ActorPayloadError, decode_reply
-from pybeam.actors.state import SnapshotSpec
+from pybeam.actors.state import ClaimedSnapshot, SnapshotSpec, _finish
 from pybeam.runtime.config import load_config
 
 
@@ -120,7 +120,13 @@ class ActorGroup:
         max_children: int = 128,
         max_pending: int = 64,
         max_bytes: int = 1_048_576,
+        replicas: Sequence[str] = (),
     ) -> None:
+        if isinstance(replicas, str | bytes) or any(
+            not node or "\x00" in node for node in replicas
+        ):
+            raise ValueError("replicas must contain nonempty node names")
+        self._replicas = tuple(node.encode() for node in replicas)
         self._limits = _ActorGroupConfig(
             max_children=max_children, max_pending=max_pending, max_bytes=max_bytes
         )
@@ -130,6 +136,8 @@ class ActorGroup:
         self._routes: list[Route] = []
         self._ids = count()
         self._stops: dict[str, asyncio.Task[Failed | None]] = {}
+        self._owned: dict[str, ClaimedSnapshot] = {}
+        self._restores: set[asyncio.Task[object]] = set()
         self._entered = False
         self._closing = False
         self._closing_task: asyncio.Task[bool | None] | None = None
@@ -140,6 +148,7 @@ class ActorGroup:
         self._entered = True
         native = await open_group(max_children=self._limits.max_children)
         self._native = native
+        self._stack.push_async_callback(self._release_owned)
         self._stack.push_async_callback(native.close)
         try:
             self._starts = await asyncio.TaskGroup().__aenter__()
@@ -157,6 +166,7 @@ class ActorGroup:
         kwargs: Mapping[str, object],
         state_key: str | None = None,
     ) -> Started[T] | Failed:
+        snapshot: ClaimedSnapshot | None = None
         try:
             spec = definition(cls)
             payload = spec.constructor.encode(args, kwargs)
@@ -164,11 +174,11 @@ class ActorGroup:
             size = self._limits.max_bytes
             if len(payload) > size:
                 raise ActorPayloadError("Encoded actor constructor exceeds max_bytes")
-            snapshot = (
-                SnapshotSpec.build(cls, state_key, load_config(Path.cwd()).data_dir, size)
-                if state_key is not None
-                else None
-            )
+            if state_key is not None:
+                snapshot = await ClaimedSnapshot.acquire(
+                    SnapshotSpec.build(cls, state_key, load_config(Path.cwd()).data_dir, size),
+                    self._replicas,
+                )
             actor = await native.spawn(
                 cls.__qualname__ + "-" + str(next(self._ids)),
                 spec.factory(payload, max_bytes=size, snapshot=snapshot),
@@ -182,8 +192,13 @@ class ActorGroup:
                 raise
             route = Route(actor, spec.methods, cls, active=not self._closing)
             self._routes.append(route)
+            if snapshot is not None:
+                self._owned[actor.child_id] = snapshot
+                snapshot = None
             return Started(spec.reference(cls, route))
         except BaseException as error:
+            if snapshot is not None:
+                await _finish(asyncio.create_task(snapshot.release()))
             return Failed(error)
 
     @overload
@@ -216,15 +231,37 @@ class ActorGroup:
 
         All declared fields must be data supported by Json. The constructor runs
         on each start, then saved fields replace its values before the first call.
-        Keep data_dir across launches. Snapshots survive local process crashes,
-        not disk loss; replication and cross-node restart are not provided.
-        Concurrent actors with one key conflict on writes, not on activation.
+        Keep data_dir across launches. One restore owns a class/key at a time;
+        others wait until stop or group exit. Ownership survives crash/rejoin.
+        With at least three replicas including this node, run a standby restore
+        on each node for takeover after owner-node loss. Majority-backed writes
+        fence stale owners. Empty replicas keeps snapshots on this node only.
+        Calls from other nodes do not follow the actor. Uncommitted in-memory
+        changes are lost. Tested only with same-host process kills, not partitions.
         """
         if self._closing or self._starts is None or self._native is None:
             raise RuntimeError("ActorGroup is not open")
         if not is_actor_class(cls):
             raise TypeError("ActorGroup.restore requires a decorated actor class")
-        outcome = await self._starts.create_task(self._spawn(cls, self._native, args, kwargs, key))
+        pending = self._starts.create_task(self._spawn(cls, self._native, args, kwargs, key))
+        self._restores.add(pending)
+        try:
+            try:
+                outcome = await asyncio.shield(pending)
+            except asyncio.CancelledError:
+                pending.cancel()
+                outcome = await _finish(pending)
+                if isinstance(outcome, Started) and isinstance(outcome.reference, Reference):
+                    route = reference_route(outcome.reference)
+                    route.active = False
+                    stopped = await _finish(
+                        asyncio.create_task(self._stop(self._native, route.native.child_id))
+                    )
+                    if isinstance(stopped, Failed):
+                        raise stopped.error from None
+                raise
+        finally:
+            self._restores.discard(pending)
         if isinstance(outcome, Failed):
             raise outcome.error
         return outcome.reference
@@ -242,9 +279,18 @@ class ActorGroup:
     async def _stop(self, native: DataGroup, child_id: str) -> Failed | None:
         try:
             await native.stop(child_id)
+            if owned := self._owned.get(child_id):
+                await owned.release()
+                del self._owned[child_id]
         except BaseException as error:
             return Failed(error)
         return None
+
+    async def _release_owned(self) -> None:
+        async with asyncio.TaskGroup() as releases:
+            for owned in self._owned.values():
+                releases.create_task(owned.release())
+        self._owned.clear()
 
     async def stop(self, reference: object, /) -> None:
         route = self._require_member(reference)
@@ -304,6 +350,8 @@ class ActorGroup:
     ) -> bool | None:
         if self._closing_task is None:
             self._closing = True
+            for pending in self._restores:
+                pending.cancel()
             for route in self._routes:
                 route.active = False
             self._closing_task = asyncio.create_task(
