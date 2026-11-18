@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="165" viewBox="0 0 800 165" role="img" aria-labelledby="title desc">
+<title id="title">Python smoke mean completion rate</title><desc id="desc">Three repeats: 96068.14 events/s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Python smoke mean completion rate</text>
+
+<text x="215" y="72" text-anchor="end">Three repeats</text>
+<rect class="s0" x="230" y="65" width="384.27256" height="14"/>
+<text x="621.27256" y="77">96.1k events/s</text><path d="M230,107H630"/>
+<path d="M230,107v5"/><text x="230" y="131" text-anchor="start">0</text><path d="M330,107v5"/><text x="330" y="131" text-anchor="middle">25,000</text><path d="M430,107v5"/><text x="430" y="131" text-anchor="middle">50,000</text><path d="M530,107v5"/><text x="530" y="131" text-anchor="middle">75,000</text><path d="M630,107v5"/><text x="630" y="131" text-anchor="end">100,000</text>
+<text x="630" y="155" text-anchor="end">events/s</text></svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="390" viewBox="0 0 800 390" role="img" aria-labelledby="title desc">
+<title id="title">In-process validated request throughput</title><desc id="desc">1 thread, GIL: 2905 requests/s; 1 thread, Free-threaded: 1919 requests/s; 2 threads, GIL: 2108 requests/s; 2 threads, Free-threaded: 3519 requests/s; 4 threads, GIL: 1369 requests/s; 4 threads, Free-threaded: 5645 requests/s; 8 threads, GIL: 1241 requests/s; 8 threads, Free-threaded: 10760 requests/s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">In-process validated request throughput</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">1 thread</text>
+<rect class="s0" x="230" y="95" width="77.46666666666667" height="14"/>
+<text x="314.4666666666667" y="107">2.90k requests/s</text>
+<rect class="s1" x="230" y="116" width="51.17333333333331" height="14"/>
+<text x="288.1733333333333" y="128">1.92k requests/s</text>
+<text x="215" y="170.5" text-anchor="end">2 threads</text>
+<rect class="s0" x="230" y="153" width="56.21333333333334" height="14"/>
+<text x="293.21333333333337" y="165">2.11k requests/s</text>
+<rect class="s1" x="230" y="174" width="93.84" height="14"/>
+<text x="330.84000000000003" y="186">3.52k requests/s</text>
+<text x="215" y="228.5" text-anchor="end">4 threads</text>
+<rect class="s0" x="230" y="211" width="36.506666666666646" height="14"/>
+<text x="273.50666666666666" y="223">1.37k requests/s</text>
+<rect class="s1" x="230" y="232" width="150.53333333333333" height="14"/>
+<text x="387.5333333333333" y="244">5.64k requests/s</text>
+<text x="215" y="286.5" text-anchor="end">8 threads</text>
+<rect class="s0" x="230" y="269" width="33.09333333333333" height="14"/>
+<text x="270.0933333333333" y="281">1.24k requests/s</text>
+<rect class="s1" x="230" y="290" width="286.93333333333334" height="14"/>
+<text x="523.9333333333334" y="302">10.8k requests/s</text><path d="M230,332H630"/>
+<path d="M230,332v5"/><text x="230" y="356" text-anchor="start">0</text><path d="M363.33333333333337,332v5"/><text x="363.33333333333337" y="356" text-anchor="middle">5,000</text><path d="M496.6666666666667,332v5"/><text x="496.6666666666667" y="356" text-anchor="middle">10,000</text><path d="M630,332v5"/><text x="630" y="356" text-anchor="end">15,000</text>
+<text x="630" y="380" text-anchor="end">requests/s</text></svg>

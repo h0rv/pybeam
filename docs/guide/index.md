@@ -1,6 +1,6 @@
 # Get started
 
-PyBEAM adds actors, shared state and messaging to async Python, without locks or extra infrastructure. Keep your existing web framework and write ordinary async functions.
+PyBEAM adds actors, shared state and messaging to async Python, without a separate broker. Keep your existing web framework and write ordinary async functions.
 
 ```sh
 uv add python-beam

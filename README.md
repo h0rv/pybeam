@@ -1,12 +1,12 @@
 # PyBEAM
 
-Actors, shared state and messaging for async Python, without locks or extra infrastructure.
+Actors, shared state and messaging for async Python, without a separate broker.
 
 ```sh
 uv add python-beam
 ```
 
-- [Actors](docs/guide/actors.md) keep state and handle one call at a time, so you never need a lock.
+- [Actors](docs/guide/actors.md) keep state and handle one call at a time, without locks around actor state.
 - [Supervision](docs/guide/supervision.md) restarts an actor that fails.
 - [Shared state](docs/guide/state.md) stores values and counts atomically across requests.
 - [Messaging](docs/guide/messaging.md) notifies subscribers without a broker.

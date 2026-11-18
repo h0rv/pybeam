@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shared BEAM counter · Litestar</title>
+  <title>Shared PyBEAM counter · Litestar</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/missing.min.css">
-  <script src="/static/htmx.min.js" defer></script>
-  <script src="/static/sse.js" defer></script>
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/sse.js"></script>
 </head>
 <body>
 <main>
@@ -21,9 +21,9 @@
     <button type="submit">Increment</button>
   </form>
   <p id="confirmation" role="status"></p>
-  <p>Litestar stores the counter in BEAM ETS. Notifications trigger fresh reads.
+  <p>Litestar updates a shared PyBEAM counter. Notifications trigger fresh reads.
      Watch the terminal for increments, publications, and subscription activity.</p>
-  <p>Everyone shares this node-local counter. It is not persistent and has no authentication.</p>
+  <p>Everyone connected to this app shares the counter. Restarting the app clears it. This demo has no authentication.</p>
   <p><a href="/">Reload current state</a></p>
 </main>
 </body>

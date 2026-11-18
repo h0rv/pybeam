@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="558" viewBox="0 0 800 558" role="img" aria-labelledby="title desc">
+<title id="title">Task batch completion wall time</title><desc id="desc">GIL shared, N=1: 200 ms; GIL shared, N=2: 395 ms; GIL shared, N=4: 768 ms; GIL shared, N=8: 1502 ms; Free shared, N=1: 229 ms; Free shared, N=2: 430 ms; Free shared, N=4: 878 ms; Free shared, N=8: 1719 ms; GIL dedicated, N=1: 1187 ms; GIL dedicated, N=2: 1368 ms; GIL dedicated, N=4: 1759 ms; GIL dedicated, N=8: 2525 ms; Free dedicated, N=1: 1223 ms; Free dedicated, N=2: 1244 ms; Free dedicated, N=4: 1231 ms; Free dedicated, N=8: 1242 ms. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Task batch completion wall time</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">N=1</text><rect class="s1" x="350" y="49" width="14" height="14"/><text x="371" y="61">N=2</text><rect class="s2" x="470" y="49" width="14" height="14"/><text x="491" y="61">N=4</text><rect class="s3" x="590" y="49" width="14" height="14"/><text x="611" y="61">N=8</text>
+<text x="215" y="133.5" text-anchor="end">GIL shared</text>
+<rect class="s0" x="230" y="95" width="26.666666666666654" height="14"/>
+<text x="263.66666666666663" y="107">200 ms</text>
+<rect class="s1" x="230" y="116" width="52.66666666666665" height="14"/>
+<text x="289.66666666666663" y="128">395 ms</text>
+<rect class="s2" x="230" y="137" width="102.39999999999996" height="14"/>
+<text x="339.4" y="149">768 ms</text>
+<rect class="s3" x="230" y="158" width="200.26666666666668" height="14"/>
+<text x="437.26666666666665" y="170">1.50 s</text>
+<text x="215" y="233.5" text-anchor="end">Free shared</text>
+<rect class="s0" x="230" y="195" width="30.533333333333314" height="14"/>
+<text x="267.5333333333333" y="207">229 ms</text>
+<rect class="s1" x="230" y="216" width="57.33333333333333" height="14"/>
+<text x="294.3333333333333" y="228">430 ms</text>
+<rect class="s2" x="230" y="237" width="117.06666666666665" height="14"/>
+<text x="354.06666666666666" y="249">878 ms</text>
+<rect class="s3" x="230" y="258" width="229.20000000000002" height="14"/>
+<text x="466.20000000000005" y="270">1.72 s</text>
+<text x="215" y="333.5" text-anchor="end">GIL dedicated</text>
+<rect class="s0" x="230" y="295" width="158.26666666666668" height="14"/>
+<text x="395.26666666666665" y="307">1.19 s</text>
+<rect class="s1" x="230" y="316" width="182.40000000000003" height="14"/>
+<text x="419.40000000000003" y="328">1.37 s</text>
+<rect class="s2" x="230" y="337" width="234.53333333333333" height="14"/>
+<text x="471.5333333333333" y="349">1.76 s</text>
+<rect class="s3" x="230" y="358" width="336.66666666666674" height="14"/>
+<text x="573.6666666666667" y="370">2.52 s</text>
+<text x="215" y="433.5" text-anchor="end">Free dedicated</text>
+<rect class="s0" x="230" y="395" width="163.06666666666666" height="14"/>
+<text x="400.06666666666666" y="407">1.22 s</text>
+<rect class="s1" x="230" y="416" width="165.8666666666667" height="14"/>
+<text x="402.8666666666667" y="428">1.24 s</text>
+<rect class="s2" x="230" y="437" width="164.1333333333333" height="14"/>
+<text x="401.1333333333333" y="449">1.23 s</text>
+<rect class="s3" x="230" y="458" width="165.60000000000002" height="14"/>
+<text x="402.6" y="470">1.24 s</text><path d="M230,500H630"/>
+<path d="M230,500v5"/><text x="230" y="524" text-anchor="start">0</text><path d="M363.33333333333337,500v5"/><text x="363.33333333333337" y="524" text-anchor="middle">1,000</text><path d="M496.6666666666667,500v5"/><text x="496.6666666666667" y="524" text-anchor="middle">2,000</text><path d="M630,500v5"/><text x="630" y="524" text-anchor="end">3,000</text>
+<text x="630" y="548" text-anchor="end">ms</text></svg>

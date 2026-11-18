@@ -9,10 +9,12 @@ from fastapi import Depends, FastAPI, Request, Response, WebSocket
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from starlette.websockets import WebSocketDisconnect
 
+from pybeam import ActorGroup
 from pybeam.codec import Json
 from pybeam.integrations.fastapi.dependencies import BeamProvider
 from pybeam.integrations.hornbeam import Services
 from pybeam.integrations.hornbeam.errors import SubscriptionClosed, SubscriptionOverflow
+from tests.native.pythonic_actors import Counter
 
 
 @dataclass
@@ -49,6 +51,30 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.post("/crash-actor")
+async def crash_actor(beam: BeamDependency) -> dict[str, int]:
+    async with ActorGroup() as group:
+        counter = await group.spawn(Counter, value=5)
+        assert await counter.add(2) == 7
+        await group.crash(counter)
+        fresh = await group.rejoin(counter)
+        return {"count": await fresh.read()}
+
+
+@app.get("/auth-attempts")
+async def auth_attempts(beam: BeamDependency) -> dict[str, int]:
+    return {"count": await beam.incr("attempts", 0, namespace="auth")}
+
+
+@app.websocket("/authorized-shared")
+async def authorized_shared(socket: WebSocket, beam: BeamDependency) -> None:
+    await beam.incr("attempts", namespace="auth")
+    if socket.query_params.get("token") != "valid":
+        await socket.close(code=1008)
+        return
+    await shared(socket, beam)
 
 
 @app.get("/health")

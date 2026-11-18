@@ -10,29 +10,29 @@
 <body>
 <main>
   <h1>Where your Python actually runs</h1>
-  <p class="muted">One CPU-bound function, run live on this machine the way Python does it today and in each PyBEAM execution mode. You choose the mode; each one buys something and costs something.</p>
+  <p class="muted">Contributor lab: compare one CPU-bound function across Python execution strategies and raw runtime modes on this machine. These probes are not application benchmarks.</p>
 
   <h2>One call, end to end</h2>
   <ol class="path">
-    <li>BEAM process<br><small>≈2.7 KB, preemptively scheduled, millions per box</small></li>
+    <li>BEAM process<br><small>caller identity and mailbox</small></li>
     <li>mailbox<br><small>queued, bounded by your limits</small></li>
     <li>Python context<br><small>one OS thread it owns</small></li>
     <li>interpreter<br><small>shared, own, or in a child process</small></li>
-    <li>GIL<br><small>held on 3.14, absent on 3.14t</small></li>
+    <li>GIL<br><small>enabled on conventional Python; check live state on free-threaded builds</small></li>
     <li>result as a message<br><small>or a crash signal to the supervisor</small></li>
   </ol>
   <p>A BEAM process is not a Python interpreter. A million of them waiting on Python share a fixed set of contexts, the same way a million web requests share a thread pool. The mode only decides what a context is:</p>
   <div class="scroll"><table>
     <thead><tr><th>Mode</th><th>A context is</th><th>Gains</th><th>Gives up</th></tr></thead>
     <tbody>
-      <tr><td><code>ExecutionMode.WORKER</code> · 3.14</td><td>a thread in the one interpreter, sharing its GIL</td><td>~1 ms start, ~15 KiB each, ~20 µs calls; every C extension works</td><td>CPU work runs one at a time; a segfault takes down the whole VM</td></tr>
-      <tr><td><code>ExecutionMode.WORKER</code> · 3.14t</td><td>a thread in the one interpreter, no GIL</td><td>the same cheap threads, now in parallel on every core</td><td>needs the free-threaded build and extensions that support it; still one crash domain</td></tr>
-      <tr><td><code>ExecutionMode.OWNGIL</code></td><td>a subinterpreter with its own GIL, same OS process</td><td>parallel CPU on conventional 3.14; separate module state</td><td>~80 ms and ~10 MiB each; NumPy, pydantic_core and other single-phase extensions refuse to load; still one crash domain</td></tr>
-      <tr><td><code>ExecutionMode.ISOLATED</code></td><td>a child OS process with its own interpreter</td><td>parallel CPU and a crash kills only that child, which restarts</td><td>~90 ms and ~24 MiB each; calls cost ~3× more because arguments cross a socket</td></tr>
+      <tr><td><code>ExecutionMode.WORKER</code> · 3.14</td><td>a thread in the main interpreter, sharing its GIL</td><td>shared modules and no child process per worker</td><td>Python CPU work runs one at a time; a segfault takes down the whole VM</td></tr>
+      <tr><td><code>ExecutionMode.WORKER</code> · 3.14t</td><td>a thread in the main interpreter</td><td>parallel Python CPU work when the GIL stays disabled</td><td>needs the free-threaded build and compatible extensions; still one crash domain</td></tr>
+      <tr><td>Raw own-GIL context (unsupported by PyBEAM)</td><td>a subinterpreter with its own GIL, same OS process</td><td>parallel CPU on conventional 3.14; separate module state</td><td>common native extensions refuse to load; still one crash domain</td></tr>
+      <tr><td><code>ExecutionMode.ISOLATED</code></td><td>a child OS process with its own interpreter</td><td>parallel CPU; a native crash kills only that child</td><td>process startup and memory overhead; arguments cross a socket</td></tr>
       <tr><td>separate nodes</td><td>another BEAM VM, here or on another machine</td><td>scale past one box; whole-VM failure isolation</td><td>a VM's start time and memory per node; network latency; you run more machines</td></tr>
     </tbody>
   </table></div>
-  <p class="muted">Free-threaded or not is the interpreter you install (CPython 3.14 vs 3.14t), not a PyBEAM option. The <code>ExecutionMode</code> setting from <a href="https://github.com/h0rv/pybeam/pull/16">pybeam#16</a>: tasks accept <code>WORKER</code> today, <code>OWNGIL</code> and <code>ISOLATED</code> raise <code>CapabilityUnavailable</code> until erlang-python accepts a per-task mode. This lab drives erlang-python contexts directly so every mode can be measured now.</p>
+  <p class="muted">This lab drives erlang-python contexts directly. PyBEAM tasks support <code>WORKER</code> and <code>ISOLATED</code>; own-GIL subinterpreters are unsupported because common native extensions cannot load in them. Raw isolated contexts in this lab can restart their child; PyBEAM isolated tasks never restart or retry after a child crash. Free-threaded Python is a build choice, not an <code>ExecutionMode</code> setting.</p>
 
   <h2>Run it</h2>
   <form class="controls" hx-post="/runs" hx-target="#run" hx-swap="outerHTML">
@@ -59,8 +59,8 @@
   <ul>
     <li>Everything runs on one shared {{ cores }}-core VM. "Separate nodes" are extra BEAM VMs on the same host, so they show the start and memory cost of a node, not a network.</li>
     <li>The prefork pool is <code>ProcessPoolExecutor</code>, the model behind Celery's default worker, without a broker. When one of its workers dies the whole pool is marked broken.</li>
-    <li>Supervision restarts code, not work: PyBEAM jobs are not persisted, so a job running in a crashed worker is lost unless your app retries it.</li>
-    <li>asyncio is just as cheap as BEAM processes for waiting callers. What it cannot do is run CPU work in parallel, preempt a coroutine that never yields, or survive a crash in one of them.</li>
+    <li>The jobs in this lab are not persisted. Actor supervision restores fresh actors, not in-flight work. Durable tasks are a separate API and are not measured here.</li>
+    <li>One asyncio loop runs Python code on one thread and cannot preempt a coroutine that never yields. Both asyncio callers and runtime workers still consume memory; compare the live measurements rather than assuming equal costs.</li>
   </ul>
 </main>
 </body>
