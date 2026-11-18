@@ -24,7 +24,9 @@ from benchmarks.web.ws import Command, Reply
 ROOT = Path(__file__).resolve().parents[2]
 IMAGE = "pybeam-web:jammy"
 PORT = 18764
-type Variant = Literal["hornbeam", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"]
+type Variant = Literal[
+    "hornbeam", "hornbeam-baseline", "managed", "uvicorn", "uvicorn2", "uvicorn-standard"
+]
 VARIANTS: tuple[Variant, ...] = ("hornbeam", "managed", "uvicorn", "uvicorn2")
 HOST_VARIANTS: tuple[Variant, ...] = ("hornbeam", "uvicorn", "uvicorn-standard")
 
@@ -36,6 +38,7 @@ class Settings:
     repeats: int
     steps: tuple[int, ...]
     host_http: bool = False
+    hornbeam_baseline: Path | None = None
 
 
 def execute(args: list[str], *, timeout: float = 120) -> str:
@@ -52,14 +55,24 @@ def required(name: str) -> str:
     return path
 
 
-def server_command(variant: Variant, app: str = "benchmarks.web.app:app") -> list[str]:
+def server_command(
+    variant: Variant,
+    app: str = "benchmarks.web.app:app",
+    *,
+    hornbeam_baseline: Path | None = None,
+) -> list[str]:
     python = str(ROOT / ".venv/bin/python")
     match variant:
-        case "hornbeam":
+        case "hornbeam" | "hornbeam-baseline":
+            build = ROOT / "_build/hornbeam"
+            if variant == "hornbeam-baseline":
+                if hornbeam_baseline is None:
+                    raise ValueError("Missing Hornbeam baseline build")
+                build = hornbeam_baseline
             return [
                 required("escript"),
                 str(ROOT / "benchmarks/web/hornbeam.escript"),
-                str(ROOT / "_build/hornbeam"),
+                str(build),
                 "127.0.0.1:" + str(PORT),
                 str(ROOT),
                 str(ROOT / ".venv/lib/python3.14/site-packages"),
@@ -163,7 +176,9 @@ def server(
 
 
 @contextmanager
-def host_server(variant: Variant, name: str, output: Path) -> Generator[None]:
+def host_server(
+    variant: Variant, name: str, output: Path, hornbeam_baseline: Path | None = None
+) -> Generator[None]:
     app = "benchmarks.web.app:app"
     with socket.socket() as probe:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -177,7 +192,12 @@ def host_server(variant: Variant, name: str, output: Path) -> Generator[None]:
     with (
         (output / (name + ".log")).open("wb") as log,
         subprocess.Popen(  # noqa: S603
-            [required("taskset"), "-c", "0-1", *server_command(variant, app)],
+            [
+                required("taskset"),
+                "-c",
+                "0-1",
+                *server_command(variant, app, hornbeam_baseline=hornbeam_baseline),
+            ],
             cwd=ROOT / "benchmarks/web",
             env=env,
             stdout=log,
@@ -392,14 +412,20 @@ def run(settings: Settings) -> None:
 def run_locked(settings: Settings) -> None:
     settings.output.mkdir(parents=True, exist_ok=False)
     variants = HOST_VARIANTS if settings.host_http else VARIANTS
-    start_server = host_server if settings.host_http else server
+    if settings.hornbeam_baseline is not None:
+        variants = ("hornbeam-baseline", "hornbeam", "uvicorn-standard")
     result_model = CleanHttpResult if settings.host_http else HttpResult
     rates: list[float] = []
     for repeat in range(settings.repeats):
         offset = repeat % len(variants) if settings.host_http else 0
         for variant in variants[offset:] + variants[:offset]:
             name = "web-" + variant + "-" + str(repeat)
-            with start_server(variant, name, settings.output):
+            active_server = (
+                host_server(variant, name, settings.output, settings.hornbeam_baseline)
+                if settings.host_http
+                else server(variant, name, settings.output)
+            )
+            with active_server:
                 warmup = settings.output / (name + ".warmup.json")
                 http_load(warmup, 2, 16)
                 for concurrency in (64, 256):
@@ -429,13 +455,21 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--host-http", action="store_true", help="CPU-pinned HTTP only, no Docker")
+    parser.add_argument(
+        "--hornbeam-baseline",
+        help="Compare two Hornbeam builds against optimized Uvicorn",
+    )
     args = parser.parse_args()
+    baseline = Path(args.hornbeam_baseline).resolve() if args.hornbeam_baseline else None
+    if baseline is not None and (not args.host_http or not (baseline / "lib").is_dir()):
+        parser.error("--hornbeam-baseline requires --host-http and a Hornbeam build directory")
     settings = Settings(
         output=Path(args.output).resolve(),
         seconds=2 if args.smoke else (10 if args.host_http else 30),
         repeats=1 if args.smoke else 3,
         steps=(40, 200) if args.smoke else (1000, 5000, 10000, 20000, 30000, 50000),
         host_http=args.host_http,
+        hornbeam_baseline=baseline,
     )
     if settings.output.is_relative_to(ROOT):
         raise ValueError("Keep raw measurements outside the repository")
