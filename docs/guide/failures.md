@@ -30,11 +30,15 @@ current state to render a fresh view. Re-read state on each notification.
 Do not send a view before authorization succeeds. Rejection depends on the
 transport and your application's authorization policy:
 
-- **WebSocket:** the handler below closes with `1008`. The client completes the
-  handshake and then receives that close code, rather than an HTTP rejection.
+- **WebSocket:** the handler below closes before accepting. With Uvicorn, as used
+  by this example, the client receives HTTP `403` and no WebSocket connection.
+  With PyBEAM's native web server, the same close-before-accept pattern completes
+  the handshake and then delivers close code `1008`.
 - **PyView:** session authorization using PyView's required-scope check runs again
   before the connected mount. A rejected join closes with code `1000` and sends
   no mounted view. An accepted reconnect mounts a new view from current state.
+  Socket-owned live subscriptions require PyBEAM's native web server; the
+  [Uvicorn example](integrations/pyview.md) reads shared state without subscribing.
 - **SSE:** reject unauthorized requests before opening the event stream. A handler
   that raises HTTP `403` returns that status, not a stream or a current-state event.
   An accepted request should send current state as its first event.

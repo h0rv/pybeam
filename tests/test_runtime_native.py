@@ -3,17 +3,19 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
 import pytest
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as async_connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, InvalidStatus
 from websockets.sync.client import connect
 
 from pybeam.codec import Json
-from tests.conftest import RunningServer, ServerFactory
+from tests.conftest import ROOT, RunningServer, ServerFactory
+from tests.native.managed_web import serve_entry
 
 pytestmark = pytest.mark.runtime
 
@@ -300,28 +302,25 @@ def test_native__shared_services_survive_actor_restart(service_server: RunningSe
 
 
 async def test_native__reconnect_docs_example(
-    runtime_server_factory: ServerFactory,
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
 ) -> None:
-    with runtime_server_factory("tests.fixtures.reconnect_app:app") as server:
+    entry = ROOT / "examples/docs/reconnect.py"
+    with serve_entry(request, tmp_path, entry, 8770) as server:
         url = "ws://127.0.0.1:{}/counter".format(server.port)
         async with httpx.AsyncClient(base_url=server.base_url) as client:
             async with async_connect(url + "?token=demo-token") as first:
                 assert Json(CounterReply).decode(await first.recv()).count == 0
-                await wait_subscription_count(server, 1)
                 (await client.post("/increment")).raise_for_status()
                 assert Json(CounterReply).decode(await first.recv()).count == 1
-            await wait_subscription_count(server, 0)
             (await client.post("/increment")).raise_for_status()
-            async with async_connect(url + "?token=revoked") as rejected:
-                with pytest.raises(ConnectionClosed) as closed:
-                    await rejected.recv()
-                assert closed.value.rcvd is not None
-                assert closed.value.rcvd.code == 1008
-            await wait_subscription_count(server, 0)
+            with pytest.raises(InvalidStatus) as rejected:
+                async with async_connect(url + "?token=revoked"):
+                    raise AssertionError("Rejected connection was accepted")
+            assert rejected.value.response.status_code == 403
             async with async_connect(url + "?token=demo-token") as fresh:
                 assert Json(CounterReply).decode(await fresh.recv()).count == 2
                 with pytest.raises(TimeoutError):
                     await asyncio.wait_for(fresh.recv(), timeout=0.2)
                 (await client.post("/increment")).raise_for_status()
                 assert Json(CounterReply).decode(await fresh.recv()).count == 3
-            await wait_subscription_count(server, 0)

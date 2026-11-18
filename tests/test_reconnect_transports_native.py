@@ -2,7 +2,9 @@ import asyncio
 import json
 import re
 from collections.abc import AsyncIterator
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,10 +12,26 @@ from pydantic import BaseModel, TypeAdapter
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 
-from tests.conftest import ServerFactory
+from tests.conftest import ROOT, RunningServer, ServerFactory
+from tests.native.managed_web import serve_entry
 from tests.test_runtime_native import wait_subscription_count
 
 pytestmark = pytest.mark.runtime
+
+
+@pytest.fixture(params=("native", "uvicorn"))
+def reconnect_server(
+    request: pytest.FixtureRequest, runtime_server_factory: ServerFactory, tmp_path: Path
+) -> ServerFactory:
+    if request.param == "native":
+        return runtime_server_factory
+
+    def start(app: str) -> AbstractContextManager[RunningServer]:
+        return serve_entry(
+            request, tmp_path, ROOT / "tests/native/uvicorn_entry.py", 8771, app, "8771"
+        )
+
+    return start
 
 
 class RenderResponse(BaseModel):
@@ -135,6 +153,40 @@ async def test_native__pyview_reconnect_auth_mount_and_no_replay(
             await wait_pyview_subscriptions(client, 0)
 
 
+async def test_native__pyview_uvicorn_rejects_session_before_mount(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> None:
+    with serve_entry(
+        request,
+        tmp_path,
+        ROOT / "tests/native/uvicorn_entry.py",
+        8771,
+        "tests.fixtures.pyview_reconnect_app:app",
+        "8771",
+    ) as server:
+        async with httpx.AsyncClient(base_url=server.base_url) as client:
+            (await client.get("/session?token=valid")).raise_for_status()
+            page = await client.get("/")
+            page.raise_for_status()
+            join = Join(
+                topic="lv:" + extract(r'id="(phx-[^"]+)"', page.text),
+                csrf=extract(r'name="csrf-token" content="([^"]+)"', page.text),
+                session=extract(r'data-phx-session="([^"]+)"', page.text),
+                url=server.base_url + "/",
+            )
+            (await client.get("/session?token=revoked")).raise_for_status()
+            url = "ws://127.0.0.1:{}/live/websocket".format(server.port)
+            async with connect(
+                url, additional_headers={"Cookie": "session=" + client.cookies["session"]}
+            ) as rejected:
+                await join.send(rejected)
+                with pytest.raises(ConnectionClosed) as closed:
+                    await rejected.recv()
+                assert closed.value.rcvd is not None
+                assert closed.value.rcvd.code == 1000
+            assert await stats(client) == {"auth": 1, "mounts": 0, "count": 0}
+
+
 async def next_event(lines: AsyncIterator[str]) -> list[str]:
     event: list[str] = []
     async with asyncio.timeout(5):
@@ -153,9 +205,9 @@ async def auth_attempts(client: httpx.AsyncClient) -> int:
 
 
 async def test_native__sse_reconnect_auth_snapshot_and_last_event_id(
-    runtime_server_factory: ServerFactory,
+    reconnect_server: ServerFactory,
 ) -> None:
-    with runtime_server_factory("tests.fixtures.reconnect_app:app") as server:
+    with reconnect_server("tests.fixtures.reconnect_app:app") as server:
         async with httpx.AsyncClient(base_url=server.base_url) as client:
             async with client.stream("GET", "/events?token=valid") as first:
                 assert first.status_code == 200
