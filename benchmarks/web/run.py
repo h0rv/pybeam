@@ -62,7 +62,7 @@ def server_command(variant: Variant, app: str = "benchmarks.web.app:app") -> lis
                 app,
             ]
         case "managed":
-            return [python, str(ROOT / "benchmarks/web/managed.py")]
+            return [python, str(ROOT / "benchmarks/web/managed.py"), "--app", app]
         case "uvicorn" | "uvicorn2":
             workers = "2" if variant == "uvicorn2" else "1"
             return [python, "-m", "benchmarks.web.plain", "--workers", workers, "--app", app]
