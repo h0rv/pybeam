@@ -110,32 +110,40 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
             {Peer, Node}
         end || {Name, I} <- lists:zip(Names, lists:seq(0, 2))],
         try
-            [pong = peer:call(P, net_adm, ping, [N])
+            CallBefore = fun(Deadline, P, M, F, A) ->
+                case Deadline - erlang:monotonic_time(millisecond) of
+                    Remaining when Remaining > 0 -> peer:call(P, M, F, A, Remaining);
+                    _ -> error({rpc_deadline, M, F})
+                end
+            end,
+            StartupDeadline = erlang:monotonic_time(millisecond) + 60000,
+            StartupCall = fun(P, M, F, A) -> CallBefore(StartupDeadline, P, M, F, A) end,
+            [pong = StartupCall(P, net_adm, ping, [N])
              || {P, Local} <- Peers, {_, N} <- Peers, N =/= Local],
             Nodes = [atom_to_binary(N) || {_, N} <- Peers],
             Nodes = ReplicaNames,
             Contexts = [begin
                 Dir = filename:join(DIRECTORY, integer_to_list(I)),
-                ok = peer:call(P, file, set_cwd, [Dir]),
-                true = peer:call(P, os, putenv, ["ERL_CRASH_DUMP", filename:join(Dir, "erl_crash.dump")]),
-                ok = peer:call(P, logger, add_handler, [durable_test_log, logger_std_h,
+                ok = StartupCall(P, file, set_cwd, [Dir]),
+                true = StartupCall(P, os, putenv, ["ERL_CRASH_DUMP", filename:join(Dir, "erl_crash.dump")]),
+                ok = StartupCall(P, logger, add_handler, [durable_test_log, logger_std_h,
                     #{config => #{file => filename:join(Dir, "erlang.log")}}]),
-                ok = peer:call(P, application, set_env, [erlang_python, num_contexts, 1]),
-                ok = peer:call(P, application, set_env, [erlang_python, event_loop_pool_size, 1]),
-                {ok, _} = peer:call(P, application, ensure_all_started, [erlang_python]),
-                ok = peer:call(P, py_import, add_paths, [PYTHON_PATHS]),
-                ok = peer:call(P, py_callback, register, [durable_node_ready,
+                ok = StartupCall(P, application, set_env, [erlang_python, num_contexts, 1]),
+                ok = StartupCall(P, application, set_env, [erlang_python, event_loop_pool_size, 1]),
+                {ok, _} = StartupCall(P, application, ensure_all_started, [erlang_python]),
+                ok = StartupCall(P, py_import, add_paths, [PYTHON_PATHS]),
+                ok = StartupCall(P, py_callback, register, [durable_node_ready,
                     fun([]) -> Parent ! {ready, node()}, ok end]),
-                ok = peer:call(P, py_callback, register, [durable_body_started,
+                ok = StartupCall(P, py_callback, register, [durable_body_started,
                     fun([Payload]) -> Parent ! {started, node(), Payload}, ok end]),
-                {ok, Ctx} = peer:call(P, py_context, new, [#{mode => worker}]),
+                {ok, Ctx} = StartupCall(P, py_context, new, [#{mode => worker}]),
                 case MANAGED_MAIN of
                     true ->
-                        {ok, _} = peer:call(P, py_context, call, [Ctx, 'pybeam.runtime.loader', load, []]);
+                        {ok, _} = StartupCall(P, py_context, call, [Ctx, 'pybeam.runtime.loader', load, []]);
                     false -> ok
                 end,
-                ok = peer:call(P, py_context, start_loop, [Ctx, #{owner => Parent}]),
-                {monitors, Monitors} = peer:call(P, erlang, process_info, [Ctx, monitors]),
+                ok = StartupCall(P, py_context, start_loop, [Ctx, #{owner => Parent}]),
+                {monitors, Monitors} = StartupCall(P, erlang, process_info, [Ctx, monitors]),
                 true = lists:member({process, Parent}, Monitors),
                 {P, Ctx}
             end || {{P, _}, I} <- lists:zip(Peers, lists:seq(0, 2))],
@@ -150,7 +158,7 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
              after 65000 -> error(open_timeout) end || Ref <- Opens],
             [{First, _}, _, {Dead, DeadNode}] = Peers,
             Submitter = case MANAGED_MAIN of true -> Dead; false -> First end,
-            {ok, SubmitCtx} = peer:call(Submitter, py_context, new, [#{mode => worker}]),
+            {ok, SubmitCtx} = StartupCall(Submitter, py_context, new, [#{mode => worker}]),
             {ok, true} = peer:call(Submitter, py_context, submit_await,
                 [SubmitCtx, ENTRY_MODULE, cluster_submit,
                  [Nodes, list_to_binary(OUTPUT), 3, 27], #{}, 15000], 20000),
@@ -163,7 +171,7 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
                     true -> {'pybeam.runtime.loader', invoke, []};
                     false -> {ENTRY_MODULE, cluster_serve, [Nodes]}
                 end,
-                {ok, _} = peer:call(P, py_context, submit, [Ctx, Module, Function, Arguments])
+                {ok, _} = StartupCall(P, py_context, submit, [Ctx, Module, Function, Arguments])
              end || {P, Ctx} <- ServingContexts],
             ServingNodes = case MANAGED_MAIN of
                 true -> [DeadNode];
@@ -177,7 +185,8 @@ def test_tasks__three_nodes_rerun_after_worker_node_dies(
             os:cmd("kill -9 " ++ DeadPid),
             case MANAGED_MAIN of
                 true ->
-                    [{ok, _} = peer:call(P, py_context, submit,
+                    RecoveryDeadline = erlang:monotonic_time(millisecond) + 40000,
+                    [{ok, _} = CallBefore(RecoveryDeadline, P, py_context, submit,
                         [Ctx, 'pybeam.runtime.loader', invoke, []])
                      || {P, Ctx} <- Contexts, P =/= Dead],
                     [receive {ready, N} -> ok after 40000 -> error({not_ready, N}) end

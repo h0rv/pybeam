@@ -164,7 +164,9 @@ def test_process__preserves_args_environment_cwd_stdio(
         "pending = Path(p['completed']).with_suffix('.tmp')\n"
         "pending.write_text('0')\n"
         "os.replace(pending, p['completed'])\n"
-        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "pending = Path(os.environ['PYBEAM_CLEANUP'] + '.tmp')\n"
+        "pending.write_text('clean')\n"
+        "pending.replace(os.environ['PYBEAM_CLEANUP'])\n"
         "print(json.dumps([p['argv'], os.getcwd(), os.environ['PYBEAM_TEST_VALUE']]))\n"
     )
     assert _launch(fake_runtime) == 0
@@ -238,8 +240,13 @@ def test_process__bootstrap_roundtrips_surrogate_escaped_paths(
     fake_runtime.write_text(
         "import json, os\nfrom pathlib import Path\n"
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
-        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
-        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "Path(p['ready']).touch()\n"
+        "pending = Path(p['completed'] + '.tmp')\n"
+        "pending.write_text('0')\n"
+        "pending.replace(p['completed'])\n"
+        "pending = Path(os.environ['PYBEAM_CLEANUP'] + '.tmp')\n"
+        "pending.write_text('clean')\n"
+        "pending.replace(os.environ['PYBEAM_CLEANUP'])\n"
         "print(json.dumps([p['argv'], p['python_paths']]))\n"
     )
     assert _launch(entry) == 0
@@ -259,8 +266,13 @@ def test_process__merges_asset_environment_without_losing_caller_environment(
     fake_runtime.write_text(
         "import json, os\nfrom pathlib import Path\n"
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
-        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
-        "Path(os.environ['PYBEAM_CLEANUP']).write_text('clean')\n"
+        "Path(p['ready']).touch()\n"
+        "pending = Path(p['completed'] + '.tmp')\n"
+        "pending.write_text('0')\n"
+        "pending.replace(p['completed'])\n"
+        "pending = Path(os.environ['PYBEAM_CLEANUP'] + '.tmp')\n"
+        "pending.write_text('clean')\n"
+        "pending.replace(os.environ['PYBEAM_CLEANUP'])\n"
         "print(json.dumps({key: os.environ[key] for key in "
         "['ROOTDIR', 'BINDIR', 'EMU', 'PROGNAME', 'PYBEAM_TEST_VALUE']}))\n"
     )
@@ -306,7 +318,9 @@ def test_process__application_stop_stall_after_completion_is_bounded_and_owned_p
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
         "Path(p['ready']).touch()\n"
         + "Path({!r}).write_text(str(os.getpid()))\n".format(str(pidfile))
-        + "Path(p['completed']).write_text({!r})\n".format(str(status))
+        + "pending = Path(p['completed'] + '.tmp')\n"
+        + "pending.write_text({!r})\n".format(str(status))
+        + "pending.replace(p['completed'])\n"
         + "time.sleep(30)\n"
     )
     started = time.monotonic()
@@ -844,7 +858,9 @@ def test_native__application_stop_stall_has_parent_deadline(
         + 'ok = file:write_file("'
         + str(pidfile)
         + '", os:getpid()), '
-        + 'ok = file:write_file(os:getenv("PYBEAM_COMPLETION"), <<"0">>), '
+        + 'Completion = os:getenv("PYBEAM_COMPLETION"), '
+        + 'ok = file:write_file(Completion ++ ".tmp", <<"0">>), '
+        + 'ok = file:rename(Completion ++ ".tmp", Completion), '
         + "application:stop(pybeam_stop_stall), halt(0)."
     )
 
