@@ -5,7 +5,48 @@ The four launch paths are A: Hornbeam; B: Uvicorn in PyBEAM's managed runtime;
 C: standalone Uvicorn, one worker; C2: standalone Uvicorn, two workers.
 This measures serving only, not shared state, persistence, or application work.
 
-## Reproduce
+## Native HTTP throughput
+
+On the small JSON route, Hornbeam served 34–48% more requests per second than
+single-worker Uvicorn with asyncio/h11, and 22% fewer than single-worker Uvicorn
+with uvloop/httptools. This is a loopback HTTP/1.1 test, not a container,
+WebSocket, or production-capacity result.
+
+![Sustained requests per second at 64 and 256 concurrent connections. Dots show medians; lines show the range over three repeats.](host-http-throughput.svg)
+
+### Reproduce the host run
+
+From a clean PyBEAM checkout on Linux with CPUs 0–7, prepare the Hornbeam
+checkout in the [appendix](#host-run-appendix), then run:
+
+```sh
+mise install
+mise exec -- uv sync --locked --all-extras
+mkdir -p _checkouts
+ln -s "$(realpath ../hornbeam-web-asgi)" _checkouts/hornbeam
+mise exec -- uv run --no-sync python tools/build_native.py
+mise exec -- uv pip install --python .venv/bin/python uvloop==0.23.0 httptools==0.8.0
+mise install oha@1.17.0
+mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run \
+  --host-http --output "$HOME/web-http"
+```
+
+The output directory must not exist. The runner pins each server to CPUs 0–1
+and the load generator to CPUs 4–7, rotates server order, and rejects trials
+with errors or non-200 responses. It measures each concurrency for 10 seconds
+after a warm-up. To recover the median and range from the saved samples:
+
+```sh
+for server in hornbeam uvicorn uvicorn-standard; do
+  for clients in 64 256; do
+    printf '%s c%s: ' "$server" "$clients"
+    jq -sr 'map(.summary.requestsPerSec) | sort | [.[1], .[0], .[2]] | @tsv' \
+      "$HOME"/web-http/web-"$server"-?.http"$clients".json
+  done
+done
+```
+
+## Reproduce the container benchmark
 
 Run from the repository root on a Linux host with CPUs 0–7, container-engine
 access, and sibling runtime checkouts as described in
@@ -215,3 +256,18 @@ The managed transport made 26,867 receive attempts for about 13,400 requests,
 versus 20,478 for about 20,400 standalone requests: its drain-until-EAGAIN loop
 adds receive attempts. These measurements identify contributors, not a complete
 whole-runtime CPU breakdown. The remaining gap and c256 timeouts are unattributed.
+
+## Host run appendix
+
+The host run used Ubuntu 22.04.5 on an eight-vCPU Intel Xeon VM, OTP 29.1.2,
+and the same shared build of CPython 3.14.10 for Hornbeam and Uvicorn.
+The erlang-python pin was `32ad6748fe5e08eae627b1231f809423eea72963`.
+The Hornbeam override is the commit from
+[the complete-response PR](https://github.com/h0rv/hornbeam/pull/18).
+With a sibling Hornbeam clone, prepare the checkout from the PyBEAM root:
+
+```sh
+git -C ../hornbeam fetch origin pull/18/head
+git -C ../hornbeam worktree add --detach "$(realpath -m ../hornbeam-web-asgi)" \
+  f84eb587ddc42467322903912078d48a20577588
+```

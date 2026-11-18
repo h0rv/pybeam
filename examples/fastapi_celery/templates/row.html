@@ -1,0 +1,3 @@
+<tr hx-sse:connect="/tasks/{{ status.task_id }}/events" hx-sse:close="done" hx-swap="innerHTML">
+  {% include 'cells.html' %}
+</tr>

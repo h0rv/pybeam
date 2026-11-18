@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 790 346" role="img" aria-labelledby="title desc">
+  <title id="title">Loopback HTTP/1.1 throughput</title>
+  <desc id="desc">Hornbeam exceeds Uvicorn with asyncio and h11 at both concurrency levels, but trails Uvicorn with uvloop and httptools. Dots are medians; lines span three measured repeats.</desc>
+  <style>
+    svg { color: #202124; background: #fff; font: 16px system-ui, sans-serif; }
+    text { fill: currentColor; }
+    .grid { stroke: #d1d5db; fill: none; }
+    .hornbeam { color: #155a9f; }
+    .uvicorn, .uvicorn-standard { color: #50555d; }
+    .range { stroke: currentColor; stroke-width: 2; }
+    .median { fill: currentColor; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #eceef0; background: #151719; }
+      .grid { stroke: #515761; }
+      .hornbeam { color: #8cc5ff; }
+      .uvicorn, .uvicorn-standard { color: #b8bec6; }
+    }
+  </style>
+  <text x="18" y="28" font-size="21" font-weight="600">Loopback HTTP/1.1 throughput</text>
+  <text x="18" y="54">Requests per second · median and range of three repeats</text>
+  <path class="grid" d="M250,75V307 M358,75V307 M466,75V307 M574,75V307 M682,75V307"/>
+  <text x="18" y="88" font-weight="600">64 concurrent connections</text>
+  <text x="18" y="115">Hornbeam</text>
+  <g class="hornbeam">
+    <path class="range" d="M471.3,110H547.8"/>
+    <circle class="median" cx="537.1" cy="110" r="4"/>
+  </g>
+  <text x="770" y="115" text-anchor="end">10,633</text>
+  <text x="18" y="140">Uvicorn · asyncio/h11</text>
+  <g class="uvicorn">
+    <path class="range" d="M438,135H444.4"/>
+    <circle class="median" cx="443.7" cy="135" r="4"/>
+  </g>
+  <text x="770" y="140" text-anchor="end">7,176</text>
+  <text x="18" y="165">Uvicorn · uvloop/httptools</text>
+  <g class="uvicorn-standard">
+    <path class="range" d="M601.4,160H633.9"/>
+    <circle class="median" cx="617.4" cy="160" r="4"/>
+  </g>
+  <text x="770" y="165" text-anchor="end">13,608</text>
+  <text x="18" y="199" font-weight="600">256 concurrent connections</text>
+  <text x="18" y="226">Hornbeam</text>
+  <g class="hornbeam">
+    <path class="range" d="M515,221H524.8"/>
+    <circle class="median" cx="523.4" cy="221" r="4"/>
+  </g>
+  <text x="770" y="226" text-anchor="end">10,125</text>
+  <text x="18" y="251">Uvicorn · asyncio/h11</text>
+  <g class="uvicorn">
+    <path class="range" d="M426.6,246H459"/>
+    <circle class="median" cx="453.4" cy="246" r="4"/>
+  </g>
+  <text x="770" y="251" text-anchor="end">7,532</text>
+  <text x="18" y="276">Uvicorn · uvloop/httptools</text>
+  <g class="uvicorn-standard">
+    <path class="range" d="M596.9,271H636"/>
+    <circle class="median" cx="600.5" cy="271" r="4"/>
+  </g>
+  <text x="770" y="276" text-anchor="end">12,980</text>
+  <text x="250" y="329" text-anchor="middle">0</text>
+  <text x="358" y="329" text-anchor="middle">4k</text>
+  <text x="466" y="329" text-anchor="middle">8k</text>
+  <text x="574" y="329" text-anchor="middle">12k</text>
+  <text x="682" y="329" text-anchor="middle">16k</text>
+</svg>

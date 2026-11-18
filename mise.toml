@@ -319,6 +319,18 @@ wait "$pid"
 description = "Private finite two-node CLI with an installed or explicitly prepared runtime"
 run = "uv run --locked python -m examples.distributed.demo"
 
+[tasks."example:fastapi-celery"]
+description = "Background task port on port 8810"
+run = "uv run --locked --extra fastapi --extra hornbeam python -m examples.fastapi_celery.app"
+
+[tasks."example:fastapi-celery-original"]
+description = "Original task queue stack on port 8811, dashboard on 5556"
+run = "docker compose -f examples/fastapi_celery/original/compose.yaml up --build"
+
+[tasks."check:fastapi-celery-original"]
+description = "Check vendored sources with their own minimal lint policy and locked environment"
+run = "uv run --locked --project examples/fastapi_celery/original ruff check --config examples/fastapi_celery/original/pyproject.toml examples/fastapi_celery/original"
+
 [tasks."example:pyview-cluster"]
 description = "Serve the local two-node PyView feed on ports 8771 and 8772"
 run = "uv run --locked --extra hornbeam --extra pyview python -m examples.pyview_cluster.launch"

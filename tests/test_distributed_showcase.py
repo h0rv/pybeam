@@ -24,6 +24,7 @@ from examples.showcase.catalog import ROOT, catalog
 from examples.showcase.jobs import Job, Jobs
 from pybeam.codec import Json
 from pybeam.distribution import Distribution
+from pybeam.runtime.cluster import NODE_EXIT, NodeExit
 from pybeam.runtime.config import Config as RuntimeConfig
 from pybeam.runtime.guardian import AuthorizationError, GuardianEndpoint
 from pybeam.runtime.ownership import Identity, identity
@@ -208,6 +209,32 @@ def test_demo__controlled_receipt_boundary_callback_and_cli_compatibility(
     assert Json(WalkthroughProof).decode(path.read_text()).observations == tuple(observed)
     assert cluster.starts == 1 and cluster.restarts == 1 and cluster.closed
     assert "SECRET" not in path.read_text()
+
+
+@pytest.mark.parametrize("status", [0, 7])
+def test_demo__reports_sender_exit_instead_of_missing_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    config, distribution = demo.configuration()
+    cluster = ControlledCluster(distribution, config=config, directory=tmp_path)
+    (tmp_path / "a.stopped.json").write_bytes(
+        NODE_EXIT.encode(
+            NodeExit(alias="a", launcher=identity(os.getpid()), clean=True, status=status)
+        )
+    )
+
+    def factory(
+        distribution: Distribution,
+        *,
+        config: RuntimeConfig | None = None,
+        guardian: GuardianEndpoint | None = None,
+    ) -> ControlledCluster:
+        return cluster
+
+    monkeypatch.setattr(demo, "LocalCluster", factory)
+    with pytest.raises(RuntimeError, match="Node A exited with status " + str(status)):
+        demonstration()
+    assert cluster.closed
 
 
 def test_adapter__controlled_boundary_writes_typed_adapter_json(

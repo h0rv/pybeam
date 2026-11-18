@@ -15,6 +15,7 @@ from types import FrameType
 from pybeam.runtime.assets import RuntimeAssets
 from pybeam.runtime.attach import EPMD, LOOPBACK, App, announce, node_name
 from pybeam.runtime.config import BootstrapError, CleanupError, Config
+from pybeam.runtime.discovery import cluster
 
 
 @dataclass(slots=True)
@@ -54,7 +55,12 @@ def _completion(path: Path) -> int | None:
     return value
 
 
-def _command(assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+def _command(
+    assets: RuntimeAssets,
+    *,
+    python_paths: tuple[str, ...] = (),
+    startup: tuple[str, ...] = (),
+) -> list[str]:
     paths = (
         "["
         + ",".join(
@@ -77,6 +83,7 @@ def _command(assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> li
         "-erlang_python",
         "isolated_python",
         "<<" + ",".join(str(byte) for byte in os.fsencode(sys.executable)) + ">>",
+        *startup,
         "-s",
         "py_launch",
         "start",
@@ -137,6 +144,13 @@ def launch(
             ensure_ascii=True,
         )
         name = node_name(entry)
+        startup: tuple[str, ...] = ()
+        joined = cluster(environment, config.startup_timeout) if extra_environment is None else None
+        if joined is not None:
+            if debug:
+                raise BootstrapError("PYBEAM_CLUSTER cannot be combined with debug attach")
+            environment["PYBEAM_CLUSTER_ADDRESS"] = joined.address
+            startup = joined.options
         if debug:
             environment.update(EPMD)
             options = (*options, "-name", name + "@127.0.0.1", *LOOPBACK)
@@ -163,7 +177,10 @@ def launch(
             signal.signal(signal.SIGINT, forward)
             signal.signal(signal.SIGTERM, forward)
             try:
-                command = [*_command(assets, python_paths=python_paths), *options]
+                command = [
+                    *_command(assets, python_paths=python_paths, startup=startup),
+                    *options,
+                ]
                 if "PYBEAM_OWNER_DIRECTORY" in environment:
                     command = [sys.executable, "-m", "pybeam.runtime.guardian", "gate", *command]
                 process = subprocess.Popen(  # noqa: S603
