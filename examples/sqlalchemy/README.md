@@ -60,6 +60,8 @@ has not been traced. The execution boundary needs investigation in
 erlang-python, coordinated with Hornbeam. The same ORM operations pass through
 the managed entrypoint.
 
+On macOS, native Hornbeam ASGI with the async engine intermittently drops connections under concurrent writes at the same greenlet/execution boundary as the Linux SIGSEGV, tracked in erlang-python.
+
 Use the managed entrypoint for this example; do not treat native Hornbeam async
 SQLAlchemy support as verified. These checks cover conventional Python 3.14.10
 on Linux, not free-threaded Python, other drivers, external databases, or native

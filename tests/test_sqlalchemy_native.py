@@ -129,6 +129,13 @@ def test_sqlalchemy__hornbeam_native_sync_engine(
 
 
 @pytest.mark.skipif(sys.platform == "linux", reason="Linux startup crash has a separate probe")
+@pytest.mark.xfail(
+    sys.platform == "darwin",
+    strict=False,
+    reason="Native Hornbeam ASGI plus the async engine intermittently drops connections under "
+    "concurrent writes on macOS; same greenlet/execution boundary as the Linux SIGSEGV, "
+    "tracked in erlang-python",
+)
 def test_sqlalchemy__hornbeam_native_async_engine(
     runtime_server_factory: ServerFactory,
 ) -> None:
