@@ -70,6 +70,87 @@ def test_process__cluster_startup_runs_before_the_entry() -> None:
     assert command[-5:] == ["-eval", "ok.", "-s", "py_launch", "start"]
 
 
+def test_cluster__explicit_peers_use_epmd_and_the_first_hosts_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queries: list[str] = []
+
+    def address(host: str) -> str:
+        queries.append(host)
+        return "127.0.0.1"
+
+    monkeypatch.setattr(discovery, "_address", address)
+    joined = discovery.cluster(
+        {"PYBEAM_CLUSTER": " app@localhost, other@10.0.0.2 ", "PYBEAM_COOKIE": "secret"}, 0.0
+    )
+    assert joined is not None
+    assert queries == ["localhost"]
+    assert joined.peers == ("app@localhost", "other@10.0.0.2")
+    assert joined.options[:2] == ("-name", "pybeam@127.0.0.1")
+    assert "-start_epmd" not in joined.options
+    assert "-erl_epmd_port" not in joined.options
+    assert "{127,0,0,1}" in joined.options
+    assert "secret" not in "".join(joined.options)
+    assert "5000" in joined.options[-1]
+
+
+@pytest.mark.parametrize(
+    "nodes",
+    [
+        "@localhost",
+        "app@",
+        "app@@localhost",
+        "app@localhost,",
+        "app@localhost,other",
+        "app name@localhost",
+    ],
+)
+def test_cluster__rejects_malformed_peer_lists(nodes: str) -> None:
+    with pytest.raises(BootstrapError, match="comma-separated longnames"):
+        discovery.cluster({"PYBEAM_CLUSTER": nodes, "PYBEAM_COOKIE": "secret"}, 0.0)
+
+
+@pytest.mark.parametrize("cookie", ["", "x" * 256])
+def test_cluster__explicit_peers_require_a_bounded_cookie(cookie: str) -> None:
+    with pytest.raises(BootstrapError, match="PYBEAM_COOKIE"):
+        discovery.cluster({"PYBEAM_CLUSTER": "app@localhost", "PYBEAM_COOKIE": cookie}, 0.0)
+
+
+def test_cluster__unresolved_first_peer_uses_the_startup_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queries: list[str] = []
+
+    def missing(host: str) -> None:
+        queries.append(host)
+
+    monkeypatch.setattr(discovery, "_address", missing)
+    with pytest.raises(BootstrapError, match=r"does not resolve: app@missing\.invalid"):
+        discovery.cluster({"PYBEAM_CLUSTER": "app@missing.invalid", "PYBEAM_COOKIE": "secret"}, 0.0)
+    assert queries == ["missing.invalid"]
+
+
+def test_cluster__retries_resolution_before_startup_and_supports_ipv6(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[str] = []
+    pauses: list[float] = []
+
+    def address(host: str) -> str | None:
+        attempts.append(host)
+        return "::1" if len(attempts) == 2 else None
+
+    monkeypatch.setattr(discovery, "_address", address)
+    monkeypatch.setattr(discovery.time, "sleep", pauses.append)
+    joined = discovery.cluster({"PYBEAM_CLUSTER": "app@::1", "PYBEAM_COOKIE": "x"}, 10.0)
+    assert joined is not None
+    assert attempts == ["::1", "::1"]
+    assert pauses == [1.0]
+    assert joined.node == "pybeam@::1"
+    assert "inet6_tcp" in joined.options
+    assert "{0,0,0,0,0,0,0,1}" in joined.options
+
+
 def test_process__cluster_rejects_debug_attach(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

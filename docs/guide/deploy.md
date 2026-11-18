@@ -31,6 +31,50 @@ Connecting nodes does not share or move work. Shared state, counters, actors and
 background services live on the node that created them, and a stopped node loses
 its in-memory state. Keep data that must survive in your database.
 
+## Join an existing Erlang/Elixir app
+
+To accept work from an existing app, list its node names instead of a DNS name:
+
+```sh
+PYBEAM_CLUSTER=app@10.0.0.5,app@10.0.0.6
+PYBEAM_COOKIE=<the app's shared secret>
+```
+
+Start your usual file with `uv run app.py`. PyBEAM uses the local address that
+routes to the first peer and names its worker `pybeam@<that address>`. This mode
+uses normal EPMD discovery, not fixed port 4370. Allow EPMD (TCP 4369 by default)
+and the nodes' distribution ports on your private network. Only longnames
+(`name@IP` or `name@fully.qualified.host`) are supported, not shortnames.
+
+PyBEAM connects to every listed peer at startup and retries every five seconds.
+If the first peer's host does not resolve within the startup timeout, startup
+fails. This does not wait for every peer to accept a connection.
+
+From the existing Elixir app, call an importable Python function on the worker:
+
+```elixir
+worker = :"pybeam@10.0.0.7"
+ctx = :erpc.call(worker, :py, :context, [1])
+:erpc.call(worker, :py_context, :submit_await, [ctx, :math, :sqrt, [81.0]])
+# {:ok, 9.0}
+```
+
+Use `submit_await` to run work alongside the active `pybeam.run` entry; it accepts
+ordinary functions and awaits async functions. Replace `:math` and `:sqrt` with
+your module and function. Modules beside the
+entry file are importable. Pass `self()` explicitly in the argument list if
+Python needs to reply to the calling process; the caller's identity is not
+implicit. Inside the worker, use `erlang.send(pid, message)` or
+`erlang.send((erlang.atom(name), erlang.atom(node)), message)`. These native
+bindings are available in the worker, not in a standalone Python client.
+Sends are fire-and-forget: they do not establish connections, wait for
+distribution capacity, or acknowledge delivery.
+
+Treat the cookie as full code-execution access to every connected node. Plain
+distribution is unencrypted; use TLS distribution across machines. A lost node
+can produce `{:erpc, :noconnection}` and a node-down notification even after work
+has taken effect. Neither retries nor durability are implied.
+
 ## Choose where to run
 
 Run one node per VM or container. Start with one node; add a second when you need
