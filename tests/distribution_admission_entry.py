@@ -155,8 +155,11 @@ async def sender(directory: Path) -> None:
         await remote("b", Request(op="ack", incarnation=inc, token=token))
     ).status == "invalid_phase"
     # Drop all result observations until after the effect/finally/context cleanup.
-    await asyncio.sleep(1.25)
-    retained = await remote("b", Request(op="snapshot"))
+    async with asyncio.timeout(5):
+        while True:
+            retained = await remote("b", Request(op="snapshot"))
+            if retained.completed > peer.completed:
+                break
     assert retained.count == 1 and retained.completed == peer.completed + 1
     assert (await remote("b", submit)).status == "invalid_phase"
     result = await remote("b", Request(op="result", incarnation=inc, token=token))
