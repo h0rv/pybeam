@@ -15,6 +15,21 @@ peer exceeded 46 ms.
 
 ![WebSocket ramp time, p99 echo latency, and incremental server memory across clean trials.](scale-websockets.svg)
 
+In a separate diagnostic run, a forced full Python collection took 1.1
+seconds of CPU time at 20,000 live Hornbeam sockets and reclaimed no objects.
+Hornbeam can finish wire upgrades before every application has accepted its
+socket, so that startup work can continue into the first echo samples.
+
+**Free-threaded diagnostic.** On CPython 3.14t with default GC, all three
+servers held 20,000 sockets without errors in three repeats. Hornbeam's median
+p99 echo latency fell to 177 ms (38–344 ms), still above Uvicorn (17 ms) and
+Granian (15 ms). All nine crash trials reconnected 5,000 sockets and verified
+echoes. This is a separate runtime comparison, not a fix for the packaged build.
+A forced full collection at 20,000 Hornbeam sockets used 0.22 seconds of CPU
+time and still reclaimed no objects.
+
+![WebSocket ramp time, p99 echo latency, and incremental server memory on free-threaded CPython.](scale-websockets-freethreaded.svg)
+
 **HTTP.** At 10,000 concurrent clients, Granian delivered 17,800 successful
 responses per second at the median, with no failed attempts. Uvicorn delivered
 10,800 per second with 11.5% failed attempts; Hornbeam delivered 9,800 per
@@ -54,7 +69,8 @@ crash results, and server logs.
   load generator's elapsed time, including its final drain.
 - **WebSockets:** four client processes open sockets in batches, then hold each
   target for at least 10 seconds. Ramp time measures how long it takes to add
-  the sockets for that step, not the cumulative run. Each round sends one echo
+  the sockets for that step as seen by the clients, not when the last ASGI
+  application accepts its socket. Each round sends one echo
   on up to 100 rotating sockets per client process, with a three-second timeout.
   A step is clean only if the full target stays open at every sample and no
   handshake or echo fails. The ramp stops at the first failed step. Memory is
@@ -120,6 +136,39 @@ concurrency 16 and runs each test level for 10 seconds before draining. Crash
 probes retry 50 ms after failures and stop trying for the first response after
 30 seconds. The three WebSocket phases (steady ramp, crash, and reconnect) use
 the same echo payload and count only matching responses.
+
+### Reproduce the free-threaded diagnostic
+
+Use separate PyBEAM and Hornbeam checkouts so the conventional and
+free-threaded builds cannot mix. Build and link the standalone Hornbeam
+checkout as above, but skip the conventional `.venv` setup. Then reconfigure
+the native module to link to CPython 3.14t and install the same ASGI servers
+in the free-threaded environment:
+
+```sh
+mise exec -- uv python install 3.14.10t
+python_t="$(mise exec -- uv python find 3.14.10t)"
+python_root="$(dirname "$(dirname "$python_t")")"
+bridge="$hornbeam_dir/_build/default/lib/erlang_python"
+mise exec erlang@29.1.2 cmake@4.5.0 -- cmake \
+  -S "$bridge/c_src" -B "$bridge/_build/cmake-314t" \
+  -DPython3_EXECUTABLE="$python_t" -DPython3_ROOT_DIR="$python_root" \
+  '-DPython3_FIND_ABI=ANY;ANY;ANY;ON'
+mise exec cmake@4.5.0 -- cmake --build "$bridge/_build/cmake-314t" -j 2
+ldd "$bridge/priv/py_nif.so" | grep 'libpython3.14t'
+mise exec -- uv venv --python "$python_t" .venv
+mise exec -- uv pip install --python .venv/bin/python \
+  fastapi==0.163.0 uvicorn==0.54.0 websockets==16.1.1 \
+  uvloop==0.23.0 httptools==0.8.0 granian==2.8.8
+mise exec oha@1.17.0 -- uv run --locked --project benchmarks \
+  python -m benchmarks.web.scale --output "$HOME/web-scale-314t"
+```
+
+The server processes use the free-threaded build; the load generator still
+uses the locked benchmark environment. This comparison does not change the
+packaged PyBEAM runtime.
+
+### Inspect HTTP results
 
 To inspect HTTP goodput, p99 latency in milliseconds (including non-200
 responses), and percentage of failed attempts from a rerun:

@@ -274,6 +274,7 @@ def test_commands_reject_invalid_targets() -> None:
 
 def test_containers_have_identical_limits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("benchmarks.web.run.required", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr("benchmarks.web.run.server_site_packages", lambda python: "/packages")
     for variant in ("hornbeam", "managed", "uvicorn", "uvicorn2"):
         command = container_command(variant, "test-web")
         for flag in ("--cpus=2", "--cpuset-cpus=0-1", "--memory=2g", "--memory-swap=2g"):
@@ -288,9 +289,27 @@ def test_server_commands_forward_app(
     monkeypatch: pytest.MonkeyPatch, variant: Variant, application: str
 ) -> None:
     monkeypatch.setattr("benchmarks.web.run.required", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr("benchmarks.web.run.server_site_packages", lambda python: "/packages")
     command = server_command(variant, application)
     assert command[-1] == application
     assert ("--standard" in command) == (variant == "uvicorn-standard")
+
+
+def test_hornbeam_uses_server_interpreter_packages(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    python = tmp_path / ".venv/bin/python"
+    packages = str(tmp_path / ".venv/lib/python3.14t/site-packages")
+    monkeypatch.setattr("benchmarks.web.run.ROOT", tmp_path)
+    monkeypatch.setattr("benchmarks.web.run.required", lambda name: "/usr/bin/" + name)
+
+    def execute(command: list[str]) -> str:
+        assert command[:2] == [str(python), "-c"]
+        return packages
+
+    monkeypatch.setattr("benchmarks.web.run.execute", execute)
+    assert server_command("hornbeam")[-2] == packages
+    assert server_command("uvicorn-standard")[0] == str(python)
 
 
 def test_granian_uses_asgi_http1_and_uvloop() -> None:

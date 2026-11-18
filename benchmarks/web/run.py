@@ -12,6 +12,7 @@ import time
 from collections.abc import AsyncGenerator, Callable, Generator, Mapping
 from contextlib import ExitStack, asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Literal
 
@@ -56,6 +57,11 @@ def required(name: str) -> str:
     return path
 
 
+@cache
+def server_site_packages(python: str) -> str:
+    return execute([python, "-c", "import sysconfig; print(sysconfig.get_path('platlib'))"])
+
+
 def server_command(
     variant: Variant,
     app: str = "benchmarks.web.app:app",
@@ -76,7 +82,7 @@ def server_command(
                 str(build),
                 "127.0.0.1:" + str(PORT),
                 str(ROOT),
-                str(ROOT / ".venv/lib/python3.14/site-packages"),
+                server_site_packages(python),
                 app,
             ]
         case "managed":
