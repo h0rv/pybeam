@@ -17,6 +17,7 @@ from websockets.asyncio.client import ClientConnection
 
 from benchmarks.runner import measurement_lock
 from benchmarks.web.app import app
+from benchmarks.web.managed import main as managed_main
 from benchmarks.web.run import (
     Settings,
     Variant,
@@ -24,6 +25,7 @@ from benchmarks.web.run import (
     memory,
     memory_delta,
     run,
+    server_command,
     stop_worker,
 )
 from benchmarks.web.ws import Command, Pool, ensure_client_fds
@@ -160,6 +162,40 @@ def test_containers_have_identical_limits(monkeypatch: pytest.MonkeyPatch) -> No
         command = container_command(variant, "test-web")
         for flag in ("--cpus=2", "--cpuset-cpus=0-1", "--memory=2g", "--memory-swap=2g"):
             assert flag in command
+
+
+@pytest.mark.parametrize("variant", ["hornbeam", "managed", "uvicorn", "uvicorn2"])
+@pytest.mark.parametrize("application", ["benchmarks.web.app:app", "benchmarks.web.pyview_app:app"])
+def test_server_commands_forward_app(
+    monkeypatch: pytest.MonkeyPatch, variant: Variant, application: str
+) -> None:
+    monkeypatch.setattr("benchmarks.web.run.required", lambda name: "/usr/bin/" + name)
+    assert server_command(variant, application)[-1] == application
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("application", [None, "benchmarks.web.pyview_app:app"])
+async def test_managed_launcher_selects_app(
+    monkeypatch: pytest.MonkeyPatch, application: str | None
+) -> None:
+    configurations: list[Config] = []
+
+    class RecordingServer:
+        def __init__(self, config: Config) -> None:
+            configurations.append(config)
+
+        async def serve(self) -> None:
+            pass
+
+    arguments = ["managed.py"]
+    if application is not None:
+        arguments.extend(["--app", application])
+    monkeypatch.setattr(sys, "argv", arguments)
+    monkeypatch.setenv("WEB_PORT", "18764")
+    monkeypatch.setattr("benchmarks.web.managed.Server", RecordingServer)
+    await managed_main()
+    assert len(configurations) == 1
+    assert configurations[0].app == (application or "benchmarks.web.app:app")
 
 
 @pytest.mark.parametrize(
