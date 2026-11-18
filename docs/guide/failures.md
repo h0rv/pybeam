@@ -37,8 +37,6 @@ transport and your application's authorization policy:
 - **PyView:** session authorization using PyView's required-scope check runs again
   before the connected mount. A rejected join closes with code `1000` and sends
   no mounted view. An accepted reconnect mounts a new view from current state.
-  Socket-owned live subscriptions require PyBEAM's native web server; the
-  [Uvicorn example](integrations/pyview.md) reads shared state without subscribing.
 - **SSE:** reject unauthorized requests before opening the event stream. A handler
   that raises HTTP `403` returns that status, not a stream or a current-state event.
   An accepted request should send current state as its first event.
