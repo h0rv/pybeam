@@ -160,7 +160,7 @@ def test_recorded_manifest__can_verify_its_original_revision_explicitly(
 
 def test_source__excludes_only_untracked_declared_outputs(tmp_path: Path) -> None:
     def git(*args: str) -> None:
-        subprocess.run(  # noqa: S603,S607
+        subprocess.run(
             ("git", "-C", str(tmp_path), *args),
             check=True,
             capture_output=True,

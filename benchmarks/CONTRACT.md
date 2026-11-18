@@ -127,6 +127,8 @@ They are never part of the default smoke run.
 
 `python -m benchmarks.canonical_build` runs `tools/build_native.py` and records the rebar-fetched erlang-python application in the existing benchmark manifest format. Current runs require the clean revision in `rebar.lock`, source fingerprints, matching Python/CMake hashes and native asset hashes. Archived records retain their original provenance and are not rewritten.
 
+Rebar leaves `ebin/erlang_python.app` untracked. Only that declared, hashed generated file is excluded from the native source fingerprint; tracked files and other nonignored untracked files remain checked. No Git ignore rules are changed. Historical manifests can be checked against their explicitly recorded revision with `verify(..., expected_revision=manifest.native.sha)`; current launches always use the lockfile revision.
+
 ### Recorded commands
 
 ```sh

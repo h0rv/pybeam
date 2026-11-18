@@ -22,7 +22,10 @@ def locked_revision(lock: Path = ROOT / "rebar.lock") -> str:
     entries = tuple(pattern.finditer(lock.read_text()))
     if len(entries) != 1:
         raise ValueError("Expected one pinned erlang_python Git revision in rebar.lock")
-    return entries[0].group(1)
+    revision = entries[0].group(1)
+    if not isinstance(revision, str):
+        raise ValueError("Native revision must be a string")
+    return revision
 
 
 BASELINE = locked_revision()
