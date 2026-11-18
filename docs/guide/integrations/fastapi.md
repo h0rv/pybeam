@@ -58,4 +58,4 @@ $ curl http://127.0.0.1:8767/counter
 
 `incr` updates and returns the counter atomically, so concurrent requests do not need a lock. Values live in memory and are lost when the program stops. Stop the server with Ctrl+C.
 
-The [full FastAPI example](../../../examples/fastapi/main.py) adds templates, form validation and live updates through a subscription.
+The [HTMX example](htmx.md) adds an HTML form, partial responses and live updates through a subscription.
