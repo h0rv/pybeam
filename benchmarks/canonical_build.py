@@ -38,7 +38,7 @@ def build(root: Path = ROOT) -> Path:
     command = (sys.executable, str(root / "tools/build_native.py"))
     subprocess.run(command, cwd=root, check=True)  # noqa: S603
     native = dependency(root)
-    before = source(native)
+    before = source(native, generated_paths=frozenset({"ebin/erlang_python.app"}))
     if before.dirty or before.sha != locked_revision(root / "rebar.lock"):
         raise ValueError("Canonical native source is not clean at the locked revision")
     beams = sorted((native / "ebin").glob("*.beam"))

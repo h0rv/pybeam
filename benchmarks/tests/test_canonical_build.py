@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pytest
 
 from benchmarks import canonical_build
 from benchmarks.contract import Source
+from benchmarks.provenance import source
 from benchmarks.pybeam_reference_build import BASELINE, BuildManifest, locked_revision, verify
 
 
@@ -42,7 +44,7 @@ def canonical(
         working_tree_sha256="0" * 64,
     )
 
-    def source(_path: Path) -> Source:
+    def source(_path: Path, *, generated_paths: frozenset[str] = frozenset()) -> Source:
         return fingerprint
 
     commands: list[tuple[str, ...]] = []
@@ -107,7 +109,7 @@ def test_canonical__rejects_stale_or_escaped_build(
                 else {"sha": "1" * 40}
             )
 
-            def source(_path: Path) -> Source:
+            def source(_path: Path, *, generated_paths: frozenset[str] = frozenset()) -> Source:
                 return changed
 
             monkeypatch.setattr("benchmarks.pybeam_reference_build.source", source)
@@ -133,7 +135,7 @@ def test_canonical__refuses_escaping_or_overridden_build_before_compilation(
         pytest.fail("Unsafe paths must fail before compilation")
 
     monkeypatch.setattr(canonical_build.subprocess, "run", forbidden)
-    with pytest.raises(ValueError, match="checkout|escapes"):
+    with pytest.raises(ValueError, match=r"checkout|escapes"):
         canonical_build.build(root)
 
 
@@ -147,10 +149,47 @@ def test_recorded_manifest__can_verify_its_original_revision_explicitly(
     original = fingerprint.model_copy(update={"sha": "a1ca04bfcaea817654ec7d1972f210c7a60075c4"})
     manifest = manifest.model_copy(update={"native": original})
 
-    def source(_path: Path) -> Source:
+    def source(_path: Path, *, generated_paths: frozenset[str] = frozenset()) -> Source:
         return original
 
     monkeypatch.setattr("benchmarks.pybeam_reference_build.source", source)
     with pytest.raises(ValueError, match="pinned"):
         verify(manifest, native)
     verify(manifest, native, expected_revision=original.sha)
+
+
+def test_source__excludes_only_untracked_declared_outputs(tmp_path: Path) -> None:
+    def git(*args: str) -> None:
+        subprocess.run(  # noqa: S603,S607
+            ("git", "-C", str(tmp_path), *args),
+            check=True,
+            capture_output=True,
+            env=dict(
+                os.environ,
+                GIT_AUTHOR_NAME="Fixture",
+                GIT_AUTHOR_EMAIL="fixture@example.invalid",
+                GIT_COMMITTER_NAME="Fixture",
+                GIT_COMMITTER_EMAIL="fixture@example.invalid",
+            ),
+        )
+
+    git("init", "--initial-branch=main")
+    tracked = tmp_path / "source.erl"
+    tracked.write_text("original source")
+    git("add", "source.erl")
+    git("commit", "-m", "fixture")
+    before = source(tmp_path)
+    app = tmp_path / "ebin/erlang_python.app"
+    app.parent.mkdir()
+    app.write_text("generated application metadata")
+    outputs = frozenset({"ebin/erlang_python.app"})
+    assert source(tmp_path).dirty
+    assert source(tmp_path, generated_paths=outputs) == before
+    (app.parent / "unexpected.app").write_text("not declared")
+    assert source(tmp_path, generated_paths=outputs).dirty
+    tracked.write_text("modified source")
+    assert (
+        source(tmp_path, generated_paths=outputs).working_tree_sha256 != before.working_tree_sha256
+    )
+    with pytest.raises(ValueError, match="Tracked source"):
+        source(tmp_path, generated_paths=frozenset({"source.erl"}))
