@@ -1,6 +1,6 @@
 # Startup, reconnects, and failures
 
-Treat a restart as a new execution and a WebSocket reconnect as a new connection.
+Treat a restart as a new execution and a reconnect as a new connection or request.
 PyBEAM can restart work, but it does not make every value or message durable.
 Choose what to save, and rebuild each client's view from authorized current state.
 
@@ -19,15 +19,25 @@ See [Shared state](state.md), [Actors](actors.md), and your
 [FastAPI](integrations/fastapi.md) or [Litestar](integrations/litestar.md)
 integration for resource setup.
 
-## Rebuild a view after WebSocket reconnect
+## Rebuild a view after reconnect
 
-A reconnect does not migrate the previous connection or replay missed messages.
-Your connection handler runs again. Authenticate and authorize the new connection
-even if the previous one was accepted.
+A WebSocket reconnect, a PyView live view reconnect, and a new SSE stream request
+run application code again. They do not migrate the previous connection or replay
+missed pub/sub messages. Authenticate and authorize each new connection or request,
+even if the previous one was accepted. Subscribe to the authorized data, then read
+current state to render a fresh view. Re-read state on each notification.
 
-When your handler rejects a WebSocket with close code `1008`, the client completes
-the handshake and then receives that close code, rather than an HTTP rejection.
-Do not send a view before authorization succeeds.
+Do not send a view before authorization succeeds. Rejection depends on the
+transport and your application's authorization policy:
+
+- **WebSocket:** the handler below closes with `1008`. The client completes the
+  handshake and then receives that close code, rather than an HTTP rejection.
+- **PyView:** session authorization using PyView's required-scope check runs again
+  before the connected mount. A rejected join closes with code `1000` and sends
+  no mounted view. An accepted reconnect mounts a new view from current state.
+- **SSE:** reject unauthorized requests before opening the event stream. A handler
+  that raises HTTP `403` returns that status, not a stream or a current-state event.
+  An accepted request should send current state as its first event.
 
 This example uses a fixed demo token for a shared counter. Replace the token check
 with your application's authentication and data authorization before using it for
@@ -110,7 +120,11 @@ included in your initial read; reading current state again is safe.
 
 Messages published while the client has no subscription are missed. Reconnecting
 does not recover them. If your application needs a history, store it separately
-and authorize reads of that history. See [Messaging](messaging.md).
+and authorize reads of that history. An SSE `Last-Event-ID` header does not make
+pub/sub durable: a snapshot-and-subscribe handler without a history lookup sends
+current state, not events since that ID. Implement history lookup explicitly if
+you need replay. See [Messaging](messaging.md) and the
+[PyView integration](integrations/pyview.md).
 
 ## Know what survives a failure
 
