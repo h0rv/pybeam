@@ -4,6 +4,9 @@ One FastAPI application returns 19-byte JSON from `GET /` and echoes text on
 `/ws`. The host benchmark measures serving over loopback HTTP/1.1, not shared
 state, persistence, or application work.
 
+See the [high-concurrency benchmark](SCALE_RESULTS.md) for connection ramps
+and recovery after killing the serving process.
+
 ## Native HTTP throughput
 
 Hornbeam's median throughput was 20% below Uvicorn with uvloop/httptools

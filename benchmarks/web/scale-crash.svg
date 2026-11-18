@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 704 253" role="img" aria-labelledby="title desc">
+<title id="title">Recovery after killing the serving process</title>
+<desc id="desc">Seconds from SIGKILL to a valid fresh HTTP response, a fresh WebSocket echo, and reconnecting all 5,000 WebSockets and checking an echo burst.</desc>
+<style>
+    svg { color: #202124; font-family: system-ui, sans-serif; }
+    text { fill: currentColor; }
+    .paper { fill: #fff; }
+    .grid { stroke: #d6d9dc; }
+    .mark { fill: currentColor; }
+    .range { stroke: currentColor; stroke-width: 1.5; }
+    .hornbeam { color: #1764a3; }
+    .uvicorn-standard { color: #9a4809; }
+    .granian { color: #307567; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #eef0f2; }
+      .paper { fill: #16181a; }
+      .grid { stroke: #4d5259; }
+      .hornbeam { color: #8bc8ff; }
+      .uvicorn-standard { color: #ffb477; }
+      .granian { color: #79d7c1; }
+    }
+  </style>
+<rect class="paper" width="704" height="253"/>
+<text x="20" y="29" font-size="21" text-anchor="start" font-weight="600">Recovery after killing the serving process</text>
+<g class="mark hornbeam"><circle cx="27" cy="55" r="4"/></g>
+<text x="37" y="60" font-size="15" text-anchor="start" font-weight="400">Hornbeam</text>
+<g class="mark uvicorn-standard"><rect x="133.00" y="51.00" width="8" height="8"/></g>
+<text x="147" y="60" font-size="15" text-anchor="start" font-weight="400">Uvicorn</text>
+<g class="mark granian"><path d="M247.00,50.00l5,5 -5,5 -5,-5z"/></g>
+<text x="257" y="60" font-size="15" text-anchor="start" font-weight="400">Granian</text>
+<text x="682" y="60" font-size="15" text-anchor="end" font-weight="400">Median and range</text>
+<text x="20" y="87" font-size="15" text-anchor="start" font-weight="600">Seconds from SIGKILL</text>
+<path class="grid" d="M80,217.00H682"/>
+<text x="72" y="222.0" font-size="13" text-anchor="end" font-weight="400">0</text>
+<path class="grid" d="M80,188.75H682"/>
+<text x="72" y="193.75" font-size="13" text-anchor="end" font-weight="400">1</text>
+<path class="grid" d="M80,160.50H682"/>
+<text x="72" y="165.5" font-size="13" text-anchor="end" font-weight="400">2</text>
+<path class="grid" d="M80,132.25H682"/>
+<text x="72" y="137.25" font-size="13" text-anchor="end" font-weight="400">3</text>
+<path class="grid" d="M80,104.00H682"/>
+<text x="72" y="109.0" font-size="13" text-anchor="end" font-weight="400">4</text>
+<text x="180.33" y="240" font-size="15" text-anchor="middle" font-weight="400">First HTTP</text>
+<g class="mark hornbeam"><title>hornbeam: 1.32 (1.276–1.332); n=3</title><path class="range" d="M156.33,179.38V180.94"/><circle cx="156.33" cy="179.7" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 0.7098 (0.6859–0.7456); n=3</title><path class="range" d="M180.33,195.94V197.62"/><rect x="176.33" y="192.95" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 0.8317 (0.8298–1); n=3</title><path class="range" d="M204.33,188.75V193.56"/><path d="M204.33,188.50l5,5 -5,5 -5,-5z"/></g>
+<text x="381.0" y="240" font-size="15" text-anchor="middle" font-weight="400">First WebSocket echo</text>
+<g class="mark hornbeam"><title>hornbeam: 1.331 (1.286–1.341); n=3</title><path class="range" d="M357.00,179.12V180.67"/><circle cx="357.0" cy="179.39" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 0.7108 (0.6867–0.7467); n=3</title><path class="range" d="M381.00,195.91V197.60"/><rect x="377.00" y="192.92" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 0.8326 (0.8301–1.001); n=3</title><path class="range" d="M405.00,188.73V193.55"/><path d="M405.00,188.48l5,5 -5,5 -5,-5z"/></g>
+<text x="581.67" y="240" font-size="15" text-anchor="middle" font-weight="400">5,000 reconnected</text>
+<g class="mark hornbeam"><title>hornbeam: 2.984 (2.771–3.026); n=3</title><path class="range" d="M557.67,131.51V138.73"/><circle cx="557.67" cy="132.7" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 3.266 (3.232–3.652); n=3</title><path class="range" d="M581.67,113.83V125.70"/><rect x="577.67" y="120.75" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 1.604 (1.57–1.943); n=3</title><path class="range" d="M605.67,162.11V172.66"/><path d="M605.67,166.68l5,5 -5,5 -5,-5z"/></g>
+</svg>

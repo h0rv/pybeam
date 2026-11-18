@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 704 432" role="img" aria-labelledby="title desc">
+<title id="title">WebSocket echo and memory</title>
+<desc id="desc">Completed ramp steps only. A cross means no repeat held the target without errors. Memory is incremental server process-tree PSS divided by held connections.</desc>
+<style>
+    svg { color: #202124; font-family: system-ui, sans-serif; }
+    text { fill: currentColor; }
+    .paper { fill: #fff; }
+    .grid { stroke: #d6d9dc; }
+    .mark { fill: currentColor; }
+    .range { stroke: currentColor; stroke-width: 1.5; }
+    .hornbeam { color: #1764a3; }
+    .uvicorn-standard { color: #9a4809; }
+    .granian { color: #307567; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #eef0f2; }
+      .paper { fill: #16181a; }
+      .grid { stroke: #4d5259; }
+      .hornbeam { color: #8bc8ff; }
+      .uvicorn-standard { color: #ffb477; }
+      .granian { color: #79d7c1; }
+    }
+  </style>
+<rect class="paper" width="704" height="432"/>
+<text x="20" y="29" font-size="21" text-anchor="start" font-weight="600">WebSocket echo and memory</text>
+<g class="mark hornbeam"><circle cx="27" cy="55" r="4"/></g>
+<text x="37" y="60" font-size="15" text-anchor="start" font-weight="400">Hornbeam</text>
+<g class="mark uvicorn-standard"><rect x="133.00" y="51.00" width="8" height="8"/></g>
+<text x="147" y="60" font-size="15" text-anchor="start" font-weight="400">Uvicorn</text>
+<g class="mark granian"><path d="M247.00,50.00l5,5 -5,5 -5,-5z"/></g>
+<text x="257" y="60" font-size="15" text-anchor="start" font-weight="400">Granian</text>
+<text x="682" y="60" font-size="15" text-anchor="end" font-weight="400">Median and range</text>
+<text x="20" y="87" font-size="15" text-anchor="start" font-weight="600">p99 echo round-trip time (ms)</text>
+<path class="grid" d="M80,217.00H682"/>
+<text x="72" y="222.0" font-size="13" text-anchor="end" font-weight="400">0</text>
+<path class="grid" d="M80,194.40H682"/>
+<text x="72" y="199.4" font-size="13" text-anchor="end" font-weight="400">200</text>
+<path class="grid" d="M80,171.80H682"/>
+<text x="72" y="176.8" font-size="13" text-anchor="end" font-weight="400">400</text>
+<path class="grid" d="M80,149.20H682"/>
+<text x="72" y="154.2" font-size="13" text-anchor="end" font-weight="400">600</text>
+<path class="grid" d="M80,126.60H682"/>
+<text x="72" y="131.6" font-size="13" text-anchor="end" font-weight="400">800</text>
+<path class="grid" d="M80,104.00H682"/>
+<text x="72" y="109.0" font-size="13" text-anchor="end" font-weight="400">1,000</text>
+<text x="155.25" y="240" font-size="15" text-anchor="middle" font-weight="400">1,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 184.3 (37.43–395.2); n=3</title><path class="range" d="M131.25,172.34V212.77"/><circle cx="131.25" cy="196.17" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 17.43 (15.47–22.96); n=3</title><path class="range" d="M155.25,214.41V215.25"/><rect x="151.25" y="211.03" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 12.36 (12.1–22.13); n=3</title><path class="range" d="M179.25,214.50V215.63"/><path d="M179.25,210.60l5,5 -5,5 -5,-5z"/></g>
+<text x="305.75" y="240" font-size="15" text-anchor="middle" font-weight="400">5,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 122.8 (58.8–155.1); n=3</title><path class="range" d="M281.75,199.48V210.36"/><circle cx="281.75" cy="203.12" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 18.42 (17.19–26.06); n=3</title><path class="range" d="M305.75,214.05V215.06"/><rect x="301.75" y="210.92" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 9.721 (7.64–28.84); n=3</title><path class="range" d="M329.75,213.74V216.14"/><path d="M329.75,210.90l5,5 -5,5 -5,-5z"/></g>
+<text x="456.25" y="240" font-size="15" text-anchor="middle" font-weight="400">10,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 544.8 (502.4–910.2); n=3</title><path class="range" d="M432.25,114.15V160.23"/><circle cx="432.25" cy="155.43" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 34.87 (17.11–35.15); n=3</title><path class="range" d="M456.25,213.03V215.07"/><rect x="452.25" y="209.06" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 12.73 (10.84–22.28); n=3</title><path class="range" d="M480.25,214.48V215.78"/><path d="M480.25,210.56l5,5 -5,5 -5,-5z"/></g>
+<text x="606.75" y="240" font-size="15" text-anchor="middle" font-weight="400">20,000 sockets</text>
+<text x="582.75" y="209" font-size="15" text-anchor="middle" font-weight="400">×</text>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 18.52 (14.37–36.07); n=3</title><path class="range" d="M606.75,212.92V215.38"/><rect x="602.75" y="210.91" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 13.16 (7.98–23.18); n=3</title><path class="range" d="M630.75,214.38V216.10"/><path d="M630.75,210.51l5,5 -5,5 -5,-5z"/></g>
+<text x="20" y="266" font-size="15" text-anchor="start" font-weight="600">Incremental server memory (KiB/socket)</text>
+<path class="grid" d="M80,396.00H682"/>
+<text x="72" y="401.0" font-size="13" text-anchor="end" font-weight="400">0</text>
+<path class="grid" d="M80,367.75H682"/>
+<text x="72" y="372.75" font-size="13" text-anchor="end" font-weight="400">50</text>
+<path class="grid" d="M80,339.50H682"/>
+<text x="72" y="344.5" font-size="13" text-anchor="end" font-weight="400">100</text>
+<path class="grid" d="M80,311.25H682"/>
+<text x="72" y="316.25" font-size="13" text-anchor="end" font-weight="400">150</text>
+<path class="grid" d="M80,283.00H682"/>
+<text x="72" y="288.0" font-size="13" text-anchor="end" font-weight="400">200</text>
+<text x="155.25" y="419" font-size="15" text-anchor="middle" font-weight="400">1,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 114.7 (74.18–116.8); n=3</title><path class="range" d="M131.25,330.02V354.09"/><circle cx="131.25" cy="331.21" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 32.83 (32.82–32.84); n=3</title><path class="range" d="M155.25,377.44V377.46"/><rect x="151.25" y="373.45" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 158.2 (157.9–158.5); n=3</title><path class="range" d="M179.25,306.45V306.77"/><path d="M179.25,301.64l5,5 -5,5 -5,-5z"/></g>
+<text x="305.75" y="419" font-size="15" text-anchor="middle" font-weight="400">5,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 60.25 (59.88–63.97); n=3</title><path class="range" d="M281.75,359.86V362.17"/><circle cx="281.75" cy="361.96" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 37.85 (37.85–37.85); n=3</title><path class="range" d="M305.75,374.61V374.62"/><rect x="301.75" y="370.62" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 159.7 (159.7–159.9); n=3</title><path class="range" d="M329.75,305.68V305.79"/><path d="M329.75,300.74l5,5 -5,5 -5,-5z"/></g>
+<text x="456.25" y="419" font-size="15" text-anchor="middle" font-weight="400">10,000 sockets</text>
+<g class="mark hornbeam"><title>hornbeam: 70.34 (67.05–70.51); n=3</title><path class="range" d="M432.25,356.16V358.12"/><circle cx="432.25" cy="356.26" r="4"/></g>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 38.34 (38.34–38.35); n=3</title><path class="range" d="M456.25,374.33V374.34"/><rect x="452.25" y="370.34" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 159.9 (159.9–160); n=3</title><path class="range" d="M480.25,305.63V305.66"/><path d="M480.25,300.66l5,5 -5,5 -5,-5z"/></g>
+<text x="606.75" y="419" font-size="15" text-anchor="middle" font-weight="400">20,000 sockets</text>
+<text x="582.75" y="388" font-size="15" text-anchor="middle" font-weight="400">×</text>
+<g class="mark uvicorn-standard"><title>uvicorn-standard: 38.73 (38.73–38.73); n=3</title><path class="range" d="M606.75,374.12V374.12"/><rect x="602.75" y="370.12" width="8" height="8"/></g>
+<g class="mark granian"><title>granian: 160 (160–160); n=3</title><path class="range" d="M630.75,305.58V305.62"/><path d="M630.75,300.62l5,5 -5,5 -5,-5z"/></g>
+</svg>
