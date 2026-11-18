@@ -435,6 +435,24 @@ async def test_loader__registers_and_invokes_once(
     assert not calls.exists()
 
 
+async def test_loader__completion_does_not_consume_runtime_pending_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def main() -> None:
+        pass
+
+    completed = tmp_path / "completed"
+    session = loader._Session(ready=tmp_path / "ready", completed=completed, entry=main)
+    monkeypatch.setattr(loader, "_state", loader._Loader(session=session))
+    runtime_pending = completed.with_name(completed.name + ".tmp")
+    runtime_pending.write_text("143")
+
+    assert await loader.invoke() == 0
+    assert completed.read_text() == "0"
+    runtime_pending.replace(completed)
+    assert completed.read_text() == "143"
+
+
 @pytest.mark.skipif(
     not sysconfig.get_config_var("Py_GIL_DISABLED"),
     reason="Only free-threaded builds immortalize code constants",
