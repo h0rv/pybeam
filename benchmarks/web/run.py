@@ -509,7 +509,7 @@ def run_locked(settings: Settings) -> None:
     settings.output.mkdir(parents=True, exist_ok=False)
     variants = HOST_VARIANTS if settings.host_http else VARIANTS
     if settings.hornbeam_baseline is not None:
-        variants = ("hornbeam-baseline", "hornbeam", "uvicorn-standard")
+        variants = ("hornbeam-baseline", *HOST_VARIANTS)
     result_model = CleanHttpResult if settings.host_http else HttpResult
     rates: list[float] = []
     for repeat in range(settings.repeats):
@@ -553,7 +553,7 @@ def main() -> None:
     parser.add_argument("--host-http", action="store_true", help="CPU-pinned HTTP only, no Docker")
     parser.add_argument(
         "--hornbeam-baseline",
-        help="Compare two Hornbeam builds against optimized Uvicorn",
+        help="Compare two Hornbeam builds against optimized Uvicorn and Granian",
     )
     args = parser.parse_args()
     baseline = Path(args.hornbeam_baseline).resolve() if args.hornbeam_baseline else None

@@ -503,10 +503,33 @@ def test_host_http_rotates_servers_without_fixed_rate_or_websockets(
     monkeypatch.setattr("benchmarks.web.run.host_server", host_server)
     monkeypatch.setattr("benchmarks.web.run.http_load", http_load)
     run(Settings(tmp_path / "results", 30, 3, (), host_http=True, hornbeam_baseline=baseline))
-    first, second, third = (
-        ("hornbeam-baseline", "hornbeam", "uvicorn-standard")
+    expected_order = (
+        [
+            "hornbeam-baseline",
+            "hornbeam",
+            "uvicorn-standard",
+            "granian",
+            "hornbeam",
+            "uvicorn-standard",
+            "granian",
+            "hornbeam-baseline",
+            "uvicorn-standard",
+            "granian",
+            "hornbeam-baseline",
+            "hornbeam",
+        ]
         if compare_baseline
-        else ("hornbeam", "uvicorn-standard", "granian")
+        else [
+            "hornbeam",
+            "uvicorn-standard",
+            "granian",
+            "uvicorn-standard",
+            "granian",
+            "hornbeam",
+            "granian",
+            "hornbeam",
+            "uvicorn-standard",
+        ]
     )
-    assert launches == [first, second, third, second, third, first, third, first, second]
+    assert launches == expected_order
     assert loads == [16, 64, 256] * len(launches)
