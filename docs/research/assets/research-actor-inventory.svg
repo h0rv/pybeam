@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="448" viewBox="0 0 800 448" role="img" aria-labelledby="title desc">
+<title id="title">Threads and live contexts at checkpoints</title><desc id="desc">0 actors, OS threads: 19 count; 0 actors, Live contexts: 1 count; 100 actors, OS threads: 119 count; 100 actors, Live contexts: 101 count; 1,000 actors, OS threads: 1019 count; 1,000 actors, Live contexts: 1001 count; 5,000 actors, OS threads: 5019 count; 5,000 actors, Live contexts: 5001 count; 10,000 actors, OS threads: 10019 count; 10,000 actors, Live contexts: 10001 count. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Threads and live contexts at checkpoints</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">OS threads</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Live contexts</text>
+<text x="215" y="112.5" text-anchor="end">0 actors</text>
+<rect class="s0" x="230" y="95" width="102.30028807622631" height="14"/>
+<text x="339.3002880762263" y="107">19 count</text>
+<rect class="s1" x="230" y="116" width="1" height="14"/>
+<text x="237" y="128">1 count</text>
+<text x="215" y="170.5" text-anchor="end">100 actors</text>
+<rect class="s0" x="230" y="153" width="166.0437569114025" height="14"/>
+<text x="403.0437569114025" y="165">119 count</text>
+<rect class="s1" x="230" y="174" width="160.34570990261142" height="14"/>
+<text x="397.3457099026114" y="186">101 count</text>
+<text x="215" y="228.5" text-anchor="end">1,000 actors</text>
+<rect class="s0" x="230" y="211" width="240.65393472051414" height="14"/>
+<text x="477.65393472051414" y="223">1019 count</text>
+<rect class="s1" x="230" y="232" width="240.03472619834548" height="14"/>
+<text x="477.0347261983455" y="244">1001 count</text>
+<text x="215" y="286.5" text-anchor="end">5,000 actors</text>
+<rect class="s0" x="230" y="269" width="296.0493756545645" height="14"/>
+<text x="533.0493756545645" y="281">5019 count</text>
+<rect class="s1" x="230" y="290" width="295.9245483638134" height="14"/>
+<text x="532.9245483638134" y="302">5001 count</text>
+<text x="215" y="344.5" text-anchor="end">10,000 actors</text>
+<rect class="s0" x="230" y="327" width="320.06595012844843" height="14"/>
+<text x="557.0659501284484" y="339">10019 count</text>
+<rect class="s1" x="230" y="348" width="320.00347418214903" height="14"/>
+<text x="557.003474182149" y="360">10001 count</text><path d="M230,390H630"/>
+<path d="M230,390v5"/><text x="230" y="414" text-anchor="start">1</text><path d="M310,390v5"/><text x="310" y="414" text-anchor="middle">10</text><path d="M390,390v5"/><text x="390" y="414" text-anchor="middle">100</text><path d="M470,390v5"/><text x="470" y="414" text-anchor="middle">1k</text><path d="M550,390v5"/><text x="550" y="414" text-anchor="middle">10k</text><path d="M630,390v5"/><text x="630" y="414" text-anchor="end">100k</text>
+<text x="630" y="438" text-anchor="end">count · log scale</text></svg>

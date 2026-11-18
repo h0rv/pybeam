@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="276" viewBox="0 0 800 276" role="img" aria-labelledby="title desc">
+<title id="title">Blocking HTTP requests inside actor methods</title><desc id="desc">10 serial requests: 0.53–0.57 s; 10 executor requests: 0.055 s; 10 to_thread requests: 0.055 s; 10 actors × 10 requests: 0.47 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Blocking HTTP requests inside actor methods</text>
+
+<text x="215" y="72" text-anchor="end">10 serial requests</text>
+<rect class="s0" x="230" y="65" width="344.3794671864848" height="14"/>
+<path d="M574.3794671864848,72H600.3703703703703m0,-5v10"/>
+<text x="607.3703703703703" y="77">0.53–0.57 s</text>
+<text x="215" y="109" text-anchor="end">10 executor requests</text>
+<rect class="s0" x="230" y="102" width="35.73749187784273" height="14"/>
+<text x="272.73749187784273" y="114">0.055 s</text>
+<text x="215" y="146" text-anchor="end">10 to_thread requests</text>
+<rect class="s0" x="230" y="139" width="35.73749187784273" height="14"/>
+<text x="272.73749187784273" y="151">0.055 s</text>
+<text x="215" y="183" text-anchor="end">10 actors × 10 requests</text>
+<rect class="s0" x="230" y="176" width="305.39311241065616" height="14"/>
+<text x="542.3931124106562" y="188">0.47 s</text><path d="M230,218H630"/>
+<path d="M230,218v5"/><text x="230" y="242" text-anchor="start">0</text><path d="M330,218v5"/><text x="330" y="242" text-anchor="middle">0.154</text><path d="M430,218v5"/><text x="430" y="242" text-anchor="middle">0.308</text><path d="M530,218v5"/><text x="530" y="242" text-anchor="middle">0.462</text><path d="M630,218v5"/><text x="630" y="242" text-anchor="end">0.616</text>
+<text x="630" y="266" text-anchor="end">s</text></svg>

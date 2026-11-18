@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="276" viewBox="0 0 800 276" role="img" aria-labelledby="title desc">
+<title id="title">Time to spawn each additional actor batch</title><desc id="desc">100 actors: 0.27 s; 1,000 actors: 2.3 s; 5,000 actors: 6.9 s; 10,000 actors: 12.5–14.8 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Time to spawn each additional actor batch</text>
+
+<text x="215" y="72" text-anchor="end">100 actors</text>
+<rect class="s0" x="230" y="65" width="6.756756756756744" height="14"/>
+<text x="243.75675675675674" y="77">0.27 s</text>
+<text x="215" y="109" text-anchor="end">1,000 actors</text>
+<rect class="s0" x="230" y="102" width="57.55755755755757" height="14"/>
+<text x="294.5575575575576" y="114">2.3 s</text>
+<text x="215" y="146" text-anchor="end">5,000 actors</text>
+<rect class="s0" x="230" y="139" width="172.67267267267266" height="14"/>
+<text x="409.67267267267266" y="151">6.9 s</text>
+<text x="215" y="183" text-anchor="end">10,000 actors</text>
+<rect class="s0" x="230" y="176" width="312.8128128128128" height="14"/>
+<path d="M542.8128128128128,183H600.3703703703703m0,-5v10"/>
+<text x="607.3703703703703" y="188">12.5–14.8 s</text><path d="M230,218H630"/>
+<path d="M230,218v5"/><text x="230" y="242" text-anchor="start">0</text><path d="M330,218v5"/><text x="330" y="242" text-anchor="middle">4</text><path d="M430,218v5"/><text x="430" y="242" text-anchor="middle">7.99</text><path d="M530,218v5"/><text x="530" y="242" text-anchor="middle">12</text><path d="M630,218v5"/><text x="630" y="242" text-anchor="end">16</text>
+<text x="630" y="266" text-anchor="end">s</text></svg>

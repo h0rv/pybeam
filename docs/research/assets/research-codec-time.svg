@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="680" viewBox="0 0 800 680" role="img" aria-labelledby="title desc">
+<title id="title">State codec decode and re-encode time</title><desc id="desc">32 · pickle, GIL: 4.4 µs; 32 · pickle, Free-threaded: 5.4 µs; 32 · marshal, GIL: 3.3 µs; 32 · marshal, Free-threaded: 3.5 µs; 32 · JSON, GIL: 12.3 µs; 32 · JSON, Free-threaded: 12.6 µs; 3,300 · pickle, GIL: 410 µs; 3,300 · pickle, Free-threaded: 460 µs; 3,300 · marshal, GIL: 290 µs; 3,300 · marshal, Free-threaded: 310 µs; 3,300 · JSON, GIL: 880 µs; 3,300 · JSON, Free-threaded: 990 µs; 33,000 · pickle, GIL: 4900 µs; 33,000 · pickle, Free-threaded: 5300 µs; 33,000 · marshal, GIL: 3300 µs; 33,000 · marshal, Free-threaded: 3600 µs; 33,000 · JSON, GIL: 11300 µs; 33,000 · JSON, Free-threaded: 11600 µs. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">State codec decode and re-encode time</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">32 · pickle</text>
+<rect class="s0" x="230" y="95" width="51.47621411889497" height="14"/>
+<text x="288.476214118895" y="107">4.4 µs</text>
+<rect class="s1" x="230" y="116" width="58.59150078583747" height="14"/>
+<text x="295.59150078583747" y="128">5.4 µs</text>
+<text x="215" y="170.5" text-anchor="end">32 · marshal</text>
+<rect class="s0" x="230" y="153" width="41.48111519023098" height="14"/>
+<text x="278.481115190231" y="165">3.3 µs</text>
+<rect class="s1" x="230" y="174" width="43.525443548022054" height="14"/>
+<text x="280.52544354802205" y="186">3.5 µs</text>
+<text x="215" y="228.5" text-anchor="end">32 · JSON</text>
+<rect class="s0" x="230" y="211" width="87.19240891515187" height="14"/>
+<text x="324.1924089151519" y="223">12.3 µs</text>
+<rect class="s1" x="230" y="232" width="88.02964360940507" height="14"/>
+<text x="325.02964360940507" y="244">12.6 µs</text>
+<text x="215" y="286.5" text-anchor="end">3,300 · pickle</text>
+<rect class="s0" x="230" y="269" width="209.02270853757886" height="14"/>
+<text x="446.02270853757886" y="281">410 µs</text>
+<rect class="s1" x="230" y="290" width="213.02062653452595" height="14"/>
+<text x="450.02062653452595" y="302">460 µs</text>
+<text x="215" y="344.5" text-anchor="end">3,300 · marshal</text>
+<rect class="s0" x="230" y="327" width="196.99183983191648" height="14"/>
+<text x="433.9918398319165" y="339">290 µs</text>
+<rect class="s1" x="230" y="348" width="199.30893550674182" height="14"/>
+<text x="436.3089355067418" y="360">310 µs</text>
+<text x="215" y="402.5" text-anchor="end">3,300 · JSON</text>
+<rect class="s0" x="230" y="385" width="235.55861377201347" height="14"/>
+<text x="472.5586137720135" y="397">880 µs</text>
+<rect class="s1" x="230" y="406" width="239.650815567804" height="14"/>
+<text x="476.650815567804" y="418">990 µs</text>
+<text x="215" y="460.5" text-anchor="end">33,000 · pickle</text>
+<rect class="s0" x="230" y="443" width="295.2156864022811" height="14"/>
+<text x="532.2156864022811" y="455">4900 µs</text>
+<rect class="s1" x="230" y="464" width="297.9420695680632" height="14"/>
+<text x="534.9420695680632" y="476">5300 µs</text>
+<text x="215" y="518.5" text-anchor="end">33,000 · marshal</text>
+<rect class="s0" x="230" y="501" width="281.481115190231" height="14"/>
+<text x="518.481115190231" y="513">3300 µs</text>
+<rect class="s1" x="230" y="522" width="284.504200061383" height="14"/>
+<text x="521.504200061383" y="534">3600 µs</text>
+<text x="215" y="576.5" text-anchor="end">33,000 · JSON</text>
+<rect class="s0" x="230" y="559" width="324.2462754786736" height="14"/>
+<text x="561.2462754786736" y="571">11300 µs</text>
+<rect class="s1" x="230" y="580" width="325.1566391381534" height="14"/>
+<text x="562.1566391381534" y="592">11600 µs</text><path d="M230,622H630"/>
+<path d="M230,622v5"/><text x="230" y="646" text-anchor="start">1</text><path d="M310,622v5"/><text x="310" y="646" text-anchor="middle">10</text><path d="M390,622v5"/><text x="390" y="646" text-anchor="middle">100</text><path d="M470,622v5"/><text x="470" y="646" text-anchor="middle">1k</text><path d="M550,622v5"/><text x="550" y="646" text-anchor="middle">10k</text><path d="M630,622v5"/><text x="630" y="646" text-anchor="end">100k</text>
+<text x="630" y="670" text-anchor="end">µs · log scale</text></svg>

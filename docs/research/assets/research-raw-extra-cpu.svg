@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="448" viewBox="0 0 800 448" role="img" aria-labelledby="title desc">
+<title id="title">Single-job and historical own-GIL CPU calls</title><desc id="desc">Worker · 1, GIL: 0.33 s; Worker · 1, Free-threaded: 0.33–0.34 s; Own-GIL · 1, GIL: 0.34 s; Own-GIL · 1, Free-threaded: 0.33–0.34 s; Own-GIL · 8, GIL: 0.38 s; Own-GIL · 8, Free-threaded: 0.34–0.66 s; Own-GIL · 64, GIL: 2.86 s; Own-GIL · 64, Free-threaded: 2.69–2.98 s; Isolated · 1, GIL: 0.25 s; Isolated · 1, Free-threaded: 0.27–0.28 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Single-job and historical own-GIL CPU calls</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">Worker · 1</text>
+<rect class="s0" x="230" y="95" width="41.014168530947074" height="14"/>
+<text x="278.0141685309471" y="107">0.33 s</text>
+<rect class="s1" x="230" y="116" width="41.014168530947074" height="14"/>
+<path d="M271.0141685309471,123H272.25702212279396m0,-5v10"/>
+<text x="279.25702212279396" y="128">0.33–0.34 s</text>
+<text x="215" y="170.5" text-anchor="end">Own-GIL · 1</text>
+<rect class="s0" x="230" y="153" width="42.257022122793956" height="14"/>
+<text x="279.25702212279396" y="165">0.34 s</text>
+<rect class="s1" x="230" y="174" width="41.014168530947074" height="14"/>
+<path d="M271.0141685309471,181H272.25702212279396m0,-5v10"/>
+<text x="279.25702212279396" y="186">0.33–0.34 s</text>
+<text x="215" y="228.5" text-anchor="end">Own-GIL · 8</text>
+<rect class="s0" x="230" y="211" width="47.22843649018148" height="14"/>
+<text x="284.2284364901815" y="223">0.38 s</text>
+<rect class="s1" x="230" y="232" width="42.257022122793956" height="14"/>
+<path d="M272.25702212279396,239H312.0283370618941m0,-5v10"/>
+<text x="319.0283370618941" y="244">0.34–0.66 s</text>
+<text x="215" y="286.5" text-anchor="end">Own-GIL · 64</text>
+<rect class="s0" x="230" y="269" width="355.45612726820775" height="14"/>
+<text x="592.4561272682078" y="281">2.86 s</text>
+<rect class="s1" x="230" y="290" width="334.3276162068107" height="14"/>
+<path d="M564.3276162068107,297H600.3703703703703m0,-5v10"/>
+<text x="607.3703703703703" y="302">2.69–2.98 s</text>
+<text x="215" y="344.5" text-anchor="end">Isolated · 1</text>
+<rect class="s0" x="230" y="327" width="31.071339796172026" height="14"/>
+<text x="268.071339796172" y="339">0.25 s</text>
+<rect class="s1" x="230" y="348" width="33.55704697986579" height="14"/>
+<path d="M263.5570469798658,355H264.79990057171267m0,-5v10"/>
+<text x="271.79990057171267" y="360">0.27–0.28 s</text><path d="M230,390H630"/>
+<path d="M230,390v5"/><text x="230" y="414" text-anchor="start">0</text><path d="M330,390v5"/><text x="330" y="414" text-anchor="middle">0.805</text><path d="M430,390v5"/><text x="430" y="414" text-anchor="middle">1.61</text><path d="M530,390v5"/><text x="530" y="414" text-anchor="middle">2.41</text><path d="M630,390v5"/><text x="630" y="414" text-anchor="end">3.22</text>
+<text x="630" y="438" text-anchor="end">s</text></svg>

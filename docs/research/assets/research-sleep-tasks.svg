@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="390" viewBox="0 0 800 390" role="img" aria-labelledby="title desc">
+<title id="title">Blocking sleep task batch completion</title><desc id="desc">8 shared-loop tasks, GIL: 0.43 s; 8 shared-loop tasks, Free-threaded: 0.51 s; 64 shared-loop tasks, GIL: 3.35–3.37 s; 64 shared-loop tasks, Free-threaded: 3.99 s; 8 dedicated-loop tasks, GIL: 1.08 s; 8 dedicated-loop tasks, Free-threaded: 1.18 s; 64 dedicated-loop tasks, GIL: 1.18–1.19 s; 64 dedicated-loop tasks, Free-threaded: 2.12 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Blocking sleep task batch completion</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">8 shared-loop tasks</text>
+<rect class="s0" x="230" y="95" width="39.9146013181101" height="14"/>
+<text x="276.9146013181101" y="107">0.43 s</text>
+<rect class="s1" x="230" y="116" width="47.34057365636312" height="14"/>
+<text x="284.3405736563631" y="128">0.51 s</text>
+<text x="215" y="170.5" text-anchor="end">64 shared-loop tasks</text>
+<rect class="s0" x="230" y="153" width="310.96259166434606" height="14"/>
+<path d="M540.9625916643461,160H542.8190847489093m0,-5v10"/>
+<text x="549.8190847489093" y="165">3.35–3.37 s</text>
+<rect class="s1" x="230" y="174" width="370.3703703703703" height="14"/>
+<text x="607.3703703703703" y="186">3.99 s</text>
+<text x="215" y="228.5" text-anchor="end">8 dedicated-loop tasks</text>
+<rect class="s0" x="230" y="211" width="100.25062656641603" height="14"/>
+<text x="337.25062656641603" y="223">1.08 s</text>
+<rect class="s1" x="230" y="232" width="109.53309198923233" height="14"/>
+<text x="346.53309198923233" y="244">1.18 s</text>
+<text x="215" y="286.5" text-anchor="end">64 dedicated-loop tasks</text>
+<rect class="s0" x="230" y="269" width="109.53309198923233" height="14"/>
+<path d="M339.53309198923233,276H340.46133853151395m0,-5v10"/>
+<text x="347.46133853151395" y="281">1.18–1.19 s</text>
+<rect class="s1" x="230" y="290" width="196.78826696370555" height="14"/>
+<text x="433.78826696370555" y="302">2.12 s</text><path d="M230,332H630"/>
+<path d="M230,332v5"/><text x="230" y="356" text-anchor="start">0</text><path d="M330,332v5"/><text x="330" y="356" text-anchor="middle">1.08</text><path d="M430,332v5"/><text x="430" y="356" text-anchor="middle">2.15</text><path d="M530,332v5"/><text x="530" y="356" text-anchor="middle">3.23</text><path d="M630,332v5"/><text x="630" y="356" text-anchor="end">4.31</text>
+<text x="630" y="380" text-anchor="end">s</text></svg>

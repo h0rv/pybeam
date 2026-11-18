@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="395" viewBox="0 0 800 395" role="img" aria-labelledby="title desc">
+<title id="title">Current smoke completion rates</title><desc id="desc">Python, Trial 0: 49719.28 events/s; Python, Trial 1: 44617.14 events/s; Python, Trial 2: 31820.12 events/s; Raw PyBEAM, Trial 0: 11757.39 events/s; Raw PyBEAM, Trial 1: 8886.32 events/s; Raw PyBEAM, Trial 2: 11477.16 events/s; Erlang OTP, Trial 0: 787662.06 events/s; Erlang OTP, Trial 1: 821071.99 events/s; Erlang OTP, Trial 2: 842694.26 events/s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Current smoke completion rates</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">Trial 0</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Trial 1</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">Trial 2</text>
+<text x="215" y="123" text-anchor="end">Python</text>
+<rect class="s0" x="230" y="95" width="21.85199190528263" height="14"/>
+<text x="258.8519919052826" y="107">49719.28 events/s</text>
+<rect class="s1" x="230" y="116" width="19.609563576078784" height="14"/>
+<text x="256.6095635760788" y="128">44617.14 events/s</text>
+<rect class="s2" x="230" y="137" width="13.985178479356932" height="14"/>
+<text x="250.98517847935693" y="149">31820.12 events/s</text>
+<text x="215" y="202" text-anchor="end">Raw PyBEAM</text>
+<rect class="s0" x="230" y="174" width="5.167460009623056" height="14"/>
+<text x="242.16746000962306" y="186">11757.39 events/s</text>
+<rect class="s1" x="230" y="195" width="3.905603474301131" height="14"/>
+<text x="240.90560347430113" y="207">8886.32 events/s</text>
+<rect class="s2" x="230" y="216" width="5.044296848539119" height="14"/>
+<text x="242.04429684853912" y="228">11477.16 events/s</text>
+<text x="215" y="281" text-anchor="end">Erlang OTP</text>
+<rect class="s0" x="230" y="253" width="346.18331076432025" height="14"/>
+<text x="583.1833107643203" y="265">787662.06 events/s</text>
+<rect class="s1" x="230" y="274" width="360.8672225167844" height="14"/>
+<text x="597.8672225167844" y="286">821071.99 events/s</text>
+<rect class="s2" x="230" y="295" width="370.3703703703703" height="14"/>
+<text x="607.3703703703703" y="307">842694.26 events/s</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">228k</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">455k</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">683k</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">910k</text>
+<text x="630" y="385" text-anchor="end">events/s</text></svg>

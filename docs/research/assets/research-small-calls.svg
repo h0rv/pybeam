@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="854" viewBox="0 0 800 854" role="img" aria-labelledby="title desc">
+<title id="title">Smaller async and blocking actor calls</title><desc id="desc">Async wait · 1, GIL: 0.051–0.052 s; Async wait · 1, Free-threaded: 0.051 s; Async wait · 10, GIL: 0.054 s; Async wait · 10, Free-threaded: 0.053 s; Async wait · 100, GIL: 0.071–0.086 s; Async wait · 100, Free-threaded: 0.1 s; Async wait · 1,000, GIL: 0.33–0.51 s; Async wait · 1,000, Free-threaded: 0.52 s; Async wait · 4,000, GIL: 1.6–2.1 s; Async wait · 4,000, Free-threaded: 3.5 s; Blocking wait · 1, GIL: 0.053 s; Blocking wait · 1, Free-threaded: 0.062 s; Blocking wait · 8, GIL: 0.41 s; Blocking wait · 8, Free-threaded: 0.41 s; Threaded wait · 8, GIL: 0.054 s; Threaded wait · 8, Free-threaded: 0.065 s; Threaded wait · 100, GIL: 0.46 s; Threaded wait · 100, Free-threaded: 0.49 s; CPU body · 1, GIL: 0.12 s; CPU body · 1, Free-threaded: 0.14 s; Threaded CPU · 1, GIL: 0.12 s; Threaded CPU · 1, Free-threaded: 0.16 s; Async beside blocking, GIL: 0.311 s; Async beside blocking, Free-threaded: 0.317 s. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Smaller async and blocking actor calls</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">Async wait · 1</text>
+<rect class="s0" x="230" y="95" width="5.396825396825392" height="14"/>
+<path d="M235.3968253968254,102H235.5026455026455m0,-5v10"/>
+<text x="242.5026455026455" y="107">0.051–0.052 s</text>
+<rect class="s1" x="230" y="116" width="5.396825396825392" height="14"/>
+<text x="242.3968253968254" y="128">0.051 s</text>
+<text x="215" y="170.5" text-anchor="end">Async wait · 10</text>
+<rect class="s0" x="230" y="153" width="5.714285714285722" height="14"/>
+<text x="242.71428571428572" y="165">0.054 s</text>
+<rect class="s1" x="230" y="174" width="5.608465608465622" height="14"/>
+<text x="242.60846560846562" y="186">0.053 s</text>
+<text x="215" y="228.5" text-anchor="end">Async wait · 100</text>
+<rect class="s0" x="230" y="211" width="7.51322751322752" height="14"/>
+<path d="M237.51322751322752,218H239.1005291005291m0,-5v10"/>
+<text x="246.1005291005291" y="223">0.071–0.086 s</text>
+<rect class="s1" x="230" y="232" width="10.582010582010582" height="14"/>
+<text x="247.58201058201058" y="244">0.1 s</text>
+<text x="215" y="286.5" text-anchor="end">Async wait · 1,000</text>
+<rect class="s0" x="230" y="269" width="34.92063492063494" height="14"/>
+<path d="M264.92063492063494,276H283.968253968254m0,-5v10"/>
+<text x="290.968253968254" y="281">0.33–0.51 s</text>
+<rect class="s1" x="230" y="290" width="55.02645502645504" height="14"/>
+<text x="292.02645502645504" y="302">0.52 s</text>
+<text x="215" y="344.5" text-anchor="end">Async wait · 4,000</text>
+<rect class="s0" x="230" y="327" width="169.31216931216932" height="14"/>
+<path d="M399.3121693121693,334H452.22222222222223m0,-5v10"/>
+<text x="459.22222222222223" y="339">1.6–2.1 s</text>
+<rect class="s1" x="230" y="348" width="370.3703703703703" height="14"/>
+<text x="607.3703703703703" y="360">3.5 s</text>
+<text x="215" y="402.5" text-anchor="end">Blocking wait · 1</text>
+<rect class="s0" x="230" y="385" width="5.608465608465622" height="14"/>
+<text x="242.60846560846562" y="397">0.053 s</text>
+<rect class="s1" x="230" y="406" width="6.5608465608465565" height="14"/>
+<text x="243.56084656084656" y="418">0.062 s</text>
+<text x="215" y="460.5" text-anchor="end">Blocking wait · 8</text>
+<rect class="s0" x="230" y="443" width="43.38624338624339" height="14"/>
+<text x="280.3862433862434" y="455">0.41 s</text>
+<rect class="s1" x="230" y="464" width="43.38624338624339" height="14"/>
+<text x="280.3862433862434" y="476">0.41 s</text>
+<text x="215" y="518.5" text-anchor="end">Threaded wait · 8</text>
+<rect class="s0" x="230" y="501" width="5.714285714285722" height="14"/>
+<text x="242.71428571428572" y="513">0.054 s</text>
+<rect class="s1" x="230" y="522" width="6.878306878306887" height="14"/>
+<text x="243.8783068783069" y="534">0.065 s</text>
+<text x="215" y="576.5" text-anchor="end">Threaded wait · 100</text>
+<rect class="s0" x="230" y="559" width="48.677248677248656" height="14"/>
+<text x="285.67724867724866" y="571">0.46 s</text>
+<rect class="s1" x="230" y="580" width="51.85185185185185" height="14"/>
+<text x="288.85185185185185" y="592">0.49 s</text>
+<text x="215" y="634.5" text-anchor="end">CPU body · 1</text>
+<rect class="s0" x="230" y="617" width="12.69841269841271" height="14"/>
+<text x="249.6984126984127" y="629">0.12 s</text>
+<rect class="s1" x="230" y="638" width="14.81481481481481" height="14"/>
+<text x="251.8148148148148" y="650">0.14 s</text>
+<text x="215" y="692.5" text-anchor="end">Threaded CPU · 1</text>
+<rect class="s0" x="230" y="675" width="12.69841269841271" height="14"/>
+<text x="249.6984126984127" y="687">0.12 s</text>
+<rect class="s1" x="230" y="696" width="16.931216931216937" height="14"/>
+<text x="253.93121693121694" y="708">0.16 s</text>
+<text x="215" y="750.5" text-anchor="end">Async beside blocking</text>
+<rect class="s0" x="230" y="733" width="32.91005291005291" height="14"/>
+<text x="269.9100529100529" y="745">0.311 s</text>
+<rect class="s1" x="230" y="754" width="33.54497354497357" height="14"/>
+<text x="270.5449735449736" y="766">0.317 s</text><path d="M230,796H630"/>
+<path d="M230,796v5"/><text x="230" y="820" text-anchor="start">0</text><path d="M330,796v5"/><text x="330" y="820" text-anchor="middle">0.945</text><path d="M430,796v5"/><text x="430" y="820" text-anchor="middle">1.89</text><path d="M530,796v5"/><text x="530" y="820" text-anchor="middle">2.83</text><path d="M630,796v5"/><text x="630" y="820" text-anchor="end">3.78</text>
+<text x="630" y="844" text-anchor="end">s</text></svg>

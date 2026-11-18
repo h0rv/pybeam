@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="274" viewBox="0 0 800 274" role="img" aria-labelledby="title desc">
+<title id="title">Resident memory per raw context</title><desc id="desc">Own-GIL, GIL: 10.8–11.3 MiB; Own-GIL, Free-threaded: 15.7–16.2 MiB; Isolated, GIL: 21.3–22.3 MiB; Isolated, Free-threaded: 25.7–26.8 MiB. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Resident memory per raw context</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
+<text x="215" y="112.5" text-anchor="end">Own-GIL</text>
+<rect class="s0" x="230" y="95" width="149.25373134328356" height="14"/>
+<path d="M379.25373134328356,102H386.16362631288007m0,-5v10"/>
+<text x="393.16362631288007" y="107">10.8–11.3 MiB</text>
+<rect class="s1" x="230" y="116" width="216.97070204532884" height="14"/>
+<path d="M446.97070204532884,123H453.88059701492534m0,-5v10"/>
+<text x="460.88059701492534" y="128">15.7–16.2 MiB</text>
+<text x="215" y="170.5" text-anchor="end">Isolated</text>
+<rect class="s0" x="230" y="153" width="294.3615257048093" height="14"/>
+<path d="M524.3615257048093,160H538.1813156440021m0,-5v10"/>
+<text x="545.1813156440021" y="165">21.3–22.3 MiB</text>
+<rect class="s1" x="230" y="174" width="355.1686014372581" height="14"/>
+<path d="M585.1686014372581,181H600.3703703703703m0,-5v10"/>
+<text x="607.3703703703703" y="186">25.7–26.8 MiB</text><path d="M230,216H630"/>
+<path d="M230,216v5"/><text x="230" y="240" text-anchor="start">0</text><path d="M330,216v5"/><text x="330" y="240" text-anchor="middle">7.24</text><path d="M430,216v5"/><text x="430" y="240" text-anchor="middle">14.5</text><path d="M530,216v5"/><text x="530" y="240" text-anchor="middle">21.7</text><path d="M630,216v5"/><text x="630" y="240" text-anchor="end">28.9</text>
+<text x="630" y="264" text-anchor="end">MiB</text></svg>

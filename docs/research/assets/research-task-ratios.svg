@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="558" viewBox="0 0 800 558" role="img" aria-labelledby="title desc">
+<title id="title">Task end-to-end throughput ratios</title><desc id="desc">GIL shared, N=1: 1 ×; GIL shared, N=2: 1.01 ×; GIL shared, N=4: 1.04 ×; GIL shared, N=8: 1.07 ×; Free shared, N=1: 1 ×; Free shared, N=2: 1.07 ×; Free shared, N=4: 1.04 ×; Free shared, N=8: 1.07 ×; GIL dedicated, N=1: 1 ×; GIL dedicated, N=2: 1.74 ×; GIL dedicated, N=4: 2.7 ×; GIL dedicated, N=8: 3.76 ×; Free dedicated, N=1: 1 ×; Free dedicated, N=2: 1.97 ×; Free dedicated, N=4: 3.97 ×; Free dedicated, N=8: 7.88 ×. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Task end-to-end throughput ratios</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">N=1</text><rect class="s1" x="350" y="49" width="14" height="14"/><text x="371" y="61">N=2</text><rect class="s2" x="470" y="49" width="14" height="14"/><text x="491" y="61">N=4</text><rect class="s3" x="590" y="49" width="14" height="14"/><text x="611" y="61">N=8</text>
+<text x="215" y="133.5" text-anchor="end">GIL shared</text>
+<rect class="s0" x="230" y="95" width="47.001316036849005" height="14"/>
+<text x="284.001316036849" y="107">1 ×</text>
+<rect class="s1" x="230" y="116" width="47.47132919721753" height="14"/>
+<text x="284.4713291972175" y="128">1.01 ×</text>
+<rect class="s2" x="230" y="137" width="48.881368678322985" height="14"/>
+<text x="285.881368678323" y="149">1.04 ×</text>
+<rect class="s3" x="230" y="158" width="50.29140815942844" height="14"/>
+<text x="287.29140815942844" y="170">1.07 ×</text>
+<text x="215" y="233.5" text-anchor="end">Free shared</text>
+<rect class="s0" x="230" y="195" width="47.001316036849005" height="14"/>
+<text x="284.001316036849" y="207">1 ×</text>
+<rect class="s1" x="230" y="216" width="50.29140815942844" height="14"/>
+<text x="287.29140815942844" y="228">1.07 ×</text>
+<rect class="s2" x="230" y="237" width="48.881368678322985" height="14"/>
+<text x="285.881368678323" y="249">1.04 ×</text>
+<rect class="s3" x="230" y="258" width="50.29140815942844" height="14"/>
+<text x="287.29140815942844" y="270">1.07 ×</text>
+<text x="215" y="333.5" text-anchor="end">GIL dedicated</text>
+<rect class="s0" x="230" y="295" width="47.001316036849005" height="14"/>
+<text x="284.001316036849" y="307">1 ×</text>
+<rect class="s1" x="230" y="316" width="81.7822899041173" height="14"/>
+<text x="318.7822899041173" y="328">1.74 ×</text>
+<rect class="s2" x="230" y="337" width="126.90355329949239" height="14"/>
+<text x="363.9035532994924" y="349">2.7 ×</text>
+<rect class="s3" x="230" y="358" width="176.72494829855236" height="14"/>
+<text x="413.72494829855236" y="370">3.76 ×</text>
+<text x="215" y="433.5" text-anchor="end">Free dedicated</text>
+<rect class="s0" x="230" y="395" width="47.001316036849005" height="14"/>
+<text x="284.001316036849" y="407">1 ×</text>
+<rect class="s1" x="230" y="416" width="92.59259259259261" height="14"/>
+<text x="329.5925925925926" y="428">1.97 ×</text>
+<rect class="s2" x="230" y="437" width="186.59522466629062" height="14"/>
+<text x="423.5952246662906" y="449">3.97 ×</text>
+<rect class="s3" x="230" y="458" width="370.3703703703703" height="14"/>
+<text x="607.3703703703703" y="470">7.88 ×</text><path d="M230,500H630"/>
+<path d="M230,500v5"/><text x="230" y="524" text-anchor="start">0</text><path d="M330,500v5"/><text x="330" y="524" text-anchor="middle">2.13</text><path d="M430,500v5"/><text x="430" y="524" text-anchor="middle">4.26</text><path d="M530,500v5"/><text x="530" y="524" text-anchor="middle">6.38</text><path d="M630,500v5"/><text x="630" y="524" text-anchor="end">8.51</text>
+<text x="630" y="548" text-anchor="end">×</text></svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="350" viewBox="0 0 800 350" role="img" aria-labelledby="title desc">
+<title id="title">Raw context creation</title><desc id="desc">Worker · GIL: 1.335 ms; Worker · free: 1.536 ms; Own-GIL · GIL: 78.56 ms; Own-GIL · free: 345.199 ms; Isolated · GIL: 90.065 ms; Isolated · free: 320.468 ms. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Raw context creation</text>
+
+<text x="215" y="72" text-anchor="end">Worker · GIL</text>
+<rect class="s0" x="230" y="65" width="16.73083542674587" height="14"/>
+<text x="253.73083542674587" y="77">1.335 ms</text>
+<text x="215" y="109" text-anchor="end">Worker · free</text>
+<rect class="s0" x="230" y="102" width="24.852162092732414" height="14"/>
+<text x="261.85216209273244" y="114">1.536 ms</text>
+<text x="215" y="146" text-anchor="end">Own-GIL · GIL</text>
+<rect class="s0" x="230" y="139" width="252.69352997051908" height="14"/>
+<text x="489.6935299705191" y="151">78.56 ms</text>
+<text x="215" y="183" text-anchor="end">Own-GIL · free</text>
+<rect class="s0" x="230" y="176" width="338.409270526146" height="14"/>
+<text x="575.409270526146" y="188">345.199 ms</text>
+<text x="215" y="220" text-anchor="end">Isolated · GIL</text>
+<rect class="s0" x="230" y="213" width="260.6074737806102" height="14"/>
+<text x="497.6074737806102" y="225">90.065 ms</text>
+<text x="215" y="257" text-anchor="end">Isolated · free</text>
+<rect class="s0" x="230" y="250" width="334.1046226659264" height="14"/>
+<text x="571.1046226659264" y="262">320.468 ms</text><path d="M230,292H630"/>
+<path d="M230,292v5"/><text x="230" y="316" text-anchor="start">1</text><path d="M363.3333333333333,292v5"/><text x="363.3333333333333" y="316" text-anchor="middle">10</text><path d="M496.66666666666663,292v5"/><text x="496.66666666666663" y="316" text-anchor="middle">100</text><path d="M630,292v5"/><text x="630" y="316" text-anchor="end">1k</text>
+<text x="630" y="340" text-anchor="end">ms · log scale</text></svg>

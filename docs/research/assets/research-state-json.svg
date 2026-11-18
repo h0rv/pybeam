@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="395" viewBox="0 0 800 395" role="img" aria-labelledby="title desc">
+<title id="title">Conventional JSON state round trips</title><desc id="desc">32 entries, Codec only: 12 µs; 32 entries, HTTP: 474 µs; 32 entries, Redis: 131 µs; 3,300 entries, Codec only: 1000 µs; 3,300 entries, HTTP: 1700 µs; 3,300 entries, Redis: 1400 µs; 33,000 entries, Codec only: 13700 µs; 33,000 entries, HTTP: 17000 µs; 33,000 entries, Redis: 17300 µs. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Conventional JSON state round trips</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">Codec only</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">HTTP</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">Redis</text>
+<text x="215" y="123" text-anchor="end">32 entries</text>
+<rect class="s0" x="230" y="95" width="7.9181246047624825" height="14"/>
+<text x="244.91812460476248" y="107">12 µs</text>
+<rect class="s1" x="230" y="116" width="167.57783416740853" height="14"/>
+<text x="404.5778341674085" y="128">474 µs</text>
+<rect class="s2" x="230" y="137" width="111.72712956557643" height="14"/>
+<text x="348.72712956557643" y="149">131 µs</text>
+<text x="215" y="202" text-anchor="end">3,300 entries</text>
+<rect class="s0" x="230" y="174" width="200" height="14"/>
+<text x="437" y="186">1000 µs</text>
+<rect class="s1" x="230" y="195" width="223.04489213782745" height="14"/>
+<text x="460.04489213782745" y="207">1700 µs</text>
+<rect class="s2" x="230" y="216" width="214.6128035678238" height="14"/>
+<text x="451.6128035678238" y="228">1400 µs</text>
+<text x="215" y="281" text-anchor="end">33,000 entries</text>
+<rect class="s0" x="230" y="253" width="313.6720567156407" height="14"/>
+<text x="550.6720567156407" y="265">13700 µs</text>
+<rect class="s1" x="230" y="274" width="323.04489213782745" height="14"/>
+<text x="560.0448921378274" y="286">17000 µs</text>
+<rect class="s2" x="230" y="295" width="323.8046103128795" height="14"/>
+<text x="560.8046103128795" y="307">17300 µs</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">10</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">100</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">1k</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">10k</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">100k</text>
+<text x="630" y="385" text-anchor="end">µs · log scale</text></svg>

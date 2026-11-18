@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="395" viewBox="0 0 800 395" role="img" aria-labelledby="title desc">
+<title id="title">LEGACY raw PyBEAM corrected smoke latency</title><desc id="desc">Trial 0, p50: 438.083 µs; Trial 0, p95: 1131.875 µs; Trial 0, p99: 2965.291 µs; Trial 1, p50: 487.583 µs; Trial 1, p95: 853.834 µs; Trial 1, p99: 2989.084 µs; Trial 2, p50: 446.166 µs; Trial 2, p95: 591.791 µs; Trial 2, p99: 810.792 µs. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">LEGACY raw PyBEAM corrected smoke latency</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">p50</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">p95</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">p99</text>
+<text x="215" y="123" text-anchor="end">Trial 0</text>
+<rect class="s0" x="230" y="95" width="54.2818344894165" height="14"/>
+<text x="291.2818344894165" y="107">438.083 µs</text>
+<rect class="s1" x="230" y="116" width="140.24796993425514" height="14"/>
+<text x="377.24796993425514" y="128">1131.875 µs</text>
+<rect class="s2" x="230" y="137" width="367.42223568354916" height="14"/>
+<text x="604.4222356835492" y="149">2965.291 µs</text>
+<text x="215" y="202" text-anchor="end">Trial 1</text>
+<rect class="s0" x="230" y="174" width="60.415263102775384" height="14"/>
+<text x="297.4152631027754" y="186">487.583 µs</text>
+<rect class="s1" x="230" y="195" width="105.7965633668424" height="14"/>
+<text x="342.7965633668424" y="207">853.834 µs</text>
+<rect class="s2" x="230" y="216" width="370.3703703703703" height="14"/>
+<text x="607.3703703703703" y="228">2989.084 µs</text>
+<text x="215" y="281" text-anchor="end">Trial 2</text>
+<rect class="s0" x="230" y="253" width="55.28338001430092" height="14"/>
+<text x="292.2833800143009" y="265">446.166 µs</text>
+<rect class="s1" x="230" y="274" width="73.32743136420788" height="14"/>
+<text x="310.3274313642079" y="286">591.791 µs</text>
+<rect class="s2" x="230" y="295" width="100.46333034914153" height="14"/>
+<text x="337.46333034914153" y="307">810.792 µs</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">807</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">1.61k</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">2.42k</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">3.23k</text>
+<text x="630" y="385" text-anchor="end">µs</text></svg>

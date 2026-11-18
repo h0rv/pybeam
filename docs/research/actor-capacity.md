@@ -1,63 +1,81 @@
 # Actor capacity: plain sync code versus async
 
-How many actors fit in one PyBEAM process, what each costs, what happens when an actor method runs blocking code, and how each Python execution mode behaves under the same load. All numbers are measured; nothing here is a production limit.
+Historical actors added a native thread each, and blocking method bodies stalled the shared event loop. These pre-pool measurements are not limits for current pooled actors; direct free-threaded worker calls did run in parallel.
 
-## Setup
-
-- Linux x86-64 VM, 8 CPUs, 31 GiB memory, kernel 6.8, `ulimit -u` 128356.
-- CPython 3.14.10 conventional (GIL enabled) and 3.14.10t free-threaded, Erlang/OTP 29.1.2. Each build used its own `py_nif.so`, checked with `ldd`.
-- erlang-python `d60392c`, as locked in `rebar.lock`; default `ActorGroup` (worker contexts, shared loop).
-- [`pybeam_actors.py`](probes/capacity/pybeam_actors.py): three runs on 3.14, one on 3.14t. [`plain_python.py`](probes/capacity/plain_python.py): one run on 3.14. [`modes_matrix.py`](probes/capacity/modes_matrix.py): one run on 3.14, two on 3.14t. Where runs differ, both values are shown.
-- Network calls go to [`server.py`](probes/capacity/server.py) on localhost, which answers each `GET` after 50 ms.
-- `ExecutionLimits` actor groups were not measured.
 
 ## How an actor method runs
 
-Each spawned actor owns one erlang-python worker context. In the [native actor](https://github.com/h0rv/erlang-python/blob/d60392cdd86a5947f0569d83e0f8dfefcec83410/src/py_data_actor.erl) the context is `py_context:new(#{mode => worker})`, and worker contexts [share the main interpreter's event loop](https://github.com/h0rv/erlang-python/blob/d60392cdd86a5947f0569d83e0f8dfefcec83410/src/py_context.erl#L638-L639). The probe confirms it: `threading.get_ident()` inside every actor method equals the caller's thread.
+In this historical runtime each actor owned a worker context, and all actor bodies used one event-loop thread. The [native actor][source-1] created a worker context, and worker contexts [shared the main interpreter's loop][source-2]; the probe observed the caller's thread ID in every method.
 
 So every actor method body runs on one event loop thread. An `await` lets other actors run. A blocking call inside an `async def` method stops every actor in the process until it returns.
 
 ## Cost per actor
 
-| Count | RSS | OS threads | Live contexts | Time to spawn this step |
-| --- | --- | --- | --- | --- |
-| 0 | 84.9 MiB | 19 | 1 | |
-| 100 | 91.3 MiB | 119 | 101 | 0.27 s |
-| 1,000 | 142.8 MiB | 1,019 | 1,001 | 2.3 s |
-| 5,000 | 375.2 MiB | 5,019 | 5,001 | 6.9 s |
-| 10,000 | 669.1 MiB | 10,019 | 10,001 | 12.5–14.8 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-On 3.14t, 10,000 actors added 494 MiB (about 50 KiB each) and the same 10,000 threads.
+![Resident memory at actor checkpoints.](assets/research-actor-rss.svg)
 
-Each idle actor added about **60 KiB RSS and one OS thread** on 3.14. Spawning took 2.3–3.0 ms per actor and slowed as the count grew; reaching 10,000 took about 24 s. 10,000 was the last checkpoint; spawning did not fail. RSS reached about 920 MiB after the call tests below.
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Threads and live contexts at checkpoints.](assets/research-actor-inventory.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Time to spawn each additional actor batch.](assets/research-actor-spawn.svg)
+
+</div>
+
+On free-threaded, 10,000 actors added 494 MiB (about 50 KiB each) and the same 10,000 threads.
+
+Each idle actor added about **60 KiB RSS and one OS thread** on conventional. Spawning took 2.3–3.0 ms per actor and slowed as the count grew; reaching 10,000 took about 24 s. 10,000 was the last checkpoint; spawning did not fail. RSS reached about 920 MiB after the call tests below.
 
 For comparison, plain Python on the same machine:
 
-| 10,000 of | RSS added | OS threads | Start time |
-| --- | --- | --- | --- |
-| PyBEAM actors | ~584 MiB | 10,000 | ~24 s |
-| `threading.Thread` blocked on an `Event` | 206 MiB | 10,000 | 1.2 s |
-| `asyncio` tasks blocked on an `Event` | 8.5 MiB | 0 | 0.03 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Added memory for actors, threads and tasks.](../guide/assets/measurement-memory.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Start time for actors, threads and tasks.](../guide/assets/measurement-start.svg)
+
+</div>
+
+Actors and threads each added 10,000 OS threads; asyncio tasks added none.
 
 ## Calls
 
 All rows call one method on N distinct actors at once with `asyncio.gather`, unless noted. The CPU job is a 2,000,000-step integer loop that takes about 0.12 s alone.
 
-| Method body | N | 3.14 | 3.14t |
-| --- | --- | --- | --- |
-| `await asyncio.sleep(0.05)` | 1 / 10 / 100 | 0.051–0.052 / 0.054 / 0.071–0.086 s | 0.051 / 0.053 / 0.10 s |
-| `await asyncio.sleep(0.05)` | 1,000 / 4,000 / 8,000 | 0.33–0.51 / 1.6–2.1 / 2.8–4.3 s | 0.52 / 3.5 / 12.8 s |
-| `await asyncio.sleep(0.05)` | 10,000 | Failed: `RuntimeError: Native callback queue full` | Not run |
-| `time.sleep(0.05)` | 1 / 8 / 32 | 0.053 / 0.41 / 1.62 s | 0.062 / 0.41 / 1.65 s |
-| `await asyncio.to_thread(time.sleep, 0.05)` | 8 / 32 / 100 | 0.054 / 0.16 / 0.46 s | 0.065 / 0.17 / 0.49 s |
-| CPU job in the method | 1 / 8 | 0.12 / 0.96 s | 0.14 / 1.06 s |
-| `await asyncio.to_thread(cpu_job)` | 1 / 8 | 0.12 / 1.0 s | 0.16 / 0.17 s |
-| `await asyncio.sleep(0.01)` beside one `time.sleep(0.3)` | 2 | 0.311 s | 0.317 s |
-| Empty method, 1,000 sequential calls on one actor | 1 | 0.41–0.82 ms per call | 0.61 ms per call |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Concurrent actor method wall time.](../guide/assets/measurement-calls.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Sequential empty actor call latency.](../guide/assets/measurement-noop.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Smaller async and blocking actor calls.](assets/research-small-calls.svg)
+
+</div>
+
+The 10,000-call async wait failed with `RuntimeError: Native callback queue full` on the conventional build; it was not run on the free-threaded build.
 
 - **Blocking code serializes all actors on both builds.** 32 actors each sleeping 50 ms took 32 × 50 ms. A 10 ms async call waited behind another actor's 300 ms `time.sleep`. Removing the GIL does not change this, because every method body runs on the one loop thread.
-- **CPU work in a method body serializes on both builds.** Eight 0.12 s jobs took about 1 s. On 3.14t, the same jobs through `to_thread` took 0.17 s; on 3.14 they did not overlap.
-- **Async methods overlap**, but per-call overhead dominates past about 100 concurrent calls: 8,000 calls took 2.8–4.3 s on 3.14 and 12.8 s on 3.14t for 50 ms of waiting.
+- **CPU work in a method body serializes on both builds.** Eight 0.12 s jobs took about 1 s. On free-threaded, the same jobs through `to_thread` took 0.17 s; on conventional they did not overlap.
+- **Async methods overlap**, but per-call overhead dominates past about 100 concurrent calls: 8,000 calls took 2.8–4.3 s on conventional and 12.8 s on free-threaded for 50 ms of waiting.
 - **About 8,000 calls can be in flight from one caller loop.** erlang-python caps reserved native callbacks per loop at 8,192 (`MAX_RESERVED_PENDING` in `c_src/py_event_loop.h`). The overflow raised in the caller; after the error, closing the group also hit the full queue and the managed shutdown deadline expired.
 - **`asyncio.to_thread` restores overlap** for blocking code, up to the default executor's 12 threads on 8 CPUs: 100 calls took 9 rounds of 50 ms.
 - The ~40 ms acknowledgment delay under separate investigation did not appear: one empty call took under 1 ms.
@@ -66,12 +84,11 @@ All rows call one method on N distinct actors at once with `asyncio.gather`, unl
 
 One actor method makes 10 blocking `http.client` requests to the 50 ms server.
 
-| Method body | Wall time |
-| --- | --- |
-| 10 requests in a loop | 0.53–0.57 s |
-| 10 requests through a `ThreadPoolExecutor(10)` inside the method | 0.055 s |
-| 10 requests through `asyncio.gather(asyncio.to_thread(...))` | 0.055 s |
-| 10 actors, each fanning out 10 requests with `to_thread` | 0.47 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Blocking HTTP requests inside actor methods.](assets/research-network.svg)
+
+</div>
 
 Fan-out cuts one actor's wall time from 10 × 50 ms to one round trip. The `ThreadPoolExecutor` version still blocks the shared loop, and every other actor, for those 55 ms. With `to_thread`, 100 concurrent requests are limited by the 12-thread default executor.
 
@@ -79,10 +96,11 @@ Fan-out cuts one actor's wall time from 10 × 50 ms to one round trip. The `Thre
 
 `TaskFunction` bodies doing `time.sleep(0.05)`, all started at once:
 
-| Loop | N = 8, 3.14 / 3.14t | N = 64, 3.14 / 3.14t |
-| --- | --- | --- |
-| Shared (default) | 0.43 / 0.51 s | 3.35–3.37 / 3.99 s |
-| `dedicated_loop=True` | 1.08 / 1.18 s | 1.18–1.19 / 2.12 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Blocking sleep task batch completion.](assets/research-sleep-tasks.svg)
+
+</div>
 
 Shared-loop tasks serialize like actors. Dedicated-loop tasks overlap blocking calls but include the ~1 s untraced completion overhead described in [execution modes](execution-modes.md). Actors have no dedicated-loop option.
 
@@ -90,46 +108,79 @@ Shared-loop tasks serialize like actors. Dedicated-loop tasks overlap blocking c
 
 [`modes_matrix.py`](probes/capacity/modes_matrix.py) drives the modes lab's [`probe.escript`](../../examples/modes_lab/probe.escript). Each of N Erlang processes calls its own erlang-python context with `py_context:call`, with no asyncio loop in between. The CPU job is a 3,000,000-step integer loop that takes about 0.33 s alone. The blocking job is `time.sleep(0.05)` from [`blocking/job.py`](probes/capacity/blocking/job.py).
 
-| Mode | CPU job, N = 1 / 8 / 64, 3.14 | CPU job, N = 1 / 8 / 64, 3.14t | `time.sleep(0.05)`, N = 64 |
-| --- | --- | --- | --- |
-| Worker | 0.33 / 2.86 / 22.9 s | 0.33–0.34 / 0.33–0.43 / 2.68–2.77 s | 0.053 s / 0.054–0.135 s |
-| Own-GIL | 0.34 / 0.38 / 2.86 s | 0.33–0.34 / 0.34–0.66 / 2.69–2.98 s | 0.051 s / 0.052–0.055 s |
-| Isolated | 0.25 / 0.35 / 2.31 s | 0.27–0.28 / 0.32–0.64 / 2.31–2.70 s | 0.053 s / 0.053–0.054 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-| Mode | Create one context | RSS per context, 3.14 / 3.14t | Empty call p50, 3.14 / 3.14t | `os.abort()` in one of 4 contexts |
-| --- | --- | --- | --- | --- |
-| Worker | 1.1–1.2 ms | under 0.1 MiB / under 0.1 MiB | 28–36 / 41–42 µs | VM exits |
-| Own-GIL | 75–83 ms | 10.8–11.3 / 15.7–16.2 MiB | 12–15 µs | VM exits |
-| Isolated | 61–132 ms | 21.3–22.3 / 25.7–26.8 MiB | 52–401 µs | Other 3 survive; replacement in 64–134 ms |
+![Worker and isolated CPU wall time.](../guide/assets/measurement-cpu.svg)
 
-- **On 3.14t, worker contexts run Python on all 8 CPUs.** Eight CPU jobs took as long as one, and 64 took 8 rounds. On 3.14 they serialize.
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Single-job and historical own-GIL CPU calls.](assets/research-raw-extra-cpu.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Blocking sleep across 64 contexts.](assets/research-raw-sleep.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Context creation time.](../guide/assets/measurement-create.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Empty context call latency.](../guide/assets/measurement-latency.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Resident memory per raw context.](assets/research-context-rss.svg)
+
+</div>
+
+Worker RSS was under 0.1 MiB per context on both builds. Own-GIL creation took 75–83 ms and empty call p50 was 12–15 µs. A native abort killed the VM in worker and own-GIL modes; isolated kept the other three contexts alive and replaced the child in 64–134 ms.
+
+- **On free-threaded, worker contexts run Python on all 8 CPUs.** Eight CPU jobs took as long as one, and 64 took 8 rounds. On conventional they serialize.
 - **The actor slowdown comes from the shared loop, not the GIL.** The same worker contexts that parallelize here serialize when PyBEAM actors dispatch through one asyncio loop.
-- **This integer loop ran at the same speed on 3.14 and 3.14t** (0.33–0.34 s alone). That says nothing about a web request path, which was not measured.
+- **This integer loop ran at the same speed on conventional and free-threaded** (0.33–0.34 s alone). That says nothing about a web request path, which was not measured.
 - **Blocking calls overlap in every mode on both builds**, because each context has its own thread.
 
 ## Many BEAM processes sharing 8 contexts
 
 The `fanin` probe spawns N Erlang processes. Each one calls an empty Python function on one of 8 contexts, with at most 32 calls in flight.
 
-| Processes | Memory per process | Spawn time | Worker, 3.14 / 3.14t | Own-GIL, 3.14 / 3.14t | Isolated, 3.14 / 3.14t |
-| --- | --- | --- | --- | --- | --- |
-| 10,000 | 2.7 KB | 0.02–0.03 s | 0.33 / 0.21–0.24 s | 0.056 / 0.060–0.067 s | 0.19 / 0.17–0.31 s |
-| 100,000 | 2.7 KB | 0.24–0.27 s | 2.7 / 2.5–3.3 s | 0.50 / 0.74–0.84 s | 2.6 / 1.7–2.7 s |
-| 1,000,000 | 2.7 KB | 2.4–3.0 s | 28.0 / 23.3–31.3 s | 5.4 / 5.8–8.6 s | 21.5 / 20.6–32.9 s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-While they waited, one million BEAM processes used 2.7 KB each, about 2.7 GB in total, as reported by `erlang:memory(processes)`. Worker calls completed at about 32,000–43,000 per second on both builds, and that rate did not rise from 3.14 to 3.14t. Own-GIL reached about 116,000–185,000 per second. The worker limit was not traced.
+![BEAM process fan-in wall time.](../guide/assets/measurement-fanin.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![BEAM spawn and historical own-GIL fan-in.](assets/research-fanin-extra.svg)
+
+</div>
+
+While they waited, one million BEAM processes used 2.7 KB each, about 2.7 GB in total, as reported by `erlang:memory(processes)`. Worker calls completed at about 32,000–43,000 per second on both builds, and that rate did not rise from conventional to free-threaded. Own-GIL reached about 116,000–185,000 per second. The worker limit was not traced.
 
 ## Own-GIL contexts and common packages
 
 [`subinterpreters.py`](probes/capacity/subinterpreters.py) imports each package in a fresh `concurrent.interpreters` subinterpreter, which applies the same extension check that erlang-python's own-GIL contexts use. Binary wheels were installed from PyPI on 2026-11-17.
 
-| Result on 3.14 | Packages |
+| Result on conventional | Packages |
 | --- | --- |
 | Refused: `does not support loading in subinterpreters` | pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, orjson |
 | Loaded | asyncpg, MarkupSafe |
 | Not importable | psycopg-binary |
 
-On 3.14t, the same packages were refused in subinterpreters. orjson, psycopg-binary, and grpcio had no 3.14t wheel. Every other package imported with the GIL still disabled, except lxml, which re-enabled it.
+
+On free-threaded, the same packages were refused in subinterpreters. orjson, psycopg-binary, and grpcio had no free-threaded wheel. Every other package imported with the GIL still disabled, except lxml, which re-enabled it.
 
 Own-GIL contexts cannot load most compiled web and data packages, so this page does not consider them further.
 
@@ -141,48 +192,64 @@ Own-GIL contexts cannot load most compiled web and data packages, so this page d
 - **ETS transfer:** Erlang reads the pickled state from ETS and passes the bytes to Python, which only reads their length.
 - **ETS copy:** Python also unpickles, increments, and pickles, and Erlang writes the result back to ETS.
 
-[`state/conventional.py`](probes/capacity/state/conventional.py) measures the same dict as JSON, the way a FastAPI service with a Redis cache would move it: over a stdlib HTTP server on localhost, and through Redis 7 (`GET`, decode, increment, encode, `SET`) over a raw RESP socket. That client is lighter than redis-py.
+[`state/conventional.py`](probes/capacity/state/conventional.py) measures the same dict as JSON over localhost HTTP and through Redis (`GET`, decode, increment, encode, `SET`). Its raw RESP socket client is lighter than redis-py.
 
-| Entries | Pickle / JSON size | Pinned, 3.14 / 3.14t | ETS transfer, 3.14 / 3.14t | ETS copy, 3.14 / 3.14t | JSON codec only | JSON over HTTP | JSON through Redis |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 32 | 357 B / 1.1 KB | 27 / 42–45 µs | 28 / 44–45 µs | 35 / 55–58 µs | 12 µs | 474 µs | 131 µs |
-| 3,300 | 38.5 KB / 114 KB | 27 / 42–44 µs | 30 / 47–48 µs | 0.58 / 0.59–0.62 ms | 1.0 ms | 1.7 ms | 1.4 ms |
-| 33,000 | 418 KB / 1.2 MB | 27 / 44–45 µs | 0.54 ms / 95–99 µs | 8.8 / 6.7–7.8 ms | 13.7 ms | 17.0 ms | 17.3 ms |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-The JSON rows ran on 3.14 only.
+![Serialized actor state sizes.](assets/research-state-size.svg)
 
-- **Pinned state costs one call** at every size: 27 µs on 3.14 and 42–45 µs on 3.14t.
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![State round trips through a worker context.](assets/research-state-context.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Conventional JSON state round trips.](assets/research-state-json.svg)
+
+</div>
+
+The JSON rows ran on conventional only.
+
+- **Pinned state costs one call** at every size: 27 µs on conventional and 42–45 µs on free-threaded.
 - **ETS lookup and byte transfer are cheap.** An ETS lookup took 0.1–0.7 µs, and passing 418 KB to Python added under 0.6 ms.
 - **Decoding and encoding the Python objects dominates the cost of moving state.** It grows with the state size on every path.
 - **At small sizes, the network adds most of the cost** on the conventional stack: 474 µs over HTTP and 131 µs through Redis, against 35–58 µs through ETS.
 
 ## Pool probes
 
-These probes drive a minimal pool of worker contexts from Erlang on 3.14, the same shape the [worker design](worker-design.md) proposes.
+These probes drive a minimal pool of worker contexts from Erlang on conventional, the same shape the [worker design](worker-design.md) proposes.
 
 **In-flight calls.** [`pool/inflight.escript`](probes/capacity/pool/inflight.escript) starts N Erlang processes at once, each calling an empty function on one of 8 worker contexts, with no window. 10,000, 20,000, and 100,000 concurrent callers finished in 0.29, 0.57, and 5.2 s with no errors. The 8,192 cap applies to async calls from one asyncio loop, not to `py_context:call` from BEAM processes.
 
 **Growing the pool for blocked calls.** [`pool/growth.escript`](probes/capacity/pool/growth.escript) keeps 8 warm contexts, holds B of them with 200 ms `time.sleep` calls, and measures 200 sequential empty calls. A growing pool creates a context whenever none is free, up to the cap.
 
-| Pool | Blocked calls | Peak contexts | Empty call p50 / p99 / max |
-| --- | --- | --- | --- |
-| Fixed at 8 | 0 | 8 | 29 µs / 48 µs / 0.2 ms |
-| Fixed at 8 | 8 | 8 | 28 µs / 175 µs / 180 ms |
-| Fixed at 8 | 32 | 8 | 29 µs / 169 µs / 781 ms |
-| Grows to 64 | 8 | 9 | 29 µs / 96 µs / 1.5 ms |
-| Grows to 64 | 32 | 33 | 29 µs / 62 µs / 21.6 ms |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Empty calls with blocked pool workers.](assets/research-pool-growth.svg)
+
+</div>
 
 In a fixed pool, a call waits behind blocked calls for up to several of their durations. Growing on demand cut that wait to the cost of creating contexts: 1.1 ms each, at under 0.1 MiB RSS. Retiring idle contexts was not measured.
 
 ## State codecs and what state can hold
 
-[`state/codecs.py`](probes/capacity/state/codecs.py) decodes and re-encodes the same dict as in [moving actor state](#moving-actor-state). Each figure is the median of 200 round trips, on 3.14 and 3.14t.
+[`state/codecs.py`](probes/capacity/state/codecs.py) decodes and re-encodes the same dict as in [moving actor state](#moving-actor-state). Each figure is the median of 200 round trips, on conventional and free-threaded.
 
-| Entries | `pickle` | `marshal` | `json` |
-| --- | --- | --- | --- |
-| 32 | 357 B, 4.4 / 5.4 µs | 405 B, 3.3 / 3.5 µs | 1.1 KB, 12.3 / 12.6 µs |
-| 3,300 | 38.5 KB, 0.41 / 0.46 ms | 45 KB, 0.29 / 0.31 ms | 114 KB, 0.88 / 0.99 ms |
-| 33,000 | 418 KB, 4.9 / 5.3 ms | 484 KB, 3.3 / 3.6 ms | 1.2 MB, 11.3 / 11.6 ms |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![State codec payload sizes.](assets/research-codec-size.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![State codec decode and re-encode time.](assets/research-codec-time.svg)
+
+</div>
 
 | State holds | `pickle` | `marshal` | `json` |
 | --- | --- | --- | --- |
@@ -192,24 +259,24 @@ In a fixed pool, a call waits behind blocked calls for up to several of their du
 | A socket | `TypeError` | `ValueError` | `TypeError` |
 | A generator | `TypeError` | `ValueError` | `TypeError` |
 
+
 `marshal` was about 30% faster than `pickle` but encodes only built-in types. Locks, sockets, lambdas, and generators cannot go into any durable copy; they can only live in pinned state.
 
-## A FastAPI request path on 3.14 and 3.14t
+## A FastAPI request path on conventional and free-threaded
 
-[`web/request_path.py`](probes/capacity/web/request_path.py) calls a FastAPI 0.163.1 app in-process through ASGI. Each request is a `POST /orders` whose body Pydantic (pydantic-core 2.50.4) validates as a 50-item model, handled by a plain `def` route that returns a response model. Each thread runs its own asyncio loop and sends 2,000 requests. There is no network or server in the path. This was run once per build.
+The in-process ASGI probe validates a 50-item request model and returns a response model from a plain `def` route. Each thread sends 2,000 requests on its own loop; there is no network or server in this path.
 
-| Threads | 3.14 | 3.14t |
-| --- | --- | --- |
-| 1 | 2,905 requests/s | 1,919 requests/s |
-| 2 | 2,108 requests/s | 3,519 requests/s |
-| 4 | 1,369 requests/s | 5,645 requests/s |
-| 8 | 1,241 requests/s | 10,760 requests/s |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-On this path, one 3.14t thread was 34% slower than one 3.14 thread. Eight 3.14t threads served 3.7 times the best 3.14 rate, and the GIL stayed disabled. On 3.14, more threads lowered throughput.
+![In-process validated request throughput.](assets/research-web.svg)
+
+</div>
+
+On this path, one free-threaded thread was 34% slower than one conventional thread. Eight free-threaded threads served 3.7 times the best conventional rate, and the GIL stayed disabled. On conventional, more threads lowered throughput.
 
 ## What this measures and what it does not
 
-On this build, a PyBEAM actor is not a cheap sequential process. It costs a native thread and about 50–60 KiB, and plain blocking or CPU-bound code in one actor stalls the rest on both 3.14 and 3.14t. A BEAM process costs 2.7 KB. On 3.14t, worker contexts called directly from BEAM processes ran Python in parallel on all 8 CPUs.
+On this build, a PyBEAM actor is not a cheap sequential process. It costs a native thread and about 50–60 KiB, and plain blocking or CPU-bound code in one actor stalls the rest on both conventional and free-threaded. A BEAM process costs 2.7 KB. On free-threaded, worker contexts called directly from BEAM processes ran Python in parallel on all 8 CPUs.
 
 Not measured:
 
@@ -219,7 +286,28 @@ Not measured:
 - Retiring idle pool contexts.
 - The cause of the worker-context call rate limit of about 40,000 calls per second.
 
-## Reproduce
+<style>
+.research-chart { overflow-x: auto; }
+.research-chart img { width: 100%; min-width: 740px; max-inline-size: none; height: auto; }
+.research-chart:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
+
+## Appendix: environment and provenance
+
+Chart build labels mean CPython 3.14.10 (GIL) and 3.14.10t (free-threaded), unless a historical probe below specifies otherwise. KB and MB payload sizes are decimal; KiB and MiB are binary.
+
+The conventional state probe used Redis 7.
+
+- Linux x86-64 VM, 8 CPUs, 31 GiB memory, kernel 6.8, `ulimit -u` 128356.
+- CPython 3.14.10 conventional (GIL enabled) and 3.14.10t free-threaded, Erlang/OTP 29.1.2. Each build used its own `py_nif.so`, checked with `ldd`.
+- erlang-python `d60392c`, as locked in `rebar.lock`; default `ActorGroup` (worker contexts, shared loop).
+- [`pybeam_actors.py`](probes/capacity/pybeam_actors.py): three runs on 3.14, one on 3.14t. [`plain_python.py`](probes/capacity/plain_python.py): one run on 3.14. [`modes_matrix.py`](probes/capacity/modes_matrix.py): one run on 3.14, two on 3.14t. Where runs differ, both values are shown.
+- Network calls go to [`server.py`](probes/capacity/server.py) on localhost, which answers each `GET` after 50 ms.
+- `ExecutionLimits` actor groups were not measured.
+
+[`web/request_path.py`](probes/capacity/web/request_path.py) calls a FastAPI 0.163.1 app in-process through ASGI. Each request is a `POST /orders` whose body Pydantic (pydantic-core 2.50.4) validates as a 50-item model, handled by a plain `def` route that returns a response model. Each thread runs its own asyncio loop and sends 2,000 requests. There is no network or server in the path. This was run once per build.
+
+### Recorded method and reproduction
 
 Build the native runtime and point a project at it as described in [development](../development.md#use-a-development-runtime). Then, from the repository root:
 
@@ -245,3 +333,19 @@ python docs/research/probes/capacity/subinterpreters.py pydantic_core uvloop num
 ```
 
 Run the last command with the interpreter whose installed packages you want to check.
+
+[source-1]: https://github.com/h0rv/erlang-python/blob/d60392cdd86a5947f0569d83e0f8dfefcec83410/src/py_data_actor.erl
+[source-2]: https://github.com/h0rv/erlang-python/blob/d60392cdd86a5947f0569d83e0f8dfefcec83410/src/py_context.erl#L638-L639
+
+### In-repository checks
+
+The historical actor values require the pre-pool runtime described above; the current runtime can produce different results. Start the local server and run the actor probe as above, then run these additional state, pool and web probes from the repository root.
+
+```sh
+mise exec -- uv run --locked python tools/build_native.py
+APP="$PWD/_build/hornbeam/lib/erlang_python"
+mise exec -- python docs/research/probes/capacity/state/codecs.py
+mise exec -- uv run --locked --all-extras python docs/research/probes/capacity/web/request_path.py
+mise exec -- escript docs/research/probes/capacity/pool/inflight.escript "$APP" "$PWD/docs/research/probes/capacity/pool" 10000
+mise exec -- escript docs/research/probes/capacity/pool/growth.escript "$APP" "$PWD/docs/research/probes/capacity/pool"
+```
