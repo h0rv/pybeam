@@ -16,6 +16,7 @@ export const pages = [
   { source: "docs/guide/background.md", path: "background/", label: "Background services", examples: ["examples/docs/background_body.py", "examples/docs/background.py"] },
   { source: "docs/guide/durable-tasks.md", path: "durable-tasks/", label: "Durable tasks", examples: ["examples/docs/durable_tasks.py"] },
   { source: "docs/guide/execution.md", path: "execution/", label: "Blocking and CPU work", examples: ["examples/docs/execution.py"] },
+  { source: "docs/guide/failures.md", path: "failures/", label: "Startup and failures", examples: [] },
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
@@ -28,9 +29,9 @@ export const pages = [
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 2) },
-  { label: "Guides", pages: navigation.slice(2, 10) },
-  { label: "Integrations", pages: navigation.slice(10, 13) },
-  { label: "How PyBEAM works", pages: navigation.slice(13) },
+  { label: "Guides", pages: navigation.slice(2, 11) },
+  { label: "Integrations", pages: navigation.slice(11, 14) },
+  { label: "How PyBEAM works", pages: navigation.slice(14) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",

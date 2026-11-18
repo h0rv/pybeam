@@ -17,7 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def assets(request: pytest.FixtureRequest) -> RuntimeAssets:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and staged native actor assets")
-    return discover_assets(Config())
+    runtime: object = request.config.getoption("hornbeam_runtime")
+    assert isinstance(runtime, str)
+    return discover_assets(Config(development_runtime=Path(runtime)))
 
 
 @pytest.mark.runtime
@@ -31,11 +33,14 @@ def assets(request: pytest.FixtureRequest) -> RuntimeAssets:
     ],
 )
 def test_pythonic_actors__run_through_managed_python_entrypoint(
-    assets: RuntimeAssets, entry: str, marker: str
+    assets: RuntimeAssets, entry: str, marker: str, tmp_path: Path
 ) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pybeam]\ndevelopment_runtime = "' + str(ROOT / "_build/hornbeam") + '"\n'
+    )
     result = subprocess.run(
         [sys.executable, str(ROOT / entry)],
-        cwd=ROOT,
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         timeout=45,

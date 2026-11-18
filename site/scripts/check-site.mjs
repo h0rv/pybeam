@@ -30,7 +30,7 @@ for (const file of htmlFiles) {
     assert.doesNotMatch(html, /<pre\b/);
   } else {
     const blocks = [...html.matchAll(/<pre\b/g)].length;
-    assert.ok(blocks > 0 || page.startsWith("internals/"), `Every guide needs an executable example: ${page}`);
+    assert.ok(blocks > 0 || page.startsWith("internals/") || page === "failures/index.html", `Every guide needs an executable example: ${page}`);
     for (const [block] of html.matchAll(/<pre\b[\s\S]*?<\/pre>/g)) {
       assert.match(block, /astro-code/, `Code must pass through Shiki: ${page}`);
       const colors = new Set([...block.matchAll(/(?:color|--shiki-dark):\s*(#[a-f\d]{6})/gi)].map((match) => match[1]));

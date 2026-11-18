@@ -13,7 +13,7 @@ from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect
 
 from pybeam.codec import Json
-from tests.conftest import RunningServer
+from tests.conftest import RunningServer, ServerFactory
 
 pytestmark = pytest.mark.runtime
 
@@ -214,3 +214,86 @@ async def test_native__slow_subscriber_overflows_without_retaining_runtime_owner
                 response.raise_for_status()
         await wait_subscription_count(service_server, 0)
     await wait_subscription_count(service_server, 0)
+
+
+async def test_native__reconnect_misses_publications_and_reads_fresh_state(
+    service_server: RunningServer,
+) -> None:
+    await wait_subscription_count(service_server, 0)
+    url = "ws://127.0.0.1:{}/shared".format(service_server.port)
+    async with async_connect(url) as first:
+        initial = Json(CounterReply).decode(await first.recv()).count
+    await wait_subscription_count(service_server, 0)
+    async with httpx.AsyncClient(base_url=service_server.base_url) as client:
+        for _ in range(3):
+            response = await client.post("/shared-increment")
+            response.raise_for_status()
+        response = await client.post("/publish/vertical:state", content=b"missed")
+        response.raise_for_status()
+        assert response.json() == {"targeted": 0}
+    async with async_connect(url) as reconnected:
+        assert Json(CounterReply).decode(await reconnected.recv()).count == initial + 3
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(reconnected.recv(), timeout=0.2)
+        await reconnected.send(json.dumps({"action": "snapshot"}))
+        assert Json(CounterReply).decode(await reconnected.recv()).count == initial + 3
+    await wait_subscription_count(service_server, 0)
+
+
+def test_native__node_stop_loses_shared_store_and_counters(
+    runtime_server_factory: ServerFactory,
+) -> None:
+    namespace = uuid4().hex
+    path = "/cache/" + namespace + "/value"
+    with (
+        runtime_server_factory("tests.fixtures.service_app:app") as first,
+        httpx.Client(base_url=first.base_url) as client,
+    ):
+        assert client.put(path, content=b"volatile").status_code == 204
+        assert client.get(path).content == b"volatile"
+        assert client.post("/counter").json() == {"count": 1}
+    with (
+        runtime_server_factory("tests.fixtures.service_app:app") as second,
+        httpx.Client(base_url=second.base_url) as client,
+    ):
+        assert client.get(path).status_code == 404
+        assert client.get("/counter").json() == {"count": 0}
+
+
+async def test_native__reconnect_runs_auth_and_mounts_current_authorized_state(
+    service_server: RunningServer,
+) -> None:
+    await wait_subscription_count(service_server, 0)
+    url = "ws://127.0.0.1:{}/authorized-shared".format(service_server.port)
+    async with httpx.AsyncClient(base_url=service_server.base_url) as client:
+        before = (await client.get("/auth-attempts")).json()["count"]
+        async with async_connect(url + "?token=valid") as first:
+            initial = Json(CounterReply).decode(await first.recv()).count
+        await wait_subscription_count(service_server, 0)
+        for _ in range(3):
+            (await client.post("/shared-increment")).raise_for_status()
+        async with async_connect(url + "?token=revoked") as rejected:
+            with pytest.raises(ConnectionClosed) as closed:
+                await rejected.recv()
+            assert closed.value.rcvd is not None
+            assert closed.value.rcvd.code == 1008
+        assert (await client.get("/auth-attempts")).json()["count"] == before + 2
+        await wait_subscription_count(service_server, 0)
+        async with async_connect(url + "?token=valid") as fresh:
+            assert Json(CounterReply).decode(await fresh.recv()).count == initial + 3
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(fresh.recv(), timeout=0.2)
+        assert (await client.get("/auth-attempts")).json()["count"] == before + 3
+    await wait_subscription_count(service_server, 0)
+
+
+def test_native__shared_services_survive_actor_restart(service_server: RunningServer) -> None:
+    path = "/cache/" + uuid4().hex + "/value"
+    with httpx.Client(base_url=service_server.base_url) as client:
+        assert client.put(path, content=b"survives actor").status_code == 204
+        count = client.post("/counter").json()
+        response = client.post("/crash-actor")
+        response.raise_for_status()
+        assert response.json() == {"count": 5}
+        assert client.get(path).content == b"survives actor"
+        assert client.get("/counter").json() == count
