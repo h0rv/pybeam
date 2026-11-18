@@ -4,8 +4,8 @@ main([Build, Bind, Root, Site]) ->
     main([Build, Bind, Root, Site, "benchmarks.web.app:app"]);
 main([Build, Bind, Root, Site, App]) ->
     logger:set_primary_config(level, warning),
-    Paths = filelib:wildcard(filename:join([Build, "lib/*/ebin"])) ++
-            filelib:wildcard(filename:join([Build, "checkouts/*/ebin"])),
+    Paths = filelib:wildcard(filename:join([Build, "checkouts/*/ebin"])) ++
+            filelib:wildcard(filename:join([Build, "lib/*/ebin"])),
     ok = code:add_paths(Paths),
     application:load(hornbeam),
     application:set_env(erlang_python, num_contexts, 2),

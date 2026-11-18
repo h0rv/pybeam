@@ -5,30 +5,30 @@
 <text x="16" y="28" font-size="21">LiveView event round trip p50</text>
 <text x="16" y="54">ms · median (min-max); n = completed repeats</text>
 <text x="16" y="93">Hornbeam · 250</text>
-<g class="hornbeam"><path stroke-width="3" d="M461.0526922646751,88H489.16022977752584"/><circle cx="475.1064610211005" cy="88" r="4"/></g>
-<text x="610" y="93">1.896 (1.796-1.997); n=2</text>
+<g class="hornbeam"><path stroke-width="3" d="M437.9740718540204,88H441.8454518544738"/><circle cx="438.5717159709279" cy="88" r="4"/></g>
+<text x="610" y="93">1.864 (1.859-1.890); n=3</text>
 <text x="16" y="129">Uvicorn · 250</text>
-<g class="uvicorn"><path stroke-width="3" d="M371.85958660835286,124H388.7678982457345"/><circle cx="379.15498003153976" cy="124" r="4"/></g>
-<text x="610" y="129">1.210 (1.158-1.279); n=3</text>
+<g class="uvicorn"><path stroke-width="3" d="M362.30481856748344,124H368.88319659849265"/><circle cx="364.2655279547567" cy="124" r="4"/></g>
+<text x="610" y="129">1.258 (1.242-1.295); n=3</text>
 <text x="16" y="165">Hornbeam · 500</text>
-<g class="hornbeam"><path stroke-width="3" d="M488.25788274387986,160H488.25788274387986"/><circle cx="488.25788274387986" cy="160" r="4"/></g>
-<text x="610" y="165">1.990 (1.990-1.990); n=1</text>
+<g class="hornbeam"><path stroke-width="3" d="M409.6206223580921,160H450.63914814053055"/><circle cx="432.20563469020874" cy="160" r="4"/></g>
+<text x="610" y="165">1.812 (1.628-1.962); n=3</text>
 <text x="16" y="201">Uvicorn · 500</text>
-<g class="uvicorn"><path stroke-width="3" d="M373.6993735138411,196H377.788596756292"/><circle cx="374.9000795297633" cy="196" r="4"/></g>
-<text x="610" y="201">1.179 (1.171-1.200); n=3</text>
+<g class="uvicorn"><path stroke-width="3" d="M355.7904606605648,196H370.4276522715727"/><circle cx="356.28986698113806" cy="196" r="4"/></g>
+<text x="610" y="201">1.193 (1.189-1.308); n=3</text>
 <text x="16" y="237">Hornbeam · 1000</text>
-<g class="hornbeam"><path stroke-width="3" d="M442.8609058552112,232H442.8609058552112"/><circle cx="442.8609058552112" cy="232" r="4"/></g>
-<text x="610" y="237">1.666 (1.666-1.666); n=1</text>
+<g class="hornbeam"><path stroke-width="3" d="M429.803774928041,232H491.0456805280022"/><circle cx="470.89478331941604" cy="232" r="4"/></g>
+<text x="610" y="237">2.127 (1.792-2.292); n=3</text>
 <text x="16" y="273">Uvicorn · 1000</text>
-<g class="uvicorn"><path stroke-width="3" d="M376.06289644811386,268H397.4685427317273"/><circle cx="379.99664868338505" cy="268" r="4"/></g>
-<text x="610" y="273">1.216 (1.188-1.341); n=3</text>
+<g class="uvicorn"><path stroke-width="3" d="M355.1161640833561,268H391.2302796077229"/><circle cx="361.89751788099903" cy="268" r="4"/></g>
+<text x="610" y="273">1.239 (1.183-1.478); n=3</text>
 <text x="16" y="309">Hornbeam · 2000</text>
-<g class="hornbeam"><path stroke-width="3" d="M546.3636363636364,304H546.3636363636364"/><circle cx="546.3636363636364" cy="304" r="4"/></g>
-<text x="610" y="309">2.406 (2.406-2.406); n=1</text>
+<g class="hornbeam"><path stroke-width="3" d="M446.67921922757466,304H546.3636363636363"/><circle cx="493.26676307300556" cy="304" r="4"/></g>
+<text x="610" y="309">2.310 (1.930-2.743); n=3</text>
 <text x="16" y="345">Uvicorn · 2000</text>
-<g class="uvicorn"><path stroke-width="3" d="M388.7452487085108,340H394.8367205041205"/><circle cx="390.562665729734" cy="340" r="4"/></g>
-<text x="610" y="345">1.291 (1.278-1.322); n=3</text>
+<g class="uvicorn"><path stroke-width="3" d="M367.53668828609955,340H395.67391646574777"/><circle cx="373.00305327658884" cy="340" r="4"/></g>
+<text x="610" y="345">1.329 (1.285-1.514); n=3</text>
 <path class="axis" d="M210,365H580"/>
 <text x="210" y="388">0</text>
-<text x="540" y="388">2.6</text>
+<text x="540" y="388">3.0</text>
 </svg>
