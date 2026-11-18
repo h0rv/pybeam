@@ -49,10 +49,10 @@ $ uv run --locked --extra fastapi python -m examples.chat_load.crash_test
 Open `http://127.0.0.1:8802`; servers use ports 8800/8801. The dashboard also
 starts with `mise run example:crash-test`. Flags: `--usual-url`, `--pybeam-url`,
 `--rooms`, `--clients`, `--rate` (messages/s/socket). Traffic runs once per
-dashboard process, not per tab. Choose **Crash Room 1 on both**. After a 4 s
-countdown, the same native crash runs on both stacks concurrently. Watch the
-chat messages in the other rooms: does a user lose their connection, or keep
-getting replies? Each test watches 10 s of traffic, then allows 5 s for recovery.
+dashboard process, not per tab. Choose **Crash one request on both**. After a 4 s
+countdown, the same native crash runs on both stacks concurrently. Watch another
+user's connection: does it drop, or keep getting replies? Each test watches 10 s
+of traffic, then allows 5 s for recovery.
 The default rate is one message per second per user so the conversation is
 readable. The button waits for live replies from every user on both stacks.
 
@@ -62,9 +62,17 @@ disconnect counts after connections recover. “Confirmed” means the server
 acknowledged a send. An unconfirmed send might have reached the server; clients
 do not replay it. A run with no disconnects does not establish zero latency impact.
 
-Open **How this works** to try a CPU stall or raised exception on both stacks.
-Each is a separate paired test; only the latest result is retained. A run already
-in progress rejects another start. Keep this local.
+Rooms group messages, not server processes. Users from different rooms can share
+one web worker. A native crash kills that worker and closes its connections,
+regardless of room. PyBEAM sends this crash-prone code to a separate child process,
+away from chat connections. An ordinary Python exception does not kill the worker,
+and a Python app could also isolate work in another process. This demo compares
+the two configurations, not immunity from every kind of crash.
+
+The dashboard has one test: the native crash. The runner also accepts
+`POST /run/hog` and `POST /run/raise` for separate CPU-stall and exception tests.
+Only the latest result is retained. A run already in progress rejects another
+start. Keep this local.
 
 The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 
