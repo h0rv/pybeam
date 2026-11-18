@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/release.yml
+      - .github/workflows/wheel-smoke.yml
       - examples/docs/hello.py
       - pyproject.toml
       - tools/build_native.py
@@ -34,6 +35,8 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,11 +45,18 @@ jobs:
         with:
           version: '0.13.8'
           python-version: '3.14.10'
+      - name: Read package version
+        id: version
+        run: |
+          version=$(uv version --short)
+          test -n "$version"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
       - name: Check release version
         if: github.event_name == 'release'
         env:
           TAG: ${{ github.event.release.tag_name }}
-        run: test "v$(uv version --short)" = "$TAG"
+          VERSION: ${{ steps.version.outputs.value }}
+        run: test "v$VERSION" = "$TAG"
       - run: uv build --sdist
       - uses: actions/upload-artifact@v4
         with:
@@ -176,61 +186,8 @@ jobs:
           if-no-files-found: error
 
   clean-install:
-    name: clean install (${{ matrix.target }})
     needs: wheel
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: linux-x86_64
-            runner: ubuntu-22.04
-          - target: macos-arm64
-            runner: xcode-27
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          sparse-checkout: examples/docs/hello.py
-          sparse-checkout-cone-mode: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ matrix.target }}
-          path: ${{ runner.temp }}/wheel-smoke/wheels
-      - uses: astral-sh/setup-uv@v7
-        with:
-          version: '0.13.8'
-          enable-cache: false
-      - name: Install by package name and run the getting-started example
-        shell: bash
-        run: |
-          smoke="$RUNNER_TEMP/wheel-smoke"
-          mkdir -p "$smoke/home" "$smoke/project"
-          cp examples/docs/hello.py "$smoke/project/"
-          uv_dir="$(dirname "$(command -v uv)")"
-          env -i HOME="$smoke/home" PATH="$uv_dir:/usr/bin:/bin" \
-            UV_NO_CONFIG=1 UV_PYTHON_PREFERENCE=only-managed \
-            /bin/bash --noprofile --norc -euxo pipefail <<'BASH'
-          cd "$HOME/../project"
-          uname -smr
-          if [[ "$(uname -s)" == Darwin ]]; then sw_vers; else getconf GNU_LIBC_VERSION; fi
-          for tool in erl escript rebar3 mise; do
-            if command -v "$tool"; then
-              echo "Unexpected developer tool on PATH: $tool" >&2
-              exit 1
-            fi
-          done
-          uv --version
-          uv python install 3.14.10
-          export UV_OFFLINE=1 UV_NO_INDEX=1 UV_NO_BUILD=1 UV_FIND_LINKS="$HOME/../wheels"
-          ls -1 "$UV_FIND_LINKS"
-          uv init --bare --python 3.14.10
-          uv add python-beam
-          uv run hello.py | tee hello.out
-          printf 'Hello from Python\n' > expected.out
-          diff -u expected.out hello.out
-          BASH
+    uses: ./.github/workflows/wheel-smoke.yml
 
   publish:
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish)
@@ -249,3 +206,9 @@ jobs:
           path: dist
           merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  verify-pypi:
+    needs: [sdist, publish]
+    uses: ./.github/workflows/wheel-smoke.yml
+    with:
+      published-version: ${{ needs.sdist.outputs.version }}
