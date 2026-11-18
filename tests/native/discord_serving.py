@@ -6,8 +6,10 @@ from fastapi.responses import PlainTextResponse
 from uvicorn import Config, Server
 
 import pybeam
+from tests.fixtures.lifespan_affinity_app import lifespan, router
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+app.include_router(router)
 
 
 @app.get("/health", response_class=PlainTextResponse)
