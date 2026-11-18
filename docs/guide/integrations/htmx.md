@@ -1,8 +1,8 @@
 # HTMX forms and server-sent events
 
-Open the [shared counter example](../../../examples/fastapi/README.md) in two tabs.
-Set an amount and select **Increment**. The submitting tab shows a confirmation;
-both tabs show the new shared count without navigating.
+The [shared counter example](../../../examples/fastapi/README.md) shows how to
+combine an HTMX form with server-sent events. When you increment the count in
+one tab, that tab shows a confirmation and both tabs update without navigating.
 
 ## Give the form and the stream separate targets
 
