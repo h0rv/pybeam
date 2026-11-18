@@ -28,7 +28,8 @@ run() ->
     Paths = string:split(os:getenv("PROBE_EBINS"), ":", all),
     Args = ["+S", "2:2", "+SDcpu", "2", "+SDio", "2", "-setcookie", atom_to_list(erlang:get_cookie()),
             "-kernel", "inet_dist_use_interface", "{127,0,0,1}", "-pa" | Paths],
-    {ok, Peer, PyNode} = peer:start(#{name => pyworker, connection => standard_io, args => Args}),
+    {ok, Peer, PyNode} = peer:start(#{name => pyworker, host => "127.0.0.1", longnames => true,
+                                   connection => standard_io, args => Args}),
     try
         ok = erpc:call(PyNode, ?MODULE, worker_init, []),
         io:format("worker connected=~p nodes=~p~n", [net_adm:ping(PyNode), nodes()]),
@@ -70,15 +71,17 @@ managed(Paths) ->
     Config = ["[tool.pybeam]\ndevelopment_runtime = ",
               json:encode(unicode:characters_to_binary(Runtime)), "\n"],
     ok = file:write_file(filename:join(Workdir, "pyproject.toml"), Config),
-    Flags = "+S 2:2 +SDcpu 2 +SDio 2 -sname managed -setcookie " ++
+    Flags = "+S 2:2 +SDcpu 2 +SDio 2 -name managed@127.0.0.1 -setcookie " ++
             atom_to_list(erlang:get_cookie()) ++ " -kernel inet_dist_use_interface {127,0,0,1}",
     Port = open_port({spawn_executable, Python}, [binary, exit_status, stderr_to_stdout,
         {line, 8192}, {cd, Workdir}, {args, [filename:join(Directory, "managed_wait.py")]},
         {env, [{"ERL_FLAGS", Flags}]}]),
+    {os_pid, Pid} = erlang:port_info(Port, os_pid),
+    PidFile = filename:join(Workdir, "managed.pid"),
+    ok = file:write_file(PidFile, [integer_to_list(Pid), "\n"]),
     try
         ready(Port),
-        [_Name, Hostname] = string:split(atom_to_list(node()), "@"),
-        Node = list_to_atom("managed@" ++ Hostname),
+        Node = 'managed@127.0.0.1',
         pong = net_adm:ping(Node),
         io:format("managed pybeam.run VM ping=pong node=~p~n", [Node]),
         true = erpc:call(Node, code, add_patha, [hd(Paths)]),
@@ -86,9 +89,9 @@ managed(Paths) ->
             erpc:call(Node, os, getenv, ["PYBEAM_DISTRIBUTION"]),
             erpc:call(Node, application, get_env, [kernel, dist_auto_connect])]),
         show_work(Node),
-        {os_pid, Pid} = erlang:port_info(Port, os_pid),
         [] = os:cmd("kill -TERM " ++ integer_to_list(Pid)),
-        finished(Port)
+        finished(Port),
+        ok = file:delete(PidFile)
     after try port_close(Port) catch _:_ -> ok end end.
 
 ready(Port) ->
