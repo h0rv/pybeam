@@ -325,7 +325,10 @@ def test_process__ready_and_zero_exit_do_not_imply_cleanup_acknowledgment(
     fake_runtime.write_text(
         "import json, os\nfrom pathlib import Path\n"
         "p = json.loads(os.environ['PYBEAM_BOOTSTRAP'])\n"
-        "Path(p['ready']).touch()\nPath(p['completed']).write_text('0')\n"
+        "Path(p['ready']).touch()\n"
+        "pending = Path(p['completed']).with_suffix('.tmp')\n"
+        "pending.write_text('0')\n"
+        "pending.replace(p['completed'])\n"
     )
     with pytest.raises(CleanupError, match="not acknowledged") as failure:
         _launch(fake_runtime)
