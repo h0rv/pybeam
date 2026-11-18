@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 from collections.abc import AsyncGenerator, Callable, Generator, Mapping
-from contextlib import asynccontextmanager, contextmanager, suppress
+from contextlib import ExitStack, asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -250,6 +250,35 @@ def spawn_host_server(
                     process.wait(timeout=10)
             with suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
+
+
+async def _finish_in_thread[T](operation: Callable[[], T]) -> T:
+    task = asyncio.create_task(asyncio.to_thread(operation))
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # The thread can still acquire or release a process after cancellation.
+        while not task.done():
+            with suppress(asyncio.CancelledError):
+                await asyncio.shield(task)
+        task.result()
+        raise
+
+
+@asynccontextmanager
+async def spawn_host_server_async(
+    variant: Variant,
+    name: str,
+    output: Path,
+    *,
+    extra_env: Mapping[str, str] | None = None,
+) -> AsyncGenerator[subprocess.Popen[bytes]]:
+    stack = ExitStack()
+    try:
+        server = spawn_host_server(variant, name, output, extra_env=extra_env)
+        yield await _finish_in_thread(lambda: stack.enter_context(server))
+    finally:
+        await _finish_in_thread(stack.close)
 
 
 @contextmanager

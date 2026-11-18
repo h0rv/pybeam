@@ -8,6 +8,8 @@ import time
 from collections.abc import AsyncGenerator, Generator
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
+from typing import Literal
 
 import httpx
 import pytest
@@ -30,6 +32,7 @@ from benchmarks.web.run import (
     memory_delta,
     run,
     server_command,
+    spawn_host_server_async,
     stop_worker,
 )
 from benchmarks.web.scale import port_released, wait_for_recovery
@@ -146,6 +149,54 @@ async def test_recovery_does_not_swallow_other_socket_errors(
     monkeypatch.setattr("benchmarks.web.scale.check_host_port", check_port)
     with pytest.raises(PermissionError):
         await port_released()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["startup", "teardown"])
+async def test_crash_server_lifecycle_keeps_loop_running_and_finishes_on_cancel(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, phase: Literal["startup", "teardown"]
+) -> None:
+    started = asyncio.Event()
+    cleaned = Event()
+    release = Event()
+    loop = asyncio.get_running_loop()
+
+    def delay() -> None:
+        loop.call_soon_threadsafe(started.set)
+        if not release.wait(timeout=5):
+            raise RuntimeError("Server lifecycle blocked the event loop")
+
+    @contextmanager
+    def delayed_server() -> Generator[None]:
+        if phase == "startup":
+            delay()
+        try:
+            yield
+        finally:
+            if phase == "teardown":
+                delay()
+            cleaned.set()
+
+    monkeypatch.setattr(
+        "benchmarks.web.run.spawn_host_server", lambda *args, **kwargs: delayed_server()
+    )
+
+    async def run_server() -> None:
+        async with spawn_host_server_async("hornbeam", "test", tmp_path):
+            pass
+
+    task = asyncio.create_task(run_server())
+    try:
+        async with asyncio.timeout(5):
+            await started.wait()
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+    finally:
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert cleaned.is_set()
 
 
 @pytest.mark.parametrize(

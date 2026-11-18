@@ -30,6 +30,7 @@ from benchmarks.web.run import (
     read_reply,
     send_command,
     spawn_host_server,
+    spawn_host_server_async,
     wait_for_server,
     websocket_workers,
 )
@@ -40,7 +41,9 @@ HTTP_URL = "http://127.0.0.1:" + str(PORT) + "/"
 WS_URL = "ws://127.0.0.1:" + str(PORT) + "/ws"
 PROBE_INTERVAL = 0.05
 RECOVERY_TIMEOUT = 30
-scale_server = partial(spawn_host_server, extra_env={"GRANIAN_BACKPRESSURE": "65536"})
+GRANIAN_ENV = {"GRANIAN_BACKPRESSURE": "65536"}
+scale_server = partial(spawn_host_server, extra_env=GRANIAN_ENV)
+crash_server = partial(spawn_host_server_async, extra_env=GRANIAN_ENV)
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +145,7 @@ async def crash_trial(variant: Variant, name: str, output: Path, target: int) ->
         websocket_workers() as workers,
         httpx.AsyncClient(timeout=0.5, trust_env=False) as client,
     ):
-        with scale_server(variant, name, output) as server:
+        async with crash_server(variant, name, output) as server:
             await asyncio.to_thread(wait_for_server, APP, name, server)
             open_connections = Command(action="open", target=target // len(workers))
             sample = Command(action="sample")
@@ -177,7 +180,7 @@ async def crash_trial(variant: Variant, name: str, output: Path, target: int) ->
                 return CrashResult(
                     target, opened, before, interrupted, exit_code, port_release=port_release
                 )
-            with scale_server(variant, name + "-restart", output):
+            async with crash_server(variant, name + "-restart", output):
                 http_task = group.create_task(wait_for_recovery(check_http, killed_at))
                 ws_task = group.create_task(wait_for_recovery(websocket_probe, killed_at))
                 http, websocket = await http_task, await ws_task
