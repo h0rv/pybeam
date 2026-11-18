@@ -30,6 +30,8 @@ FRAMEWORK_TESTS = frozenset(
         "test_litestar.py",
         "test_pyview_subscription.py",
         "test_pyview_dependencies.py",
+        "test_pyview_cluster.py",
+        "test_pyview_cluster_native.py",
         "test_distributed_showcase.py",
         "test_distributed_showcase_browser.py",
         "test_distributed_ready_browser.py",
