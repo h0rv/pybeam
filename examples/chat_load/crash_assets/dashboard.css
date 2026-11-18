@@ -32,7 +32,6 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 main { max-width: 1040px; margin: auto; padding: 32px 28px; }
 h1, h2, h3, h4, p { margin: 0; }
 h1 { font-size: 24px; font-weight: 650; }
-h1 span { color: var(--muted); font-weight: 400; }
 .intro { margin-top: 8px; }
 #stream-status { margin-top: 20px; padding: 12px; border: 1px solid var(--fault); color: var(--fault); }
 a { color: inherit; text-underline-offset: 3px; }
@@ -52,24 +51,23 @@ button:disabled { opacity: .55; cursor: default; }
 .side-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .side-heading h3 { font-size: 18px; font-weight: 650; }
 .side-heading span { color: var(--muted); font-size: 13px; }
+.process-boundary { margin: 8px 0; min-height: 3em; font-size: 14px; }
 .connection-event { color: var(--muted); font-size: 13px; min-height: 40px; padding-top: 4px; }
 .problem, .outcome.affected h4 { color: var(--fault); }
 .messages { list-style: none; margin: 0; padding: 8px 0 16px; height: 250px; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; overflow: hidden; }
 .message { align-self: flex-end; max-width: 95%; padding: 8px 12px; border-radius: 8px 8px 0 8px; background: var(--bubble); font-size: 14px; }
 .message small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.duration { white-space: nowrap; }
 .message.pending small, .message.unconfirmed small { color: var(--fault); }
 .message.unconfirmed { background: var(--fault-bg); }
 .empty { color: var(--muted); font-size: 14px; margin-block: auto; }
 .outcome { border-top: 1px solid var(--line); padding-top: 16px; min-height: 112px; }
 .outcome h4 { font-size: 16px; font-weight: 600; }
 .outcome p { color: var(--muted); font-size: 13px; margin-top: 4px; }
-.room-list { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 13px; margin-top: 12px; }
 .target { color: var(--muted); font-size: 13px; margin-top: 12px; }
 .explanation { border-top: 1px solid var(--line); margin-top: 28px; padding-top: 16px; font-size: 14px; }
 summary { cursor: pointer; width: fit-content; }
 details p { color: var(--muted); margin-top: 12px; max-width: 80ch; }
-.alternatives { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-.alternatives button { font-size: 14px; }
 @media (max-width: 640px) {
   main { padding: 20px 16px; }
   .scenario { flex-direction: column; align-items: flex-start; gap: 10px; }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="htmx-config" content='{"includeIndicatorCSS":false}'>
-  <title>Room crash test · PyBEAM</title>
+  <title>Can one crashed request disconnect other users? · PyBEAM</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/assets/dashboard.css">
   <script src="/static/htmx.min.js"></script>
@@ -14,8 +14,8 @@
 <body>
 <main>
   <header class="page-header">
-    <h1>PyBEAM <span>/ crash test</span></h1>
-    <p class="intro">Crash Room 1 on both stacks. See whether users in other rooms get disconnected.</p>
+    <h1>Can one crashed request disconnect other users?</h1>
+    <p class="intro">This is a native process crash, not an ordinary Python exception.</p>
   </header>
   <p id="stream-status" role="status"><span id="stream-message">Connecting to the live view…</span> <a href="/">Reload live view</a></p>
   <div id="live" hx-sse:connect="/events" hx-swap="innerHTML"
@@ -24,15 +24,11 @@
   </div>
   <details class="explanation">
     <summary>How this works</summary>
-    <p>These are scripted messages over real connections, not an animation. “Confirmed” means the server acknowledged the send, not that another user read it. Both sides use the same messages and sending rate.</p>
-    <p>The usual stack has 8 web workers, a KV cache, a message broker and a task-queue worker. Its fault runs in a web worker. PyBEAM runs the crash in an isolated child process; CPU work and exceptions use separate worker tasks. The configurations have different failure boundaries by design. This is not a throughput comparison.</p>
-    <p>Each test waits 4 s, injects the same fault on both sides concurrently, watches the other rooms for 10 s, then allows 5 s for recovery. The displayed user switches to an actually affected user, matched across both sides. Connections retry without replay. “Unconfirmed” means a pending send was discarded at disconnect; it might have reached the server.</p>
-    <p>Worker assignment and this machine affect the result. Zero disconnects does not mean zero latency impact. A lost fault request alone does not prove a process died. Keep this demo local.</p>
-    <div class="alternatives">
-      <button type="button" data-run hx-post="/run/hog" hx-swap="none" disabled>Block one worker for 3 s · both stacks</button>
-      <button type="button" data-run hx-post="/run/raise" hx-swap="none" disabled>Raise an exception · both stacks</button>
-    </div>
-    <p>Wait for a test to finish before starting another. Results describe the latest test only.</p>
+    <p>Rooms group chat messages, not server processes. Users in different rooms can share one web worker. If that worker dies, all of its connections close, regardless of room.</p>
+    <p>The request names Room 1 on both stacks and calls <code>os.abort()</code>, like a native extension crashing. This kills a process; an ordinary Python exception does not. The usual stack runs it in one of 8 web workers. PyBEAM sends this crash-prone work to a separate child process. A Python app could also choose to isolate work in another process: this compares these two configurations, not a guarantee for every request.</p>
+    <p>After a 4 s countdown, both stacks receive the crash concurrently. Counts cover the {{ (live.settings.rooms - 1) * live.settings.clients }} users outside Room 1 during the next 10 s, followed by 5 s for recovery. The view selects an affected user when there is one and shows the matching user on both sides. Disconnect counts remain after reconnection.</p>
+    <p>Both sides send the same scripted messages at the same rate. “Confirmed” means the server acknowledged a send, not that another user read it. Connections retry without replay; an unconfirmed send might have reached the server.</p>
+    <p>Worker assignment and this machine affect the result. Zero disconnects does not mean zero latency impact. A lost crash request alone does not prove a process died. Results describe the latest run, not throughput. Keep this demo local.</p>
   </details>
 </main>
 </body>
