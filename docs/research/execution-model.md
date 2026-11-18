@@ -33,7 +33,7 @@ An `asyncio.Task` stays on its local loop and interpreter. It does not automatic
 
 ## ASGI lifespan resources
 
-Managed Uvicorn (`await Server.serve()`) runs lifespan, HTTP and WebSocket handlers on one loop. Hornbeam does the same per mount with its [lifespan-affinity fix](https://github.com/h0rv/hornbeam/commit/7e63be9cb24767da625a69cbeadcac64596607a2); the current PyBEAM pin does not include that fix. You can use lifespan-created loop-bound pools and background tasks from those handlers through lifespan state. This is loop affinity, not a guarantee of permanent thread affinity or database-driver compatibility. Do not share these resources with separate worker loops, dedicated loops or actors.
+Managed Uvicorn (`await Server.serve()`) runs lifespan, HTTP and WebSocket handlers on one loop. Hornbeam does the same per mount once [hornbeam#11](https://github.com/h0rv/hornbeam/pull/11) is in the pinned runtime. You can use lifespan-created loop-bound pools and background tasks from those handlers through lifespan state. This is loop affinity, not a guarantee of permanent thread affinity or database-driver compatibility. Do not share these resources with separate worker loops, dedicated loops or actors.
 
 ## Many jobs do not require many interpreters
 
