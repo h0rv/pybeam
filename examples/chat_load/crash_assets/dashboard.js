@@ -3,6 +3,7 @@
   const status = document.getElementById("stream-status");
   const message = document.getElementById("stream-message");
   let lastUpdate = null;
+  let focusedRun = false;
 
   function fresh() {
     return lastUpdate !== null && performance.now() - lastUpdate < 3000;
@@ -22,10 +23,18 @@
     controls();
   }
 
+  live.addEventListener("htmx:sse:before:message", () => {
+    focusedRun = document.activeElement?.id === "run-crash";
+  });
   live.addEventListener("htmx:sse:after:message", () => {
     lastUpdate = performance.now();
     status.hidden = true;
     controls();
+    const run = document.getElementById("run-crash");
+    if (focusedRun && !run.disabled && document.activeElement === document.body) {
+      run.focus({ preventScroll: true });
+    }
+    focusedRun = false;
   });
   live.addEventListener("htmx:sse:error", disconnected);
   live.addEventListener("htmx:sse:close", disconnected);

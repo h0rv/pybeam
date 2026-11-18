@@ -28,6 +28,21 @@ Use mise for development tools and tasks, uv for Python dependencies, and rebar3
 
 Keep one Python distribution. Core primitives belong in domain packages such as `pybeam.actors`, `pybeam.mailbox`, `pybeam.services`, `pybeam.supervision`, and `pybeam.runtime`. Optional framework and ecosystem adapters belong under `pybeam.integrations.<name>`. Hornbeam-specific web-service contracts belong to its integration, not core services. Keep initializers minimal. Core modules must not import integrations or optional frameworks, and framework adapters must not import other framework adapters. Avoid duplicate transport abstractions and speculative plugin systems.
 
+## UI design
+
+Design from the actual task and real content, not a landing-page or dashboard
+template. Keep one primary action. Prefer plain headings, lists, tables,
+spacing and dividers; boxes must represent a useful boundary, not decoration.
+Do not use decorative gradients, glow, glass, invented brand marks, italic-serif
+accent words, ornamental monospace, tiny tracked uppercase labels, number badges
+or step rails. Replacing purple SaaS styling with cream editorial or black/neon
+styling is not a fix. Use readable text, light and dark modes, visible keyboard
+focus and narrow layouts without hiding important content. Show actual state and
+measured outcomes, never invented proof or guaranteed success. Before handoff,
+review the rendered waiting, running, interrupted and completed states; delete
+repeated copy and anything that adds no action, meaning or evidence. Automated
+style checks do not establish visual quality.
+
 ## Documentation
 
 Before writing, editing, or reviewing README content, guides, API prose, docstrings, or example explanations, read and apply the [documentation-writing skill](.agents/skills/documentation-writing/SKILL.md). Include that path in delegated documentation briefs, including resumed tasks. Its Python-first audience rules, example checks, and editing checklist apply to small changes too. Keep this skill in the repository so future sessions use the same writing standard.

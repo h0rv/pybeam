@@ -131,7 +131,7 @@ async def test_routes__single_run_is_owned_by_group_and_rejects_cross_origin(
             page = await client.get("/")
             assert page.status_code == 200
             assert 'hx-sse:connect="/events"' in page.text
-            assert "Usual stack" in page.text and "PyBeam" in page.text
+            assert "Usual stack" in page.text and "PyBEAM" in page.text
             assert "Waiting for both stacks" in page.text
             assert (await client.post("/run")).status_code == 503
             live_clients(live)
@@ -143,7 +143,7 @@ async def test_routes__single_run_is_owned_by_group_and_rejects_cross_origin(
             assert not calls
             result = await client.post("/run")
             assert result.status_code == 200
-            assert "BEFORE THE FAULT" in result.text
+            assert "Crashing in" in result.text
             assert "disabled" in result.text
             assert live.running
             assert (await client.post("/run", headers={"origin": "http://test"})).status_code == 409

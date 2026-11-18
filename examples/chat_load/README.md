@@ -68,7 +68,7 @@ in progress rejects another start. Keep this local.
 
 The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 
-| Fault | Usual stack | PyBeam |
+| Fault | Usual stack | PyBEAM |
 | --- | --- | --- |
 | `raise` | Handler raises; HTTP 500 and failed notice | Dedicated-loop task raises; HTTP 200 and contained notice |
 | `hog` | Tight loop blocks one web worker for 3 s | Dedicated-loop task runs the same loop; completed notice |
@@ -77,7 +77,7 @@ The run targets `room-1` through `POST /rooms/{room}/faults/{kind}`:
 The fault target is separate from the other-room conversation. Its request
 outcome is not a measurement of other users' experience. A lost fault request
 alone does not prove a worker died. Results depend on worker assignment and
-this machine. The usual stack runs faults in its web workers; PyBeam runs native
+this machine. The usual stack runs faults in its web workers; PyBEAM runs native
 crashes in isolated child processes. This compares those failure boundaries,
 not maximum throughput. The measurements below used a separate load runner.
 
@@ -85,7 +85,7 @@ not maximum throughput. The measurements below used a separate load runner.
 
 Linux x86-64, 8 CPUs shared with the loopback client; dashboard stopped,
 stacks loaded sequentially. Three trials per point; medians [min–max].
-PyBeam: 3.14.10t, dedicated-loop tasks. Usual stack: 3.14.10, eight web workers
+PyBEAM: 3.14.10t, dedicated-loop tasks. Usual stack: 3.14.10, eight web workers
 and a KV cache.
 
 Fault trials: 8 rooms × 4 sockets × 4 messages/s, no jobs. Paired 3 s baseline
@@ -94,7 +94,7 @@ Only rooms 2–8 sends scheduled in the window count. Late replies retain full
 latency; missing replies after an 8 s drain count as unbounded, including
 sends missed during reconnection.
 
-| Other-room ack p99, ms: baseline → fault | Usual stack | PyBeam |
+| Other-room ack p99, ms: baseline → fault | Usual stack | PyBEAM |
 | --- | --- | --- |
 | `hog` | 4.52 [4.19–4.59] → 2935.94 [2615.46–3003.46] | 3.63 [2.19–99.64] → 4.95 [3.27–5.93] |
 | `abort` | 3.32 [3.27–4.51] → unbounded [3.74–unbounded] | 4.28 [3.61–4.46] → 4.52 [2.86–8.73] |
@@ -104,7 +104,7 @@ Hog-window maximum pending age was 2962.41 [2905.37–2976.08] ms versus
 2.51 [1.29–4.16] ms. Abort disconnected 9 [3–9] of 28 other-room sockets
 versus zero, with 12 [3–12] versus zero scheduled sends unacknowledged.
 All post-fault health checks returned 200; other-room HTTP probes had zero
-failures. PyBeam's paired hog p99 changes (+2.30, +1.08, −94.68 ms) do **not**
+failures. PyBEAM's paired hog p99 changes (+2.30, +1.08, −94.68 ms) do **not**
 establish zero latency impact.
 
 Throughput: `traffic.py`, 8 rooms × 4 sockets, 64-byte messages, 15 s runs,
@@ -117,10 +117,10 @@ three runs—not a server-only ceiling:
 | Stack | Acknowledged messages/s | Ack p99, ms | Completed jobs/s |
 | --- | --- | --- | --- |
 | Usual stack | 3844 [3767–3884] | 21.05 [13.77–35.69] | 20.13 [19.80–20.27] |
-| PyBeam | 1989 [1969–1997] | 11.61 [8.84–14.36] | 21.20 [20.73–21.40] |
+| PyBEAM | 1989 [1969–1997] | 11.61 [8.84–14.36] | 21.20 [20.73–21.40] |
 
 Nominal rates: 4096/s and 2048/s. Requiring ≥95% nominal delivery in every run
-limits both to the 2048/s point. PyBeam disconnected clients at 4096/s in two
+limits both to the 2048/s point. PyBEAM disconnected clients at 4096/s in two
 of three runs, and at 8192/s in all three. The usual stack delivered all replies
 at nominal 16384/s, but p99 reached 7892 [7005–8337] ms: draining a backlog is
 not sustained throughput. Client CPU/pacing is shared; lower-load latency

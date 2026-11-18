@@ -1,5 +1,8 @@
 {% include 'scenario.html' %}
-<p class="focus-note">{% if live.phase in ('observe', 'recovery', 'done') %}{{ live.focus_reason }}{% else %}Below: a live conversation outside Room 1. Watch the confirmations, not the fault target.{% endif %}</p>
+<div class="conversation-label">
+  <h2>Room {{ live.focus_room + 1 }} · user {{ live.focus_client + 1 }}</h2>
+  <p>The same user on both stacks, outside Room 1.</p>
+</div>
 <div class="columns">
 {% for key, side in live.sides.items() %}
   {% set target = side.rooms[0] %}
@@ -7,19 +10,9 @@
   {% set client = room.clients[live.focus_client] %}
   {% set impact = live.impact(key) %}
   {% set interrupted = live.focus_interrupted(key) %}
-  <section class="chat-panel" aria-label="{{ side.title }} live conversation">
-    <div class="side-heading"><h2>{{ side.title }}</h2><span>{{ side.rooms | sum(attribute='connected') }} / {{ live.settings.rooms * live.settings.clients }} online now</span></div>
-    <div class="target" data-target="{{ key }}">
-      <span>Room 1 <small>FAULT TARGET</small></span>
-      <strong>{% if live.phase in ('ready', 'baseline', 'interrupted') %}Not faulted{% elif target.notice == 'injecting' %}Fault requested…{% elif target.notice == 'contained' %}Failure reported as contained{% elif target.notice == 'disconnected' %}Fault request lost its connection{% elif target.notice == 'failed' %}Handler returned an error{% elif target.notice == 'completed' %}Fault finished{% else %}Outcome unknown{% endif %}</strong>
-    </div>
-    <div class="outcome {{ 'affected' if impact and impact.dropped else '' }}" role="status" aria-live="polite">
-      <p class="eyebrow">OTHER ROOMS · NOT THE FAULT TARGET</p>
-      <h3>{% if impact and impact.dropped %}{{ impact.dropped }} {{ 'user' if impact.dropped == 1 else 'users' }} disconnected.{% elif impact and impact.pending_ms >= 500 %}Replies stalled for {{ '%.1f' | format(impact.pending_ms / 1000) }} s.{% elif impact and impact.replies %}No users disconnected{% if live.phase == 'observe' %} so far{% endif %}.{% elif impact %}Watching for replies…{% elif live.ready %}Conversations are live.{% else %}Waiting for live replies.{% endif %}</h3>
-      <p>{% if impact %}{{ impact.replies }} sends confirmed · {{ impact.lost }} unconfirmed at disconnect.<br>Longest observed reply wait: {{ '%.2f' | format(impact.pending_ms / 1000) }} s{% if live.phase in ('recovery', 'done') %} during the 10 s test{% endif %}.{% else %}A crash should not end someone else's conversation.<br>These users are in rooms 2–{{ live.settings.rooms }}.{% endif %}</p>
-    </div>
-    <div class="conversation-heading"><strong>Room {{ live.focus_room + 1 }} <small>USER {{ live.focus_client + 1 }} · NOT FAULTED</small></strong><span class="{{ 'problem' if client.state != 'connected' else '' }}">{{ client.state }}</span></div>
-    <div class="connection-event {{ 'problem' if interrupted or client.state != 'connected' else '' }}">{% if interrupted %}Connection interrupted{% if client.state == 'connected' %} → reconnected{% endif %}. This user had to reconnect.{% elif client.state != 'connected' %}Waiting for a connection. No messages can be sent.{% else %}Connected{% if impact %} · no disconnect observed for this user{% endif %}.{% endif %}</div>
+  <section class="chat-panel" data-side="{{ key }}" aria-label="{{ side.title }} live conversation">
+    <div class="side-heading"><h3>{{ side.title }}</h3><span>{{ side.rooms | sum(attribute='connected') }}/{{ live.settings.rooms * live.settings.clients }} online</span></div>
+    <div class="connection-event {{ 'problem' if interrupted or client.state != 'connected' else '' }}">{% if interrupted %}{% if client.state == 'connected' %}Disconnected, then reconnected.{% else %}Disconnected. Reconnecting…{% endif %}{% elif client.state != 'connected' %}Waiting for a connection…{% else %}Connected{% if impact %} · no disconnect for this user{% endif %}.{% endif %}</div>
     <ol class="messages" aria-label="{{ side.title }} real message acknowledgements">
     {% for message in client.messages %}
       <li class="message {{ message.state }}">
@@ -28,10 +21,16 @@
       </li>
     {% else %}<li class="empty">Waiting for this user's first message…</li>{% endfor %}
     </ol>
-    <div class="room-list" aria-label="{{ side.title }} other room connections">
-    {% for other in side.rooms[1:] %}<span class="{{ 'problem' if other.status(now) != 'healthy' else '' }}">Room {{ loop.index + 1 }} · {% if other.oldest_ms(now) >= 500 and other.connected == other.clients | length %}waiting{% else %}{{ other.connected }}/{{ other.clients | length }}{% endif %}</span>{% endfor %}
+    {% if impact %}
+    <div class="outcome {{ 'affected' if impact.dropped else '' }}" role="status" aria-live="polite">
+      <h4>{% if impact and impact.dropped %}{{ impact.dropped }} {{ 'user' if impact.dropped == 1 else 'users' }} in other rooms disconnected.{% elif impact and impact.pending_ms >= 500 %}Replies in other rooms stalled for {{ '%.1f' | format(impact.pending_ms / 1000) }} s.{% elif impact and impact.replies %}No users in other rooms disconnected{% if live.phase == 'observe' %} so far{% endif %}.{% elif impact %}Watching for replies in other rooms…{% else %}Other rooms{% endif %}</h4>
+      <p>{% if impact %}{{ impact.replies }} sends confirmed. {{ impact.lost }} unconfirmed at disconnect. Longest observed reply wait: {{ '%.2f' | format(impact.pending_ms / 1000) }} s.{% else %}Rooms 2–{{ live.settings.rooms }}. Results appear here after the crash.{% endif %}</p>
     </div>
-    <p class="request-detail">{% if impact %}Room 1 request: {{ side.result }}{% else %}{{ side.url }}{% endif %}</p>
+    {% endif %}
+    <div class="room-list" aria-label="{{ side.title }} other room connections">
+    {% for other in side.rooms[1:] %}<span class="{{ 'problem' if other.status(now) != 'healthy' else '' }}">Room {{ loop.index + 1 }}: {% if other.oldest_ms(now) >= 500 and other.connected == other.clients | length %}waiting{% else %}{{ other.connected }}/{{ other.clients | length }}{% endif %}</span>{% endfor %}
+    </div>
+    <p class="target" data-target="{{ key }}">Room 1: {% if live.phase in ('ready', 'baseline', 'interrupted') %}not faulted.{% elif target.notice == 'injecting' %}fault requested…{% elif target.notice == 'contained' %}failure reported as contained.{% elif target.notice == 'disconnected' %}fault request lost its connection.{% elif target.notice == 'failed' %}handler returned an error.{% elif target.notice == 'completed' %}fault finished.{% else %}outcome unknown.{% endif %}</p>
   </section>
 {% endfor %}
 </div>
