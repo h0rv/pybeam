@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Background tasks</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/missing.min.css">
+  <style>
+    :root { color-scheme: light dark; }
+    .table-scroll { overflow-x: auto; }
+    td:first-child { overflow-wrap: anywhere; }
+    :focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+  </style>
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/sse.js"></script>
+  <script>
+    document.addEventListener('htmx:sse:error', () => {
+      document.getElementById('updates').textContent = 'Updates interrupted. Read the linked task status before submitting again.';
+    });
+    document.addEventListener('htmx:sse:after:connection', () => {
+      document.getElementById('updates').textContent = '';
+    });
+    document.addEventListener('htmx:response:error', () => {
+      document.getElementById('updates').textContent = 'Submission failed. Check the server before trying again.';
+    });
+  </script>
+</head>
+<body>
+<main>
+  <h1>Tasks</h1>
+  <p>Pick a task length.</p>
+  <form hx-post="/rows" hx-target="#tasks" hx-swap="afterbegin">
+    <button name="type" value="1">Short</button>
+    <button name="type" value="2">Medium</button>
+    <button name="type" value="3">Long</button>
+  </form>
+  <p id="updates" role="status"></p>
+  <h2>Task status</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Result</th></tr></thead>
+      <tbody id="tasks" aria-live="polite"></tbody>
+    </table>
+  </div>
+  <p>Results expire after one day. Restarting this process loses tasks and results.</p>
+</main>
+</body>
+</html>
