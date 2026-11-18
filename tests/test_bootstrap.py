@@ -139,7 +139,12 @@ def test_development_assets__rejects_incompatible_nif_without_loading_it(
 def fake_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     script = tmp_path / "vm.py"
 
-    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+    def command(
+        _assets: RuntimeAssets,
+        *,
+        python_paths: tuple[str, ...] = (),
+        startup: tuple[str, ...] = (),
+    ) -> list[str]:
         return [sys.executable, str(script)]
 
     monkeypatch.setattr(process, "_command", command)
@@ -383,7 +388,10 @@ def test_process__signal_during_spawn_is_not_lost(
     fake_runtime.write_text("import time\ntime.sleep(30)\n")
 
     def interrupted_command(
-        _assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()
+        _assets: RuntimeAssets,
+        *,
+        python_paths: tuple[str, ...] = (),
+        startup: tuple[str, ...] = (),
     ) -> list[str]:
         os.kill(os.getpid(), signal.SIGTERM)
         return [sys.executable, str(fake_runtime)]
@@ -864,7 +872,12 @@ def test_native__application_stop_stall_has_parent_deadline(
         + "application:stop(pybeam_stop_stall), halt(0)."
     )
 
-    def command(_assets: RuntimeAssets, *, python_paths: tuple[str, ...] = ()) -> list[str]:
+    def command(
+        _assets: RuntimeAssets,
+        *,
+        python_paths: tuple[str, ...] = (),
+        startup: tuple[str, ...] = (),
+    ) -> list[str]:
         return [
             str(assets.executable),
             "+S",
