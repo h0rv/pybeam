@@ -285,6 +285,7 @@ async def live_view(port: int) -> AsyncGenerator[Demo]:
     async with ActorGroup(max_children=1) as actors:
         requests = await actors.spawn(Requests)
         with socket.socket() as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind(("127.0.0.1", port))
             listener.listen(128)
             listener.setblocking(False)

@@ -20,8 +20,9 @@ def test_soul__http_survives_inspection_stop_and_replacement(
         indent(
             """from examples.soul.main import View, live_view
 import httpx
-async with live_view(0) as demo:
-    async with httpx.AsyncClient(base_url="http://" + demo.address) as client:
+async with httpx.AsyncClient() as client:
+    async with live_view(0) as demo:
+        client.base_url = "http://" + demo.address
         assert (await client.get("/")).status_code == 200
         assert (await client.post("/run")).status_code == 202
         assert (await client.post("/run")).status_code == 409
@@ -50,6 +51,14 @@ async with live_view(0) as demo:
         assert b"INFO REPORT" not in response.content
         assert b"/home/" not in response.content
         print("soul-view-ok")
+        port = int(demo.address.rsplit(":", 1)[1])
+    async with live_view(port) as replay:
+        response = await client.get("/state")
+        fresh = Json(View).decode(response.content)
+        assert fresh.phase == "waiting"
+        assert not fresh.samples and fresh.completed == 0
+        assert not replay.finished.is_set()
+        print("soul-immediate-restart-ok")
 """,
             "    ",
         ),
@@ -57,4 +66,5 @@ async with live_view(0) as demo:
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "soul-view-ok" in output
+    assert "soul-immediate-restart-ok" in output
     assert "Traceback (most recent call last)" not in output
