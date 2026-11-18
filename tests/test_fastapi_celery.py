@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import override
+from typing import Literal, override
 
 import httpx
 import pytest
@@ -11,8 +11,10 @@ from fastapi import APIRouter, FastAPI
 
 from examples.fastapi_celery.app import (
     NAMESPACE,
+    SLEEP,
     Jobs,
     Status,
+    TaskRequest,
     app,
     events,
     running_jobs,
@@ -20,7 +22,9 @@ from examples.fastapi_celery.app import (
 from examples.fastapi_celery.compare import Plan, compare, one, pss, sample
 from pybeam.submissions import Overloaded
 from pybeam.tasks import TaskLimits, TaskRef, TaskSupervisor, _Failure, _Success
-from tests.fakes import FakeServices, ServiceState
+from tests.fakes import FakeServices, FakeStore, ServiceState
+from tests.test_tasks_dispatch import TasksModule
+from tests.test_tasks_dispatch import native as native
 
 
 @dataclass(slots=True)
@@ -117,6 +121,37 @@ async def test_crash_and_overload(monkeypatch: pytest.MonkeyPatch) -> None:
         assert (await jobs.read(task_id)).task_status == "FAILURE"
     async with client_for(monkeypatch, full=True) as (client, _, _):
         assert (await client.post("/tasks", json={"type": 1})).status_code == 503
+
+
+async def test_initial_store_failure_releases_slot(
+    monkeypatch: pytest.MonkeyPatch, native: TasksModule
+) -> None:
+    writes = 0
+    original_set = FakeStore.set
+
+    async def set_result(
+        store: FakeStore, key: str, value: bytes, *, expires_in: float | None = None
+    ) -> None:
+        nonlocal writes
+        writes += 1
+        if writes == 1:
+            raise RuntimeError("store unavailable")
+        await original_set(store, key, value, expires_in=expires_in)
+
+    async def outcome(_group: object, _pid: object) -> tuple[Literal[True], bytes]:
+        return True, b"true"
+
+    monkeypatch.setattr(FakeStore, "set", set_result)
+    monkeypatch.setattr(native, "outcome", outcome)
+    beam = FakeServices(ServiceState(), owner="test")
+    async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=1024, shutdown_ms=100)) as supervisor:
+        async with asyncio.TaskGroup() as tasks:
+            jobs = Jobs(beam, supervisor, tasks, 0.01)
+            with pytest.raises(RuntimeError, match="store unavailable"):
+                await jobs.submit(TaskRequest(type=1))
+        assert len(native.calls) == 1
+        ref = await supervisor.start(SLEEP, 0.01)
+        assert await ref is True
 
 
 async def test_events_fresh_read_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:

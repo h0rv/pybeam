@@ -71,7 +71,11 @@ class Jobs:
     async def submit(self, request: TaskRequest) -> Accepted:
         ref = await self.supervisor.start(SLEEP, request.type * self.unit)
         task_id = secrets.token_hex(16)
-        await self.save(Status(task_id=task_id))
+        try:
+            await self.save(Status(task_id=task_id))
+        except BaseException:
+            self.tasks.create_task(ref.exception())
+            raise
         self.tasks.create_task(self.finish(task_id, ref))
         return Accepted(task_id=task_id)
 
