@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from contextlib import AsyncExitStack
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Self
 
 from pybeam._shared.lifecycle import await_cleanup
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from pyview.events import InfoEvent
 
-    from pybeam.integrations.hornbeam import Services, Subscription
+    from pybeam.integrations.hornbeam import PresenceEntry, Services, Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -19,16 +19,14 @@ class InfoReceiver(Protocol):
     async def send_info(self, event: InfoEvent) -> None: ...
 
 
-class ViewSubscription:
-    """Retain the handle from ``services.subscribe`` and await close on disconnect."""
-
+class _ViewStream[T]:
     def __init__(
         self,
         stack: AsyncExitStack,
-        subscription: Subscription,
+        subscription: Subscription[T],
         socket: InfoReceiver,
         topic: str,
-        convert: Callable[[bytes], InfoEvent],
+        convert: Callable[[T], InfoEvent],
     ) -> None:
         self._stack = stack
         self._failure: Exception | None = None
@@ -39,18 +37,15 @@ class ViewSubscription:
         self._task.add_done_callback(self._report_failure)
 
     @classmethod
-    async def start(
+    async def _open(
         cls,
-        beam: Services,
+        context: Subscription[T],
         socket: InfoReceiver,
         topic: str,
-        convert: Callable[[bytes], InfoEvent],
-        *,
-        max_bytes: int = 65536,
-    ) -> ViewSubscription:
+        convert: Callable[[T], InfoEvent],
+    ) -> Self:
         stack = AsyncExitStack()
         try:
-            context = beam.subscribe(topic, max_bytes=max_bytes)
             subscription = await context.__aenter__()
             stack.push_async_exit(context.__aexit__)
         except BaseException:
@@ -60,9 +55,9 @@ class ViewSubscription:
 
     async def _consume(
         self,
-        subscription: Subscription,
+        subscription: Subscription[T],
         socket: InfoReceiver,
-        convert: Callable[[bytes], InfoEvent],
+        convert: Callable[[T], InfoEvent],
     ) -> None:
         async with self._stack:
             try:
@@ -101,3 +96,42 @@ class ViewSubscription:
                 raise
         finally:
             await self._stack.aclose()
+
+
+class ViewSubscription(_ViewStream[bytes]):
+    """Retain the handle from ``services.subscribe`` and await close on disconnect."""
+
+    @classmethod
+    async def start(
+        cls,
+        beam: Services,
+        socket: InfoReceiver,
+        topic: str,
+        convert: Callable[[bytes], InfoEvent],
+        *,
+        max_bytes: int = 65536,
+    ) -> Self:
+        return await cls._open(beam.subscribe(topic, max_bytes=max_bytes), socket, topic, convert)
+
+
+class ViewPresence(_ViewStream["tuple[PresenceEntry, ...]"]):
+    """Receive full snapshots; await close on disconnect to acknowledge untracking.
+
+    Presence is eventually consistent across nodes and is not durable.
+    """
+
+    @classmethod
+    async def start(
+        cls,
+        beam: Services,
+        socket: InfoReceiver,
+        topic: str,
+        key: str,
+        payload: bytes,
+        convert: Callable[[tuple[PresenceEntry, ...]], InfoEvent],
+        *,
+        max_bytes: int = 65536,
+    ) -> Self:
+        return await cls._open(
+            beam.presence(topic, key, payload, max_bytes=max_bytes), socket, topic, convert
+        )

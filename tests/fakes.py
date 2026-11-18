@@ -3,13 +3,16 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pybeam._shared.lifecycle import await_cleanup
 from pybeam.integrations.hornbeam.errors import (
     SubscriptionClosed,
     SubscriptionOverflow,
 )
+
+if TYPE_CHECKING:
+    from pybeam.integrations.hornbeam import PresenceEntry
 
 
 @dataclass
@@ -25,6 +28,7 @@ class ServiceState:
         self.calls: list[tuple[str, list[object]]] = []
         self.channels: dict[object, FakeSubscription] = {}
         self.subscriptions: dict[object, tuple[str, FakeSubscription]] = {}
+        self.presences: dict[object, FakePresence] = {}
         self.cache: dict[tuple[str, str], Entry] = {}
         self.counters: dict[tuple[str, str], int] = {}
         self.published: list[tuple[str, bytes]] = []
@@ -90,6 +94,77 @@ class FakeSubscription:
         self.state.channels.pop(self, None)
         self.state.subscriptions.pop(self, None)
         self.closed = True
+
+    async def aclose(self) -> None:
+        if self.cleanup is None:
+            self.cleanup = asyncio.create_task(self._close())
+        await await_cleanup(self.cleanup)
+
+
+class FakePresence:
+    def __init__(
+        self,
+        state: ServiceState,
+        owner: object,
+        topic: str,
+        key: str,
+        payload: bytes,
+        max_bytes: int,
+    ) -> None:
+        self.state, self.owner, self.topic = state, owner, topic
+        self.key, self.payload, self.max_bytes = key, payload, max_bytes
+        self.queue: asyncio.Queue[tuple[PresenceEntry, ...] | Exception] = asyncio.Queue(8)
+        self.cleanup: asyncio.Task[None] | None = None
+        self.closed = False
+
+    def _broadcast(self) -> None:
+        from pybeam.integrations.hornbeam import PresenceEntry
+
+        snapshot = tuple(
+            PresenceEntry(item.key, item.key, item.payload)
+            for item in self.state.presences.values()
+            if item.topic == self.topic
+        )
+        for item in self.state.presences.values():
+            if item.topic == self.topic:
+                item.queue.put_nowait(snapshot)
+
+    async def __aenter__(self) -> Self:
+        self.state.calls.append(("presence", [self.owner, self.topic, self.key, self.max_bytes]))
+        self.state.presences[self] = self
+        self._broadcast()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self.aclose()
+
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> tuple[PresenceEntry, ...]:
+        if self.closed:
+            raise StopAsyncIteration
+        return await self.receive()
+
+    async def receive(self) -> tuple[PresenceEntry, ...]:
+        if self.closed:
+            raise SubscriptionClosed("closed")
+        value = await self.queue.get()
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    async def _close(self) -> None:
+        self.state.close_started.set()
+        await self.state.close_gate.wait()
+        self.state.presences.pop(self, None)
+        self.closed = True
+        self._broadcast()
 
     async def aclose(self) -> None:
         if self.cleanup is None:
@@ -190,4 +265,9 @@ class FakeServices:
         return FakeSubscription(self.state, self.owner, topic, max_bytes)
 
     async def subscription_count(self) -> int:
-        return len(self.state.channels)
+        return len(self.state.channels) + len(self.state.presences)
+
+    def presence(
+        self, topic: str, key: str, payload: bytes, *, max_bytes: int = 65536
+    ) -> FakePresence:
+        return FakePresence(self.state, self.owner, topic, key, payload, max_bytes)

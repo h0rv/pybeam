@@ -21,7 +21,7 @@ from examples.discord_simulation import Delivery, Event, Membership, Room, Snaps
 from pybeam.actors import ActorGroup, ActorInfo
 from pybeam.actors.classes import Container, Route, definition
 from pybeam.integrations.hornbeam import runtime as managed
-from pybeam.integrations.hornbeam.contracts import ByteStore
+from pybeam.integrations.hornbeam.contracts import ByteStore, PresenceSubscription
 from pybeam.runtime.loader import Entry
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +83,11 @@ class FakeServices:
 
     async def subscription_count(self) -> int:
         return int(not self.subscription.closed)
+
+    def presence(
+        self, topic: str, key: str, payload: bytes, *, max_bytes: int = 65536
+    ) -> PresenceSubscription:
+        raise NotImplementedError
 
 
 class RenderingDemo(Demo):

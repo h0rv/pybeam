@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import AsyncExitStack
 from re import escape
 from typing import TYPE_CHECKING
 
@@ -22,10 +23,11 @@ from examples.pyview.main import (
     counter_event,
     root_template,
 )
-from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.hornbeam import Beam as ServiceBeam
+from pybeam.integrations.hornbeam import PresenceEntry, Services
 from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
 from pybeam.integrations.pyview.dependencies import services
-from pybeam.integrations.pyview.subscriptions import ViewSubscription
+from pybeam.integrations.pyview.subscriptions import ViewPresence, ViewSubscription
 from tests.fakes import FakeServices as Beam
 from tests.fakes import ServiceState
 
@@ -71,6 +73,78 @@ class TestDoubleSocket:
 
 def notification(payload: bytes) -> InfoEvent:
     return InfoEvent("demo:counter", int(payload.decode("ascii")))
+
+
+def roster(entries: tuple[PresenceEntry, ...]) -> InfoEvent:
+    return InfoEvent("online", entries)
+
+
+async def test_presence__forwards_snapshots_and_acknowledges_leave() -> None:
+    state = ServiceState()
+    beam = ServiceBeam(Beam(state, owner="socket"))
+    first, second = TestDoubleSocket(), TestDoubleSocket()
+    async with AsyncExitStack() as cleanup:
+        one = await ViewPresence.start(beam, first, "online", "one", b"A", roster)
+        cleanup.push_async_callback(one.aclose)
+        assert (await first.received()).payload == (PresenceEntry("one", "one", b"A"),)
+        two = await ViewPresence.start(beam, second, "online", "two", b"B", roster)
+        cleanup.push_async_callback(two.aclose)
+        expected = (PresenceEntry("one", "one", b"A"), PresenceEntry("two", "two", b"B"))
+        assert (await first.received()).payload == expected
+        assert (await second.received()).payload == expected
+        await two.aclose()
+        assert (await first.received()).payload == (PresenceEntry("one", "one", b"A"),)
+        assert await beam.subscription_count() == 1
+    assert not state.presences
+
+
+async def test_presence__cancelled_close_still_waits_for_acknowledgement() -> None:
+    state = ServiceState()
+    view = await ViewPresence.start(
+        Beam(state, owner="socket"), TestDoubleSocket(), "online", "one", b"A", roster
+    )
+    state.close_gate.clear()
+    closing = asyncio.create_task(view.aclose())
+    await state.close_started.wait()
+    closing.cancel()
+    await asyncio.sleep(0)
+    assert not closing.done()
+    assert state.presences
+    state.close_gate.set()
+    with pytest.raises(asyncio.CancelledError):
+        await closing
+    await view.aclose()
+    assert not state.presences
+
+
+async def test_presence__cancelled_wait_does_not_cancel_consumer() -> None:
+    state = ServiceState()
+    socket = TestDoubleSocket()
+    view = await ViewPresence.start(
+        Beam(state, owner="socket"), socket, "online", "one", b"A", roster
+    )
+    try:
+        observer = asyncio.create_task(view.wait())
+        await asyncio.sleep(0)
+        observer.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await observer
+        assert (await socket.received()).payload == (PresenceEntry("one", "one", b"A"),)
+        assert state.presences
+    finally:
+        await view.aclose()
+
+
+async def test_presence__consumer_failure_is_observable_and_untracks() -> None:
+    state = ServiceState()
+    view = await ViewPresence.start(
+        Beam(state, owner="socket"), TestDoubleSocket(fail=True), "online", "one", b"A", roster
+    )
+    with pytest.raises(ValueError, match="render failed"):
+        await view.wait()
+    with pytest.raises(ValueError, match="render failed"):
+        await view.aclose()
+    assert not state.presences
 
 
 async def test_two_views__should_keep_request_owners_and_cleanup_independent() -> None:
