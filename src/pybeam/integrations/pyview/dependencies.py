@@ -1,11 +1,15 @@
 from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
 from pyview.events import InfoEvent
 from pyview.live_socket import ConnectedLiveViewSocket, LiveViewSocket
 
-from pybeam.integrations.hornbeam import PresenceEntry, Services
+from pybeam.integrations.hornbeam import Services
 from pybeam.integrations.hornbeam.dependencies import BeamProvider as ServicesProvider
 from pybeam.integrations.pyview.subscriptions import ViewPresence, ViewSubscription
+
+if TYPE_CHECKING:
+    from pybeam.integrations.hornbeam import PresenceEntry
 
 
 class BeamProvider(ServicesProvider):
