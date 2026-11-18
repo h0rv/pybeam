@@ -331,7 +331,7 @@ source = { editable = "../" }
 requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = "==0.163.0" },
     { name = "fastapi", marker = "extra == 'showcase'", specifier = "==0.163.0" },
-    { name = "hornbeam", marker = "extra == 'hornbeam'", git = "https://github.com/h0rv/hornbeam.git?rev=69cd6c9e529ed5b4e0c34be039560bd2bb8f0c66" },
+    { name = "hornbeam", marker = "extra == 'hornbeam'", git = "https://github.com/h0rv/hornbeam.git?rev=297881ca7961e633f29739c861e818fbb9765d9a" },
     { name = "jinja2", marker = "extra == 'fastapi'", specifier = ">=3.1.6,<4" },
     { name = "jinja2", marker = "extra == 'showcase'", specifier = ">=3.1.6,<4" },
     { name = "litestar", extras = ["jinja"], marker = "extra == 'litestar'", specifier = "==2.25.0" },
@@ -346,6 +346,7 @@ provides-extras = ["genstage", "showcase", "hornbeam", "fastapi", "litestar", "p
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22,<1" },
     { name = "hatchling", specifier = ">=1.27,<2" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "hypothesis", specifier = ">=6,<7" },
@@ -356,6 +357,7 @@ dev = [
     { name = "pytest", specifier = ">=9,<10" },
     { name = "pytest-asyncio", specifier = ">=1,<2" },
     { name = "ruff", specifier = ">=0.14,<1" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0,<3" },
     { name = "ty", specifier = ">=0.0.104" },
     { name = "types-psutil", specifier = ">=7,<8" },
     { name = "typing-extensions", specifier = ">=4.14.1,<5" },
