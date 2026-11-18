@@ -4,25 +4,25 @@
 <text class="heading" x="20" y="29">Current smoke completion rates</text>
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">Trial 0</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Trial 1</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">Trial 2</text>
 <text x="215" y="123" text-anchor="end">Python</text>
-<rect class="s0" x="230" y="95" width="21.85199190528263" height="14"/>
-<text x="258.8519919052826" y="107">49719.28 events/s</text>
-<rect class="s1" x="230" y="116" width="19.609563576078784" height="14"/>
-<text x="256.6095635760788" y="128">44617.14 events/s</text>
-<rect class="s2" x="230" y="137" width="13.985178479356932" height="14"/>
-<text x="250.98517847935693" y="149">31820.12 events/s</text>
+<rect class="s0" x="230" y="95" width="19.88771199999999" height="14"/>
+<text x="256.88771199999996" y="107">49.7k events/s</text>
+<rect class="s1" x="230" y="116" width="17.846856" height="14"/>
+<text x="254.84685600000003" y="128">44.6k events/s</text>
+<rect class="s2" x="230" y="137" width="12.728047999999985" height="14"/>
+<text x="249.72804799999997" y="149">31.8k events/s</text>
 <text x="215" y="202" text-anchor="end">Raw PyBEAM</text>
-<rect class="s0" x="230" y="174" width="5.167460009623056" height="14"/>
-<text x="242.16746000962306" y="186">11757.39 events/s</text>
-<rect class="s1" x="230" y="195" width="3.905603474301131" height="14"/>
-<text x="240.90560347430113" y="207">8886.32 events/s</text>
-<rect class="s2" x="230" y="216" width="5.044296848539119" height="14"/>
-<text x="242.04429684853912" y="228">11477.16 events/s</text>
+<rect class="s0" x="230" y="174" width="4.702956000000006" height="14"/>
+<text x="241.702956" y="186">11.8k events/s</text>
+<rect class="s1" x="230" y="195" width="3.5545279999999906" height="14"/>
+<text x="240.554528" y="207">8.89k events/s</text>
+<rect class="s2" x="230" y="216" width="4.590864000000006" height="14"/>
+<text x="241.590864" y="228">11.5k events/s</text>
 <text x="215" y="281" text-anchor="end">Erlang OTP</text>
-<rect class="s0" x="230" y="253" width="346.18331076432025" height="14"/>
-<text x="583.1833107643203" y="265">787662.06 events/s</text>
-<rect class="s1" x="230" y="274" width="360.8672225167844" height="14"/>
-<text x="597.8672225167844" y="286">821071.99 events/s</text>
-<rect class="s2" x="230" y="295" width="370.3703703703703" height="14"/>
-<text x="607.3703703703703" y="307">842694.26 events/s</text><path d="M230,337H630"/>
-<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">228k</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">455k</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">683k</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">910k</text>
+<rect class="s0" x="230" y="253" width="315.064824" height="14"/>
+<text x="552.064824" y="265">788k events/s</text>
+<rect class="s1" x="230" y="274" width="328.4287959999999" height="14"/>
+<text x="565.4287959999999" y="286">821k events/s</text>
+<rect class="s2" x="230" y="295" width="337.077704" height="14"/>
+<text x="574.077704" y="307">843k events/s</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">250,000</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">500,000</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">750,000</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">1,000,000</text>
 <text x="630" y="385" text-anchor="end">events/s</text></svg>

@@ -37,6 +37,6 @@
   <text x="367.33333333333337" y="166" class="note">206 MiB</text>
   <text x="204" y="217" text-anchor="end">asyncio tasks</text>
   <rect class="bar" x="220" y="202" width="5.666666666666657" height="14"/>
-  <text x="235.66666666666666" y="214" class="note">8.5 MiB</text>
+  <text x="235.66666666666666" y="214" class="note">8.50 MiB</text>
   <text x="220" y="278" class="note">MiB</text>
 </svg>

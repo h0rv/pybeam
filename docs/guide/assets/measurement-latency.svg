@@ -30,13 +30,13 @@
   <text x="204" y="115" text-anchor="end">worker</text>
   <rect class="bar" x="220" y="90" width="24.888888888888886" height="14"/>
   <path d="M244.88888888888889 97H252m0 -6v12"/>
-  <text x="262" y="102" class="note">28–36 µs</text>
+  <text x="262" y="102" class="note">28.0–36.0 µs</text>
   <rect class="bar-alt" x="220" y="112" width="36.44444444444446" height="14"/>
   <path d="M256.44444444444446 119H257.3333333333333m0 -6v12"/>
-  <text x="267.3333333333333" y="124" class="note">41–42 µs</text>
+  <text x="267.3333333333333" y="124" class="note">41.0–42.0 µs</text>
   <text x="204" y="169" text-anchor="end">isolated · both builds</text>
   <rect class="bar" x="220" y="154" width="46.22222222222223" height="14"/>
   <path d="M266.22222222222223 161H576.4444444444445m0 -6v12"/>
-  <text x="586.4444444444445" y="166" class="note">52–401 µs</text>
+  <text x="586.4444444444445" y="166" class="note">52.0–401 µs</text>
   <text x="220" y="230" class="note">µs</text>
 </svg>

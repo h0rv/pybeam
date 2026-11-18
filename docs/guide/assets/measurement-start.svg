@@ -31,12 +31,12 @@
   <text x="620" y="29" class="note" text-anchor="middle">100</text>
   <text x="204" y="70" text-anchor="end">Actors</text>
   <rect class="bar" x="220" y="55" width="338.02112417116064" height="14"/>
-  <text x="568.0211241711606" y="67" class="note">≈24 s</text>
+  <text x="568.0211241711606" y="67" class="note">≈24.0 s</text>
   <text x="204" y="118" text-anchor="end">Threads</text>
   <rect class="bar" x="220" y="103" width="207.91812460476245" height="14"/>
-  <text x="437.91812460476245" y="115" class="note">1.2 s</text>
+  <text x="437.91812460476245" y="115" class="note">1.20 s</text>
   <text x="204" y="166" text-anchor="end">asyncio tasks</text>
   <rect class="bar" x="220" y="151" width="47.71212547196626" height="14"/>
-  <text x="277.71212547196626" y="163" class="note">0.03 s</text>
+  <text x="277.71212547196626" y="163" class="note">30.0 ms</text>
   <text x="220" y="227" class="note">s · logarithmic scale</text>
 </svg>

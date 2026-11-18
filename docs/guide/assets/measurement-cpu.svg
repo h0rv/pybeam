@@ -34,13 +34,13 @@
   <text x="424.182137750539" y="102" class="note">2.86 s</text>
   <rect class="bar-alt" x="220" y="112" width="69.1351919837183" height="14"/>
   <path d="M289.1351919837183 119H304.46246074394486m0 -6v12"/>
-  <text x="314.46246074394486" y="124" class="note">0.33–0.43 s</text>
+  <text x="314.46246074394486" y="124" class="note">330–430 ms</text>
   <text x="204" y="179" text-anchor="end">8 jobs · isolated</text>
   <rect class="bar" x="220" y="154" width="72.54240591337009" height="14"/>
-  <text x="302.5424059133701" y="166" class="note">0.35 s</text>
+  <text x="302.5424059133701" y="166" class="note">350 ms</text>
   <rect class="bar-alt" x="220" y="176" width="67.35333044265411" height="14"/>
   <path d="M287.3533304426541 183H327.49066319785163m0 -6v12"/>
-  <text x="337.49066319785163" y="188" class="note">0.32–0.64 s</text>
+  <text x="337.49066319785163" y="188" class="note">320–640 ms</text>
   <text x="204" y="243" text-anchor="end">64 jobs · worker</text>
   <rect class="bar" x="220" y="218" width="314.64473097865175" height="14"/>
   <text x="544.6447309786518" y="230" class="note">22.9 s</text>

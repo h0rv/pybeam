@@ -31,28 +31,28 @@
   <text x="620" y="64" class="note" text-anchor="middle">100</text>
   <text x="204" y="115" text-anchor="end">10k · worker</text>
   <rect class="bar" x="220" y="90" width="69.1351919837183" height="14"/>
-  <text x="299.1351919837183" y="102" class="note">0.33 s</text>
+  <text x="299.1351919837183" y="102" class="note">330 ms</text>
   <rect class="bar-alt" x="220" y="112" width="42.96257263118923" height="14"/>
   <path d="M262.96257263118923 119H270.6948322282141m0 -6v12"/>
-  <text x="280.6948322282141" y="124" class="note">0.21–0.24 s</text>
+  <text x="280.6948322282141" y="124" class="note">210–240 ms</text>
   <text x="204" y="179" text-anchor="end">10k · isolated</text>
   <rect class="bar" x="220" y="154" width="37.167146793710515" height="14"/>
-  <text x="267.1671467937105" y="166" class="note">0.19 s</text>
+  <text x="267.1671467937105" y="166" class="note">190 ms</text>
   <rect class="bar-alt" x="220" y="176" width="30.72652285043651" height="14"/>
   <path d="M250.7265228504365 183H285.5148925112363m0 -6v12"/>
-  <text x="295.5148925112363" y="188" class="note">0.17–0.31 s</text>
+  <text x="295.5148925112363" y="188" class="note">170–310 ms</text>
   <text x="204" y="243" text-anchor="end">100k · worker</text>
   <rect class="bar" x="220" y="218" width="190.84850188786498" height="14"/>
-  <text x="420.848501887865" y="230" class="note">2.7 s</text>
+  <text x="420.848501887865" y="230" class="note">2.70 s</text>
   <rect class="bar-alt" x="220" y="240" width="186.3920011562717" height="14"/>
   <path d="M406.3920011562717 247H422.4685253170517m0 -6v12"/>
-  <text x="432.4685253170517" y="252" class="note">2.5–3.3 s</text>
+  <text x="432.4685253170517" y="252" class="note">2.50–3.30 s</text>
   <text x="204" y="307" text-anchor="end">100k · isolated</text>
   <rect class="bar" x="220" y="282" width="188.66311306277572" height="14"/>
-  <text x="418.6631130627757" y="294" class="note">2.6 s</text>
+  <text x="418.6631130627757" y="294" class="note">2.60 s</text>
   <rect class="bar-alt" x="220" y="304" width="164.05985618376985" height="14"/>
   <path d="M384.05985618376985 311H410.848501887865m0 -6v12"/>
-  <text x="420.848501887865" y="316" class="note">1.7–2.7 s</text>
+  <text x="420.848501887865" y="316" class="note">1.70–2.70 s</text>
   <text x="204" y="371" text-anchor="end">1M · worker</text>
   <rect class="bar" x="220" y="346" width="326.28773751229596" height="14"/>
   <text x="556.287737512296" y="358" class="note">28.0 s</text>

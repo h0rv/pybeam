@@ -4,18 +4,18 @@
 <text class="heading" x="20" y="29">Resident memory per raw context</text>
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
 <text x="215" y="112.5" text-anchor="end">Own-GIL</text>
-<rect class="s0" x="230" y="95" width="149.25373134328356" height="14"/>
-<path d="M379.25373134328356,102H386.16362631288007m0,-5v10"/>
-<text x="393.16362631288007" y="107">10.8–11.3 MiB</text>
-<rect class="s1" x="230" y="116" width="216.97070204532884" height="14"/>
-<path d="M446.97070204532884,123H453.88059701492534m0,-5v10"/>
-<text x="460.88059701492534" y="128">15.7–16.2 MiB</text>
+<rect class="s0" x="230" y="95" width="144" height="14"/>
+<path d="M374,102H380.66666666666674m0,-5v10"/>
+<text x="387.66666666666674" y="107">10.8–11.3 MiB</text>
+<rect class="s1" x="230" y="116" width="209.3333333333333" height="14"/>
+<path d="M439.33333333333326,123H446m0,-5v10"/>
+<text x="453" y="128">15.7–16.2 MiB</text>
 <text x="215" y="170.5" text-anchor="end">Isolated</text>
-<rect class="s0" x="230" y="153" width="294.3615257048093" height="14"/>
-<path d="M524.3615257048093,160H538.1813156440021m0,-5v10"/>
-<text x="545.1813156440021" y="165">21.3–22.3 MiB</text>
-<rect class="s1" x="230" y="174" width="355.1686014372581" height="14"/>
-<path d="M585.1686014372581,181H600.3703703703703m0,-5v10"/>
-<text x="607.3703703703703" y="186">25.7–26.8 MiB</text><path d="M230,216H630"/>
-<path d="M230,216v5"/><text x="230" y="240" text-anchor="start">0</text><path d="M330,216v5"/><text x="330" y="240" text-anchor="middle">7.24</text><path d="M430,216v5"/><text x="430" y="240" text-anchor="middle">14.5</text><path d="M530,216v5"/><text x="530" y="240" text-anchor="middle">21.7</text><path d="M630,216v5"/><text x="630" y="240" text-anchor="end">28.9</text>
+<rect class="s0" x="230" y="153" width="284.00000000000006" height="14"/>
+<path d="M514,160H527.3333333333333m0,-5v10"/>
+<text x="534.3333333333333" y="165">21.3–22.3 MiB</text>
+<rect class="s1" x="230" y="174" width="342.66666666666663" height="14"/>
+<path d="M572.6666666666666,181H587.3333333333333m0,-5v10"/>
+<text x="594.3333333333333" y="186">25.7–26.8 MiB</text><path d="M230,216H630"/>
+<path d="M230,216v5"/><text x="230" y="240" text-anchor="start">0</text><path d="M363.33333333333337,216v5"/><text x="363.33333333333337" y="240" text-anchor="middle">10</text><path d="M496.6666666666667,216v5"/><text x="496.6666666666667" y="240" text-anchor="middle">20</text><path d="M630,216v5"/><text x="630" y="240" text-anchor="end">30</text>
 <text x="630" y="264" text-anchor="end">MiB</text></svg>

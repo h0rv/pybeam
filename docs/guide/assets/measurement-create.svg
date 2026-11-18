@@ -30,10 +30,10 @@
   <text x="204" y="70" text-anchor="end">worker</text>
   <rect class="bar" x="220" y="55" width="5.519024687763334" height="14"/>
   <path d="M225.51902468776333 62H230.55749947301663m0 -6v12"/>
-  <text x="240.55749947301663" y="67" class="note">1.1–1.2 ms</text>
+  <text x="240.55749947301663" y="67" class="note">1.10–1.20 ms</text>
   <text x="204" y="118" text-anchor="end">isolated</text>
   <rect class="bar" x="220" y="103" width="238.04397800143562" height="14"/>
   <path d="M458.0439780014356 110H502.74319082744665m0 -6v12"/>
-  <text x="512.7431908274466" y="115" class="note">61–132 ms</text>
+  <text x="512.7431908274466" y="115" class="note">61.0–132 ms</text>
   <text x="220" y="179" class="note">ms · logarithmic scale</text>
 </svg>

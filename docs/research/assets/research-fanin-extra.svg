@@ -6,32 +6,32 @@
 <text x="215" y="102" text-anchor="end">10k spawn</text>
 <rect class="s0" x="230" y="95" width="40.13733275519752" height="14"/>
 <path d="M270.1373327551975,102H293.616167295955m0,-5v10"/>
-<text x="300.616167295955" y="107">0.02–0.03 s</text>
+<text x="300.616167295955" y="107">20.0–30.0 ms</text>
 <text x="215" y="139" text-anchor="end">100k spawn</text>
 <rect class="s0" x="230" y="132" width="184.02816556154744" height="14"/>
 <path d="M414.02816556154744,139H420.848501887865m0,-5v10"/>
-<text x="427.848501887865" y="144">0.24–0.27 s</text>
+<text x="427.848501887865" y="144">240–270 ms</text>
 <text x="215" y="176" text-anchor="end">1M spawn</text>
 <rect class="s0" x="230" y="169" width="317.3614988948808" height="14"/>
 <path d="M547.3614988948808,176H560.2828339626217m0,-5v10"/>
-<text x="567.2828339626217" y="181">2.4–3 s</text>
+<text x="567.2828339626217" y="181">2.40–3.00 s</text>
 <text x="215" y="223.5" text-anchor="end">10k own-GIL</text>
 <rect class="s0" x="230" y="206" width="99.75840360082674" height="14"/>
-<text x="336.75840360082674" y="218">0.056 s</text>
+<text x="336.75840360082674" y="218">56.0 ms</text>
 <rect class="s1" x="230" y="227" width="103.75350005115251" height="14"/>
 <path d="M333.7535000511525,234H340.1433070267768m0,-5v10"/>
-<text x="347.1433070267768" y="239">0.06–0.067 s</text>
+<text x="347.1433070267768" y="239">60.0–67.0 ms</text>
 <text x="215" y="281.5" text-anchor="end">100k own-GIL</text>
 <rect class="s0" x="230" y="264" width="226.52933391146917" height="14"/>
-<text x="463.52933391146917" y="276">0.5 s</text>
+<text x="463.52933391146917" y="276">500 ms</text>
 <rect class="s1" x="230" y="285" width="249.23089596413013" height="14"/>
 <path d="M479.2308959641301,292H486.57057147491753m0,-5v10"/>
-<text x="493.57057147491753" y="297">0.74–0.84 s</text>
+<text x="493.57057147491753" y="297">740–840 ms</text>
 <text x="215" y="339.5" text-anchor="end">1M own-GIL</text>
 <rect class="s0" x="230" y="322" width="364.3191679763959" height="14"/>
-<text x="601.3191679763959" y="334">5.4 s</text>
+<text x="601.3191679763959" y="334">5.40 s</text>
 <rect class="s1" x="230" y="343" width="368.4570658083917" height="14"/>
 <path d="M598.4570658083917,350H621.266460165809m0,-5v10"/>
-<text x="628.266460165809" y="355">5.8–8.6 s</text><path d="M230,385H630"/>
+<text x="628.266460165809" y="355">5.80–8.60 s</text><path d="M230,385H630"/>
 <path d="M230,385v5"/><text x="230" y="409" text-anchor="start">0.01</text><path d="M363.3333333333333,385v5"/><text x="363.3333333333333" y="409" text-anchor="middle">0.1</text><path d="M496.66666666666663,385v5"/><text x="496.66666666666663" y="409" text-anchor="middle">1</text><path d="M630,385v5"/><text x="630" y="409" text-anchor="end">10</text>
 <text x="630" y="433" text-anchor="end">s · log scale</text></svg>

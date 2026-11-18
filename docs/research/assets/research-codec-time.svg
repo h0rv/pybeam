@@ -5,14 +5,14 @@
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
 <text x="215" y="112.5" text-anchor="end">32 · pickle</text>
 <rect class="s0" x="230" y="95" width="51.47621411889497" height="14"/>
-<text x="288.476214118895" y="107">4.4 µs</text>
+<text x="288.476214118895" y="107">4.40 µs</text>
 <rect class="s1" x="230" y="116" width="58.59150078583747" height="14"/>
-<text x="295.59150078583747" y="128">5.4 µs</text>
+<text x="295.59150078583747" y="128">5.40 µs</text>
 <text x="215" y="170.5" text-anchor="end">32 · marshal</text>
 <rect class="s0" x="230" y="153" width="41.48111519023098" height="14"/>
-<text x="278.481115190231" y="165">3.3 µs</text>
+<text x="278.481115190231" y="165">3.30 µs</text>
 <rect class="s1" x="230" y="174" width="43.525443548022054" height="14"/>
-<text x="280.52544354802205" y="186">3.5 µs</text>
+<text x="280.52544354802205" y="186">3.50 µs</text>
 <text x="215" y="228.5" text-anchor="end">32 · JSON</text>
 <rect class="s0" x="230" y="211" width="87.19240891515187" height="14"/>
 <text x="324.1924089151519" y="223">12.3 µs</text>
@@ -35,18 +35,18 @@
 <text x="476.650815567804" y="418">990 µs</text>
 <text x="215" y="460.5" text-anchor="end">33,000 · pickle</text>
 <rect class="s0" x="230" y="443" width="295.2156864022811" height="14"/>
-<text x="532.2156864022811" y="455">4900 µs</text>
+<text x="532.2156864022811" y="455">4.90 ms</text>
 <rect class="s1" x="230" y="464" width="297.9420695680632" height="14"/>
-<text x="534.9420695680632" y="476">5300 µs</text>
+<text x="534.9420695680632" y="476">5.30 ms</text>
 <text x="215" y="518.5" text-anchor="end">33,000 · marshal</text>
 <rect class="s0" x="230" y="501" width="281.481115190231" height="14"/>
-<text x="518.481115190231" y="513">3300 µs</text>
+<text x="518.481115190231" y="513">3.30 ms</text>
 <rect class="s1" x="230" y="522" width="284.504200061383" height="14"/>
-<text x="521.504200061383" y="534">3600 µs</text>
+<text x="521.504200061383" y="534">3.60 ms</text>
 <text x="215" y="576.5" text-anchor="end">33,000 · JSON</text>
 <rect class="s0" x="230" y="559" width="324.2462754786736" height="14"/>
-<text x="561.2462754786736" y="571">11300 µs</text>
+<text x="561.2462754786736" y="571">11.3 ms</text>
 <rect class="s1" x="230" y="580" width="325.1566391381534" height="14"/>
-<text x="562.1566391381534" y="592">11600 µs</text><path d="M230,622H630"/>
+<text x="562.1566391381534" y="592">11.6 ms</text><path d="M230,622H630"/>
 <path d="M230,622v5"/><text x="230" y="646" text-anchor="start">1</text><path d="M310,622v5"/><text x="310" y="646" text-anchor="middle">10</text><path d="M390,622v5"/><text x="390" y="646" text-anchor="middle">100</text><path d="M470,622v5"/><text x="470" y="646" text-anchor="middle">1k</text><path d="M550,622v5"/><text x="550" y="646" text-anchor="middle">10k</text><path d="M630,622v5"/><text x="630" y="646" text-anchor="end">100k</text>
 <text x="630" y="670" text-anchor="end">µs · log scale</text></svg>

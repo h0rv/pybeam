@@ -4,25 +4,25 @@
 <text class="heading" x="20" y="29">Python corrected smoke latency</text>
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">p50</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">p95</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">p99</text>
 <text x="215" y="123" text-anchor="end">Trial 0</text>
-<rect class="s0" x="230" y="95" width="125.6492483578889" height="14"/>
-<text x="362.6492483578889" y="107">60.5 µs</text>
-<rect class="s1" x="230" y="116" width="333.6787130027865" height="14"/>
-<text x="570.6787130027865" y="128">160.666 µs</text>
-<rect class="s2" x="230" y="137" width="370.3703703703703" height="14"/>
-<text x="607.3703703703703" y="149">178.333 µs</text>
+<rect class="s0" x="230" y="95" width="120.99999999999997" height="14"/>
+<text x="358" y="107">60.5 µs</text>
+<rect class="s1" x="230" y="116" width="321.332" height="14"/>
+<text x="558.332" y="128">161 µs</text>
+<rect class="s2" x="230" y="137" width="356.666" height="14"/>
+<text x="593.6659999999999" y="149">178 µs</text>
 <text x="215" y="202" text-anchor="end">Trial 1</text>
-<rect class="s0" x="230" y="174" width="103.41036982208277" height="14"/>
-<text x="340.41036982208277" y="186">49.792 µs</text>
-<rect class="s1" x="230" y="195" width="264.4511692752904" height="14"/>
-<text x="501.4511692752904" y="207">127.333 µs</text>
-<rect class="s2" x="230" y="216" width="278.1251304519572" height="14"/>
-<text x="515.1251304519571" y="228">133.917 µs</text>
+<rect class="s0" x="230" y="174" width="99.58400000000005" height="14"/>
+<text x="336.58400000000006" y="186">49.8 µs</text>
+<rect class="s1" x="230" y="195" width="254.666" height="14"/>
+<text x="491.666" y="207">127 µs</text>
+<rect class="s2" x="230" y="216" width="267.834" height="14"/>
+<text x="504.83399999999995" y="228">134 µs</text>
 <text x="215" y="281" text-anchor="end">Trial 2</text>
-<rect class="s0" x="230" y="253" width="97.09260100382323" height="14"/>
-<text x="334.09260100382323" y="265">46.75 µs</text>
-<rect class="s1" x="230" y="274" width="249.30680036577428" height="14"/>
-<text x="486.3068003657743" y="286">120.041 µs</text>
-<rect class="s2" x="230" y="295" width="255.36496329899683" height="14"/>
-<text x="492.3649632989968" y="307">122.958 µs</text><path d="M230,337H630"/>
-<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">48.1</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">96.3</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">144</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">193</text>
+<rect class="s0" x="230" y="253" width="93.49999999999999" height="14"/>
+<text x="330.5" y="265">46.8 µs</text>
+<rect class="s1" x="230" y="274" width="240.082" height="14"/>
+<text x="477.082" y="286">120 µs</text>
+<rect class="s2" x="230" y="295" width="245.91600000000005" height="14"/>
+<text x="482.91600000000005" y="307">123 µs</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">50</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">100</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">150</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">200</text>
 <text x="630" y="385" text-anchor="end">µs</text></svg>

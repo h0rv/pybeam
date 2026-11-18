@@ -4,25 +4,25 @@
 <text class="heading" x="20" y="29">Erlang OTP current smoke latency</text>
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">p50</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">p95</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">p99</text>
 <text x="215" y="123" text-anchor="end">Trial 0</text>
-<rect class="s0" x="230" y="95" width="54" height="14"/>
-<text x="291" y="107">2.916 µs</text>
-<rect class="s1" x="230" y="116" width="324.85185185185185" height="14"/>
-<text x="561.8518518518518" y="128">17.542 µs</text>
-<rect class="s2" x="230" y="137" width="370.3703703703703" height="14"/>
-<text x="607.3703703703703" y="149">20 µs</text>
+<rect class="s0" x="230" y="95" width="46.656000000000006" height="14"/>
+<text x="283.656" y="107">2.92 µs</text>
+<rect class="s1" x="230" y="116" width="280.672" height="14"/>
+<text x="517.672" y="128">17.5 µs</text>
+<rect class="s2" x="230" y="137" width="320" height="14"/>
+<text x="557" y="149">20.0 µs</text>
 <text x="215" y="202" text-anchor="end">Trial 1</text>
-<rect class="s0" x="230" y="174" width="52.46296296296299" height="14"/>
-<text x="289.462962962963" y="186">2.833 µs</text>
-<rect class="s1" x="230" y="195" width="319.44444444444434" height="14"/>
-<text x="556.4444444444443" y="207">17.25 µs</text>
-<rect class="s2" x="230" y="216" width="369.5925925925925" height="14"/>
-<text x="606.5925925925925" y="228">19.958 µs</text>
+<rect class="s0" x="230" y="174" width="45.32800000000003" height="14"/>
+<text x="282.32800000000003" y="186">2.83 µs</text>
+<rect class="s1" x="230" y="195" width="275.99999999999994" height="14"/>
+<text x="513" y="207">17.3 µs</text>
+<rect class="s2" x="230" y="216" width="319.328" height="14"/>
+<text x="556.328" y="228">20.0 µs</text>
 <text x="215" y="281" text-anchor="end">Trial 2</text>
-<rect class="s0" x="230" y="253" width="53.24074074074076" height="14"/>
-<text x="290.24074074074076" y="265">2.875 µs</text>
-<rect class="s1" x="230" y="274" width="305.55555555555554" height="14"/>
-<text x="542.5555555555555" y="286">16.5 µs</text>
-<rect class="s2" x="230" y="295" width="357.24074074074065" height="14"/>
-<text x="594.2407407407406" y="307">19.291 µs</text><path d="M230,337H630"/>
-<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M330,337v5"/><text x="330" y="361" text-anchor="middle">5.4</text><path d="M430,337v5"/><text x="430" y="361" text-anchor="middle">10.8</text><path d="M530,337v5"/><text x="530" y="361" text-anchor="middle">16.2</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">21.6</text>
+<rect class="s0" x="230" y="253" width="46.00000000000002" height="14"/>
+<text x="283" y="265">2.88 µs</text>
+<rect class="s1" x="230" y="274" width="264" height="14"/>
+<text x="501" y="286">16.5 µs</text>
+<rect class="s2" x="230" y="295" width="308.65599999999995" height="14"/>
+<text x="545.656" y="307">19.3 µs</text><path d="M230,337H630"/>
+<path d="M230,337v5"/><text x="230" y="361" text-anchor="start">0</text><path d="M310,337v5"/><text x="310" y="361" text-anchor="middle">5</text><path d="M390,337v5"/><text x="390" y="361" text-anchor="middle">10</text><path d="M470,337v5"/><text x="470" y="361" text-anchor="middle">15</text><path d="M550,337v5"/><text x="550" y="361" text-anchor="middle">20</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">25</text>
 <text x="630" y="385" text-anchor="end">µs</text></svg>

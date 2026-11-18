@@ -30,8 +30,8 @@
   <text x="204" y="115" text-anchor="end">Empty method</text>
   <rect class="bar" x="220" y="90" width="164" height="14"/>
   <path d="M384 97H548m0 -6v12"/>
-  <text x="558" y="102" class="note">0.41–0.82 ms</text>
+  <text x="558" y="102" class="note">0.410–0.820 ms</text>
   <rect class="bar-alt" x="220" y="112" width="244" height="14"/>
-  <text x="474" y="124" class="note">0.61 ms</text>
+  <text x="474" y="124" class="note">0.610 ms</text>
   <text x="220" y="182" class="note">ms</text>
 </svg>

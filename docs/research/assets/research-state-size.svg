@@ -7,16 +7,16 @@
 <rect class="s0" x="230" y="95" width="44.21345728897546" height="14"/>
 <text x="281.21345728897546" y="107">357 bytes</text>
 <rect class="s1" x="230" y="116" width="83.31141481265797" height="14"/>
-<text x="320.311414812658" y="128">1100 bytes</text>
+<text x="320.311414812658" y="128">1.10k bytes</text>
 <text x="215" y="170.5" text-anchor="end">3,300 entries</text>
 <rect class="s0" x="230" y="153" width="206.83685836068003" height="14"/>
-<text x="443.83685836068" y="165">38500 bytes</text>
+<text x="443.83685836068" y="165">38.5k bytes</text>
 <rect class="s1" x="230" y="174" width="244.55238810691782" height="14"/>
-<text x="481.5523881069178" y="186">114000 bytes</text>
+<text x="481.5523881069178" y="186">114k bytes</text>
 <text x="215" y="228.5" text-anchor="end">33,000 entries</text>
 <rect class="s0" x="230" y="211" width="289.69410254200284" height="14"/>
-<text x="526.6941025420028" y="223">418000 bytes</text>
+<text x="526.6941025420028" y="223">418k bytes</text>
 <rect class="s1" x="230" y="232" width="326.33449968381" height="14"/>
-<text x="563.33449968381" y="244">1200000 bytes</text><path d="M230,274H630"/>
+<text x="563.33449968381" y="244">1.20M bytes</text><path d="M230,274H630"/>
 <path d="M230,274v5"/><text x="230" y="298" text-anchor="start">100</text><path d="M310,274v5"/><text x="310" y="298" text-anchor="middle">1k</text><path d="M390,274v5"/><text x="390" y="298" text-anchor="middle">10k</text><path d="M470,274v5"/><text x="470" y="298" text-anchor="middle">100k</text><path d="M550,274v5"/><text x="550" y="298" text-anchor="middle">1M</text><path d="M630,274v5"/><text x="630" y="298" text-anchor="end">10M</text>
 <text x="630" y="322" text-anchor="end">bytes · log scale</text></svg>

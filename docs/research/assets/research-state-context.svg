@@ -5,34 +5,34 @@
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">GIL</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Free-threaded</text>
 <text x="215" y="112.5" text-anchor="end">32 · pinned</text>
 <rect class="s0" x="230" y="95" width="57.51516855453167" height="14"/>
-<text x="294.51516855453167" y="107">27 µs</text>
+<text x="294.51516855453167" y="107">27.0 µs</text>
 <rect class="s1" x="230" y="116" width="83.09990538638675" height="14"/>
 <path d="M313.09990538638675,123H317.0950018367125m0,-5v10"/>
-<text x="324.0950018367125" y="128">42–45 µs</text>
+<text x="324.0950018367125" y="128">42.0–45.0 µs</text>
 <text x="215" y="170.5" text-anchor="end">32 · ETS transfer</text>
 <rect class="s0" x="230" y="153" width="59.62107084562922" height="14"/>
-<text x="296.6210708456292" y="165">28 µs</text>
+<text x="296.6210708456292" y="165">28.0 µs</text>
 <rect class="s1" x="230" y="174" width="85.79369019815829" height="14"/>
 <path d="M315.7936901981583,181H317.0950018367125m0,-5v10"/>
-<text x="324.0950018367125" y="186">44–45 µs</text>
+<text x="324.0950018367125" y="186">44.0–45.0 µs</text>
 <text x="215" y="228.5" text-anchor="end">32 · ETS copy</text>
 <rect class="s0" x="230" y="211" width="72.54240591337009" height="14"/>
-<text x="309.5424059133701" y="223">35 µs</text>
+<text x="309.5424059133701" y="223">35.0 µs</text>
 <rect class="s1" x="230" y="232" width="98.71502526589916" height="14"/>
 <path d="M328.71502526589916,239H331.790399141725m0,-5v10"/>
-<text x="338.790399141725" y="244">55–58 µs</text>
+<text x="338.790399141725" y="244">55.0–58.0 µs</text>
 <text x="215" y="286.5" text-anchor="end">3,300 · pinned</text>
 <rect class="s0" x="230" y="269" width="57.51516855453167" height="14"/>
-<text x="294.51516855453167" y="281">27 µs</text>
+<text x="294.51516855453167" y="281">27.0 µs</text>
 <rect class="s1" x="230" y="290" width="83.09990538638675" height="14"/>
 <path d="M313.09990538638675,297H315.7936901981583m0,-5v10"/>
-<text x="322.7936901981583" y="302">42–44 µs</text>
+<text x="322.7936901981583" y="302">42.0–44.0 µs</text>
 <text x="215" y="344.5" text-anchor="end">3,300 · ETS transfer</text>
 <rect class="s0" x="230" y="327" width="63.616167295954995" height="14"/>
-<text x="300.616167295955" y="339">30 µs</text>
+<text x="300.616167295955" y="339">30.0 µs</text>
 <rect class="s1" x="230" y="348" width="89.61304772476234" height="14"/>
 <path d="M319.61304772476234,355H320.83216498341164m0,-5v10"/>
-<text x="327.83216498341164" y="360">47–48 µs</text>
+<text x="327.83216498341164" y="360">47.0–48.0 µs</text>
 <text x="215" y="402.5" text-anchor="end">3,300 · ETS copy</text>
 <rect class="s0" x="230" y="385" width="235.12373247505832" height="14"/>
 <text x="472.1237324750583" y="397">580 µs</text>
@@ -41,21 +41,21 @@
 <text x="475.98555859976716" y="418">590–620 µs</text>
 <text x="215" y="460.5" text-anchor="end">33,000 · pinned</text>
 <rect class="s0" x="230" y="443" width="57.51516855453167" height="14"/>
-<text x="294.51516855453167" y="455">27 µs</text>
+<text x="294.51516855453167" y="455">27.0 µs</text>
 <rect class="s1" x="230" y="464" width="85.79369019815829" height="14"/>
 <path d="M315.7936901981583,471H317.0950018367125m0,-5v10"/>
-<text x="324.0950018367125" y="476">44–45 µs</text>
+<text x="324.0950018367125" y="476">44.0–45.0 µs</text>
 <text x="215" y="518.5" text-anchor="end">33,000 · ETS transfer</text>
 <rect class="s0" x="230" y="501" width="230.9858346430625" height="14"/>
 <text x="467.9858346430625" y="513">540 µs</text>
 <rect class="s1" x="230" y="522" width="130.36314737184637" height="14"/>
 <path d="M360.36314737184637,529H362.75135927967335m0,-5v10"/>
-<text x="369.75135927967335" y="534">95–99 µs</text>
+<text x="369.75135927967335" y="534">95.0–99.0 µs</text>
 <text x="215" y="576.5" text-anchor="end">33,000 · ETS copy</text>
 <rect class="s0" x="230" y="559" width="392.5976896200225" height="14"/>
-<text x="629.5976896200225" y="571">8800 µs</text>
+<text x="629.5976896200225" y="571">8.80 ms</text>
 <rect class="s1" x="230" y="580" width="376.80997369344345" height="14"/>
 <path d="M606.8099736934435,587H615.6126136920641m0,-5v10"/>
-<text x="622.6126136920641" y="592">6700–7800 µs</text><path d="M230,622H630"/>
+<text x="622.6126136920641" y="592">6.70–7.80 ms</text><path d="M230,622H630"/>
 <path d="M230,622v5"/><text x="230" y="646" text-anchor="start">10</text><path d="M363.3333333333333,622v5"/><text x="363.3333333333333" y="646" text-anchor="middle">100</text><path d="M496.66666666666663,622v5"/><text x="496.66666666666663" y="646" text-anchor="middle">1k</text><path d="M630,622v5"/><text x="630" y="646" text-anchor="end">10k</text>
 <text x="630" y="670" text-anchor="end">µs · log scale</text></svg>

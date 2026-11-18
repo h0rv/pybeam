@@ -5,21 +5,21 @@
 
 <text x="215" y="72" text-anchor="end">Worker · GIL</text>
 <rect class="s0" x="230" y="65" width="16.73083542674587" height="14"/>
-<text x="253.73083542674587" y="77">1.335 ms</text>
+<text x="253.73083542674587" y="77">1.33 ms</text>
 <text x="215" y="109" text-anchor="end">Worker · free</text>
 <rect class="s0" x="230" y="102" width="24.852162092732414" height="14"/>
-<text x="261.85216209273244" y="114">1.536 ms</text>
+<text x="261.85216209273244" y="114">1.54 ms</text>
 <text x="215" y="146" text-anchor="end">Own-GIL · GIL</text>
 <rect class="s0" x="230" y="139" width="252.69352997051908" height="14"/>
-<text x="489.6935299705191" y="151">78.56 ms</text>
+<text x="489.6935299705191" y="151">78.6 ms</text>
 <text x="215" y="183" text-anchor="end">Own-GIL · free</text>
 <rect class="s0" x="230" y="176" width="338.409270526146" height="14"/>
-<text x="575.409270526146" y="188">345.199 ms</text>
+<text x="575.409270526146" y="188">345 ms</text>
 <text x="215" y="220" text-anchor="end">Isolated · GIL</text>
 <rect class="s0" x="230" y="213" width="260.6074737806102" height="14"/>
-<text x="497.6074737806102" y="225">90.065 ms</text>
+<text x="497.6074737806102" y="225">90.1 ms</text>
 <text x="215" y="257" text-anchor="end">Isolated · free</text>
 <rect class="s0" x="230" y="250" width="334.1046226659264" height="14"/>
-<text x="571.1046226659264" y="262">320.468 ms</text><path d="M230,292H630"/>
+<text x="571.1046226659264" y="262">320 ms</text><path d="M230,292H630"/>
 <path d="M230,292v5"/><text x="230" y="316" text-anchor="start">1</text><path d="M363.3333333333333,292v5"/><text x="363.3333333333333" y="316" text-anchor="middle">10</text><path d="M496.66666666666663,292v5"/><text x="496.66666666666663" y="316" text-anchor="middle">100</text><path d="M630,292v5"/><text x="630" y="316" text-anchor="end">1k</text>
 <text x="630" y="340" text-anchor="end">ms · log scale</text></svg>

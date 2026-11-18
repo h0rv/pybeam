@@ -4,17 +4,17 @@
 <text class="heading" x="20" y="29">Blocking HTTP requests inside actor methods</text>
 
 <text x="215" y="72" text-anchor="end">10 serial requests</text>
-<rect class="s0" x="230" y="65" width="344.3794671864848" height="14"/>
-<path d="M574.3794671864848,72H600.3703703703703m0,-5v10"/>
-<text x="607.3703703703703" y="77">0.53–0.57 s</text>
+<rect class="s0" x="230" y="65" width="353.33333333333337" height="14"/>
+<path d="M583.3333333333334,72H609.9999999999999m0,-5v10"/>
+<text x="616.9999999999999" y="77">530–570 ms</text>
 <text x="215" y="109" text-anchor="end">10 executor requests</text>
-<rect class="s0" x="230" y="102" width="35.73749187784273" height="14"/>
-<text x="272.73749187784273" y="114">0.055 s</text>
+<rect class="s0" x="230" y="102" width="36.666666666666636" height="14"/>
+<text x="273.66666666666663" y="114">55.0 ms</text>
 <text x="215" y="146" text-anchor="end">10 to_thread requests</text>
-<rect class="s0" x="230" y="139" width="35.73749187784273" height="14"/>
-<text x="272.73749187784273" y="151">0.055 s</text>
+<rect class="s0" x="230" y="139" width="36.666666666666636" height="14"/>
+<text x="273.66666666666663" y="151">55.0 ms</text>
 <text x="215" y="183" text-anchor="end">10 actors × 10 requests</text>
-<rect class="s0" x="230" y="176" width="305.39311241065616" height="14"/>
-<text x="542.3931124106562" y="188">0.47 s</text><path d="M230,218H630"/>
-<path d="M230,218v5"/><text x="230" y="242" text-anchor="start">0</text><path d="M330,218v5"/><text x="330" y="242" text-anchor="middle">0.154</text><path d="M430,218v5"/><text x="430" y="242" text-anchor="middle">0.308</text><path d="M530,218v5"/><text x="530" y="242" text-anchor="middle">0.462</text><path d="M630,218v5"/><text x="630" y="242" text-anchor="end">0.616</text>
+<rect class="s0" x="230" y="176" width="313.33333333333314" height="14"/>
+<text x="550.3333333333331" y="188">470 ms</text><path d="M230,218H630"/>
+<path d="M230,218v5"/><text x="230" y="242" text-anchor="start">0</text><path d="M363.3333333333333,218v5"/><text x="363.3333333333333" y="242" text-anchor="middle">0.2</text><path d="M496.66666666666663,218v5"/><text x="496.66666666666663" y="242" text-anchor="middle">0.4</text><path d="M630,218v5"/><text x="630" y="242" text-anchor="end">0.6</text>
 <text x="630" y="266" text-anchor="end">s</text></svg>

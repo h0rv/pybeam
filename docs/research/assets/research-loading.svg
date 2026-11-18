@@ -4,18 +4,18 @@
 <text class="heading" x="20" y="29">Plain-thread checksum completion wall time</text>
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">N=1</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">N=4</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">N=8</text>
 <text x="215" y="123" text-anchor="end">Direct file · immortal</text>
-<rect class="s0" x="230" y="95" width="29.62962962962962" height="14"/>
-<text x="266.6296296296296" y="107">276 ms</text>
-<rect class="s1" x="230" y="116" width="33.279656468062285" height="14"/>
-<text x="270.2796564680623" y="128">310 ms</text>
-<rect class="s2" x="230" y="137" width="47.879763821792835" height="14"/>
-<text x="284.87976382179284" y="149">446 ms</text>
+<rect class="s0" x="230" y="95" width="27.599999999999994" height="14"/>
+<text x="264.6" y="107">276 ms</text>
+<rect class="s1" x="230" y="116" width="31.00000000000002" height="14"/>
+<text x="268" y="128">310 ms</text>
+<rect class="s2" x="230" y="137" width="44.60000000000003" height="14"/>
+<text x="281.6" y="149">446 ms</text>
 <text x="215" y="202" text-anchor="end">run_path · mortal</text>
-<rect class="s0" x="230" y="174" width="35.963499731615684" height="14"/>
-<text x="272.9634997316157" y="186">335 ms</text>
-<rect class="s1" x="230" y="195" width="178.09983896940412" height="14"/>
-<text x="415.0998389694041" y="207">1659 ms</text>
-<rect class="s2" x="230" y="216" width="370.3703703703703" height="14"/>
-<text x="607.3703703703703" y="228">3450 ms</text><path d="M230,258H630"/>
-<path d="M230,258v5"/><text x="230" y="282" text-anchor="start">0</text><path d="M330,258v5"/><text x="330" y="282" text-anchor="middle">932</text><path d="M430,258v5"/><text x="430" y="282" text-anchor="middle">1.86k</text><path d="M530,258v5"/><text x="530" y="282" text-anchor="middle">2.79k</text><path d="M630,258v5"/><text x="630" y="282" text-anchor="end">3.73k</text>
+<rect class="s0" x="230" y="174" width="33.500000000000014" height="14"/>
+<text x="270.5" y="186">335 ms</text>
+<rect class="s1" x="230" y="195" width="165.89999999999995" height="14"/>
+<text x="402.9" y="207">1.66 s</text>
+<rect class="s2" x="230" y="216" width="345" height="14"/>
+<text x="582" y="228">3.45 s</text><path d="M230,258H630"/>
+<path d="M230,258v5"/><text x="230" y="282" text-anchor="start">0</text><path d="M330,258v5"/><text x="330" y="282" text-anchor="middle">1,000</text><path d="M430,258v5"/><text x="430" y="282" text-anchor="middle">2,000</text><path d="M530,258v5"/><text x="530" y="282" text-anchor="middle">3,000</text><path d="M630,258v5"/><text x="630" y="282" text-anchor="end">4,000</text>
 <text x="630" y="306" text-anchor="end">ms</text></svg>

@@ -5,24 +5,24 @@
 <rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">Trial 0</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">Trial 1</text><rect class="s2" x="540" y="49" width="14" height="14"/><text x="561" y="61">Trial 2</text>
 <text x="215" y="123" text-anchor="end">Python</text>
 <rect class="s0" x="230" y="95" width="217.27108551569916" height="14"/>
-<text x="454.27108551569916" y="107">42612.12 events/s</text>
+<text x="454.27108551569916" y="107">42.6k events/s</text>
 <rect class="s1" x="230" y="116" width="227.14421512363072" height="14"/>
-<text x="464.1442151236307" y="128">50533.76 events/s</text>
+<text x="464.1442151236307" y="128">50.5k events/s</text>
 <rect class="s2" x="230" y="137" width="230.01995236278225" height="14"/>
-<text x="467.01995236278225" y="149">53106.74 events/s</text>
+<text x="467.01995236278225" y="149">53.1k events/s</text>
 <text x="215" y="202" text-anchor="end">Legacy raw PyBEAM</text>
 <rect class="s0" x="230" y="174" width="123.96229454836049" height="14"/>
-<text x="360.9622945483605" y="186">8505.84 events/s</text>
+<text x="360.9622945483605" y="186">8.51k events/s</text>
 <rect class="s1" x="230" y="195" width="121.551733027448" height="14"/>
-<text x="358.551733027448" y="207">8159.02 events/s</text>
+<text x="358.551733027448" y="207">8.16k events/s</text>
 <rect class="s2" x="230" y="216" width="138.84967322933335" height="14"/>
-<text x="375.84967322933335" y="228">10999.49 events/s</text>
+<text x="375.84967322933335" y="228">11.0k events/s</text>
 <text x="215" y="281" text-anchor="end">Erlang OTP</text>
 <rect class="s0" x="230" y="253" width="392.1805127448947" height="14"/>
-<text x="629.1805127448947" y="265">873682.92 events/s</text>
+<text x="629.1805127448947" y="265">874k events/s</text>
 <rect class="s1" x="230" y="274" width="389.80554806473685" height="14"/>
-<text x="626.8055480647369" y="286">838574.42 events/s</text>
+<text x="626.8055480647369" y="286">839k events/s</text>
 <rect class="s2" x="230" y="295" width="384.807553083661" height="14"/>
-<text x="621.807553083661" y="307">769230.77 events/s</text><path d="M230,337H630"/>
+<text x="621.807553083661" y="307">769k events/s</text><path d="M230,337H630"/>
 <path d="M230,337v5"/><text x="230" y="361" text-anchor="start">1k</text><path d="M363.3333333333333,337v5"/><text x="363.3333333333333" y="361" text-anchor="middle">10k</text><path d="M496.66666666666663,337v5"/><text x="496.66666666666663" y="361" text-anchor="middle">100k</text><path d="M630,337v5"/><text x="630" y="361" text-anchor="end">1M</text>
 <text x="630" y="385" text-anchor="end">events/s · log scale</text></svg>
