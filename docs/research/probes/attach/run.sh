@@ -6,6 +6,11 @@ if [[ "${PYBEAM_ATTACH_MISE:-}" != 1 ]]; then
     exec mise exec -- env PYBEAM_ATTACH_MISE=1 bash "$ROOT/docs/research/probes/attach/run.sh"
 fi
 PYTHON="$(uv run --locked python -c 'import sys; print(sys.executable)')"
+COOKIE="$("$PYTHON" -c 'import secrets; print(secrets.token_hex(32))')"
+export ERL_EPMD_ADDRESS=127.0.0.1
+export ERL_EPMD_PORT
+ERL_EPMD_PORT="$("$PYTHON" -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+trap 'epmd -kill >/dev/null 2>&1 || true' EXIT
 export PYTHONHOME
 PYTHONHOME="$("$PYTHON" -c 'import sys; print(sys.base_prefix)')"
 export LD_LIBRARY_PATH="$PYTHONHOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -17,5 +22,6 @@ ebins=()
 for path in "${paths[@]}"; do
     [[ ! -d "$path" ]] || ebins+=("$path")
 done
-exec erl +S 2:2 +SDcpu 2 +SDio 2 -noshell -sname host -setcookie pybeam_probe \
+erl +S 2:2 +SDcpu 2 +SDio 2 -noshell -sname host -setcookie "$COOKIE" \
+    -kernel inet_dist_use_interface '{127,0,0,1}' \
     -pa "${ebins[@]}" -eval "$(< "$ROOT/docs/research/probes/attach/host.eval")"

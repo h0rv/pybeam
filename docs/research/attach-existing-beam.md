@@ -28,7 +28,9 @@ bash docs/research/probes/attach/run_join.sh
 ```
 
 These are native development probes, not public startup APIs. They use local
-named nodes and a fixed test cookie; do not run them against a real cluster.
+named nodes with a fresh random cookie per run, never printed. Distribution and
+a dedicated ephemeral-port epmd listen only on loopback; an already-running epmd
+is not reused. Do not run these probes against a real cluster.
 The Join probe generates its development-runtime configuration under `_build`.
 
 ## Embed
@@ -62,7 +64,7 @@ Rerun every result in this table with
 | Direct `erlang.send` to a remote PID fails; Python receives `None` instead of a PID wrapper. | Native conversion handles only local PIDs, then falls back to `None`; the send binding requires a PID wrapper. See the runtime source references below. |
 | Direct `erlang.send` to `{Name, Node}` also fails. | The same binding rejects tuple destinations. An explicit scratch Erlang callback retains the remote PID and successfully forwards the push: [bridge](probes/attach/join_probe.erl#L13). |
 | Killing the worker after Python announces execution produces `{erpc,noconnection}` and `nodedown`; the host survives. | The probe waits for the start message, kills only the worker, and observes both RPC failure and the node monitor: [failure probe](probes/attach/join_probe.erl#L35). |
-| A waiting `pybeam.run` VM accepts a host connection and runs the same work. | `ERL_FLAGS` supplies a node name and cookie. The host loads the scratch facade and calls it while the managed entry waits: [managed probe](probes/attach/join_probe.erl#L64). |
+| A waiting `pybeam.run` VM accepts a host connection and runs the same work. | `ERL_FLAGS` supplies a node name, the run's random cookie, and `-kernel inet_dist_use_interface {127,0,0,1}`; it inherits the loopback-only epmd settings. The host loads the scratch facade and calls it while the managed entry waits: [managed probe](probes/attach/join_probe.erl#L65). |
 
 The managed probe observes `PYBEAM_DISTRIBUTION` absent and
 `dist_auto_connect` unset. The existing two-node

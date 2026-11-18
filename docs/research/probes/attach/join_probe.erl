@@ -26,7 +26,8 @@ run() ->
     io:format("host: no erlang_python application or py module~n"),
     true = register(probe_receiver, self()),
     Paths = string:split(os:getenv("PROBE_EBINS"), ":", all),
-    Args = ["+S", "2:2", "+SDcpu", "2", "+SDio", "2", "-setcookie", "pybeam_probe", "-pa" | Paths],
+    Args = ["+S", "2:2", "+SDcpu", "2", "+SDio", "2", "-setcookie", atom_to_list(erlang:get_cookie()),
+            "-kernel", "inet_dist_use_interface", "{127,0,0,1}", "-pa" | Paths],
     {ok, Peer, PyNode} = peer:start(#{name => pyworker, connection => standard_io, args => Args}),
     try
         ok = erpc:call(PyNode, ?MODULE, worker_init, []),
@@ -69,9 +70,11 @@ managed(Paths) ->
     Config = ["[tool.pybeam]\ndevelopment_runtime = ",
               json:encode(unicode:characters_to_binary(Runtime)), "\n"],
     ok = file:write_file(filename:join(Workdir, "pyproject.toml"), Config),
+    Flags = "+S 2:2 +SDcpu 2 +SDio 2 -sname managed -setcookie " ++
+            atom_to_list(erlang:get_cookie()) ++ " -kernel inet_dist_use_interface {127,0,0,1}",
     Port = open_port({spawn_executable, Python}, [binary, exit_status, stderr_to_stdout,
         {line, 8192}, {cd, Workdir}, {args, [filename:join(Directory, "managed_wait.py")]},
-        {env, [{"ERL_FLAGS", "+S 2:2 +SDcpu 2 +SDio 2 -sname managed -setcookie pybeam_probe"}]}]),
+        {env, [{"ERL_FLAGS", Flags}]}]),
     try
         ready(Port),
         [_Name, Hostname] = string:split(atom_to_list(node()), "@"),

@@ -9,6 +9,11 @@ export PROBE_PYTHON PROBE_DIRECTORY PROBE_ROOT PROBE_WORKDIR
 PROBE_ROOT="$ROOT"
 PROBE_WORKDIR="$ROOT/_build/join-probe"
 PROBE_PYTHON="$(uv run --locked python -c 'import sys; print(sys.executable)')"
+COOKIE="$("$PROBE_PYTHON" -c 'import secrets; print(secrets.token_hex(32))')"
+export ERL_EPMD_ADDRESS=127.0.0.1
+export ERL_EPMD_PORT
+ERL_EPMD_PORT="$("$PROBE_PYTHON" -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+trap 'epmd -kill >/dev/null 2>&1 || true' EXIT
 PROBE_DIRECTORY="$ROOT/docs/research/probes/attach"
 export PYTHONHOME
 PYTHONHOME="$("$PROBE_PYTHON" -c 'import sys; print(sys.base_prefix)')"
@@ -24,5 +29,6 @@ for path in "$ROOT"/_build/hornbeam/lib/*/ebin "$ROOT"/_build/hornbeam/checkouts
 done
 export PROBE_EBINS
 PROBE_EBINS="$(IFS=:; echo "${ebins[*]}")"
-exec erl +S 2:2 +SDcpu 2 +SDio 2 -noshell -sname host -setcookie pybeam_probe \
+erl +S 2:2 +SDcpu 2 +SDio 2 -noshell -sname host -setcookie "$COOKIE" \
+    -kernel inet_dist_use_interface '{127,0,0,1}' \
     -pa "$ROOT/_build/join-probe" -s join_probe run
