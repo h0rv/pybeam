@@ -31,6 +31,10 @@ The fork implements `ErlangEventLoop`: asyncio I/O readiness uses `enif_select`,
 
 An `asyncio.Task` stays on its local loop and interpreter. It does not automatically become an OTP process. BEAM can send data to another node where another invocation runs, then send back a result; this does not migrate a suspended coroutine, Python stack, socket, lock, or live local object. Remote work can finish even when its acknowledgment is lost; the current distribution implementation explicitly returns uncertain outcomes.[R2]
 
+## ASGI lifespan resources
+
+Managed Uvicorn (`await Server.serve()`) runs lifespan, HTTP and WebSocket handlers on one loop. The pinned Hornbeam runtime does the same per mount ([hornbeam#11](https://github.com/h0rv/hornbeam/pull/11)). You can use lifespan-created loop-bound pools and background tasks from those handlers through lifespan state. This is loop affinity, not a guarantee of permanent thread affinity or database-driver compatibility. Do not share these resources with separate worker loops, dedicated loops or actors.
+
 ## Many jobs do not require many interpreters
 
 Many BEAM callers can share a finite pool of Python execution resources. The fork's generic context router already chooses from a finite context pool using scheduler ID.[R3] That generic call path is distinct from the current actor/task implementations:

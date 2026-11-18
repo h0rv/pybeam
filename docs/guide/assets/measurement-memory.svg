@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="290" viewBox="0 0 760 290" role="img" aria-labelledby="title desc">
+  <title id="title">Memory added by 10,000 actors, threads or tasks</title>
+  <desc id="desc">Memory added by 10,000 actors, threads or tasks. Actors · 3.14: ≈584 MiB. Actors · 3.14t: 494 MiB. Threads: 206 MiB. asyncio tasks: 8.5 MiB. Linear axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <rect class="bar" x="220" y="12" width="24" height="14"/><text x="252" y="25" class="note">3.14</text>
+  <rect class="bar-alt" x="322" y="12" width="24" height="14"/><text x="354" y="25" class="note">3.14t</text>
+  <path class="axis" d="M220 73V242"/>
+  <text x="220" y="64" class="note" text-anchor="middle">0</text>
+  <path class="axis" d="M386.6666666666667 73V242"/>
+  <text x="386.6666666666667" y="64" class="note" text-anchor="middle">250</text>
+  <path class="axis" d="M553.3333333333334 73V242"/>
+  <text x="553.3333333333334" y="64" class="note" text-anchor="middle">500</text>
+  <text x="204" y="115" text-anchor="end">Actors</text>
+  <rect class="bar" x="220" y="90" width="389.33333333333337" height="14"/>
+  <text x="619.3333333333334" y="102" class="note">≈584 MiB</text>
+  <rect class="bar-alt" x="220" y="112" width="329.33333333333337" height="14"/>
+  <text x="559.3333333333334" y="124" class="note">494 MiB</text>
+  <text x="204" y="169" text-anchor="end">Threads</text>
+  <rect class="bar" x="220" y="154" width="137.33333333333337" height="14"/>
+  <text x="367.33333333333337" y="166" class="note">206 MiB</text>
+  <text x="204" y="217" text-anchor="end">asyncio tasks</text>
+  <rect class="bar" x="220" y="202" width="5.666666666666657" height="14"/>
+  <text x="235.66666666666666" y="214" class="note">8.50 MiB</text>
+  <text x="220" y="278" class="note">MiB</text>
+</svg>

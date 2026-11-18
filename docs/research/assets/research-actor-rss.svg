@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="313" viewBox="0 0 800 313" role="img" aria-labelledby="title desc">
+<title id="title">Resident memory at actor checkpoints</title><desc id="desc">0 actors: 84.9 MiB; 100 actors: 91.3 MiB; 1,000 actors: 142.8 MiB; 5,000 actors: 375.2 MiB; 10,000 actors: 669.1 MiB. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Resident memory at actor checkpoints</text>
+
+<text x="215" y="72" text-anchor="end">0 actors</text>
+<rect class="s0" x="230" y="65" width="42.44999999999998" height="14"/>
+<text x="279.45" y="77">84.9 MiB</text>
+<text x="215" y="109" text-anchor="end">100 actors</text>
+<rect class="s0" x="230" y="102" width="45.65" height="14"/>
+<text x="282.65" y="114">91.3 MiB</text>
+<text x="215" y="146" text-anchor="end">1,000 actors</text>
+<rect class="s0" x="230" y="139" width="71.40000000000003" height="14"/>
+<text x="308.40000000000003" y="151">143 MiB</text>
+<text x="215" y="183" text-anchor="end">5,000 actors</text>
+<rect class="s0" x="230" y="176" width="187.6" height="14"/>
+<text x="424.6" y="188">375 MiB</text>
+<text x="215" y="220" text-anchor="end">10,000 actors</text>
+<rect class="s0" x="230" y="213" width="334.55000000000007" height="14"/>
+<text x="571.5500000000001" y="225">669 MiB</text><path d="M230,255H630"/>
+<path d="M230,255v5"/><text x="230" y="279" text-anchor="start">0</text><path d="M330,255v5"/><text x="330" y="279" text-anchor="middle">200</text><path d="M430,255v5"/><text x="430" y="279" text-anchor="middle">400</text><path d="M530,255v5"/><text x="530" y="279" text-anchor="middle">600</text><path d="M630,255v5"/><text x="630" y="279" text-anchor="end">800</text>
+<text x="630" y="303" text-anchor="end">MiB</text></svg>

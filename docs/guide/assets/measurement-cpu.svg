@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="386" viewBox="0 0 760 386" role="img" aria-labelledby="title desc">
+  <title id="title">CPU jobs: completion wall time</title>
+  <desc id="desc">CPU jobs: completion wall time. 8 · worker · 3.14: 2.86 s. 8 · worker · 3.14t: 0.33–0.43 s. 8 · isolated · 3.14: 0.35 s. 8 · isolated · 3.14t: 0.32–0.64 s. 64 · worker · 3.14: 22.9 s. 64 · worker · 3.14t: 2.68–2.77 s. 64 · isolated · 3.14: 2.31 s. 64 · isolated · 3.14t: 2.31–2.70 s. Logarithmic axis.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <rect class="bar" x="220" y="12" width="24" height="14"/><text x="252" y="25" class="note">3.14</text>
+  <rect class="bar-alt" x="322" y="12" width="24" height="14"/><text x="354" y="25" class="note">3.14t</text>
+  <path class="axis" d="M220 73V338"/>
+  <text x="220" y="64" class="note" text-anchor="middle">0.1</text>
+  <path class="axis" d="M353.3333333333333 73V338"/>
+  <text x="353.3333333333333" y="64" class="note" text-anchor="middle">1</text>
+  <path class="axis" d="M486.66666666666663 73V338"/>
+  <text x="486.66666666666663" y="64" class="note" text-anchor="middle">10</text>
+  <path class="axis" d="M620 73V338"/>
+  <text x="620" y="64" class="note" text-anchor="middle">100</text>
+  <text x="204" y="115" text-anchor="end">8 jobs · worker</text>
+  <rect class="bar" x="220" y="90" width="194.18213775053903" height="14"/>
+  <text x="424.182137750539" y="102" class="note">2.86 s</text>
+  <rect class="bar-alt" x="220" y="112" width="69.1351919837183" height="14"/>
+  <path d="M289.1351919837183 119H304.46246074394486m0 -6v12"/>
+  <text x="314.46246074394486" y="124" class="note">330–430 ms</text>
+  <text x="204" y="179" text-anchor="end">8 jobs · isolated</text>
+  <rect class="bar" x="220" y="154" width="72.54240591337009" height="14"/>
+  <text x="302.5424059133701" y="166" class="note">350 ms</text>
+  <rect class="bar-alt" x="220" y="176" width="67.35333044265411" height="14"/>
+  <path d="M287.3533304426541 183H327.49066319785163m0 -6v12"/>
+  <text x="337.49066319785163" y="188" class="note">320–640 ms</text>
+  <text x="204" y="243" text-anchor="end">64 jobs · worker</text>
+  <rect class="bar" x="220" y="218" width="314.64473097865175" height="14"/>
+  <text x="544.6447309786518" y="230" class="note">22.9 s</text>
+  <rect class="bar-alt" x="220" y="240" width="190.41797253717186" height="14"/>
+  <path d="M410.41797253717186 247H412.3306358752598m0 -6v12"/>
+  <text x="422.3306358752598" y="252" class="note">2.68–2.77 s</text>
+  <text x="204" y="307" text-anchor="end">64 jobs · isolated</text>
+  <rect class="bar" x="220" y="282" width="181.81493065228585" height="14"/>
+  <text x="411.81493065228585" y="294" class="note">2.31 s</text>
+  <rect class="bar-alt" x="220" y="304" width="181.81493065228585" height="14"/>
+  <path d="M401.81493065228585 311H410.848501887865m0 -6v12"/>
+  <text x="420.848501887865" y="316" class="note">2.31–2.70 s</text>
+  <text x="220" y="374" class="note">s · logarithmic scale</text>
+</svg>

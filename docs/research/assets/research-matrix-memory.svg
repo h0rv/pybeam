@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="350" viewBox="0 0 800 350" role="img" aria-labelledby="title desc">
+<title id="title">Raw context resident memory</title><desc id="desc">Worker · GIL: 15.05 KiB/context; Worker · free: 21.22 KiB/context; Own-GIL · GIL: 10800.31 KiB/context; Own-GIL · free: 28525.98 KiB/context; Isolated · GIL: 24402.2 KiB/context; Isolated · free: 40167 KiB/context. Logarithmic axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Raw context resident memory</text>
+
+<text x="215" y="72" text-anchor="end">Worker · GIL</text>
+<rect class="s0" x="230" y="65" width="17.753649992986226" height="14"/>
+<text x="254.75364999298623" y="77">15.1 KiB/context</text>
+<text x="215" y="109" text-anchor="end">Worker · free</text>
+<rect class="s0" x="230" y="102" width="32.67453795653216" height="14"/>
+<text x="269.67453795653216" y="114">21.2 KiB/context</text>
+<text x="215" y="146" text-anchor="end">Own-GIL · GIL</text>
+<rect class="s0" x="230" y="139" width="303.3436221168174" height="14"/>
+<text x="540.3436221168174" y="151">10.5 MiB/context</text>
+<text x="215" y="183" text-anchor="end">Own-GIL · free</text>
+<rect class="s0" x="230" y="176" width="345.5240573380571" height="14"/>
+<text x="582.5240573380571" y="188">27.9 MiB/context</text>
+<text x="215" y="220" text-anchor="end">Isolated · GIL</text>
+<rect class="s0" x="230" y="213" width="338.7428982272718" height="14"/>
+<text x="575.7428982272718" y="225">23.8 MiB/context</text>
+<text x="215" y="257" text-anchor="end">Isolated · free</text>
+<rect class="s0" x="230" y="250" width="360.3869396279855" height="14"/>
+<text x="597.3869396279855" y="262">39.2 MiB/context</text><path d="M230,292H630"/>
+<path d="M230,292v5"/><text x="230" y="316" text-anchor="start">10</text><path d="M330,292v5"/><text x="330" y="316" text-anchor="middle">100</text><path d="M430,292v5"/><text x="430" y="316" text-anchor="middle">1k</text><path d="M530,292v5"/><text x="530" y="316" text-anchor="middle">10k</text><path d="M630,292v5"/><text x="630" y="316" text-anchor="end">100k</text>
+<text x="630" y="340" text-anchor="end">KiB/context · log scale</text></svg>

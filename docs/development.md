@@ -43,6 +43,17 @@ Native builds use CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0
 as pinned in `mise.toml`. With these tools and the sibling checkouts above
 (plus `erlang-ws` and `erlang-h1`), build with `mise run setup`.
 
+### Run the HTMX counter on Hornbeam
+
+After the native build, run from the repository root:
+
+```sh
+mise run serve -- examples.fastapi.main:app
+```
+
+Open `http://127.0.0.1:8642/` in two tabs and increment in one. The submitting
+tab shows a confirmation, and both tabs update without reloading.
+
 ### Use a development runtime
 
 Build the native runtime with `tools/build_native.py`, then add this to the

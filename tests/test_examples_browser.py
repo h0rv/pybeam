@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from collections.abc import Generator
 from typing import Literal
 
@@ -88,6 +89,11 @@ def test_counter__two_browsers_should_share_updates_without_navigation(
         elif response.url.endswith("/increment"):
             mutations.append(response.status)
 
+    def delay_sse_extension(route: Route) -> None:
+        response = route.fetch()
+        time.sleep(0.5)
+        route.fulfill(response=response)
+
     selector = "#count" if framework == "fastapi" else "#counter"
     with (
         runtime_server_factory("examples." + framework + ".main:app") as server,
@@ -107,8 +113,10 @@ def test_counter__two_browsers_should_share_updates_without_navigation(
                     page.goto(server.base_url)
                 expect(page.locator("[data-phx-main]")).to_have_class(re.compile("phx-connected"))
             else:
+                page.route("**/static/sse.js", delay_sse_extension)
                 with page.expect_response("**/events") as connected:
-                    page.goto(server.base_url)
+                    page.goto(server.base_url, wait_until="domcontentloaded")
+                page.unroute("**/static/sse.js", delay_sse_extension)
                 assert connected.value.status == 200
                 assert "text/event-stream" in connected.value.headers["content-type"]
             expect(page.locator(selector)).to_have_text("0")
@@ -120,6 +128,9 @@ def test_counter__two_browsers_should_share_updates_without_navigation(
         for page in (first, second):
             expect(page.locator(selector)).to_have_text("10", timeout=10000)
             expect(page.locator('input[name="amount"]')).to_have_value("10")
+        if framework != "pyview":
+            expect(first.locator("#confirmation")).to_have_text("Added 10.")
+            expect(second.locator("#confirmation")).to_be_empty()
         first.wait_for_timeout(2200)
         second.get_by_role("button", name="Increment", exact=True).click()
         for page in (first, second):

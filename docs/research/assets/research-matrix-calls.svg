@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="506" viewBox="0 0 800 506" role="img" aria-labelledby="title desc">
+<title id="title">Raw context sequential call latency</title><desc id="desc">Worker · GIL, p50: 17 µs; Worker · GIL, p99: 31 µs; Worker · free, p50: 29 µs; Worker · free, p99: 51 µs; Own-GIL · GIL, p50: 14 µs; Own-GIL · GIL, p99: 23 µs; Own-GIL · free, p50: 14 µs; Own-GIL · free, p99: 21 µs; Isolated · GIL, p50: 76 µs; Isolated · GIL, p99: 146 µs; Isolated · free, p50: 81 µs; Isolated · free, p99: 138 µs. Linear axis.</desc>
+<style>text{font-family:system-ui,sans-serif;font-size:15px;fill:#333}.heading{font-size:19px;font-weight:600}.s0{fill:#666}.s1{fill:#888}.s2{fill:#aaa}.s3{fill:#ccc}path,line{fill:none;stroke:#777;stroke-width:1} @media (prefers-color-scheme: dark){text{fill:#ddd}.s0{fill:#bbb}.s1{fill:#999}.s2{fill:#777}.s3{fill:#555}path,line{stroke:#aaa}}</style>
+<text class="heading" x="20" y="29">Raw context sequential call latency</text>
+<rect class="s0" x="230" y="49" width="14" height="14"/><text x="251" y="61">p50</text><rect class="s1" x="385" y="49" width="14" height="14"/><text x="406" y="61">p99</text>
+<text x="215" y="112.5" text-anchor="end">Worker · GIL</text>
+<rect class="s0" x="230" y="95" width="45.333333333333336" height="14"/>
+<text x="282.3333333333333" y="107">17.0 µs</text>
+<rect class="s1" x="230" y="116" width="82.66666666666669" height="14"/>
+<text x="319.6666666666667" y="128">31.0 µs</text>
+<text x="215" y="170.5" text-anchor="end">Worker · free</text>
+<rect class="s0" x="230" y="153" width="77.33333333333334" height="14"/>
+<text x="314.33333333333337" y="165">29.0 µs</text>
+<rect class="s1" x="230" y="174" width="136" height="14"/>
+<text x="373" y="186">51.0 µs</text>
+<text x="215" y="228.5" text-anchor="end">Own-GIL · GIL</text>
+<rect class="s0" x="230" y="211" width="37.33333333333335" height="14"/>
+<text x="274.33333333333337" y="223">14.0 µs</text>
+<rect class="s1" x="230" y="232" width="61.33333333333331" height="14"/>
+<text x="298.3333333333333" y="244">23.0 µs</text>
+<text x="215" y="286.5" text-anchor="end">Own-GIL · free</text>
+<rect class="s0" x="230" y="269" width="37.33333333333335" height="14"/>
+<text x="274.33333333333337" y="281">14.0 µs</text>
+<rect class="s1" x="230" y="290" width="56.00000000000002" height="14"/>
+<text x="293" y="302">21.0 µs</text>
+<text x="215" y="344.5" text-anchor="end">Isolated · GIL</text>
+<rect class="s0" x="230" y="327" width="202.6666666666667" height="14"/>
+<text x="439.66666666666674" y="339">76.0 µs</text>
+<rect class="s1" x="230" y="348" width="389.3333333333334" height="14"/>
+<text x="626.3333333333335" y="360">146 µs</text>
+<text x="215" y="402.5" text-anchor="end">Isolated · free</text>
+<rect class="s0" x="230" y="385" width="215.99999999999997" height="14"/>
+<text x="453" y="397">81.0 µs</text>
+<rect class="s1" x="230" y="406" width="368.00000000000006" height="14"/>
+<text x="605" y="418">138 µs</text><path d="M230,448H630"/>
+<path d="M230,448v5"/><text x="230" y="472" text-anchor="start">0</text><path d="M363.33333333333337,448v5"/><text x="363.33333333333337" y="472" text-anchor="middle">50</text><path d="M496.6666666666667,448v5"/><text x="496.6666666666667" y="472" text-anchor="middle">100</text><path d="M630,448v5"/><text x="630" y="472" text-anchor="end">150</text>
+<text x="630" y="496" text-anchor="end">µs</text></svg>

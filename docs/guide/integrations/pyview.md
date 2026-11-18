@@ -1,5 +1,8 @@
 # PyView
 
+For per-connection authorization, fresh mounts, and missed-message boundaries, see
+[Startup, reconnects, and failures](../failures.md#rebuild-a-view-after-reconnect).
+
 Keep a shared counter behind a PyView page. Each click updates the counter atomically and renders the result with PyView's template engine.
 
 ```sh
@@ -90,3 +93,24 @@ Open [localhost:8769](http://127.0.0.1:8769/) in your browser. The counter start
 Each view reads the shared counter when it mounts or increments. Other open views do not refresh automatically in this example. Values live in memory and are lost when the program stops. Stop the server with Ctrl+C.
 
 The [full PyView example](../../../examples/pyview/main.py) calls `await services.subscribe(socket, topic, convert)` during connected mount for live updates across views. This returns a `ViewSubscription` owned by the socket's connection. The server must supply connection ownership; an unowned scope raises instead of using application ownership. Retain the handle and await its `aclose()` on disconnect. Do not create subscriptions during the initial HTTP render.
+
+## Send posts between two local nodes
+
+The [two-node feed example](../../../examples/pyview_cluster/main.py) sends each
+post's text and origin node through pub/sub. It does not share a counter or a
+history store. From a checkout prepared with the [development setup](../../development.md), run:
+
+```sh
+mise run example:pyview-cluster
+```
+
+Open [node A](http://127.0.0.1:8771/) and [node B](http://127.0.0.1:8772/) in
+separate tabs. Enter a post and select **Send**. Both tabs append the post and
+show which node served the sender. Send a second post from the other tab to
+see the reverse direction. Press Ctrl+C in the terminal to stop both nodes.
+
+This is a loopback-only local demo, not a deployment configuration. Each
+connected tab keeps its latest 20 posts in memory. A new tab starts empty;
+reloading clears that tab's list. Messages are not durable: disconnected tabs
+and nodes that are down miss posts, with no replay when they reconnect.
+There is no authentication; anyone who can access the local ports can post.

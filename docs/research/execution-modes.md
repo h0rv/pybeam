@@ -1,24 +1,18 @@
 # Execution modes: measured development builds
 
-These are single trials on one Linux x86-64 VM with eight CPUs, not compatibility certification or production limits. The measurements below are historical; the supported default is free-threaded CPython 3.14t workers, with isolated OS processes for code that might crash the interpreter. See the [execution model](execution-model.md) for ownership, cancellation and durability boundaries.
-
-## Choosing a mode
+Dedicated-loop tasks parallelized on the tested free-threaded build; shared-loop tasks did not. Only isolated children contained native crashes, and own-GIL subinterpreters remain unsupported.
 
 Import `ExecutionMode` and `TaskFunction` from `pybeam.tasks`. Select a task boundary with the keyword-only `TaskFunction(..., execution=ExecutionMode.WORKER, dedicated_loop=False)`. Worker is the default; isolated accepts importable byte entries with caller-side codecs. Own-GIL mode remains in code but is unsupported.
 
-| Mode / build | How to select in PyBEAM | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility | Cost |
-|---|---|---|---|---|---|---|
-| worker / 3.14 | `execution=ExecutionMode.WORKER` (default) | Yes / yes | No Python bytecode parallelism under the GIL | None; VM dies | Main-interpreter extensions | ~15 KiB/context; ~17 µs raw calls |
-| worker / 3.14t | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution | ~21 KiB/context; ~29 µs raw calls |
-| worker + dedicated loop / 3.14t | Also `dedicated_loop=True` | Development tasks / no actor loop option | Measured across task loops | None; VM dies | Same as worker / 3.14t | Context-owned loop; ~1 s unexplained task completion overhead |
-| owngil | Unsupported; retained in code only | Unsupported / no | Historical measurements below | None; VM dies | Common native extensions reject subinterpreters | Not a supported option |
-| isolated | `TaskFunction(entry, request, result, execution=ExecutionMode.ISOLATED)` | Yes, byte entries / no | Across task child processes | Contains `os.abort()`; not a sandbox | Entry-module imports of pybeam/pydantic/pydantic_core verified; NumPy imported in earlier raw probes | ~24–40 MiB/context; ~76–81 µs raw calls; child startup per task |
-
-Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Named owngil and isolated tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: both named modes already own their interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
+| Mode / build | How to select in PyBEAM | Tasks / actors today | Parallel CPU | Native-crash containment | Extension compatibility |
+|---|---|---|---|---|---|
+| worker / conventional | `execution=ExecutionMode.WORKER` (default) | Yes / yes | No Python bytecode parallelism under the GIL | None; VM dies | Main-interpreter extensions |
+| worker / free-threaded | Same setting, free-threaded build | Development / development; acceptance incomplete | Threads can parallelize, but shared-loop task bodies do not | None; VM dies | Requires free-threading compatibility for GIL-free execution |
+| worker + dedicated loop / free-threaded | Also `dedicated_loop=True` | Development tasks / no actor loop option | Measured across task loops | None; VM dies | Same as worker / free-threaded |
+| owngil | Unsupported; retained in code only | Unsupported / no | Historical measurements below | None; VM dies | Common native extensions reject subinterpreters |
+| isolated | `TaskFunction(entry, request, result, execution=ExecutionMode.ISOLATED)` | Yes, byte entries / no | Across task child processes | Contains `os.abort()`; not a sandbox | Entry-module imports of pybeam/pydantic/pydantic_core verified; NumPy imported in earlier raw probes |
 
 ### Unsupported own-GIL subinterpreters
-
-Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In the [PR #48 mode grid](https://github.com/h0rv/pybeam/pull/48), measured 2026-11-17 on both regular CPython 3.14 and free-threaded 3.14t, 14 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`: pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and orjson. Only asyncpg and MarkupSafe loaded; psycopg-binary was not importable. Free-threading support does not imply subinterpreter support.
 
 The following contract and measurements describe the historical implementation, not a supported execution option.
 
@@ -34,97 +28,164 @@ Cancellation and shutdown are cooperative: CPU/native-blocked entry loops delay 
 
 Use a plain module-level `async def entry(payload: bytes) -> bytes` with `execution=ExecutionMode.ISOLATED` and caller-side `Codec` encoding/decoding. `Json` supports standard types and dataclasses without optional dependencies. Each task owns a fresh child process and loop; `dedicated_loop=True` is rejected. Child startup and separate interpreter/module memory make this more expensive than shared workers. PyBEAM selects the caller's Python executable through the runtime's `isolated_python` option rather than discovering it through an occupied managed worker.
 
-Isolated entry modules **can import PyBEAM**. The native task probe uses stdlib dataclasses and `Json` in the caller, and imports `pybeam` and `pybeam.codec.Json` in a different OS process. Pydantic remains a development/test dependency, not a PyBEAM core dependency, so the probe also checks module-level imports of Pydantic **2.14.3** and `pydantic_core` **2.50.4** as optional-extension coverage; neither supplies the task codecs. These imports do not certify every extension's compatibility. Isolated entries must not import `erlang.tasks` or submit nested tasks: the child has no actor-gate/native task hooks.
-
 Python exceptions and module import/lookup failures remain terminal `RemoteTaskError` outcomes. A confirmed child exit instead raises **`pybeam.tasks.TaskCrashed`**, also returned by `ref.exception()`, with `.reason`, for example `('signal', 6)` after `os.abort()`. The process exited and execution stopped, but **external effects are unknown**. The task is **never restarted or retried**. Confirmed death releases its native admission ticket and leaves the supervisor open for a following task; as with other completed tasks, observe the outcome to release the Python handle's slot. A timeout or context death without child-exit acknowledgement remains `UncertainInflight`, not proof of stopped execution. A terminal result already received wins over a later child exit.
 
 Cancellation and shutdown use the existing cooperative cancel path. An acknowledged terminal cancellation yields `asyncio.CancelledError`; if interruption escalates to child termination without that acknowledgement, it yields `TaskCrashed`. Child crashes are contained, but isolated processes are **not a sandbox**, and neither cancellation nor crash containment rolls back effects.
 
-Choose the Python build when installing the interpreter: conventional **3.14** or free-threaded **3.14t**, with `PYBEAM_ALLOW_FREE_THREADED=1` to opt into the development build. This is not a runtime setting on `TaskFunction`; packaged wheels remain conventional. Check live GIL state with `sys._is_gil_enabled()` after imports: extensions can re-enable it. The GIL is a property of the chosen build and its live configuration, not an inherent PyBEAM limit. Free-threaded 3.14t and newer releases such as 3.15 are in scope, subject to actual runtime/dependency validation.
+Choose the interpreter build at installation, not on `TaskFunction`; packaged wheels remain conventional. Development free-threaded builds require `PYBEAM_ALLOW_FREE_THREADED=1`; check `sys._is_gil_enabled()` after imports because extensions can re-enable the GIL.
 
 ## Mapping work to execution resources
 
 ### Worker: conventional Python
 
-![Worker on CPython 3.14: BEAM callers share a bounded context pool. Context threads share the main interpreter and GIL inside the BEAM OS process. A native abort kills the whole VM.](assets/worker-314.svg)
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Worker on CPython conventional: BEAM callers share a bounded context pool. Context threads share the main interpreter and GIL inside the BEAM OS process. A native abort kills the whole VM.](assets/worker-314.svg)
+
+</div>
 
 ### Worker: free-threaded Python
 
-![Worker on CPython 3.14t: context threads share the main interpreter without a GIL in the tested build. Threads can run Python in parallel, but a native abort still kills the whole VM.](assets/worker-314t.svg)
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Worker on CPython free-threaded: context threads share the main interpreter without a GIL in the tested build. Threads can run Python in parallel, but a native abort still kills the whole VM.](assets/worker-314t.svg)
+
+</div>
 
 ### Own-GIL subinterpreters
 
-![Each owngil context has a thread and separate subinterpreter state, with its own GIL on 3.14 and no GIL in the tested 3.14t build. All share one BEAM OS process, so a native abort kills the whole VM.](assets/owngil.svg)
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Each owngil context has a thread and separate subinterpreter state, with its own GIL on conventional and no GIL in the tested free-threaded build. All share one BEAM OS process, so a native abort kills the whole VM.](assets/owngil.svg)
+
+</div>
 
 ### Isolated children
 
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
 ![Each isolated context owns a separate child OS process with a Python interpreter and execution thread. A native abort kills only that child; the BEAM VM survives. Generic contexts can restart their child.](assets/isolated.svg)
 
-The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task. The current runtime includes the merged PR #5 bootstrap fix.
-
-A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context costs one pthread; isolated contexts instead cost a child process. Bounded data actors now lease workers from a separate node-wide pool in pinned erlang-python `f893508`. Each worker reuses a thread-local loop, so different actors need not share one execution loop. Actor count no longer determines thread count. Tasks still allocate contexts in their selected mode; their shared-loop measurements below do not describe pooled actor dispatch. Actor state and queued work still consume memory, and no million-actor capacity has been verified.
+</div>
 
 ## Raw context matrix
 
-CPython **3.14.10 / 3.14.10t**; `erl +S 8:8`. Creation is the cumulative mean at **256 contexts**. RSS is the baseline-subtracted VM plus child RSS, divided by context count; it is summed RSS, not PSS. Calls are 10,000 sequential `operator.add(1, 2)` calls after warm-up. CPU work is a calibrated ~200 ms pure-Python sum of squares. Speedup is `N × wall1 / wallN`; both scaling columns below use **N=8**. No affinity pinning or repeated-trial confidence intervals.
+These single-trial records combine historical builds, without affinity pinning or confidence intervals; they are not a controlled same-revision comparison. Creation is the cumulative mean at 256 contexts, memory is baseline-subtracted summed RSS rather than PSS, and calls are 10,000 warmed sequential additions.
 
-| Mode / build | Works? / capacity reached | Create ms | RSS/context KiB | Call p50/p99 µs | CPU across 8 contexts | 8 threads in one context | Module state | pydantic / numpy | `os.abort()` |
-|---|---|---:|---:|---:|---:|---:|---|---|---|
-| worker / 3.14 | Yes; 1000 | 1.335 | 15.05 | 17 / 31 | 0.96× | 0.97× | Shared | Both import | VM dies, exit 134 |
-| worker / 3.14t | Yes; 1000 | 1.536 | 21.22 | 29 / 51 | 4.71× | 5.03× | Shared | Both import | VM dies, exit 134 |
-| owngil / 3.14 | Raw contexts only; 1000 | 78.560 | 10,800.31 | 14 / 23 | 5.27× | 0.96× | Separate | Both rejected | VM dies, exit 134 |
-| owngil / 3.14t | Raw contexts only; 288 in 100 s | 345.199 | 28,525.98 | 14 / 21 | 4.14× | 4.28× | Separate | Both rejected | VM dies, exit 134 |
-| isolated / 3.14 | With PR #5 fix; 1000 | 90.065 | 24,402.20 | 76 / 146 | 4.73× | 1.23× | Separate | Both import | VM survives; child restarts |
-| isolated / 3.14t | With PR #5 fix; 314 in 100 s | 320.468 | 40,167.00 | 81 / 138 | 4.51× | 7.44× | Separate | Both import | VM survives; child restarts |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Raw context creation.](assets/research-matrix-create.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Raw context resident memory.](assets/research-matrix-memory.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Raw context sequential call latency.](assets/research-matrix-calls.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Raw context CPU throughput scaling.](assets/research-matrix-scaling.svg)
+
+</div>
+
+Worker contexts share module state; own-GIL and isolated contexts separate it. Pydantic and NumPy imported in worker and isolated contexts but were rejected in own-GIL contexts. A native abort killed worker and own-GIL VMs with exit 134; isolated VMs survived and restarted the child. Worker builds and conventional own-GIL/isolated reached 1,000 contexts; free-threaded own-GIL reached 288 and isolated 314 within 100 seconds.
 
 Creation checkpoints were 1, 8, 64, 256 and 1000, with a 100 s deadline. The two time-capped runs did not reach the 1000 checkpoint; neither reached an allocation limit. Reaching 1000 is a requested ceiling, not a discovered maximum. A Python `ValueError` returned an error in every mode/build and the next call returned `{ok,3}`. In isolated mode the abort caller received `{error,{child_exited,{signal,6}}}`; the context survived and both same-context and fresh-context calls returned `{ok,3}`.
-
-`sys._is_gil_enabled()` stayed false in all tested 3.14t contexts, including after successful pydantic and numpy imports. Both imports failed in owngil without enabling the GIL. Conventional contexts reported true. Import versions: pydantic **2.14.3**, pydantic-core **2.50.4**, numpy **2.5.5**, installed from wheels into separate environments. CPU probes preceded optional-library imports. Ratios near one, including conventional isolated threads at 1.23×, do not establish parallel bytecode execution.
 
 ## PyBEAM task probe
 
 The public `TaskSupervisor` / `TaskFunction` probe ran the same calibrated sum-of-squares workload in N tasks, after importing PyBEAM and pydantic. Creation was outside timing. Timing began at a shared start gate and ended when every `TaskRef.result()` completed. These historical measurements used `+S 1:1`; the current launcher leaves the BEAM scheduler count at its runtime default.
 
-| Build / task loop | Wall ms, N=1 / 2 / 4 / 8 | Speedup, N=1 / 2 / 4 / 8 | GIL inside tasks |
-|---|---|---|---|
-| 3.14 / shared (default) | 200 / 395 / 768 / 1502 | 1.00 / 1.01 / 1.04 / 1.07× | Enabled |
-| 3.14t / shared (default) | 229 / 430 / 878 / 1719 | 1.00 / 1.07 / 1.04 / 1.07× | Disabled |
-| 3.14 / `dedicated_loop=True` | 1187 / 1368 / 1759 / 2525 | 1.00 / 1.74 / 2.70 / 3.76× | Enabled |
-| 3.14t / `dedicated_loop=True` | 1223 / 1244 / 1231 / 1242 | 1.00 / 1.97 / 3.97 / 7.88× | Disabled |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-Dedicated tasks had **~1 s extra completion latency per batch on both builds; its source is untraced**. This inflates the conventional end-to-end ratio: 3.76× is not CPU parallelism. Elapsed work span, from the first task's work start to the last task's work end, was **178 → 1517 ms** at N=1 → 8 on 3.14 (**0.94×** throughput), versus **215 → 232 ms** on 3.14t (**7.43× for this sum-of-squares workload**). Previously called “CPU span”, this was measured with `perf_counter()`, not thread CPU time. Dedicated tasks used eight distinct threads at N=8; shared-loop tasks used one thread and did not parallelize on either build.
+![Task batch completion wall time.](assets/research-task-walls.svg)
+
+</div>
+
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Task end-to-end throughput ratios.](assets/research-task-ratios.svg)
+
+</div>
+
+Dedicated tasks had **~1 s extra completion latency per batch on both builds; its source is untraced**. This inflates the conventional end-to-end ratio: 3.76× is not CPU parallelism. Elapsed work span, from the first task's work start to the last task's work end, was **178 → 1517 ms** at N=1 → 8 on conventional (**0.94×** throughput), versus **215 → 232 ms** on free-threaded (**7.43× for this sum-of-squares workload**). Previously called “CPU span”, this was measured with `perf_counter()`, not thread CPU time. Dedicated tasks used eight distinct threads at N=8; shared-loop tasks used one thread and did not parallelize on either build.
 
 ### Free-threaded shared-object contention
 
-Code loading matters on 3.14t. The [managed entry loader][managed-loader] uses [`runpy.run_path()`][run-path], which compiles source in-process. [Explicit `compile()` suppresses constant immortalization][constant-compilation], leaving large integer constants such as `0xFFFFFFFF` mortal; marshal/pyc-loaded code [interns and immortalizes those constants][constant-interning]. Threads repeatedly referencing the same mortal object contend on [atomic shared-refcount updates][ft-refcounts]; immortal objects bypass them. This affects plain threads too, not just PyBEAM tasks.
+Code loading matters on free-threaded. The [managed entry loader][managed-loader] uses [`runpy.run_path()`][run-path], which compiles source in-process. [Explicit `compile()` suppresses constant immortalization][constant-compilation], leaving large integer constants such as `0xFFFFFFFF` mortal; marshal/pyc-loaded code [interns and immortalizes those constants][constant-interning]. Threads repeatedly referencing the same mortal object contend on [atomic shared-refcount updates][ft-refcounts]; immortal objects bypass them. This affects plain threads too, not just PyBEAM tasks.
 
 A standalone checksum loop, `value = (value * 31 + index) & 0xFFFFFFFF`, showed the difference with ordinary Python threads, without PyBEAM or Erlang:
 
-| Loading | Mask immortal? | Completion wall ms, N=1 / 4 / 8 |
-|---|---|---|
-| Direct file execution | Yes | 276 / 310 / 446 |
-| Source via `runpy.run_path()` | No | 335 / 1659 / 3450 |
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
 
-On PyBEAM `d4f6374` with erlang-python `c007eb5` and CPython 3.14.10t, the same checksum at 3,000,000 iterations per dedicated-loop task gave:
+![Plain-thread checksum completion wall time.](assets/research-loading.svg)
 
-| Checksum code | Per-task thread CPU ms, N=4 | Per-task thread CPU ms, N=8 |
-|---|---:|---:|
-| Source-compiled, shared mortal mask | 1268–1610 | 2298–3369 |
-| Diagnostic marshal round-trip, immortal mask | 332–355 | 324–345 |
+</div>
 
-The round-trip preserved bytecode and changed constant immortality. The managed loader now loads the entry file through marshal, so its constants are immortal as with direct file execution; modules imported from cold source can still contend until their pyc is cached. The GIL remained disabled. A worker-local object, constructed with `int("4294967295")` inside each worker, also avoided the contention; a plain local assignment `mask = 0xFFFFFFFF` still shares the constant. Importing a module is not sufficient on its own: a cold source import and a cached pyc import can differ. These are workload/loading effects, not evidence of a task-path lock or a regression in `c007eb5`.
+<div class="research-chart" tabindex="0" role="region" aria-label="Scrollable research chart">
+
+![Dedicated-task checksum thread CPU time.](assets/research-checksum.svg)
+
+</div>
 
 Future measurements should record thread CPU (`time.thread_time()`), elapsed work span, completion wall time, and code-loading/bytecode-cache state separately.
 
 ## Constraints and evidence
+
+Actors require main-interpreter objects and now lease workers from a bounded pool; actor count no longer determines thread count. These historical task measurements do not describe pooled actor dispatch or establish million-actor capacity.
+
+Own-GIL mode rejects common native extensions and does not contain native crashes. Use isolated byte entries for crash containment, not as a sandbox or durable-job boundary.
+
+Full free-threaded integration acceptance remains incomplete. Dedicated-loop completion still has an untraced extra second per batch; creation slowdowns and integration failures remain open.
+
+<style>
+.research-chart { overflow-x: auto; }
+.research-chart img { width: 100%; min-width: 740px; max-inline-size: none; height: auto; }
+.research-chart:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>
+
+## Appendix: environment and provenance
+
+Chart build labels mean CPython 3.14.10 (GIL) and 3.14.10t (free-threaded), unless a historical probe below specifies otherwise. KB and MB payload sizes are decimal; KiB and MiB are binary.
+
+The prototype passed lint/format/strict typing. Core units: conventional **612 passed, 11 skipped**; 3.14t **608 passed, 4 failed, 11 skipped** (conventional-only wheel-manifest fixtures). Full 3.14t integration was interrupted after 740 s: **29 failed, 26 passed, 5 skipped, 7 errors**, including source-layout/asset setup issues. After private sibling-path setup, focused task/supervision/actor suites passed **32 tests**. An actor argument-retention assertion also failed on conventional Python; this is not full free-threaded acceptance.
+
+Free-threaded CPython 3.15 and newer are in scope only after runtime/dependency validation, not established compatibility.
+
+These are single trials on one Linux x86-64 VM with eight CPUs, not compatibility certification or production limits. The measurements below are historical; the supported default is free-threaded CPython 3.14t workers, with isolated OS processes for code that might crash the interpreter. See the [execution model](execution-model.md) for ownership, cancellation and durability boundaries.
+
+
+Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Named owngil and isolated tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: both named modes already own their interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
+
+Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In the [PR #48 mode grid](https://github.com/h0rv/pybeam/pull/48), measured 2026-11-17 on both regular CPython 3.14 and free-threaded 3.14t, 14 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`: pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and orjson. Only asyncpg and MarkupSafe loaded; psycopg-binary was not importable. Free-threading support does not imply subinterpreter support.
+
+Isolated entry modules **can import PyBEAM**. The native task probe uses stdlib dataclasses and `Json` in the caller, and imports `pybeam` and `pybeam.codec.Json` in a different OS process. Pydantic remains a development/test dependency, not a PyBEAM core dependency, so the probe also checks module-level imports of Pydantic **2.14.3** and `pydantic_core` **2.50.4** as optional-extension coverage; neither supplies the task codecs. These imports do not certify every extension's compatibility. Isolated entries must not import `erlang.tasks` or submit nested tasks: the child has no actor-gate/native task hooks.
+
+The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task. The current runtime includes the merged PR #5 bootstrap fix.
+
+A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context costs one pthread; isolated contexts instead cost a child process. Bounded data actors now lease workers from a separate node-wide pool in pinned erlang-python `f893508`. Each worker reuses a thread-local loop, so different actors need not share one execution loop. Actor count no longer determines thread count. Tasks still allocate contexts in their selected mode; their shared-loop measurements below do not describe pooled actor dispatch. Actor state and queued work still consume memory, and no million-actor capacity has been verified.
+
+CPython **3.14.10 / 3.14.10t**; `erl +S 8:8`. Creation is the cumulative mean at **256 contexts**. RSS is the baseline-subtracted VM plus child RSS, divided by context count; it is summed RSS, not PSS. Calls are 10,000 sequential `operator.add(1, 2)` calls after warm-up. CPU work is a calibrated ~200 ms pure-Python sum of squares. Speedup is `N × wall1 / wallN`; both scaling columns below use **N=8**. No affinity pinning or repeated-trial confidence intervals.
+
+`sys._is_gil_enabled()` stayed false in all tested 3.14t contexts, including after successful pydantic and numpy imports. Both imports failed in owngil without enabling the GIL. Conventional contexts reported true. Import versions: pydantic **2.14.3**, pydantic-core **2.50.4**, numpy **2.5.5**, installed from wheels into separate environments. CPU probes preceded optional-library imports. Ratios near one, including conventional isolated threads at 1.23×, do not establish parallel bytecode execution.
+
+The dedicated-task checksum thread-CPU chart used PyBEAM `d4f6374`, erlang-python `c007eb5`, CPython 3.14.10t and 3,000,000 iterations per task.
+
+The round-trip preserved bytecode and changed constant immortality. The managed loader now loads the entry file through marshal, so its constants are immortal as with direct file execution; modules imported from cold source can still contend until their pyc is cached. The GIL remained disabled. A worker-local object, constructed with `int("4294967295")` inside each worker, also avoided the contention; a plain local assignment `mask = 0xFFFFFFFF` still shares the constant. Importing a module is not sufficient on its own: a cold source import and a cached pyc import can differ. These are workload/loading effects, not evidence of a task-path lock or a regression in `c007eb5`.
 
 - **owngil extensions:** [the interpreter configuration][own-gil] sets `check_multi_interp_extensions = 1`. Actual imports returned `module pydantic_core._pydantic_core does not support loading in subinterpreters` and `module numpy._core._multiarray_umath does not support loading in subinterpreters` (the latter wrapped by NumPy). Free-threading does not remove subinterpreter compatibility requirements.
 - **Actors require the main interpreter:** [local-object retention/unwrapping][local-object] rejects other interpreters with `Actors require the main interpreter`; [context validation][local-context] rejects subinterpreters with `local_objects_require_worker`.
 - **Historical worker-only task path:** the matrix revision's [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. Current actors remain worker-only; current tasks retain named owngil entries in code (unsupported) and support isolated entries. `dedicated_loop=True` selects a worker loop, not a different interpreter or process.
 - **Isolated bootstrap:** [package initialization][bootstrap-import] eagerly imported [_supervision, which imports erlang][bootstrap-supervision], before [the child installed its synthetic erlang module][bootstrap-child]. This produced `ModuleNotFoundError: No module named 'erlang'` and `{handshake_failed,closed}`. The isolated results above used [PR #5](https://github.com/h0rv/erlang-python/pull/5)'s `249a970` fix, now merged and included in the current runtime.
 - **owngil is not a crash boundary:** its subinterpreter runs inside the BEAM address space. The separate crash probes terminated the whole VM on both builds. Only isolated contained `os.abort()` in these trials.
-
-## Decisions and open questions
 
 - Setting: `TaskFunction(..., execution=ExecutionMode.WORKER)`; supported modes are `worker` and `isolated`. Use free-threaded **3.14t workers** by default; packaged wheels remain conventional. The `owngil` value remains in code but is unsupported.
 - Recommended development path for CPU parallelism: **3.14t with dedicated-loop tasks**, opt in with `PYBEAM_ALLOW_FREE_THREADED=1`. Free-threaded packaged wheels have not been built. Shared-loop tasks do not parallelize on either build.
@@ -133,9 +194,7 @@ Future measurements should record thread CPU (`time.thread_time()`), elapsed wor
 - 3.14t task slowdown, resolved: the entry file's mortal `0xFFFFFFFF` constant, shared by every task, made four `dedicated_loop=True` tasks take 1.2-1.6 s each against 0.35 s alone. With the entry loaded through marshal, `examples/docs/execution.py`'s checksum took 318 / 425 / 433 ms elapsed work span at N=1 / 4 / 8 tasks (311-425 ms per task), and sum-of-squares 186 / 198 / 208 ms. Four plain threads inside one task took 390 ms against 321 ms for one.
 - Open: complete 3.14t integration acceptance, including the hang and `ws_session:send_sync/3` `undef`; the 3.14t owngil/isolated creation slowdown; the untraced ~1 s dedicated-loop completion latency.
 
-The prototype passed lint/format/strict typing. Core units: conventional **612 passed, 11 skipped**; 3.14t **608 passed, 4 failed, 11 skipped** (conventional-only wheel-manifest fixtures). Full 3.14t integration was interrupted after 740 s: **29 failed, 26 passed, 5 skipped, 7 errors**, including source-layout/asset setup issues, so this is not a controlled comparison to the earlier two-WebSocket-failure baseline. After private sibling-path setup, focused task/supervision/actor suites passed **32 tests**. An actor argument-retention assertion also failed on conventional Python. None of this establishes full free-threaded runtime compatibility.
-
-## Reproduce
+### Recorded method and reproduction
 
 Toolchain: Linux x86-64, eight CPUs, CPython **3.14.10** (conventional and free-threaded), Erlang/OTP **29.1.2**, rebar3 **3.28.0**, CMake **4.5.0**, uv **0.13.8**. PyBEAM prototype: `98a72e2`; raw free-threaded and fixed isolated runtime: erlang-python `249a97016479c44ef5cf4a51ebe70a06176e32ec`. Earlier conventional worker/owngil measurements reused the existing PyBEAM native build; its revision was not recorded in the original measurement records. Later combined records label the revision used for the extra probes. Do not treat the rows as a controlled same-revision experiment. Subsequent PyBEAM rebuild against fork main `54ccee8367341eb83acab1280b4316ba034e3bf4` also detected free-threaded Python.
 
@@ -218,3 +277,42 @@ A reviewed, parameterized version of these harnesses belongs in `benchmarks/` be
 [constant-compilation]: https://github.com/python/cpython/blob/3.14/Python/bltinmodule.c#L875-L887
 [constant-interning]: https://github.com/python/cpython/blob/3.14/Objects/codeobject.c#L291-L309
 [ft-refcounts]: https://github.com/python/cpython/blob/3.14/Include/refcount.h#L267-L279
+
+
+
+### Four-job fan-out and blast-radius reproduction
+
+The published fan-out and crash charts record earlier erlang-python `c007eb5` probes. Set `APP` to the matching native application directory containing `ebin` and `priv/py_nif.so`, following [development runtime setup](../development.md#use-a-development-runtime).
+
+The in-repo modes lab implements both experiments; these commands rerun the same workloads, not guaranteed historical values:
+
+```sh
+mise run modes-lab
+```
+
+Open `http://127.0.0.1:38941`, choose fan-out with 4 jobs and 3,000,000 iterations, or crash with 4 jobs. Free-threaded lanes require `PYBEAM_LAB_ERLANG_PYTHON_314T` and `PYBEAM_LAB_PYTHON_314T` pointing to matching builds; `PYBEAM_LAB_ERLANG_PYTHON` selects the conventional native application directory.
+
+For direct JSON output, run each baseline and BEAM mode from the repository root:
+
+```sh
+for mode in asyncio threads spawn prefork; do
+  mise exec -- python -m examples.modes_lab.baselines fanout "$mode" 4 3000000
+  mise exec -- python -m examples.modes_lab.baselines crash "$mode" 4 0
+done
+for mode in worker isolated nodes; do
+  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" fanout "$mode" 4 3000000
+  mise exec -- escript examples/modes_lab/probe.escript "$APP" "$PWD/examples/modes_lab" crash "$mode" 4 0
+done
+```
+
+Repeat the threads, worker and isolated fan-out commands with the free-threaded interpreter and matching native build. Crash commands intentionally abort child processes or VMs; run them in a disposable development environment with core dumps disabled (`ulimit -c 0`).
+
+### In-repository checks
+
+The original raw-context and task-probe harness files are external and missing from this repository; the following checks exercise available probes, not an exact regeneration of those historical values.
+
+```sh
+mise exec -- uv run --locked python tools/build_native.py
+mise exec -- python docs/research/probes/capacity/modes_matrix.py "$PWD/_build/hornbeam/lib/erlang_python"
+mise exec -- uv run --locked --all-extras pytest tests/test_tasks_native.py --run-runtime -q
+```
