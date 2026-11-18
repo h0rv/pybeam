@@ -144,7 +144,9 @@ async def test_initial_store_failure_releases_slot(
     monkeypatch.setattr(FakeStore, "set", set_result)
     monkeypatch.setattr(native, "outcome", outcome)
     beam = FakeServices(ServiceState(), owner="test")
-    async with TaskSupervisor(TaskLimits(capacity=1, max_bytes=1024, shutdown_ms=100)) as supervisor:
+    async with TaskSupervisor(
+        TaskLimits(capacity=1, max_bytes=1024, shutdown_ms=100)
+    ) as supervisor:
         async with asyncio.TaskGroup() as tasks:
             jobs = Jobs(beam, supervisor, tasks, 0.01)
             with pytest.raises(RuntimeError, match="store unavailable"):
@@ -172,14 +174,19 @@ async def test_compare_empty_and_errors() -> None:
     assert report.completion_overhead_ms is None
     assert report.failures == 0
 
-    async def error(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(503)
+
+@pytest.mark.parametrize("code", [200, 202, 204, 503])
+async def test_compare_requires_created(code: int) -> None:
+    async def error(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        return httpx.Response(code, json={"task_id": "unexpected"})
 
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(error), base_url="http://test"
     ) as client:
         outcome = await one(client, Plan("http://test"))
     assert outcome.failed
+    assert outcome.submit_ms is None
     assert outcome.overhead_ms is None
 
 

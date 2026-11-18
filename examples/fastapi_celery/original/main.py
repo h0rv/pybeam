@@ -22,7 +22,7 @@ def home(request: Request):
 def run_task(payload = Body(...)):
     task_type = payload["type"]
     task = create_task.delay(int(task_type))
-    return JSONResponse({"task_id": task.id})
+    return JSONResponse({"task_id": task.id}, status_code=201)
 
 
 @app.get("/tasks/{task_id}")

@@ -86,6 +86,8 @@ async def one(client: httpx.AsyncClient, plan: Plan) -> Outcome:
         async with asyncio.timeout(plan.timeout):
             response = await client.post("/tasks", json={"type": plan.type})
             response.raise_for_status()
+            if response.status_code != 201:
+                return Outcome(None, None, True)
             accepted = Accepted.model_validate_json(response.content)
             submitted = (time.perf_counter() - started) * 1000
             while True:
