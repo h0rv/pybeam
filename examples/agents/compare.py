@@ -26,6 +26,7 @@ type Case = Literal["stop", "hang", "burn", "crash", "kill"]
 type StackName = Literal["PyBEAM", "Redis/Celery"]
 CASES: tuple[Case, ...] = ("stop", "hang", "burn", "crash", "kill")
 RESULTS = Path(__file__).with_name("results")
+KILL_TIMEOUT_S = 600
 
 
 class Snapshot(BaseModel):
@@ -239,7 +240,7 @@ def measure(stack: Stack, case: Case, sampling: ThreadPoolExecutor) -> Measureme
         killed = time.monotonic()
         kill_owner(stack, fault, active.snapshot.node)
     finished: dict[str, float] = {}
-    deadline = time.monotonic() + 180
+    deadline = time.monotonic() + (KILL_TIMEOUT_S if case == "kill" else 180)
     while True:
         stack.observe(sessions, finished, submitted)
         current = stack.view(fault)

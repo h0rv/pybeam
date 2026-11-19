@@ -65,6 +65,10 @@ sessions warm the workers, followed by a 12-session no-fault baseline and
 12 healthy sessions beside one fault. Both baseline and fault batches are warm.
 Stacks are measured sequentially on the same host, with the other stack idle.
 The kill case interrupts a burn after its first lookup.
+Its completion deadline is 600 seconds. Redis visibility is an eligibility
+threshold, not a delivery timer: this Celery transport checks every 10 seconds
+and scans expired deliveries every tenth check, about 100 seconds apart.
+Queueing and the restarted 30-second burn add to recovery time.
 
 ![Maximum healthy completion time divided by the warm baseline maximum](results/completion.svg)
 
@@ -86,12 +90,19 @@ shared pages are counted more than once.
 Docker's memory samples are also retained. These are local observations, not
 capacity or production-latency guarantees.
 
+PyBEAM starts a fresh isolated process for each tool call; token gaps include
+process startup, imports and replicated state writes. Celery runs tools inline
+in existing prefork workers. The comparison retains these isolation semantics.
+
 ## Boundaries
 
 - PyBEAM uses three replica nodes. A completed tool result is reused on takeover.
   A started tool without a committed result is reported as interrupted and is
   **not re-run**. This is at-most-once execution, not a guarantee that an
   interrupted tool produced no external side effect.
+- Each PyBEAM node budgets 1 MiB of pending data for the cluster-wide full-snapshot
+  subscription. The default 64 KiB is too small for concurrent token updates
+  from these batches. Overflow remains an error, not dropped data or a retry.
 - Recovery here covers same-host SIGKILL only, not network partitions,
   whole-cluster restart or loss of the machine. PyBEAM's session directory is
   in memory; execution audit files share the host filesystem.

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import signal
 from collections.abc import AsyncGenerator
@@ -29,6 +30,7 @@ class Owner:
 
 
 owner = Owner()
+logger = logging.getLogger(__name__)
 
 
 def node_alias(value: str) -> Node:
@@ -42,26 +44,30 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     node = node_alias(os.environ["PYBEAM_AGENTS_NODE"])
     replicas = ["agents_" + name + "@localhost" for name in "abc"]
     beam = await Beam.connect()
-    async with asyncio.TaskGroup() as tasks:
-        runtime = Runtime(
-            beam, node, replicas, Path(os.environ["PYBEAM_AGENTS_AUDIT"]), tasks, transcript
-        )
-        announcements_ready, updates_ready = asyncio.Event(), asyncio.Event()
-        announcements = tasks.create_task(runtime.announcements(announcements_ready))
-        updates = tasks.create_task(runtime.updates(updates_ready))
-        await announcements_ready.wait()
-        await updates_ready.wait()
-        async with ActorGroup(replicas=replicas) as warm:
-            await warm.restore("warm-" + node, Session)
-        owner.runtime = runtime
-        try:
-            yield
-        finally:
-            owner.runtime = None
-            announcements.cancel()
-            updates.cancel()
-            for placement in runtime.placements.values():
-                placement.task.cancel()
+    try:
+        async with asyncio.TaskGroup() as tasks:
+            runtime = Runtime(
+                beam, node, replicas, Path(os.environ["PYBEAM_AGENTS_AUDIT"]), tasks, transcript
+            )
+            announcements_ready, updates_ready = asyncio.Event(), asyncio.Event()
+            announcements = tasks.create_task(runtime.announcements(announcements_ready))
+            updates = tasks.create_task(runtime.updates(updates_ready))
+            await announcements_ready.wait()
+            await updates_ready.wait()
+            async with ActorGroup(replicas=replicas) as warm:
+                await warm.restore("warm-" + node, Session)
+            owner.runtime = runtime
+            try:
+                yield
+            finally:
+                owner.runtime = None
+                announcements.cancel()
+                updates.cancel()
+                for placement in runtime.placements.values():
+                    placement.task.cancel()
+    except Exception:
+        logger.exception("Agent runtime stopped")
+        raise
 
 
 app = FastAPI(lifespan=lifespan)

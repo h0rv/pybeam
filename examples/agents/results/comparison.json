@@ -1,5 +1,5 @@
 {
-  "measured_at": "2026-11-19T15:59:16.073506Z",
+  "measured_at": "2026-11-19T16:45:47.494380Z",
   "machine": "Linux-6.8.0-1060-aws-x86_64-with-glibc2.35",
   "cpu_count": 8,
   "healthy_sessions": 12,
@@ -15,102 +15,102 @@
       "stack": "PyBEAM",
       "case": "stop",
       "baseline_completion_s": [
-        5.986479537000378,
-        6.047401632999936,
-        6.161905379000018,
-        6.219900843000232,
-        6.3346747670002514,
-        6.334679657000379,
-        6.334681240999998,
-        6.395992135000142,
-        6.395994759000132,
-        6.454165894000198,
-        6.454169235000336,
-        6.454171729000336
+        6.240926522999871,
+        6.35093039900039,
+        6.350931728999967,
+        6.5168735810002545,
+        6.516875496000466,
+        6.5168795079998745,
+        6.571751778000362,
+        6.571755106000637,
+        6.571757095000066,
+        6.626364441000078,
+        6.626365375000205,
+        6.681184033000136
       ],
       "healthy_completion_s": [
-        5.978159423999841,
-        6.035596081999756,
-        6.156479270000091,
-        6.156481467000049,
-        6.274771808999958,
-        6.27477299300017,
-        6.274775417000001,
-        6.332705102000091,
-        6.332707619999837,
-        6.332708516999901,
-        6.3908982429998105,
-        6.390901410999959
+        6.209276185000817,
+        6.328014882000389,
+        6.3867400520002775,
+        6.3867424210002355,
+        6.386743562000447,
+        6.445339172000786,
+        6.504129819000809,
+        6.563311996000266,
+        6.5633138870007315,
+        6.563314504000118,
+        6.5633150930007105,
+        6.621427911000865
       ],
-      "median_relative_to_baseline": 0.9905431308678627,
-      "max_relative_to_baseline": 0.9901969887606048,
-      "max_token_gap_s": 1.548576884999875,
+      "median_relative_to_baseline": 0.9893676968998667,
+      "max_relative_to_baseline": 0.9910560580723237,
+      "max_token_gap_s": 1.5507487019995096,
       "healthy_repeats": 0,
       "fault_repeats": 0,
       "fault_state": "stopped",
-      "stop_s": 0.049696973000209255,
+      "stop_s": 0.043938028999946255,
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "44606134e58045b39994d57b6961cdff": {
-          "step-1": 1,
+        "025d7344ef654ab8b7f461af3c819a5c": {
           "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "4766767a14ba4fd3bb9ae79038c24116": {
+          "step-3": 1,
+          "step-1": 1,
           "step-2": 1
         },
-        "81ab3b0a2e2d47b9848e40292f65ec65": {
+        "871526328e3443ac99ce5c380564d2fd": {
           "step-2": 1,
           "step-1": 1,
           "step-3": 1
         },
-        "3592048b310f47b98b17408beb61a13d": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "ccac5824031f40c1b6a235ff3d84753f": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "3de7cea22e9a4e48a28354b15e262364": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "af5237acbb334b6eb798b8b110446fc6": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "df0ac59d772a4c9d864cfc563867dd5a": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "3fc9bcfd8bd349f99ab1b12c08195479": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "89316f7ef96b497486e1c7f7d0d58bd5": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "3dbd99a1ef7f42cb9d7bbf5aebb42433": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "4be8680d36084bfd9ba2bb5259172ed5": {
+        "37c4a091311d4b2e8c3d14559a59a549": {
           "step-2": 1,
           "step-3": 1,
           "step-1": 1
         },
-        "6c385a5602164324803f70c1e5ac74a1": {
+        "ddfbc169edf043a6b3c07f9699b2f4f5": {
           "step-2": 1,
           "step-3": 1,
           "step-1": 1
+        },
+        "8895ed6ccf014af9bd681163e7b3f7a5": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "89d40be86c4845929d3cd4b801a55683": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "9258b3debeec42c7b6f8bf45c0b408f5": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "a96b4a6a753247f4908cf45c27c636fb": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "473c735c9f79410c8fe6e77db8970745": {
+          "step-2": 1,
+          "step-1": 1,
+          "step-3": 1
+        },
+        "e4b720fd444a476f97ac42f512cb1c30": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "4e892f1c8e0c4fa9a98808984068e537": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
         }
       },
       "fault_counts": {
@@ -119,7 +119,7 @@
       },
       "resources": {
         "processes": 11,
-        "rss_mib": 696.8671875,
+        "rss_mib": 695.03125,
         "docker_stats": []
       }
     },
@@ -127,99 +127,99 @@
       "stack": "Redis/Celery",
       "case": "stop",
       "baseline_completion_s": [
-        5.067885054999806,
-        5.067885954999838,
-        5.0678864269998485,
-        5.06788702699987,
-        5.067887523999616,
-        5.067888261999997,
-        5.067889380999986,
-        5.067889985999955,
-        10.112805492000007,
-        10.112806481000007,
-        10.112807145999795,
-        10.112808276999658
+        5.045170113000495,
+        5.04517123200003,
+        5.102089767000507,
+        5.102091094000571,
+        5.102091884999936,
+        5.102093021000655,
+        5.10209397700055,
+        5.102094569000656,
+        10.109887493000315,
+        10.109889880000082,
+        10.109890663999977,
+        10.109891830000379
       ],
       "healthy_completion_s": [
-        5.043162556000425,
-        5.043163534000087,
-        5.043164099000023,
-        5.043164683000214,
-        5.043165313000372,
-        5.105762101000437,
-        5.105765129000247,
-        5.301610705000257,
-        10.100971584000035,
-        10.100972560000173,
-        10.100973153000268,
-        10.100974318000226
+        5.09753150799952,
+        5.097532658999626,
+        5.097533312999985,
+        5.097533905000091,
+        5.097534454999732,
+        5.097534900000028,
+        5.097535754000091,
+        5.345728788000088,
+        10.072537086000011,
+        10.072538745999736,
+        10.072539742999652,
+        10.143552638999608
       ],
-      "median_relative_to_baseline": 1.0074734854757805,
-      "max_relative_to_baseline": 0.9988298048696971,
-      "max_token_gap_s": 1.0614332549998835,
+      "median_relative_to_baseline": 0.9991066075128894,
+      "max_relative_to_baseline": 1.00332949249757,
+      "max_token_gap_s": 1.0642451149997214,
       "healthy_repeats": 0,
       "fault_repeats": 0,
       "fault_state": "stopped",
-      "stop_s": 0.07821189800006323,
+      "stop_s": 0.07890579699960654,
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "0a91fd9505974f638ed8189cfc2c3bff": {
+        "61d83e4ee929411aa7e0137341475cd6": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "18d9519ef66f48ef97aa1186893b9a65": {
+        "2ab858ad59d7472fa083d7eb14c2f34c": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "80f00961507b4c8c94556596559958f8": {
+        "dd680e5ac1484ce286acbedcf7c28367": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "0107a6a84248413d85ca4ed681513f3b": {
+        "f2b84a4669b1427ea3e7949bdb8006d2": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "3c40071bae5d45a69115094fd1f3da5d": {
+        "27d30f9afa25471583c0904d0184d0ca": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "602783af85ec4304b8a17700f116faa6": {
+        "16ace12600dd469db4c260ab471be6cf": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "afc8d39502e34c7ab074e9228fb1e467": {
+        "c348c1f34f3341cb922a872ee424122d": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "bf112234c86e4ef48d3bda349ed70f90": {
+        "b169c490e9ea4a42b5e699d8823bd7bb": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "a0c7e183160645e2ac762630ebb7dcb0": {
+        "9c7258c3b7c44071a0b59788ca6dcf5e": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "f3d8b82736da4fe1b51a007eec0b7cc5": {
+        "23485e4669134b1ca0b21e58074b2d0d": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "ed4c90d59ae9459294fe6ee71fd0d9d8": {
+        "716f9f3e893d467bac47b6a713cae960": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "1f0c533d64a34d4dbbe3df3fd5cdb141": {
+        "d8512956aef84c03a446e2a7a957e660": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
@@ -231,50 +231,319 @@
       },
       "resources": {
         "processes": 15,
-        "rss_mib": 1527.8515625,
+        "rss_mib": 1526.12109375,
+        "docker_stats": [
+          {
+            "BlockIO": "0B / 26.6MB",
+            "CPUPerc": "14.26%",
+            "Container": "833ebbface0a9982b5ef2399613e5f71560d1d91449131e30232cdb35b5bbfb6",
+            "ID": "833ebbface0a",
+            "MemPerc": "0.80%",
+            "MemUsage": "257.5MiB / 31.34GiB",
+            "Name": "agents-usual-app-1",
+            "NetIO": "47.5MB / 47.7MB",
+            "PIDs": "16"
+          },
+          {
+            "BlockIO": "115kB / 5.62MB",
+            "CPUPerc": "7.79%",
+            "Container": "1442bb0f70a8e6fc167fa4af451ce9a06bca850926fb927cee6a7f8028e98e97",
+            "ID": "1442bb0f70a8",
+            "MemPerc": "0.02%",
+            "MemUsage": "5.605MiB / 31.34GiB",
+            "Name": "agents-usual-redis-1",
+            "NetIO": "8.97MB / 47.7MB",
+            "PIDs": "6"
+          },
+          {
+            "BlockIO": "0B / 29MB",
+            "CPUPerc": "6.22%",
+            "Container": "d820d21f430f9237545df4303d141252b39540b63b3ef5a4333abee9ceaff223",
+            "ID": "d820d21f430f",
+            "MemPerc": "1.23%",
+            "MemUsage": "393.7MiB / 31.34GiB",
+            "Name": "agents-usual-worker-1-1",
+            "NetIO": "223kB / 3.66MB",
+            "PIDs": "9"
+          },
+          {
+            "BlockIO": "0B / 29MB",
+            "CPUPerc": "3.25%",
+            "Container": "8da67c72ba917aecf7b9e4d054b312493924f23965a8100bff95ec6f95572a88",
+            "ID": "8da67c72ba91",
+            "MemPerc": "1.25%",
+            "MemUsage": "401.1MiB / 31.34GiB",
+            "Name": "agents-usual-worker-2-1",
+            "NetIO": "222kB / 3.96MB",
+            "PIDs": "9"
+          }
+        ]
+      }
+    },
+    {
+      "stack": "PyBEAM",
+      "case": "hang",
+      "baseline_completion_s": [
+        6.082902835999448,
+        6.082905311000104,
+        6.137441002999367,
+        6.191987445999985,
+        6.191989260999435,
+        6.247367205999581,
+        6.247369269999581,
+        6.3019978949996585,
+        6.302000525999574,
+        6.356554474999939,
+        6.356556240999453,
+        6.356558449999284
+      ],
+      "healthy_completion_s": [
+        6.059970331000841,
+        6.059973605000778,
+        6.234619200999987,
+        6.3510117550004,
+        6.410076525000477,
+        6.410078075999991,
+        6.410080983000626,
+        6.46828868800003,
+        6.468291223000051,
+        6.468292021000707,
+        6.526731959000244,
+        6.526736949000224
+      ],
+      "median_relative_to_baseline": 1.0260447736234015,
+      "max_relative_to_baseline": 1.0267721126675016,
+      "max_token_gap_s": 1.5227872719997322,
+      "healthy_repeats": 0,
+      "fault_repeats": 0,
+      "fault_state": "running",
+      "stop_s": null,
+      "kill_to_resume_s": null,
+      "kill_to_complete_s": null,
+      "healthy_counts": {
+        "e3eb9b1248ad4c299be2a109b995acc8": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "13ca894357a143cf8aa12f508521570b": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "6bef8a938f9e4ca9936c1a746b8c27ce": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "f4a5f0a9705441cf8e7e071b82b1567b": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "c0ead92914c84259b7ec358823dad7f1": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "14409122fb864559bbc0600d10077cc5": {
+          "step-2": 1,
+          "step-1": 1,
+          "step-3": 1
+        },
+        "eb91886cf5ef4342b95a9d7227909039": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "12ef8bfcf9b14d7a8eb28af9cd48a19e": {
+          "step-2": 1,
+          "step-1": 1,
+          "step-3": 1
+        },
+        "9f95bf249fe24f54a8c382906aaf24bc": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "3465233befd847aeb3b4a980d0d1e327": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "3beec3c1bd2646229b2383d4e114e55d": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "f369c326dffc42d28243eb09c6cd7459": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        }
+      },
+      "fault_counts": {
+        "step-1": 1,
+        "step-2": 1
+      },
+      "resources": {
+        "processes": 12,
+        "rss_mib": 738.23046875,
+        "docker_stats": []
+      }
+    },
+    {
+      "stack": "Redis/Celery",
+      "case": "hang",
+      "baseline_completion_s": [
+        5.070562751999205,
+        5.070563663999565,
+        5.070564225999988,
+        5.070564761999776,
+        5.070565660999819,
+        5.070566210999459,
+        5.070567883999502,
+        5.127214331999312,
+        10.115034030999595,
+        10.115035360999173,
+        10.115036026999405,
+        10.115037115999257
+      ],
+      "healthy_completion_s": [
+        5.086676181999792,
+        5.086677326999961,
+        5.086677868000152,
+        5.0866783310002575,
+        5.086678949000088,
+        5.086679500000173,
+        5.086680376000004,
+        10.074144383999737,
+        10.074145443999441,
+        10.074146142000245,
+        10.07414697799959,
+        10.074147995999738
+      ],
+      "median_relative_to_baseline": 1.0031777295023747,
+      "max_relative_to_baseline": 0.9959575907106812,
+      "max_token_gap_s": 1.0615204870000525,
+      "healthy_repeats": 0,
+      "fault_repeats": 0,
+      "fault_state": "running",
+      "stop_s": null,
+      "kill_to_resume_s": null,
+      "kill_to_complete_s": null,
+      "healthy_counts": {
+        "8025cfe85e9f43ad9bc2b4dee4de474d": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "dc6f7da87c8543159b154abe272b99fd": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "de08861b31c641b58854bf6526946130": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "4e41c2a2e85347b2b3caff71cb62edd5": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "45528f4d937541ebab22dc4948b2f968": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "35c879862dc6439fa8a18c1a5af71eba": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "98bf464d2b684fadaddb6c5ef9e924b3": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "87714b4d9eea470eab738392a8bd37d9": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "77a9f3fcd3d841b7bb3305e5596be8b9": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "e6a7a10aeb4547f38f77c8537073c855": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "1a76ec12b756464d871591a184251ee1": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "ad471b3a81e34b0ca6f03fd47063b724": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        }
+      },
+      "fault_counts": {
+        "step-1": 1,
+        "step-2": 1
+      },
+      "resources": {
+        "processes": 15,
+        "rss_mib": 1530.33203125,
         "docker_stats": [
           {
             "BlockIO": "0B / 26.1MB",
-            "CPUPerc": "14.41%",
-            "Container": "30f7b3e1de3f60e9b93b221b03ef17616195234e210c3bb0deb9a14dac671263",
-            "ID": "30f7b3e1de3f",
+            "CPUPerc": "14.73%",
+            "Container": "fb7d9e100386a370431903b3de546ce1f64ffa5c74d1d101bf1dabb6e1e55e46",
+            "ID": "fb7d9e100386",
             "MemPerc": "0.81%",
-            "MemUsage": "259.8MiB / 31.34GiB",
+            "MemUsage": "260.9MiB / 31.34GiB",
             "Name": "agents-usual-app-1",
-            "NetIO": "48.3MB / 48.5MB",
+            "NetIO": "48.4MB / 48.3MB",
             "PIDs": "16"
           },
           {
             "BlockIO": "115kB / 5.67MB",
-            "CPUPerc": "4.92%",
-            "Container": "2e24ba37499512e16f2e74ca4f4af00ca9a663be1bc197edc1b779aa50a29cda",
-            "ID": "2e24ba374995",
+            "CPUPerc": "4.89%",
+            "Container": "e7f07dfadd5552f8726bb9761beac32f23e7adb5706f9ffd4e1f0346ce38ad6f",
+            "ID": "e7f07dfadd55",
             "MemPerc": "0.02%",
-            "MemUsage": "5.504MiB / 31.34GiB",
+            "MemUsage": "5.309MiB / 31.34GiB",
             "Name": "agents-usual-redis-1",
-            "NetIO": "8.95MB / 48.5MB",
+            "NetIO": "8.9MB / 48.5MB",
             "PIDs": "6"
           },
           {
-            "BlockIO": "0B / 28.7MB",
-            "CPUPerc": "5.38%",
-            "Container": "6bf3b2d22e0822a8185ae9851e9901843a01d12e4f0855808d94866bd5ee829e",
-            "ID": "6bf3b2d22e08",
-            "MemPerc": "1.23%",
-            "MemUsage": "393.9MiB / 31.34GiB",
+            "BlockIO": "0B / 29.1MB",
+            "CPUPerc": "6.23%",
+            "Container": "61e64a71eaae1ab00923a9d0eacbc91e230fd027cc2f742cc4d937d1bcff0a29",
+            "ID": "61e64a71eaae",
+            "MemPerc": "1.25%",
+            "MemUsage": "401.6MiB / 31.34GiB",
             "Name": "agents-usual-worker-1-1",
-            "NetIO": "220kB / 3.65MB",
+            "NetIO": "244kB / 4.47MB",
             "PIDs": "9"
           },
           {
             "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "3.68%",
-            "Container": "ac660efa4f5719fef8626440be157c322cf8e84ebd5a3a5de3ce00a6103236fd",
-            "ID": "ac660efa4f57",
+            "CPUPerc": "2.83%",
+            "Container": "267d6469087dccabad24d7d48cd268a4ec85c5e61e370d64994851fe7ed9d2b8",
+            "ID": "267d6469087d",
             "MemPerc": "1.25%",
-            "MemUsage": "401.5MiB / 31.34GiB",
+            "MemUsage": "402.5MiB / 31.34GiB",
             "Name": "agents-usual-worker-2-1",
-            "NetIO": "224kB / 3.95MB",
+            "NetIO": "186kB / 3.13MB",
             "PIDs": "9"
           }
         ]
@@ -282,103 +551,103 @@
     },
     {
       "stack": "PyBEAM",
-      "case": "hang",
+      "case": "burn",
       "baseline_completion_s": [
-        6.024409323999862,
-        6.079819543000212,
-        6.2550126370001635,
-        6.255013937000058,
-        6.255015973999889,
-        6.374000864000209,
-        6.431525069000145,
-        6.431528092999997,
-        6.431529697999849,
-        6.487883650000185,
-        6.4878845080002066,
-        6.54342623499997
+        6.166690784999446,
+        6.1666924559995095,
+        6.221616834000088,
+        6.221620235000046,
+        6.276740444000097,
+        6.332235159999982,
+        6.3877405749999525,
+        6.497824222999952,
+        6.4978260170000794,
+        6.497826517999783,
+        6.497827973000312,
+        6.497829109999657
       ],
       "healthy_completion_s": [
-        6.118080847999863,
-        6.118082437999874,
-        6.237143968000055,
-        6.2371459799996956,
-        6.296730255000057,
-        6.414648767000017,
-        6.4146522480000385,
-        6.47387918000004,
-        6.473880935999659,
-        6.473886153999956,
-        6.532426377999855,
-        6.5324285749998126
+        5.976416416000575,
+        6.037167899000451,
+        6.157143109000572,
+        6.216098724000403,
+        6.276295559000573,
+        6.2762998150001295,
+        6.341664229000344,
+        6.401023390000773,
+        6.4605950040004245,
+        6.460599572000319,
+        6.519320549999975,
+        6.519322832999933
       ],
-      "median_relative_to_baseline": 1.001856626750365,
-      "max_relative_to_baseline": 0.9983192811219705,
-      "max_token_gap_s": 1.5271613079999042,
+      "median_relative_to_baseline": 0.9919801976729588,
+      "max_relative_to_baseline": 1.0033078313751278,
+      "max_token_gap_s": 1.5340069150006457,
       "healthy_repeats": 0,
       "fault_repeats": 0,
-      "fault_state": "running",
+      "fault_state": "completed",
       "stop_s": null,
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "784c0113850d49ca896120fe1340f577": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "7d40bf98b0874661980a9c765d991891": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "b6e71984bb4b4b5b96713e5f34b686d3": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "71acc9bafc7a42a89ffacc7b56a518c6": {
-          "step-3": 1,
-          "step-1": 1,
-          "step-2": 1
-        },
-        "ca86a0d3a91e41708855172203b386fc": {
+        "e217c101bd3a4a7e923ee25369fd6698": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "c3b35ceff2de442d9d8f8194ea4949a9": {
+        "2a8d1966337c4e928c6f73fe8b29f9e4": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "8ad6030a89d242fcbd97330b711f6371": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "97b555ae4e864b308f9ce7e17c5f1d78": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "70c2c6d0b4d64c008ad83aa6913e95c4": {
           "step-2": 1,
           "step-1": 1,
           "step-3": 1
         },
-        "b6ea4dbb5d344d52b09cc607ee95ee2a": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "8a81c155ddae4418856a394f1318ead4": {
-          "step-2": 1,
-          "step-3": 1,
-          "step-1": 1
-        },
-        "4d6f86c3f18f4e9dbe509ff85de35e17": {
-          "step-2": 1,
-          "step-3": 1,
-          "step-1": 1
-        },
-        "17a4b46ce1bd4dd8950ea4ea031592b9": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "d87a1854b5384c12950dce9be9076a55": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "4f955bb000df4f71aed5aa569bf3f621": {
+        "22124ec75c334145b673e57ce08633ba": {
           "step-2": 1,
           "step-1": 1,
+          "step-3": 1
+        },
+        "bc925da4004442d597685a38b592434a": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "165457bf98c446ac87be815588c211bf": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "e4c14dc079c44b5fa1f198c15f9f0ba3": {
+          "step-2": 1,
+          "step-1": 1,
+          "step-3": 1
+        },
+        "83462363033b4b59ab93d27d37bd51bb": {
+          "step-2": 1,
+          "step-3": 1,
+          "step-1": 1
+        },
+        "f7d99dbf41ba480985a9a4b8ec551b33": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "c99485bb5f9e4b2286d471bae55127b9": {
+          "step-1": 1,
+          "step-2": 1,
           "step-3": 1
         }
       },
@@ -388,107 +657,107 @@
       },
       "resources": {
         "processes": 12,
-        "rss_mib": 749.12109375,
+        "rss_mib": 737.6796875,
         "docker_stats": []
       }
     },
     {
       "stack": "Redis/Celery",
-      "case": "hang",
+      "case": "burn",
       "baseline_completion_s": [
-        5.061983267999949,
-        5.06198425599996,
-        5.119024348000039,
-        5.119026330999986,
-        5.119026997000219,
-        5.119028129000071,
-        5.1190289730002405,
-        5.119029556999976,
-        10.0968607169998,
-        10.096861836000244,
-        10.096862493000117,
-        10.096863685000244
+        5.079240453999773,
+        5.079241573000218,
+        5.079242214999795,
+        5.079242798999985,
+        5.0792433369997525,
+        5.0792439870001544,
+        5.079244961999393,
+        5.079245541999626,
+        10.120791255999393,
+        10.120792371999414,
+        10.120792892999816,
+        10.120794349999414
       ],
       "healthy_completion_s": [
-        5.067665927999769,
-        5.067666894000013,
-        5.067667473999791,
-        5.067667977999918,
-        5.067668497999875,
-        5.067669299000045,
-        5.0676704109996535,
-        10.121582559999752,
-        10.121583596999699,
-        10.121584357999836,
-        10.121584955999879,
-        10.121586234999995
+        5.116855862999728,
+        5.1168573940003625,
+        5.1168580209996435,
+        5.116858532999686,
+        5.116858934999982,
+        5.116859959000067,
+        5.1168616570003,
+        10.131016344000273,
+        10.13101755400021,
+        10.131018260000019,
+        10.13101892099985,
+        10.131020351000188
       ],
-      "median_relative_to_baseline": 0.9899671010839992,
-      "max_relative_to_baseline": 1.0024485375628551,
-      "max_token_gap_s": 1.061426678999851,
+      "median_relative_to_baseline": 1.0074058915039945,
+      "max_relative_to_baseline": 1.0010103950981648,
+      "max_token_gap_s": 1.0664571120005348,
       "healthy_repeats": 0,
       "fault_repeats": 0,
-      "fault_state": "running",
+      "fault_state": "completed",
       "stop_s": null,
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "dcf9c5f8b4ce42fdb2645f476be8b134": {
+        "8fe7fb5d18af4b489d51527dd5abf8ca": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "f7d61c80cdf44dcaac982dc03db860f3": {
+        "4fee2ffee4be4b88a62b65b5e2b404be": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "78295d55fc494a03b4dfcc73f2754a30": {
+        "b1baddf5495e4e0987ccd5720abb9ab5": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "9f8acf07b4fd40d0bb87b56281d921e3": {
+        "402ec7b9ffd94539b08b73c318aa136b": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "5d728b5f38344f5f8f3058c88ead32f0": {
+        "e3928d8617f445b28afb2de039c91003": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "aa0716897ff24ae8bd30de69e7295473": {
+        "372b744be58141269703f5886371a0c2": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "1fdb4f37c86f46a98afa2c946d482bcd": {
+        "4b93ccc0a3534a6ba26fa8cd49bc91c5": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "4bd60daad79449f59309a733931536f3": {
+        "4b3b723d14fd46e79282072527d0462c": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "617eed4a49cd4e798e46b7829168b28e": {
+        "6ae523468dc94efb9f6f57036c6d7f5a": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "4ad70e80e9c149a1b0b4a953cdb3d753": {
+        "96122e03f8b444b6a88bc7b48ff24eaf": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "cbb16c7a610a4189b80965d4aaefa446": {
+        "838ea18b0ef44bfaa3c38f4b4b367fd1": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "1589dda32ecb41719f9fe09a8aefc41e": {
+        "4af4e5e1b0ea497d99ec9cd2852206d7": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
@@ -500,319 +769,50 @@
       },
       "resources": {
         "processes": 15,
-        "rss_mib": 1529.40625,
+        "rss_mib": 1527.6953125,
         "docker_stats": [
           {
             "BlockIO": "0B / 26.6MB",
-            "CPUPerc": "13.98%",
-            "Container": "da28cc810c2573788a945dbd796720d75209fd15c4dea5e18934d0081b30fece",
-            "ID": "da28cc810c25",
-            "MemPerc": "0.81%",
-            "MemUsage": "259.6MiB / 31.34GiB",
+            "CPUPerc": "15.51%",
+            "Container": "29b5cdbac544b014eb5bccb672da2123108ef7ab71cd874b69ffe10df1e98137",
+            "ID": "29b5cdbac544",
+            "MemPerc": "0.80%",
+            "MemUsage": "258MiB / 31.34GiB",
             "Name": "agents-usual-app-1",
-            "NetIO": "47.7MB / 47.9MB",
+            "NetIO": "48.8MB / 48.7MB",
             "PIDs": "16"
           },
           {
-            "BlockIO": "106kB / 5.66MB",
-            "CPUPerc": "4.82%",
-            "Container": "b0db63e3082ed44115868f377a7bc5494726043d78379a1a62964b55049eb3ae",
-            "ID": "b0db63e3082e",
+            "BlockIO": "115kB / 5.63MB",
+            "CPUPerc": "5.03%",
+            "Container": "ddef468d9d9c81f953101763683b922104dc3c0fd1ae8da4d9db6767756ee45d",
+            "ID": "ddef468d9d9c",
             "MemPerc": "0.02%",
-            "MemUsage": "5.27MiB / 31.34GiB",
+            "MemUsage": "5.426MiB / 31.34GiB",
             "Name": "agents-usual-redis-1",
-            "NetIO": "8.43MB / 44.2MB",
+            "NetIO": "8.97MB / 48.7MB",
             "PIDs": "6"
+          },
+          {
+            "BlockIO": "0B / 29.1MB",
+            "CPUPerc": "105.63%",
+            "Container": "516a7d1cefb902ba72cae3018daa6af47765f4e170a1a20329626accb1eabf2b",
+            "ID": "516a7d1cefb9",
+            "MemPerc": "1.25%",
+            "MemUsage": "401.3MiB / 31.34GiB",
+            "Name": "agents-usual-worker-1-1",
+            "NetIO": "269kB / 4.48MB",
+            "PIDs": "9"
           },
           {
             "BlockIO": "0B / 29.2MB",
-            "CPUPerc": "6.43%",
-            "Container": "106c17ee8552ebbb4aa46b557afded097f7dc26ddd99ffd6f251cc1f1066ed97",
-            "ID": "106c17ee8552",
-            "MemPerc": "1.25%",
-            "MemUsage": "402.2MiB / 31.34GiB",
-            "Name": "agents-usual-worker-1-1",
-            "NetIO": "197kB / 3.29MB",
-            "PIDs": "9"
-          },
-          {
-            "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "4.68%",
-            "Container": "3c78112d32245430b9eea5f9d9465827747d608fa408c28a2b8b9f8f5764c6ce",
-            "ID": "3c78112d3224",
+            "CPUPerc": "3.84%",
+            "Container": "add3a25138e1330d7207333638fa503a9d71edbe99e398122e7443b3507cdeba",
+            "ID": "add3a25138e1",
             "MemPerc": "1.25%",
             "MemUsage": "402.2MiB / 31.34GiB",
             "Name": "agents-usual-worker-2-1",
-            "NetIO": "241kB / 4.46MB",
-            "PIDs": "9"
-          }
-        ]
-      }
-    },
-    {
-      "stack": "PyBEAM",
-      "case": "burn",
-      "baseline_completion_s": [
-        5.963670662999903,
-        6.07402397199985,
-        6.1295560849998765,
-        6.184440717999678,
-        6.1844420949996675,
-        6.239870054999756,
-        6.296312338999996,
-        6.350977779000004,
-        6.350979131999793,
-        6.350980227000036,
-        6.350981041000068,
-        6.405964045000019
-      ],
-      "healthy_completion_s": [
-        6.112565832999735,
-        6.171107989999655,
-        6.289045510000051,
-        6.34753529999989,
-        6.408616068999891,
-        6.46825373799993,
-        6.468257341000026,
-        6.530213461999665,
-        6.590419406999899,
-        6.590421005999815,
-        6.590421537999646,
-        6.590423171999646
-      ],
-      "median_relative_to_baseline": 1.0319338593216236,
-      "max_relative_to_baseline": 1.028794905139001,
-      "max_token_gap_s": 1.5712237049997384,
-      "healthy_repeats": 0,
-      "fault_repeats": 0,
-      "fault_state": "completed",
-      "stop_s": null,
-      "kill_to_resume_s": null,
-      "kill_to_complete_s": null,
-      "healthy_counts": {
-        "bb508b91269842f98e10b9dbc4974460": {
-          "step-3": 1,
-          "step-1": 1,
-          "step-2": 1
-        },
-        "91d1738dbe5049f68955d5eb9c9b6425": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "71335de9287e4c87bc255a9e1e7b997a": {
-          "step-2": 1,
-          "step-3": 1,
-          "step-1": 1
-        },
-        "c2967efbc40042adb12487bb797713dd": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "39a879bf61914764bc1997b537abab92": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "1c19913701ee4f458ef193bef2cadd6d": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "b51e9861f9e74be0b971d9fa32cc8d03": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "8b92bbc03cc84952a7a324775b2b6e5b": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "39f0e69d79e84b4e96a4429c7bafebde": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "a278d023af02458eb1184bad0838ec83": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "3e98480b61c94afc99458bf22cb95e78": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "07b0886ffde84e7e9fb982c7f8711dc1": {
-          "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        }
-      },
-      "fault_counts": {
-        "step-2": 1,
-        "step-1": 1
-      },
-      "resources": {
-        "processes": 12,
-        "rss_mib": 733.703125,
-        "docker_stats": []
-      }
-    },
-    {
-      "stack": "Redis/Celery",
-      "case": "burn",
-      "baseline_completion_s": [
-        5.083204131000002,
-        5.083204984999611,
-        5.083205710999664,
-        5.0832062779995795,
-        5.0832068039999285,
-        5.083208268999897,
-        5.083209281999643,
-        5.083209841999633,
-        10.094523512999785,
-        10.094524582999838,
-        10.094525192999754,
-        10.094526352999765
-      ],
-      "healthy_completion_s": [
-        5.125270987000022,
-        5.125272393000159,
-        5.125272953000149,
-        5.125273359999937,
-        5.125273880999885,
-        5.125275282000075,
-        5.125276273000054,
-        10.140965031000178,
-        10.140966184000263,
-        10.140966806000051,
-        10.140967303000252,
-        10.140968540999893
-      ],
-      "median_relative_to_baseline": 1.0082756785837816,
-      "max_relative_to_baseline": 1.0046007297792954,
-      "max_token_gap_s": 1.0644818370001303,
-      "healthy_repeats": 0,
-      "fault_repeats": 0,
-      "fault_state": "completed",
-      "stop_s": null,
-      "kill_to_resume_s": null,
-      "kill_to_complete_s": null,
-      "healthy_counts": {
-        "94e7cd5f81bd4dbd8ff3df0e56178519": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "3c6863fc2f84416babc449f164deb5c6": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "1cdb7d0138bd40da9a68dd9a869669f0": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "e24eaeff489e4b8a80ee38c41e294c13": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "b79a2cfbe8714ef5b76b18731e63e769": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "67adab47520142ce95389802f298f47c": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "991bafa43d4b4cb5923cf88a3644f6bc": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "43f9fbee67974d308fd014e3b09ae52a": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "bc611328b7a8458fb606df007fccc331": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "0e6f4f66ba9f4f1b8a5eb15ea387974c": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "07985cc55da44aabaa6e1ba5cf12d1d2": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "2456cdc825c541bdb7220fed7834ba7b": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        }
-      },
-      "fault_counts": {
-        "step-1": 1,
-        "step-2": 1
-      },
-      "resources": {
-        "processes": 15,
-        "rss_mib": 1527.58203125,
-        "docker_stats": [
-          {
-            "BlockIO": "0B / 26.6MB",
-            "CPUPerc": "15.48%",
-            "Container": "248dc0ebc13574c1d0283c9a89ca600513fb7faa294f3b03de638807e6c5af96",
-            "ID": "248dc0ebc135",
-            "MemPerc": "0.80%",
-            "MemUsage": "257.6MiB / 31.34GiB",
-            "Name": "agents-usual-app-1",
-            "NetIO": "47.8MB / 48MB",
-            "PIDs": "16"
-          },
-          {
-            "BlockIO": "115kB / 5.6MB",
-            "CPUPerc": "4.97%",
-            "Container": "3dd4402a895c541a109a83472ca476a9c07c9a1a5b0775085aa1c4fb6d7c8ce6",
-            "ID": "3dd4402a895c",
-            "MemPerc": "0.02%",
-            "MemUsage": "5.891MiB / 31.34GiB",
-            "Name": "agents-usual-redis-1",
-            "NetIO": "8.96MB / 48MB",
-            "PIDs": "6"
-          },
-          {
-            "BlockIO": "0B / 28.8MB",
-            "CPUPerc": "104.96%",
-            "Container": "a6140a52ba0e04fdc7d3ad2d71e9b570538e295427b2614928a7469af2fa4d6f",
-            "ID": "a6140a52ba0e",
-            "MemPerc": "1.25%",
-            "MemUsage": "402.1MiB / 31.34GiB",
-            "Name": "agents-usual-worker-1-1",
-            "NetIO": "235kB / 3.61MB",
-            "PIDs": "9"
-          },
-          {
-            "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "4.15%",
-            "Container": "23fe83635aaccc021204f19e0d19020261743603d7fcb03ba191fc8011b029d1",
-            "ID": "23fe83635aac",
-            "MemPerc": "1.25%",
-            "MemUsage": "401.7MiB / 31.34GiB",
-            "Name": "agents-usual-worker-2-1",
-            "NetIO": "246kB / 3.97MB",
+            "NetIO": "210kB / 3.09MB",
             "PIDs": "9"
           }
         ]
@@ -822,36 +822,36 @@
       "stack": "PyBEAM",
       "case": "crash",
       "baseline_completion_s": [
-        5.969536602000062,
-        6.134867051000128,
-        6.1906191739999485,
-        6.190620219000266,
-        6.245788934000302,
-        6.2457918840000275,
-        6.356580056999974,
-        6.356581928000196,
-        6.356584013999964,
-        6.356585335000091,
-        6.356587944000239,
-        6.466896166999959
+        5.959187963999284,
+        6.068078042999332,
+        6.068080954999459,
+        6.123422812999706,
+        6.123424985999918,
+        6.179075628999271,
+        6.234720464999555,
+        6.234726607000084,
+        6.234728405999704,
+        6.290037562999714,
+        6.345126574999995,
+        6.345128210999974
       ],
       "healthy_completion_s": [
-        6.028617288000078,
-        6.028620195000258,
-        6.0866744019999715,
-        6.146136174000276,
-        6.146139542000128,
-        6.262645268000142,
-        6.2626464680001845,
-        6.321534573000008,
-        6.321535819000019,
-        6.321536352000294,
-        6.321539293000114,
-        6.379734775000088
+        5.921987776000606,
+        5.9803638729999875,
+        6.038574475000132,
+        6.038576875000217,
+        6.096500307000497,
+        6.154686729000787,
+        6.154689203000089,
+        6.212937760999921,
+        6.212939114000619,
+        6.212940697000704,
+        6.212941665000471,
+        6.271415760000309
       ],
-      "median_relative_to_baseline": 0.9938836748065731,
-      "max_relative_to_baseline": 0.9865219125606735,
-      "max_token_gap_s": 1.5119056349999482,
+      "median_relative_to_baseline": 0.9915883778654597,
+      "max_relative_to_baseline": 0.9883828271788305,
+      "max_token_gap_s": 1.442375386999629,
       "healthy_repeats": 0,
       "fault_repeats": 0,
       "fault_state": "failed",
@@ -859,74 +859,74 @@
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "582be918be424c408958f6e5dc548403": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "a2df776d416a46e0a801ceac2a11eeba": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "7c7c310e5f31480f961e00ebe5e76818": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "d8052e95424343f5872c438ae7fcde3c": {
+        "c4c557b24cb14fe492f51201f0f7006f": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "753086efd83d467fb69327153ef43b93": {
+        "7738f94969f34f9a96e6c5bfcb054012": {
           "step-3": 1,
           "step-2": 1,
           "step-1": 1
         },
-        "9abb89db18cb4109a38e79cecf5eddd8": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "57ba0e220d364f498e53edadcd3ae54f": {
-          "step-1": 1,
-          "step-3": 1,
-          "step-2": 1
-        },
-        "bf8ba95a4a074a1ebebd4d025c1cd4a5": {
-          "step-1": 1,
-          "step-2": 1,
-          "step-3": 1
-        },
-        "bcef2909557247f2a502f06a3e88922c": {
-          "step-3": 1,
-          "step-1": 1,
-          "step-2": 1
-        },
-        "e01abc17fdf7434ea3bea2256b174da7": {
-          "step-2": 1,
-          "step-1": 1,
-          "step-3": 1
-        },
-        "13e614e0ef4f4c4eac83d1f4fd4fc535": {
+        "e5e532ff4ad24eeab20748ba92f7769a": {
           "step-3": 1,
           "step-2": 1,
           "step-1": 1
         },
-        "0a30627be4714a5e8756dea089848b7b": {
+        "0012fae34c4a45949a9c139c3c0d262e": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "c108e43fbe8d440d8638e4902b774007": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "a231640313124f89a463e49fb462fb7b": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "3f2478f2c8214d6a837c0b4f7f9b25f7": {
+          "step-2": 1,
+          "step-1": 1,
+          "step-3": 1
+        },
+        "80a5a2c9e59a42e6aca4142d1f95ff3a": {
+          "step-3": 1,
+          "step-2": 1,
+          "step-1": 1
+        },
+        "cdff7866b76a404f8be798ecd740a8b3": {
+          "step-1": 1,
+          "step-2": 1,
+          "step-3": 1
+        },
+        "0c7b15cde2cd40d989060d6fe0612234": {
           "step-2": 1,
           "step-3": 1,
           "step-1": 1
+        },
+        "4ba896d6a59e43dca10b9166ff060538": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "ab39f3ad45c14d9da32bd92a2c21fe2b": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
         }
       },
       "fault_counts": {
-        "step-1": 1,
-        "step-2": 1
+        "step-2": 1,
+        "step-1": 1
       },
       "resources": {
         "processes": 12,
-        "rss_mib": 744.0703125,
+        "rss_mib": 745.53125,
         "docker_stats": []
       }
     },
@@ -934,154 +934,154 @@
       "stack": "Redis/Celery",
       "case": "crash",
       "baseline_completion_s": [
-        5.044903364999755,
-        5.044904653999765,
-        5.044905415999892,
-        5.044906225999966,
-        5.1020841979998295,
-        5.1020853039999565,
-        5.102086670000062,
-        5.1020874149999145,
-        10.125487668000005,
-        10.125488615999984,
-        10.125489119999656,
-        10.125490449999688
+        5.055884648999381,
+        5.055886690999614,
+        5.055887378999614,
+        5.055887883999276,
+        5.05588846899991,
+        5.055889043999741,
+        5.055890515999636,
+        5.112484597999355,
+        10.090025223999874,
+        10.090027061999535,
+        10.09002763099943,
+        10.090028665999853
       ],
       "healthy_completion_s": [
-        5.046064596999713,
-        5.0460657539997555,
-        5.110168498999883,
-        5.110169546999714,
-        5.110170124999968,
-        5.110170632000063,
-        5.110171569999693,
-        5.365274246999888,
-        10.08553420499993,
-        10.085536143999889,
-        10.085536996999963,
-        10.085538229999656
+        5.0381039680005415,
+        5.038105132000055,
+        5.038105737000478,
+        5.038106340000013,
+        5.038106908999907,
+        5.038107410000521,
+        5.038108339000246,
+        5.349591981000231,
+        10.065277803000754,
+        10.065279072000521,
+        10.06527974600067,
+        10.065280843000437
       ],
-      "median_relative_to_baseline": 1.0015846683141894,
-      "max_relative_to_baseline": 0.9960542928564973,
-      "max_token_gap_s": 1.0704062690001592,
+      "median_relative_to_baseline": 0.9964829325256165,
+      "max_relative_to_baseline": 0.9975472990396145,
+      "max_token_gap_s": 1.0606482469993352,
       "healthy_repeats": 0,
-      "fault_repeats": 4,
+      "fault_repeats": 5,
       "fault_state": "running",
       "stop_s": null,
       "kill_to_resume_s": null,
       "kill_to_complete_s": null,
       "healthy_counts": {
-        "58e29f57f0d74d9f969c1febab824021": {
+        "d0739f621aad4ec4b77593fea7a4d2b6": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "b088e50654fe455d93ea2794143cbf77": {
+        "7946b3172b91443cbdff109ed14500ae": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "988783f072dd4c8cb2e0f39e0485c115": {
+        "432c92c480b643df8fc559aa16cc4bfa": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "25a94e7b06094b2c9fed173827260edd": {
+        "588c2892429c452ab59c2f8b9cf3e158": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "60b0e224048a4c2eab8cf102ff3579b2": {
+        "501b7290156640abba126944804fb15e": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "48d2d426bc1c4185960fc4f15ccb4744": {
+        "fecd577fad484a68a03399a903528cdd": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "3a70cc28725646ad8de235ff85b39318": {
+        "ba32e77ca9cb4ba3945010ac74596233": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "d58a6a403c944cb6a282441ccd3428ed": {
+        "ed886c72f87941079bc26e88115a585f": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "28cffa8755d34b52931856ffa5399b1a": {
+        "240ac143ad8b4337a0385e0f4a7457de": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "ad013d9a67fb48a3a02a55a2495929e1": {
+        "667ebee0d9444878980cfc1d4835131e": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "20ecd6ccd420462c92e5de9811234a2c": {
+        "bcef83bde34b496c8adb261a50e0c905": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "5e6a09dcb63b4de68097d18036abf612": {
+        "2a508bc303c74cefb121ccbe61a7fc54": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         }
       },
       "fault_counts": {
-        "step-1": 3,
+        "step-1": 4,
         "step-2": 3
       },
       "resources": {
         "processes": 15,
-        "rss_mib": 1527.140625,
+        "rss_mib": 1529.26953125,
         "docker_stats": [
           {
             "BlockIO": "0B / 26.6MB",
-            "CPUPerc": "14.91%",
-            "Container": "2753922b4afd19e9bd2e69aee283410044e26d2b799c52e9d9b0593cd9672746",
-            "ID": "2753922b4afd",
+            "CPUPerc": "13.82%",
+            "Container": "821ea4b35186b50ccc7a81f713e41d94ddeecfbd939833aeb4bf1f28db193970",
+            "ID": "821ea4b35186",
             "MemPerc": "0.81%",
-            "MemUsage": "258.8MiB / 31.34GiB",
+            "MemUsage": "260MiB / 31.34GiB",
             "Name": "agents-usual-app-1",
-            "NetIO": "44.6MB / 44.8MB",
+            "NetIO": "48.1MB / 48.3MB",
             "PIDs": "16"
           },
           {
-            "BlockIO": "115kB / 5.62MB",
-            "CPUPerc": "5.27%",
-            "Container": "efb941f84da7570ecdfc23258c5d50e3e59250aeacc1bec56bc8e1db5c322219",
-            "ID": "efb941f84da7",
+            "BlockIO": "115kB / 5.69MB",
+            "CPUPerc": "4.87%",
+            "Container": "9013a7578c460dc3e94382558f58ad2b76b13f01dbd44ecae1b8a6a836d724a8",
+            "ID": "9013a7578c46",
             "MemPerc": "0.02%",
-            "MemUsage": "5.375MiB / 31.34GiB",
+            "MemUsage": "5.473MiB / 31.34GiB",
             "Name": "agents-usual-redis-1",
-            "NetIO": "8.96MB / 48.5MB",
+            "NetIO": "8.95MB / 48.3MB",
             "PIDs": "6"
           },
           {
-            "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "7.53%",
-            "Container": "353d28f5e2c3cf05c855efa0d5d109b8fcd8239fb613947bdb32c8bae5733c22",
-            "ID": "353d28f5e2c3",
+            "BlockIO": "0B / 29.3MB",
+            "CPUPerc": "5.97%",
+            "Container": "68570f62732cac6dc3353b334eeed938708e889b2c8150f80a5aab16302b8153",
+            "ID": "68570f62732c",
             "MemPerc": "1.25%",
             "MemUsage": "401.9MiB / 31.34GiB",
             "Name": "agents-usual-worker-1-1",
-            "NetIO": "254kB / 4.76MB",
+            "NetIO": "230kB / 4.17MB",
             "PIDs": "9"
           },
           {
-            "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "5.39%",
-            "Container": "9e871bf82190b190f60e4b6881113838f544654592ffe1df67df64c9f27b27d0",
-            "ID": "9e871bf82190",
+            "BlockIO": "4.1kB / 28.9MB",
+            "CPUPerc": "16.78%",
+            "Container": "9c1c897dfdcb1b53397e077f1503c9986cf8bfb7b24ac37bbb7c2527ce7615d9",
+            "ID": "9c1c897dfdcb",
             "MemPerc": "1.23%",
-            "MemUsage": "395.3MiB / 31.34GiB",
+            "MemUsage": "394.7MiB / 31.34GiB",
             "Name": "agents-usual-worker-2-1",
-            "NetIO": "193kB / 3.06MB",
+            "NetIO": "206kB / 3.45MB",
             "PIDs": "9"
           }
         ]
@@ -1091,105 +1091,109 @@
       "stack": "PyBEAM",
       "case": "kill",
       "baseline_completion_s": [
-        6.032016110999848,
-        6.032017732999975,
-        6.1987321659999,
-        6.1987355419996675,
-        6.198736348999773,
-        6.3092736359999435,
-        6.3092760479999015,
-        6.364582012000028,
-        6.364582963999965,
-        6.364583989000039,
-        6.364584496999669,
-        6.364586794999923
+        6.08917555700009,
+        6.143899059000432,
+        6.253316053999697,
+        6.253317431000141,
+        6.308109132000027,
+        6.308113398000387,
+        6.364083155000117,
+        6.3640850339998,
+        6.419574812999599,
+        6.419576715999938,
+        6.474479118999625,
+        6.474482094999985
       ],
       "healthy_completion_s": [
-        6.104995069999859,
-        6.104996690000007,
-        6.1049977130001025,
-        6.104998218000219,
-        6.163830875000258,
-        6.163831846999983,
-        6.22213173199998,
-        6.222133298000244,
-        6.222135830999832,
-        6.281320521999987,
-        6.340497844999845,
-        7.181638186999862
+        5.883408081000198,
+        6.001194833000227,
+        6.059518739999476,
+        6.059519841999645,
+        6.059523304999857,
+        6.118741043999762,
+        6.118744114000037,
+        6.1187451890000375,
+        6.177632271999755,
+        6.236265008999908,
+        6.236266367999633,
+        6.294960080000237
       ],
-      "median_relative_to_baseline": 0.9815679209715521,
-      "max_relative_to_baseline": 1.1283746169730644,
-      "max_token_gap_s": 1.4830783239999619,
+      "median_relative_to_baseline": 0.9656956555887879,
+      "max_relative_to_baseline": 0.9722723744748037,
+      "max_token_gap_s": 1.5230183799994848,
       "healthy_repeats": 0,
       "fault_repeats": 0,
       "fault_state": "completed",
       "stop_s": null,
-      "kill_to_resume_s": 0.14007489499999792,
-      "kill_to_complete_s": 1.4989263620000202,
+      "kill_to_resume_s": 0.1302319879996503,
+      "kill_to_complete_s": 1.2375297899998259,
       "healthy_counts": {
-        "8bf3cb75910f4fc6af636e69ee603266": {
+        "158da6ea3add40159ab16e21bfd1ae09": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "1ee3b31a4e0042cfbcc99654ef45cf7e": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "46c6edbd67b64a859d1fc84f4d8343b4": {
+          "step-3": 1,
+          "step-1": 1,
+          "step-2": 1
+        },
+        "bd39ae2c8941409cbfc013c2d1f7cb88": {
           "step-1": 1,
           "step-3": 1,
           "step-2": 1
         },
-        "4a58a8977d3942699f1d6264392d64eb": {
+        "6cb5a00655a44666a56f1994e29c613d": {
           "step-2": 1,
           "step-3": 1,
           "step-1": 1
         },
-        "f67a6f847315456eabdf0042b5fb245a": {
+        "54ab6e3aca9746f599885e997d84cfca": {
           "step-3": 1,
-          "step-2": 1,
-          "step-1": 1
-        },
-        "162e8ee9af9e464db841e7ae69d52b08": {
-          "step-2": 1,
           "step-1": 1,
-          "step-3": 1
-        },
-        "4b73b87800924b2cb36b270fcccda77e": {
-          "step-2": 1,
-          "step-3": 1
-        },
-        "d60e0061f7e04c53a30966a9a35f9bca": {
-          "step-3": 1,
           "step-2": 1
         },
-        "5ddc141dcd104d218599854b4906ed62": {
-          "step-2": 1,
-          "step-3": 1
-        },
-        "56d815fb07fa4d31ad3eae80d9111841": {
-          "step-2": 1,
-          "step-3": 1,
-          "step-1": 1
-        },
-        "311a226d1cf74e5cb68d4bcb25e56591": {
+        "d7a90826678d49718ee34286133c51f9": {
           "step-1": 1,
           "step-3": 1,
           "step-2": 1
         },
-        "7996267857dc4b89a5db72850d708cb9": {
+        "4a7ce6d71a7b4651868b138416d7e7df": {
+          "step-1": 1,
+          "step-3": 1,
+          "step-2": 1
+        },
+        "35d4c6993bbb4500872895b451608743": {
           "step-2": 1,
+          "step-1": 1,
           "step-3": 1
         },
-        "49690be138154bdf976c0c0c0d8fa60c": {
+        "ac345b9e405f44b89ca24fa02c7b59ce": {
+          "step-3": 1,
           "step-2": 1,
-          "step-3": 1
+          "step-1": 1
         },
-        "b6da30c23b8b4295a5cf2debb9bc084f": {
+        "96be0bf74efc46cabf1c4194a2bbf810": {
+          "step-3": 1,
+          "step-2": 1
+        },
+        "4765309f849b475abb0374dabde05a66": {
           "step-1": 1,
           "step-3": 1,
           "step-2": 1
         }
       },
       "fault_counts": {
-        "step-1": 1,
-        "step-2": 1
+        "step-2": 1,
+        "step-1": 1
       },
       "resources": {
-        "processes": 14,
+        "processes": 12,
         "rss_mib": 739.6171875,
         "docker_stats": []
       }
@@ -1198,99 +1202,99 @@
       "stack": "Redis/Celery",
       "case": "kill",
       "baseline_completion_s": [
-        5.094081746000029,
-        5.0940829080000185,
-        5.094083472999955,
-        5.094083927000156,
-        5.094084435000241,
-        5.094084947999818,
-        5.094085857000209,
-        5.0940863040000295,
-        10.108279562999996,
-        10.108280853999986,
-        10.165661502000148,
-        10.16566345299998
+        5.079205573999388,
+        5.079207581999981,
+        5.079208294999262,
+        5.079208874999495,
+        5.079209444999833,
+        5.079209964999791,
+        5.079210879000129,
+        5.079211431999283,
+        10.081078883999908,
+        10.081079906999548,
+        10.081080688999464,
+        10.081081880000056
       ],
       "healthy_completion_s": [
-        5.113337759999922,
-        5.113339149999774,
-        5.113340029000028,
-        5.113340967000113,
-        10.149196213999858,
-        10.149197836999974,
-        10.149198925999826,
-        10.14919952299988,
-        15.179495332999977,
-        148.21578323599988,
-        148.21578477000003,
-        148.21578627500003
+        5.052276616000199,
+        5.0522779780003475,
+        5.052278860000115,
+        5.113299368000298,
+        10.07082240300042,
+        10.070823373000167,
+        10.070824418000484,
+        10.133138717000293,
+        15.143876501000705,
+        149.51406496300024,
+        149.51406632700036,
+        149.51406755800053
       ],
-      "median_relative_to_baseline": 1.9923494758291644,
-      "max_relative_to_baseline": 14.580040639773513,
-      "max_token_gap_s": 142.68363995899972,
+      "median_relative_to_baseline": 1.9827538256497153,
+      "max_relative_to_baseline": 14.831152979187953,
+      "max_token_gap_s": 143.9843332700002,
       "healthy_repeats": 3,
       "fault_repeats": 2,
       "fault_state": "completed",
       "stop_s": null,
-      "kill_to_resume_s": 142.63438555099992,
-      "kill_to_complete_s": 175.16445708399988,
+      "kill_to_resume_s": 143.94724327199947,
+      "kill_to_complete_s": 176.45526272899951,
       "healthy_counts": {
-        "bab6a34054b546ebad4e4ae7c6f11d73": {
+        "9065c34781f946c587971ef11614c89e": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "c8e9449eba3448c8b8ffda75454b9990": {
+        "e91acb34a98049029e272497870b07b6": {
           "step-1": 2,
           "step-2": 1,
           "step-3": 1
         },
-        "fd547b2b4c084934bc6eaaf34d2fadf0": {
+        "c8a6a28a011d4342b179aa0cb0725728": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "7435e0d0b4914fbdbf2452bceacdf8e0": {
+        "1572794da989447e853fda7c4de8583a": {
           "step-1": 2,
           "step-2": 1,
           "step-3": 1
         },
-        "727c45e9fbf645a3885734423ea9bb6c": {
+        "230abf6c54064731a2bdb3a5ffae22a1": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "84a9fa885e5644e1945aeabd24636051": {
+        "8ff36be203fb4728b6543de649f1c7a2": {
           "step-1": 2,
           "step-2": 1,
           "step-3": 1
         },
-        "174a5658ae524b1593adb44fbc1d7756": {
+        "9bd1522814794a72abdaded52be1f2c4": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "960770768ac047138487270b855302d3": {
+        "988fd61c0ecf4c74a5f7f9624f04b68a": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "3b699a1f6ab240b3b29146aba03e0f90": {
+        "d88379da04b843cc96ad14c0b509d3f4": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "6696908c32e743f5afc79bc852bbbb9a": {
+        "9634c0e4537842fe986e2c801c2e6749": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "ac04f7a7e91f4233979134129811f5f0": {
+        "10ce180f39de4bb0a77cdd41c63a6881": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
         },
-        "03f95e9508cd43bb8a8e38f7928115d8": {
+        "37d7357bf5a3446790eeb862fc37edfc": {
           "step-1": 1,
           "step-2": 1,
           "step-3": 1
@@ -1302,51 +1306,51 @@
       },
       "resources": {
         "processes": 10,
-        "rss_mib": 924.078125,
+        "rss_mib": 923.6953125,
         "docker_stats": [
           {
             "BlockIO": "0B / 26.6MB",
-            "CPUPerc": "24.01%",
-            "Container": "1bae841193402861cbd5988d203e26b88306a546d588bfa1f4072d4990fe86fb",
-            "ID": "1bae84119340",
-            "MemPerc": "0.82%",
-            "MemUsage": "261.7MiB / 31.34GiB",
+            "CPUPerc": "15.98%",
+            "Container": "9481710eb788117423f410a442d5223a4c9609ef11dcfa482436a79027a5a7c1",
+            "ID": "9481710eb788",
+            "MemPerc": "0.81%",
+            "MemUsage": "260.7MiB / 31.34GiB",
             "Name": "agents-usual-app-1",
-            "NetIO": "44.3MB / 44.5MB",
+            "NetIO": "45.9MB / 46MB",
             "PIDs": "16"
           },
           {
-            "BlockIO": "115kB / 5.64MB",
-            "CPUPerc": "7.14%",
-            "Container": "b1f7d8d8a2e45d6044a35fd006e0876be2c27b7f9ef900c5e9a5ebaeaacb9057",
-            "ID": "b1f7d8d8a2e4",
+            "BlockIO": "115kB / 5.62MB",
+            "CPUPerc": "4.81%",
+            "Container": "644c244d0c3a0c2a342dc84c783663256ce6eb3614a5ae724954cb9af9718319",
+            "ID": "644c244d0c3a",
             "MemPerc": "0.02%",
-            "MemUsage": "5MiB / 31.34GiB",
+            "MemUsage": "5.531MiB / 31.34GiB",
             "Name": "agents-usual-redis-1",
-            "NetIO": "8.68MB / 44.5MB",
+            "NetIO": "8.69MB / 46MB",
             "PIDs": "6"
-          },
-          {
-            "BlockIO": "0B / 29.1MB",
-            "CPUPerc": "8.79%",
-            "Container": "5c97d5314377e49279c15a8198310b858516cf57030299d55c1d6fdd7a80ddce",
-            "ID": "5c97d5314377",
-            "MemPerc": "1.25%",
-            "MemUsage": "401.7MiB / 31.34GiB",
-            "Name": "agents-usual-worker-1-1",
-            "NetIO": "232kB / 4.18MB",
-            "PIDs": "9"
           },
           {
             "BlockIO": "0B / 0B",
             "CPUPerc": "0.00%",
-            "Container": "4c66945733064dd7fa34c04a023386a05815c5fae2cc08de2b355a3e4e68855d",
-            "ID": "4c6694573306",
+            "Container": "513bd01d6b16b9c2a2640607834dc2d7448671d20e42afc8f3e88776bea9c034",
+            "ID": "513bd01d6b16",
             "MemPerc": "0.00%",
             "MemUsage": "0B / 0B",
-            "Name": "agents-usual-worker-2-1",
+            "Name": "agents-usual-worker-1-1",
             "NetIO": "0B / 0B",
             "PIDs": "0"
+          },
+          {
+            "BlockIO": "0B / 29MB",
+            "CPUPerc": "4.04%",
+            "Container": "b5eb05b0973fec7198c217b07b00471a482fff8845a83b505efeacb3ae3dddfc",
+            "ID": "b5eb05b0973f",
+            "MemPerc": "1.25%",
+            "MemUsage": "401.8MiB / 31.34GiB",
+            "Name": "agents-usual-worker-2-1",
+            "NetIO": "185kB / 3.08MB",
+            "PIDs": "9"
           }
         ]
       }

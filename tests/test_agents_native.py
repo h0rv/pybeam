@@ -82,6 +82,23 @@ def gone(pid: int) -> bool:
     return False
 
 
+def test_warm_batches_with_sse_keep_snapshot_subscription_alive(cluster: Cluster) -> None:
+    for _ in range(3):
+        sessions = cluster.start("normal", count=12)
+        with cluster.client.stream(
+            "GET", cluster.url("/sessions/" + sessions[0] + "/events")
+        ) as response:
+            assert response.status_code == 200
+            assert next(response.iter_lines()).startswith("data:")
+        deadline = time.monotonic() + 20
+        while True:
+            states = {snapshot.id: snapshot.state for snapshot in cluster.snapshots()}
+            if all(states[session] == "completed" for session in sessions):
+                break
+            assert time.monotonic() < deadline, states
+            time.sleep(0.05)
+
+
 def test_stop_terminates_isolated_tool_and_sse_reconnects(cluster: Cluster) -> None:
     session = cluster.start("hang")[0]
     value = cluster.wait(session, lambda value: bool(value.executions.get("step-2")))

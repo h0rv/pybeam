@@ -34,6 +34,7 @@ from pybeam.tasks import ExecutionMode, TaskCrashed, TaskFunction, TaskLimits, T
 
 ANNOUNCEMENTS = "agents:new"
 SNAPSHOTS = "agents:snapshots"
+SNAPSHOT_PENDING_BYTES = 1024 * 1024
 TOOL = TaskFunction(isolated, Json(str), Json(str), execution=ExecutionMode.ISOLATED)
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,7 @@ class Runtime:
                 self.placements[announcement.id] = Placement(task)
 
     async def updates(self, ready: asyncio.Event) -> None:
-        async with self.beam.subscribe(SNAPSHOTS) as subscription:
+        async with self.beam.subscribe(SNAPSHOTS, max_bytes=SNAPSHOT_PENDING_BYTES) as subscription:
             ready.set()
             async for payload in subscription:
                 await self.remember(Snapshot.model_validate_json(payload))
