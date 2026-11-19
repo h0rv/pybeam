@@ -55,8 +55,8 @@ no managed loader session exists.
 
 ## Join
 
-Rerun every result in this table with
-`bash docs/research/probes/attach/run_join.sh`.
+Rerun the direct-send result with `tests/test_join_native.py` and every other
+result in this table with `bash docs/research/probes/attach/run_join.sh`.
 
 | Result | Cause and source |
 | --- | --- |
