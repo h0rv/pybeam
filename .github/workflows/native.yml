@@ -113,14 +113,20 @@ jobs:
         # Deselected release gates need a reviewed platform wheel with GenStage
         # and an exact-byte prepared distribution profile, not this source build.
         run: |
-          uv run --locked --all-extras pytest \
-            --run-frameworks --run-runtime -m 'runtime and not browser' \
-            --deselect=tests/test_genstage_wheel.py::test_installed_genstage_without_developer_environment \
-            --deselect=tests/test_runtime_bytecode_native.py::test_managed_bytecode__two_ordinary_actor_runs_leave_exact_bundle_unchanged \
-            -vv -rs --timeout=180 --timeout-method=signal -o faulthandler_timeout=120 \
-            --basetemp="$RUNNER_TEMP/native-tests"
+          mkdir -p "$RUNNER_TEMP/native-tests"
+          status=0
+          for iteration in $(seq 1 100); do
+            echo "WS_DIAG_ITERATION=$iteration"
+            uv run --locked --all-extras pytest \
+              tests/test_runtime_native.py::test_native__two_websocket_clients_share_state_and_pubsub \
+              --run-frameworks --run-runtime \
+              -vv -s --timeout=180 --timeout-method=signal -o faulthandler_timeout=120 \
+              --basetemp="$RUNNER_TEMP/native-tests/iteration-$iteration" \
+              2>&1 | tee "$RUNNER_TEMP/native-tests/client-$iteration.log" || status=1
+          done
+          exit "$status"
       - name: Upload regression diagnostics
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: native-regression-logs

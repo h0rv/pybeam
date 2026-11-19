@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -169,13 +170,50 @@ async def receive_until(connection: ClientConnection, target: int) -> list[int]:
 
 async def receive_until_closed(connection: ClientConnection) -> list[int]:
     counts: list[int] = []
-    async with asyncio.timeout(5):
+    started = time.monotonic()
+
+    def phase(name: str) -> None:
+        print(
+            "WS_CLIENT_DIAG",
+            time.time_ns(),
+            "connection=",
+            connection.id,
+            "elapsed=",
+            time.monotonic() - started,
+            "phase=",
+            name,
+            "state=",
+            connection.state.name,
+            "transport_closing=",
+            connection.transport.is_closing(),
+            "close_code=",
+            connection.close_code,
+            file=sys.stderr,
+            flush=True,
+        )
+
+    async def drain() -> None:
         try:
             while True:
-                counts.append(Json(CounterReply).decode(await connection.recv()).count)
+                frame = await connection.recv()
+                phase("frame_received_" + repr(frame))
+                counts.append(Json(CounterReply).decode(frame).count)
         except ConnectionClosed:
-            pass
+            phase("close_received")
         await connection.wait_closed()
+        phase("wait_closed_finished")
+
+    try:
+        async with asyncio.timeout(5):
+            await drain()
+    except TimeoutError:
+        phase("initial_5s_timeout")
+        try:
+            async with asyncio.timeout(30):
+                await drain()
+        except TimeoutError:
+            phase("additional_30s_timeout")
+        pytest.fail("WebSocket close exceeded the original 5 second deadline")
     return counts
 
 
@@ -183,8 +221,14 @@ async def test_native__two_websocket_clients_share_state_and_pubsub(
     service_server: RunningServer,
 ) -> None:
     await wait_subscription_count(service_server, 0)
-    url = "ws://127.0.0.1:{}/shared".format(service_server.port)
-    async with async_connect(url) as first, async_connect(url) as second:
+    probe = uuid4().hex
+    url = "ws://127.0.0.1:{}/shared?diag={}".format(service_server.port, probe)
+    print("WS_CLIENT_DIAG", time.time_ns(), "probe=", probe, file=sys.stderr, flush=True)
+    async with (
+        async_connect(url + "&client=first") as first,
+        async_connect(url + "&client=second") as second,
+    ):
+        print("WS_CLIENT_DIAG", "probe=", probe, "first=", first.id, file=sys.stderr, flush=True)
         initial = Json(CounterReply).decode(await first.recv()).count
         assert Json(CounterReply).decode(await second.recv()).count == initial
         await wait_subscription_count(service_server, 2)

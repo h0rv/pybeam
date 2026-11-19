@@ -1,4 +1,6 @@
 import asyncio
+import sys
+import time
 from base64 import b64encode
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -258,17 +260,41 @@ async def shared_increment(beam: BeamDependency) -> Snapshot:
 async def shared(socket: WebSocket, beam: BeamDependency) -> None:
     slow = socket.query_params.get("slow") == "1"
     outbound: asyncio.Queue[Snapshot] = asyncio.Queue(maxsize=2)
+    writer_waiting: Literal["outbound.get", "send"] = "outbound.get"
+
+    def phase(name: str) -> None:
+        print(
+            "WS_DIAG",
+            time.time_ns(),
+            "session=",
+            socket.scope.get("session_id"),
+            "probe=",
+            socket.query_params.get("diag"),
+            "client=",
+            socket.query_params.get("client"),
+            "phase=",
+            name,
+            file=sys.stderr,
+            flush=True,
+        )
 
     async def snapshot() -> Snapshot:
         return Snapshot(count=await beam.incr("shared", 0, namespace="vertical"))
 
     async def writer() -> None:
+        nonlocal writer_waiting
         previous = -1
-        while True:
-            state = await outbound.get()
-            if state.count >= previous:
-                await socket.send_text(Json(type(state)).encode(state).decode())
-                previous = state.count
+        try:
+            while True:
+                writer_waiting = "outbound.get"
+                state = await outbound.get()
+                if state.count >= previous:
+                    writer_waiting = "send"
+                    await socket.send_text(Json(type(state)).encode(state).decode())
+                    previous = state.count
+        except asyncio.CancelledError:
+            phase("writer_cancelled_in_" + writer_waiting)
+            raise
 
     async def requests() -> None:
         try:
@@ -281,6 +307,8 @@ async def shared(socket: WebSocket, beam: BeamDependency) -> None:
                     case "snapshot":
                         await outbound.put(await snapshot())
                     case "cancel":
+                        phase("cancel_received")
+                        phase("cancel_writer_in_" + writer_waiting)
                         raise StopConnection
         except (WebSocketDisconnect, ValueError) as exc:
             raise StopConnection from exc
@@ -297,9 +325,18 @@ async def shared(socket: WebSocket, beam: BeamDependency) -> None:
                     await outbound.put(await snapshot())
                 raise StopConnection
 
-            async with asyncio.TaskGroup() as group:
-                group.create_task(writer())
-                group.create_task(requests())
-                group.create_task(notifications())
+            try:
+                try:
+                    async with asyncio.TaskGroup() as group:
+                        group.create_task(writer())
+                        group.create_task(requests())
+                        group.create_task(notifications())
+                finally:
+                    phase("taskgroup_exited")
+            finally:
+                phase("subscription_aexit_entered")
     except* StopConnection:
         pass
+    finally:
+        phase("subscription_aexit_finished")
+    phase("handler_returned")
