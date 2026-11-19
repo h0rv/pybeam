@@ -40,6 +40,8 @@ Use this skill before drafting or reviewing documentation, including small edits
 
 ## Draft clear prose
 
+- Describe only current behavior. Do not narrate history: no "used to", "no
+  longer", "has since", "was fixed" or "before this change".
 - Use active voice, present tense, and second person. Name who performs an action.
   Prefer direct verbs: "Run", "Save", "Return", or "Stop".
 - Keep each sentence focused on one idea and each paragraph on one topic. Use a

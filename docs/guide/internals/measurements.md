@@ -62,8 +62,6 @@ Calls run together with `asyncio.gather`: sleeps last 0.05 s, and the CPU job ru
 
 </div>
 
-At 10,000 concurrent calls, one caller loop failed with `RuntimeError: Native callback queue full`; the native callback limit was then 8,192 per loop. erlang-python has since removed that cap.
-
 ## Fan out: four CPU jobs
 
 ![Execution spans for four CPU jobs across asyncio, threads, processes and PyBEAM modes, with measured wall time and speedup.](../assets/fan-out.svg)

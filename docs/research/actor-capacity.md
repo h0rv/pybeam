@@ -71,12 +71,9 @@ All rows call one method on N distinct actors at once with `asyncio.gather`, unl
 
 </div>
 
-The 10,000-call async wait failed with `RuntimeError: Native callback queue full` on the conventional build; it was not run on the free-threaded build.
-
 - **Blocking code serializes all actors on both builds.** 32 actors each sleeping 50 ms took 32 × 50 ms. A 10 ms async call waited behind another actor's 300 ms `time.sleep`. Removing the GIL does not change this, because every method body runs on the one loop thread.
 - **CPU work in a method body serializes on both builds.** Eight 0.12 s jobs took about 1 s. On free-threaded, the same jobs through `to_thread` took 0.17 s; on conventional they did not overlap.
 - **Async methods overlap**, but per-call overhead dominates past about 100 concurrent calls: 8,000 calls took 2.8–4.3 s on conventional and 12.8 s on free-threaded for 50 ms of waiting.
-- **About 8,000 calls can be in flight from one caller loop.** The measured erlang-python capped reserved native callbacks per loop at 8,192 (`MAX_RESERVED_PENDING` in `c_src/py_event_loop.h`); [erlang-python#23](https://github.com/h0rv/erlang-python/pull/23) removed that cap. The overflow raised in the caller; after the error, closing the group also hit the full queue and the managed shutdown deadline expired.
 - **`asyncio.to_thread` restores overlap** for blocking code, up to the default executor's 12 threads on 8 CPUs: 100 calls took 9 rounds of 50 ms.
 - The ~40 ms acknowledgment delay under separate investigation did not appear: one empty call took under 1 ms.
 
