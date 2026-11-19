@@ -28,40 +28,6 @@ Workers used under 0.1 MiB per context on both builds; isolated contexts used 21
 
 Each job runs a 3,000,000-step integer loop, about 0.33 s alone. Free-threaded workers used all 8 CPUs; conventional workers took turns, while isolated contexts overlapped on both builds.
 
-## Actors: before pooled dispatch
-
-These historical actors each owned a worker context and shared one event loop. The charts do **not** describe the current worker pool's memory, thread count or timings.
-
-<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
-
-![Memory added by 10,000 historical actors compared with blocked Python threads and asyncio tasks.](../assets/measurement-memory.svg)
-
-</div>
-
-Actors and blocked threads each added 10,000 OS threads; blocked asyncio tasks added none. Spawning actors did not fail at 10,000, the last checkpoint.
-
-<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
-
-![Time to start 10,000 historical actors, blocked Python threads and asyncio tasks on a logarithmic axis.](../assets/measurement-start.svg)
-
-</div>
-
-### Method bodies
-
-<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
-
-![Concurrent actor call wall time by method body and Python build on a logarithmic axis.](../assets/measurement-calls.svg)
-
-</div>
-
-Calls run together with `asyncio.gather`: sleeps last 0.05 s, and the CPU job runs 2,000,000 loop steps (about 0.12 s alone). Blocking and CPU work serialized on the shared loop; “offloaded” means `await asyncio.to_thread(...)`, which restored overlap.
-
-<div class="measurement-chart" tabindex="0" role="region" aria-label="Scrollable measurement chart">
-
-![Time per empty actor method call across 1,000 sequential calls on one actor.](../assets/measurement-noop.svg)
-
-</div>
-
 ## Fan out: four CPU jobs
 
 ![Execution spans for four CPU jobs across asyncio, threads, processes and PyBEAM modes, with measured wall time and speedup.](../assets/fan-out.svg)
@@ -92,8 +58,7 @@ Each process makes one empty call, with at most 32 calls in flight. A million wa
 
 Web serving on conventional and free-threaded Python has its own [ASGI benchmarks](https://github.com/h0rv/pybeam/blob/main/benchmarks/web/SCALE_RESULTS.md).
 
-- Actors beyond 10,000 or under container memory limits.
-- Actor throughput and memory with pooled dispatch.
+- Actor throughput, memory and startup cost.
 
 <style>
 .measurement-chart { overflow-x: auto; }
@@ -104,5 +69,5 @@ Web serving on conventional and free-threaded Python has its own [ASGI benchmark
 ## Appendix: environment and provenance
 
 - Linux x86-64, 8 CPUs, 31 GiB memory; CPython 3.14.10 (GIL enabled) and 3.14.10t (free-threaded), Erlang/OTP 29.1.2.
-- CPU, actor and fan-in charts used erlang-python `d60392c`: three conventional actor runs and one free-threaded run, one conventional plain-Python run, and one conventional plus two free-threaded context-matrix runs. See [actor capacity reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/actor-capacity.md#recorded-method-and-reproduction).
-- Four-job fan-out and blast-radius charts used earlier erlang-python `c007eb5` probes, not controlled same-revision comparisons. See [execution-mode reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/execution-modes.md#four-job-fan-out-and-blast-radius-reproduction).
+- Context, CPU and fan-in charts used erlang-python `d60392c`: one conventional plus two free-threaded context-matrix runs. See [actor capacity reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/actor-capacity.md#recorded-method-and-reproduction).
+- Four-job fan-out and blast-radius charts used erlang-python `c007eb5` probes, not controlled same-revision comparisons. See [execution-mode reproduction](https://github.com/h0rv/pybeam/blob/main/docs/research/execution-modes.md#four-job-fan-out-and-blast-radius-reproduction).

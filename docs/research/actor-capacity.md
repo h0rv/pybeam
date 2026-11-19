@@ -1,6 +1,6 @@
 # Actor capacity: plain sync code versus async
 
-Historical actors added a native thread each, and blocking method bodies stalled the shared event loop. These pre-pool measurements are not limits for current pooled actors; direct free-threaded worker calls did run in parallel.
+In this probe each actor owns a worker context and every method body runs on one shared event loop, so blocking bodies stall all actors. Pooled actors do not work this way, so these values are not limits for them. Direct free-threaded worker calls ran in parallel.
 
 
 ## How an actor method runs
@@ -338,7 +338,7 @@ Run the last command with the interpreter whose installed packages you want to c
 
 ### In-repository checks
 
-The historical actor values require the pre-pool runtime described above; the current runtime can produce different results. Start the local server and run the actor probe as above, then run these additional state, pool and web probes from the repository root.
+The actor values require the one-context-per-actor runtime described above; pooled actors produce different results. Start the local server and run the actor probe as above, then run these additional state, pool and web probes from the repository root.
 
 ```sh
 mise exec -- uv run --locked python tools/build_native.py
