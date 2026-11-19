@@ -158,7 +158,7 @@ def test_conventional_faults_with_twelve_healthy_sessions(stack: Stack, case: Ca
     elif case == "crash":
         fault = stack.wait(bad, lambda value: value.counts.get("step-1", 0) >= 2)
         logs = compose("logs", "--no-color", "worker-1", "worker-2")
-        assert "WorkerLostError" in logs and "SIGABRT" in logs
+        assert "WorkerLostError" in logs and "SIGSEGV" in logs
         fault = stack.stop(bad)
     else:
         fault = stack.view(bad)

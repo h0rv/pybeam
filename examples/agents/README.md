@@ -28,7 +28,7 @@ in separate tabs to inspect the transcript and owner:
 | **Hang**, then **Stop session** | Terminates the isolated tool process. | Revokes the Celery task with process termination. |
 | **Hang** | Occupies its own session until stopped. | Holds one of eight worker slots; later sessions queue when the slots are full. |
 | **Burn** | Runs CPU work in an isolated process for about 30 seconds. | Runs CPU work inside a worker slot for about 30 seconds. |
-| **Crash** | Fails that session after its tool process aborts. | Loses a worker process and redelivers the turn; tools repeat until the session is stopped. |
+| **Crash** | Fails that session after its tool process segfaults. | Loses a worker process and redelivers the turn; tools repeat until the session is stopped. |
 
 Each fault follows a normal lookup. The JSON link on a session page shows
 execution counts per tool-call ID. Stop hanging or repeatedly crashing sessions

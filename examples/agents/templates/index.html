@@ -3,7 +3,7 @@
 <h1>Agent sessions</h1>
 {% if usual %}<p>One agent turn per Celery task. Tools run inside a prefork worker process. Two worker containers provide four slots each; Redis stores snapshots and execution counts.</p>{% else %}<p>One deterministic agent per session. Tools run in separate OS processes. Session state is replicated across three local nodes.</p>{% endif %}
 <form method="post" action="/sessions" class="start">
-  <label>Scenario<select name="mode"><option value="normal">Normal · three lookups</option><option value="hang">Hang · lookup then wait</option><option value="burn">Burn · lookup then 30 s CPU</option><option value="crash">Crash · lookup then abort</option></select></label>
+  <label>Scenario<select name="mode"><option value="normal">Normal · three lookups</option><option value="hang">Hang · lookup then wait</option><option value="burn">Burn · lookup then 30 s CPU</option><option value="crash">Crash · lookup then segfault</option></select></label>
   <label>Sessions<input type="number" name="count" min="1" max="12" value="1" required></label>
   {% if not usual %}<label>Owner<select name="placement"><option>a</option><option>b</option><option>c</option></select></label>{% endif %}
   <button type="submit">Start sessions</button>

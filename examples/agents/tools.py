@@ -1,3 +1,4 @@
+import ctypes
 import json
 import os
 import time
@@ -28,7 +29,8 @@ def execute(request: ToolRequest) -> str:
                 total += 1
             return "CPU work finished: " + str(total) + " iterations"
         case "crash":
-            os.abort()
+            ctypes.string_at(0)
+            raise AssertionError
 
 
 async def isolated(payload: bytes) -> bytes:
