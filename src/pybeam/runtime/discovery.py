@@ -23,18 +23,26 @@ _JOIN = (
     "receive after " + str(round(INTERVAL * 1000)) + "->Join() end end)."
 )
 
+_PEER_JOIN = (
+    'true=erlang:set_cookie(list_to_atom(os:getenv("PYBEAM_COOKIE"))),'
+    'Peers=[list_to_atom(string:trim(N))||N<-string:split(os:getenv("PYBEAM_CLUSTER"),",",all)],'
+    "spawn(fun Join()->"
+    "[net_kernel:connect_node(P)||P<-Peers],"
+    "receive after " + str(round(INTERVAL * 1000)) + "->Join() end end)."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class Cluster:
-    """Join every `pybeam` node that a DNS name resolves to.
+    """Connect to explicit longnames via EPMD, or discover PyBEAM nodes through DNS.
 
-    Nodes listen on TCP port 4370 of the address that routes to peers, without EPMD, and trust any peer that presents
-    the shared cookie. The name is resolved again every five seconds; nodes that
-    disappear from DNS are not disconnected.
+    DNS nodes listen on TCP port 4370 without EPMD. Both modes trust the shared
+    cookie and retry every five seconds; removed DNS peers are not disconnected.
     """
 
     query: str
     address: str
+    peers: tuple[str, ...] = ()
 
     @property
     def node(self) -> str:
@@ -50,17 +58,19 @@ class Cluster:
             family = ("-proto_dist", "inet6_tcp")
             words = tuple(int(word, 16) for word in address.exploded.split(":"))
         interface = "{" + ",".join(str(word) for word in words) + "}"
+        naming = (
+            ("-name", self.node)
+            if self.peers
+            else ("-start_epmd", "false", "-erl_epmd_port", str(PORT))
+        )
         return (
-            "-start_epmd",
-            "false",
-            "-erl_epmd_port",
-            str(PORT),
+            *naming,
             *family,
             "-kernel",
             "inet_dist_use_interface",
             interface,
             "-eval",
-            _JOIN,
+            _PEER_JOIN if self.peers else _JOIN,
         )
 
 
@@ -91,9 +101,24 @@ def cluster(environment: Mapping[str, str], timeout: float) -> Cluster | None:
     cookie = environment.get("PYBEAM_COOKIE", "")
     if not cookie or len(cookie) > 255:
         raise BootstrapError("PYBEAM_CLUSTER requires PYBEAM_COOKIE of 1 to 255 characters")
+    peers: tuple[str, ...] = ()
+    host = query
+    if "@" in query:
+        peers = tuple(node.strip() for node in query.split(","))
+        for peer in peers:
+            name, separator, peer_host = peer.partition("@")
+            if (
+                not name
+                or not separator
+                or not peer_host
+                or "@" in peer_host
+                or any(character.isspace() for character in peer)
+            ):
+                raise BootstrapError("PYBEAM_CLUSTER requires comma-separated longnames: name@host")
+        host = peers[0].partition("@")[2]
     deadline = time.monotonic() + timeout
-    while (address := _address(query)) is None:
+    while (address := _address(host)) is None:
         if time.monotonic() >= deadline:
             raise BootstrapError("PYBEAM_CLUSTER does not resolve: " + query)
         time.sleep(1.0)
-    return Cluster(query, address)
+    return Cluster(query, address, peers)
