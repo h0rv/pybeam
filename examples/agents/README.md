@@ -100,6 +100,10 @@ in existing prefork workers. The comparison retains these isolation semantics.
   A started tool without a committed result is reported as interrupted and is
   **not re-run**. This is at-most-once execution, not a guarantee that an
   interrupted tool produced no external side effect.
+- If you kill node **a**, restart the demo before creating more sessions.
+  Existing sessions can finish on a survivor, but new sessions stay waiting:
+  actor restoration reopens storage through node a, the fixed storage seed,
+  even though all three nodes initialize storage at startup.
 - Each PyBEAM node budgets 1 MiB of pending data for the cluster-wide full-snapshot
   subscription. The default 64 KiB is too small for concurrent token updates
   from these batches. On overflow, the node logs a warning and resubscribes;

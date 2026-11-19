@@ -264,3 +264,34 @@ def test_node_kill_resumes_without_repeating_tools(cluster: Cluster) -> None:
         "COUNTS",
         {call: len(events) for call, events in result.executions.items()},
     )
+
+
+@pytest.mark.parametrize(
+    "killed",
+    [
+        pytest.param(
+            0,
+            marks=pytest.mark.xfail(
+                strict=True,
+                raises=AssertionError,
+                reason="Actor restore reopens the store through unavailable seed agents_a",
+            ),
+        ),
+        2,
+    ],
+)
+def test_new_sessions_complete_after_node_kill(cluster: Cluster, killed: int) -> None:
+    session = cluster.start("hang" if killed == 0 else "normal")[0]
+    cluster.wait(session, lambda value: bool(value.executions.get("step-2")))
+    with pytest.raises(httpx.RemoteProtocolError):
+        cluster.client.post(cluster.url("/node/kill", killed))
+    cluster.processes[killed].wait(timeout=5)
+    cluster.wait(session, lambda value: value.snapshot.state == "completed")
+    new = cluster.start("normal", count=2, owner="b")
+    for session in new:
+        result = cluster.wait(
+            session, lambda value: value.snapshot.state == "completed", timeout=40
+        )
+        assert result.snapshot.node != "abc"[killed]
+        assert len(result.executions) == 3
+        assert all(len(events) == 1 for events in result.executions.values())
