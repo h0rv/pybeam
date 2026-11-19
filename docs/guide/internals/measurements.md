@@ -62,7 +62,7 @@ Calls run together with `asyncio.gather`: sleeps last 0.05 s, and the CPU job ru
 
 </div>
 
-At 10,000 concurrent calls, one caller loop failed with `RuntimeError: Native callback queue full`; the native callback limit was 8,192 per loop.
+At 10,000 concurrent calls, one caller loop failed with `RuntimeError: Native callback queue full`; the native callback limit was then 8,192 per loop. erlang-python has since removed that cap.
 
 ## Fan out: four CPU jobs
 
@@ -92,7 +92,8 @@ Each process makes one empty call, with at most 32 calls in flight. A million wa
 
 ## Not measured
 
-- A real web request path on free-threaded Python.
+Web serving on conventional and free-threaded Python has its own [ASGI benchmarks](https://github.com/h0rv/pybeam/blob/main/benchmarks/web/SCALE_RESULTS.md).
+
 - Actors beyond 10,000 or under container memory limits.
 - Actor throughput and memory with pooled dispatch.
 

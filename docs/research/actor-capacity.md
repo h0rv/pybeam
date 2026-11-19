@@ -76,7 +76,7 @@ The 10,000-call async wait failed with `RuntimeError: Native callback queue full
 - **Blocking code serializes all actors on both builds.** 32 actors each sleeping 50 ms took 32 × 50 ms. A 10 ms async call waited behind another actor's 300 ms `time.sleep`. Removing the GIL does not change this, because every method body runs on the one loop thread.
 - **CPU work in a method body serializes on both builds.** Eight 0.12 s jobs took about 1 s. On free-threaded, the same jobs through `to_thread` took 0.17 s; on conventional they did not overlap.
 - **Async methods overlap**, but per-call overhead dominates past about 100 concurrent calls: 8,000 calls took 2.8–4.3 s on conventional and 12.8 s on free-threaded for 50 ms of waiting.
-- **About 8,000 calls can be in flight from one caller loop.** erlang-python caps reserved native callbacks per loop at 8,192 (`MAX_RESERVED_PENDING` in `c_src/py_event_loop.h`). The overflow raised in the caller; after the error, closing the group also hit the full queue and the managed shutdown deadline expired.
+- **About 8,000 calls can be in flight from one caller loop.** The measured erlang-python capped reserved native callbacks per loop at 8,192 (`MAX_RESERVED_PENDING` in `c_src/py_event_loop.h`); [erlang-python#23](https://github.com/h0rv/erlang-python/pull/23) removed that cap. The overflow raised in the caller; after the error, closing the group also hit the full queue and the managed shutdown deadline expired.
 - **`asyncio.to_thread` restores overlap** for blocking code, up to the default executor's 12 threads on 8 CPUs: 100 calls took 9 rounds of 50 ms.
 - The ~40 ms acknowledgment delay under separate investigation did not appear: one empty call took under 1 ms.
 
@@ -148,7 +148,7 @@ Worker RSS was under 0.1 MiB per context on both builds. Own-GIL creation took 7
 
 - **On free-threaded, worker contexts run Python on all 8 CPUs.** Eight CPU jobs took as long as one, and 64 took 8 rounds. On conventional they serialize.
 - **The actor slowdown comes from the shared loop, not the GIL.** The same worker contexts that parallelize here serialize when PyBEAM actors dispatch through one asyncio loop.
-- **This integer loop ran at the same speed on conventional and free-threaded** (0.33–0.34 s alone). That says nothing about a web request path, which was not measured.
+- **This integer loop ran at the same speed on conventional and free-threaded** (0.33–0.34 s alone). That says nothing about a web request path; see the [FastAPI request path](#a-fastapi-request-path-on-conventional-and-free-threaded) below.
 - **Blocking calls overlap in every mode on both builds**, because each context has its own thread.
 
 ## Many BEAM processes sharing 8 contexts
@@ -282,7 +282,7 @@ Not measured:
 
 - `ActorGroup(execution=ExecutionLimits(...))`. The locked erlang-python `DataActorGroup` accepts only `max_children`.
 - Memory or thread limits beyond 10,000 actors, or container cgroup limits below this VM's.
-- A web request path through a real server and network, and codecs outside the standard library.
+- A web request path over a real network with TLS, and codecs outside the standard library. Loopback serving through real servers is in the [ASGI benchmarks](../../benchmarks/web/SCALE_RESULTS.md).
 - Retiring idle pool contexts.
 - The cause of the worker-context call rate limit of about 40,000 calls per second.
 

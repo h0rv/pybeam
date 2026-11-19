@@ -25,7 +25,7 @@ Every worker task without `dedicated_loop=True` runs on one event loop thread. A
 
 - Wrap blocking calls in `await asyncio.to_thread(...)`. A `ThreadPoolExecutor` used synchronously inside the method still blocks the loop until all its work finishes.
 - Give CPU-bound tasks `dedicated_loop=True`. Actors don't need it.
-- One caller loop can have at most about 8,000 calls in flight. Past that, calls raise `RuntimeError: Native callback queue full`.
+- The runtime no longer caps in-flight calls per caller loop at 8,192. The limit without that cap has not been measured.
 
 ## Boundary copies
 
