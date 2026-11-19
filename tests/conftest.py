@@ -18,6 +18,7 @@ DEFAULT_RUNTIME = ROOT / "_build" / "hornbeam"
 RUNTIME_LAUNCHER = ROOT.parent / "hornbeam" / "examples" / "run_asgi.escript"
 FRAMEWORK_TESTS = frozenset(
     {
+        "test_agents.py",
         "test_browser_gate.py",
         "test_chat_crash_test.py",
         "test_chat_load.py",
