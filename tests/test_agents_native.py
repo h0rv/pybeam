@@ -3,7 +3,7 @@ import signal
 import subprocess
 import time
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
@@ -60,6 +60,13 @@ class Cluster:
         response = self.client.post(self.url("/sessions/" + session + "/stop"))
         assert response.status_code == 303, response.text
         return self.wait(session, lambda value: value.snapshot.state == "stopped")
+
+    def kill(self, node: int) -> None:
+        with suppress(httpx.RemoteProtocolError):
+            response = self.client.post(self.url("/node/kill", node))
+            response.raise_for_status()
+        self.processes[node].wait(timeout=5)
+        assert self.processes[node].returncode == -signal.SIGKILL
 
 
 @contextmanager
@@ -241,10 +248,7 @@ def test_node_kill_resumes_without_repeating_tools(cluster: Cluster) -> None:
     assert active.snapshot.ledger["step-1"].state == "done"
     pid = active.executions["step-2"][0].pid
     started = time.monotonic()
-    with pytest.raises(httpx.RemoteProtocolError):
-        cluster.client.post(cluster.url("/node/kill", 0))
-    cluster.processes[0].wait(timeout=5)
-    assert cluster.processes[0].returncode == -signal.SIGKILL
+    cluster.kill(0)
     result = cluster.wait(session, lambda value: value.snapshot.state == "completed")
     assert result.snapshot.node in ("b", "c")
     assert result.snapshot.ledger["step-1"].state == "done"
@@ -283,9 +287,7 @@ def test_node_kill_resumes_without_repeating_tools(cluster: Cluster) -> None:
 def test_new_sessions_complete_after_node_kill(cluster: Cluster, killed: int) -> None:
     session = cluster.start("hang" if killed == 0 else "normal")[0]
     cluster.wait(session, lambda value: bool(value.executions.get("step-2")))
-    with pytest.raises(httpx.RemoteProtocolError):
-        cluster.client.post(cluster.url("/node/kill", killed))
-    cluster.processes[killed].wait(timeout=5)
+    cluster.kill(killed)
     cluster.wait(session, lambda value: value.snapshot.state == "completed")
     new = cluster.start("normal", count=2, owner="b")
     for session in new:
