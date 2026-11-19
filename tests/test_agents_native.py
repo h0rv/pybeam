@@ -270,20 +270,7 @@ def test_node_kill_resumes_without_repeating_tools(cluster: Cluster) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "killed",
-    [
-        pytest.param(
-            0,
-            marks=pytest.mark.xfail(
-                strict=True,
-                raises=AssertionError,
-                reason="Pinned runtime needs h0rv/erlang-python#36 to reopen storage after seed loss",
-            ),
-        ),
-        2,
-    ],
-)
+@pytest.mark.parametrize("killed", [0, 2])
 def test_new_sessions_complete_after_node_kill(cluster: Cluster, killed: int) -> None:
     session = cluster.start("hang" if killed == 0 else "normal")[0]
     cluster.wait(session, lambda value: bool(value.executions.get("step-2")))
