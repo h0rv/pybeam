@@ -36,7 +36,7 @@ build additionally needs the runtime's other native dependencies and toolchain.
 
 `pybeam.run` needs a managed runtime: either a `python-beam` wheel with bundled
 runtime assets, or an already-built development runtime. A source install alone
-does not include ERTS or the native extension. Packaged wheels currently support
+does not include ERTS or the native extension. Packaged wheels support
 macOS arm64 and Linux x86_64 on conventional CPython 3.14.
 
 Native builds use CPython 3.14.10, Erlang 29.1.2, rebar3 3.28.0 and CMake 4.5.0

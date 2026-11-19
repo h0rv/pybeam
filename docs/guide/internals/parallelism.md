@@ -11,7 +11,7 @@ If an actor's preferred worker is busy, its next call waits up to 100 ms for it 
 
 Background asyncio tasks continue between calls. When an actor stops or its group closes, teardown cancels and awaits its descendant tasks before releasing the actor's state, including tasks on workers it previously used. A task that ignores cancellation keeps teardown waiting. Blocking code pauses other tasks on the same worker, not on other workers.
 
-[Measurements](measurements.md) records the earlier execution-mode probes, including the pre-pool actor path; those actor costs and timings do not describe the pooled runtime.
+[Measurements](measurements.md) has the execution-mode probes.
 
 ## Own-GIL subinterpreters are unsupported
 

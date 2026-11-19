@@ -6,7 +6,7 @@ A running PyBEAM app can already show every Python stack and asyncio task to a s
 
 Tested on Linux with Python 3.14.10 (conventional build), OTP 29.1.2, PyBEAM `90c9aaa`, and erlang-python `c007eb5` (the runtime pinned for this experiment). The app was a single `@pybeam.actor` called from three `asyncio.TaskGroup` workers; after 20 calls the actor method spins in `while True: pass`. Only worker mode was tested. Own-GIL and isolated contexts were not tested. `ptrace_scope` was `1`.
 
-These stacks predate the node-wide actor worker pool in erlang-python `0f833ae`. Current bounded actors lease workers and run bodies on worker-local loops. The context ownership and interrupt observations below are historical, not a verification of pooled actor interruption.
+Actors lease workers from a node-wide pool and run bodies on worker-local loops. This experiment gave each actor its own worker context, so its context ownership and interrupt observations do not cover pooled actors.
 
 ## What works today
 
@@ -15,7 +15,7 @@ These stacks predate the node-wide actor worker pool in erlang-python `0f833ae`.
 | Python stacks for every thread | `_remote_debugging.RemoteUnwinder(pid, all_threads=True)` with `sudo` | Works. The spinning thread shows `Orders.place` at `main.py:14` under `Container.dispatch` |
 | asyncio task tree | `sudo python -m asyncio ps <pid>` and `pstree <pid>` | Works, but only for the managed entry loop: `Task-1` awaiting `TaskGroup.__aexit__`. Worker tasks are not listed |
 | Stacks, tasks, and app state without root | BEAM distribution, then Python run in a new worker context on the target node | Works. Shows every thread's stack, the spinning actor, and all asyncio tasks of the entry loop, including `worker-0` to `worker-2` |
-| Interactive `pdb` | `sudo python -m pdb -p <pid>` | Works with [erlang-python#9](https://github.com/h0rv/erlang-python/pull/9); failed before with `RuntimeError: Can't find the main thread in the remote process` |
+| Interactive `pdb` | `sudo python -m pdb -p <pid>` | Works |
 | Run Python in the entry context | `py_context:exec/2` on the context in `py_context_sup` | Refused: `{error, loop_running}` |
 | Stop the spinning actor | `py_context:interrupt/1` on its context | Returns `ok`, but the loop keeps running |
 
@@ -66,9 +66,9 @@ The output named the spinning frame (`main.py`, `place`) and the waiting workers
 
 ### Stock Python debuggers
 
-CPython's remote debuggers attach to the interpreter's main thread. Only `Py_RunMain` records that thread, so in an embedded interpreter `pdb -p` first failed with "Can't find the main thread". erlang-python now records the thread that runs a context's event loop while the loop runs ([erlang-python#9](https://github.com/h0rv/erlang-python/pull/9)). In PyBEAM that thread runs the entry loop and, in worker mode, actor methods.
+CPython's remote debuggers attach to the interpreter's main thread. erlang-python records the thread that runs a context's event loop as the main thread while the loop runs. In PyBEAM that thread runs the entry loop and, in worker mode, actor methods.
 
-With that change, these commands attach to the PID that `pybeam ps` prints:
+These commands attach to the PID that `pybeam ps` prints:
 
 ```sh
 sudo python -m pdb -p PID                         # 3.14+: breakpoints, stepping, inspection

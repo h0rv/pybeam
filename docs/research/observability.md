@@ -80,7 +80,7 @@ These are existing OTP APIs, not a PyBEAM inspection API. Check `whereis/1` befo
 
 A separate isolated VM reproduced a process exit trace with `erlang:trace(P,true,[send,procs])`. Disable tracing while the process lives with `erlang:trace(P,false,[all])`. Disabling after death raised `badarg`. Keep tracing narrow and brief; events can expose payloads and overload the tracer. OTP `dbg` is available but was not exercised.
 
-`observer:start().` requires working wx and a desktop session. `observer_cli:start().` requires separately installed observer_cli; it is not currently available. Neither UI was tested or added.
+`observer:start().` requires working wx and a desktop session. `observer_cli:start().` requires separately installed observer_cli; it is not installed. Neither UI was tested or added.
 
 Distribution requires matching cookies, compatible node naming, resolvable hostnames, EPMD connectivity, and reachable distribution ports. The example binds distribution to loopback; EPMD has its own binding. Cookies grant powerful node access and do not encrypt traffic. The public sample cookie is only for this disposable local exercise. Protect actual cookies and restrict network access; do not expose distribution to untrusted networks.
 

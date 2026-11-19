@@ -33,7 +33,7 @@ An `asyncio.Task` stays on its local loop and interpreter. It does not automatic
 
 ## ASGI lifespan resources
 
-Managed Uvicorn (`await Server.serve()`) runs lifespan, HTTP and WebSocket handlers on one loop. The pinned Hornbeam runtime does the same per mount ([hornbeam#11](https://github.com/h0rv/hornbeam/pull/11)). You can use lifespan-created loop-bound pools and background tasks from those handlers through lifespan state. This is loop affinity, not a guarantee of permanent thread affinity or database-driver compatibility. Do not share these resources with separate worker loops, dedicated loops or actors.
+Managed Uvicorn (`await Server.serve()`) runs lifespan, HTTP and WebSocket handlers on one loop. Hornbeam does the same per mount. You can use lifespan-created loop-bound pools and background tasks from those handlers through lifespan state. This is loop affinity, not a guarantee of permanent thread affinity or database-driver compatibility. Do not share these resources with separate worker loops, dedicated loops or actors.
 
 ## Many jobs do not require many interpreters
 
@@ -64,7 +64,7 @@ flowchart TB
   end
 ```
 
-Actor count no longer determines worker-thread count. Actor state, admission tickets and waiting callers still consume memory. Do not infer cheap million-actor scale from BEAM process counts. No measured actor-count or throughput limit is established here.
+Actor count does not determine worker-thread count. Actor state, admission tickets and waiting callers still consume memory. Do not infer cheap million-actor scale from BEAM process counts. No measured actor-count or throughput limit is established here.
 
 Data actors now follow **many logical actors → per-actor admission → finite native execution lanes**. A later turn can use another worker and loop: create and finalize loop-bound resources within a turn. Group shutdown releases actor state without destroying pool workers. Restart waits for the old body's native completion, not worker death. The pool does not provide native-crash isolation or bound all retained actor state and waiting producers.[W1][W2][W3]
 

@@ -55,14 +55,13 @@ no managed loader session exists.
 
 ## Join
 
-Rerun every result in this table with
-`bash docs/research/probes/attach/run_join.sh`.
+Rerun the direct-send result with `tests/test_join_native.py` and every other
+result in this table with `bash docs/research/probes/attach/run_join.sh`.
 
 | Result | Cause and source |
 | --- | --- |
 | A plain host with no Python runtime loaded receives actor/task results through `erpc:call`. | A scratch Erlang facade submits an async Python function on the worker: [dispatch](probes/attach/join_probe.erl#L13), [Python work](probes/attach/join_work.py#L7). Connected nodes are peers, not master and subordinate runtimes. |
-| Direct `erlang.send` to a remote PID failed; Python received `None` instead of a PID wrapper. | Native conversion handled only local PIDs. Fixed in the pinned erlang-python; see [Since this probe](#since-this-probe). |
-| Direct `erlang.send` to `{Name, Node}` also failed. | The same binding rejected tuple destinations. An explicit scratch Erlang callback retained the remote PID and forwarded the push: [bridge](probes/attach/join_probe.erl#L13). |
+| Python `erlang.send` reaches a remote PID and a `{Name, Node}` destination on the host. | erlang-python converts remote PIDs and routes distributed sends: [`test_join_native.py`](../../tests/test_join_native.py). |
 | Killing the worker after Python announces execution produces `{erpc,noconnection}` and `nodedown`; the host survives. | The probe waits for the start message, kills only the worker, and observes both RPC failure and the node monitor: [failure probe](probes/attach/join_probe.erl#L35). |
 | A waiting `pybeam.run` VM accepts a host connection and runs the same work. | `ERL_FLAGS` supplies a node name, the run's random cookie, and `-kernel inet_dist_use_interface {127,0,0,1}`; it inherits the loopback-only epmd settings. The host loads the scratch facade and calls it while the managed entry waits: [managed probe](probes/attach/join_probe.erl#L65). |
 
@@ -72,17 +71,8 @@ The managed probe observes `PYBEAM_DISTRIBUTION` absent and
 its [launcher](../../src/pybeam/runtime/cluster.py#L240) sets
 `dist_auto_connect=never`, and the runtime restricts allowed nodes only when
 `PYBEAM_DISTRIBUTION` is configured. Those restrictions do not execute in this
-probe. The existing [DNS discovery](../../src/pybeam/runtime/discovery.py#L12)
-constructs fixed-format peer names; it is not an arbitrary existing-node join
-option.
-
-### Since this probe
-
-- `PYBEAM_CLUSTER` accepts a list of existing longname nodes; see
-  [Join an existing Erlang/Elixir app](../guide/deploy.md#join-an-existing-erlangelixir-app).
-- The pinned erlang-python converts remote PIDs and sends to remote PIDs and
-  `{Name, Node}`. [`test_join_native.py`](../../tests/test_join_native.py)
-  checks both replies from a plain host node.
+probe. To join existing longname nodes, set `PYBEAM_CLUSTER` to their names; see
+[Join an existing Erlang/Elixir app](../guide/deploy.md#join-an-existing-erlangelixir-app).
 
 For managed shutdown, signal the owning Python launcher. Signaling only its VM
 produced an entry/VM status disagreement; the launcher
@@ -91,11 +81,9 @@ probe signals the launcher and observes exit 143.
 
 ### Runtime source references
 
-These lines are from the probed erlang-python, before the remote-send fix. After
-the native build, inspect these files under `_build/hornbeam/lib/erlang_python/`:
+After the native build, inspect these files under
+`_build/hornbeam/lib/erlang_python/`:
 
-- `c_src/py_convert.c:725–733,821–822`: local-PID conversion and unknown-term fallback.
-- `c_src/py_callback.c:2000–2023`: PID-only validation and native send.
 - `src/py_distribution.erl:7–18`: environment gate, `dist_auto_connect` check,
   and `net_kernel:allow`.
 

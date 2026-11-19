@@ -140,7 +140,7 @@ Future measurements should record thread CPU (`time.thread_time()`), elapsed wor
 
 ## Constraints and evidence
 
-Actors require main-interpreter objects and now lease workers from a bounded pool; actor count no longer determines thread count. These historical task measurements do not describe pooled actor dispatch or establish million-actor capacity.
+Actors require main-interpreter objects and lease workers from a bounded pool; actor count does not determine thread count. These task measurements do not describe pooled actor dispatch or establish million-actor capacity.
 
 Own-GIL mode rejects common native extensions and does not contain native crashes. Use isolated byte entries for crash containment, not as a sandbox or durable-job boundary.
 
@@ -163,15 +163,15 @@ Free-threaded CPython 3.15 and newer are in scope only after runtime/dependency 
 These are single trials on one Linux x86-64 VM with eight CPUs, not compatibility certification or production limits. The measurements below are historical; the supported default is free-threaded CPython 3.14t workers, with isolated OS processes for code that might crash the interpreter. See the [execution model](execution-model.md) for ownership, cancellation and durability boundaries.
 
 
-Costs are single-trial raw-context measurements below, not task guarantees. PR #13's owngil measurements used `py_context` directly, not `py_task`. Named owngil and isolated tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: both named modes already own their interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
+Costs are single-trial raw-context measurements below, not task guarantees. The owngil measurements used `py_context` directly, not `py_task`. Named owngil and isolated tasks use erlang-python's importable-entry path. `dedicated_loop` is worker-only: both named modes already own their interpreter loop. Actors remain worker-only because their local objects belong to the main interpreter.
 
-Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In the [PR #48 mode grid](https://github.com/h0rv/pybeam/pull/48), measured 2026-11-17 on both regular CPython 3.14 and free-threaded 3.14t, 14 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`: pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and orjson. Only asyncpg and MarkupSafe loaded; psycopg-binary was not importable. Free-threading support does not imply subinterpreter support.
+Own-GIL subinterpreter mode is unsupported because common native extensions refuse to load in it. In a mode grid on both regular CPython 3.14 and free-threaded 3.14t, 14 of 17 common packages raised `ImportError: ... does not support loading in subinterpreters`: pydantic-core, uvloop, httptools, SQLAlchemy, numpy, pandas, cryptography, lxml, msgspec, grpcio, greenlet, ujson, PyYAML, and orjson. Only asyncpg and MarkupSafe loaded; psycopg-binary was not importable. Free-threading support does not imply subinterpreter support.
 
 Isolated entry modules **can import PyBEAM**. The native task probe uses stdlib dataclasses and `Json` in the caller, and imports `pybeam` and `pybeam.codec.Json` in a different OS process. Pydantic remains a development/test dependency, not a PyBEAM core dependency, so the probe also checks module-level imports of Pydantic **2.14.3** and `pydantic_core` **2.50.4** as optional-extension coverage; neither supplies the task codecs. These imports do not certify every extension's compatibility. Isolated entries must not import `erlang.tasks` or submit nested tasks: the child has no actor-gate/native task hooks.
 
-The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task. The current runtime includes the merged PR #5 bootstrap fix.
+The isolated diagram describes generic raw contexts measured below, which can restart their child. Named isolated tasks use `restart => false`: losing a child never restarts or retries its task.
 
-A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context costs one pthread; isolated contexts instead cost a child process. Bounded data actors now lease workers from a separate node-wide pool in pinned erlang-python `f893508`. Each worker reuses a thread-local loop, so different actors need not share one execution loop. Actor count no longer determines thread count. Tasks still allocate contexts in their selected mode; their shared-loop measurements below do not describe pooled actor dispatch. Actor state and queued work still consume memory, and no million-actor capacity has been verified.
+A million BEAM processes do not imply a million interpreters. The [generic router][router] reuses a bounded context pool. Each embedded context costs one pthread; isolated contexts instead cost a child process. Bounded data actors lease workers from a separate node-wide pool. Each worker reuses a thread-local loop, so different actors need not share one execution loop. Actor count does not determine thread count. Tasks still allocate contexts in their selected mode; their shared-loop measurements below do not describe pooled actor dispatch. Actor state and queued work still consume memory, and no million-actor capacity has been verified.
 
 CPython **3.14.10 / 3.14.10t**; `erl +S 8:8`. Creation is the cumulative mean at **256 contexts**. RSS is the baseline-subtracted VM plus child RSS, divided by context count; it is summed RSS, not PSS. Calls are 10,000 sequential `operator.add(1, 2)` calls after warm-up. CPU work is a calibrated ~200 ms pure-Python sum of squares. Speedup is `N × wall1 / wallN`; both scaling columns below use **N=8**. No affinity pinning or repeated-trial confidence intervals.
 
@@ -184,12 +184,11 @@ The round-trip preserved bytecode and changed constant immortality. The managed 
 - **owngil extensions:** [the interpreter configuration][own-gil] sets `check_multi_interp_extensions = 1`. Actual imports returned `module pydantic_core._pydantic_core does not support loading in subinterpreters` and `module numpy._core._multiarray_umath does not support loading in subinterpreters` (the latter wrapped by NumPy). Free-threading does not remove subinterpreter compatibility requirements.
 - **Actors require the main interpreter:** [local-object retention/unwrapping][local-object] rejects other interpreters with `Actors require the main interpreter`; [context validation][local-context] rejects subinterpreters with `local_objects_require_worker`.
 - **Historical worker-only task path:** the matrix revision's [py_data_actor.erl][data-actor], [py_object_actor.erl][object-actor] and [py_task.erl][task] hard-code `mode => worker`. Current actors remain worker-only; current tasks retain named owngil entries in code (unsupported) and support isolated entries. `dedicated_loop=True` selects a worker loop, not a different interpreter or process.
-- **Isolated bootstrap:** [package initialization][bootstrap-import] eagerly imported [_supervision, which imports erlang][bootstrap-supervision], before [the child installed its synthetic erlang module][bootstrap-child]. This produced `ModuleNotFoundError: No module named 'erlang'` and `{handshake_failed,closed}`. The isolated results above used [PR #5](https://github.com/h0rv/erlang-python/pull/5)'s `249a970` fix, now merged and included in the current runtime.
 - **owngil is not a crash boundary:** its subinterpreter runs inside the BEAM address space. The separate crash probes terminated the whole VM on both builds. Only isolated contained `os.abort()` in these trials.
 
 - Setting: `TaskFunction(..., execution=ExecutionMode.WORKER)`; supported modes are `worker` and `isolated`. Use free-threaded **3.14t workers** by default; packaged wheels remain conventional. The `owngil` value remains in code but is unsupported.
 - Recommended development path for CPU parallelism: **3.14t with dedicated-loop tasks**, opt in with `PYBEAM_ALLOW_FREE_THREADED=1`. Free-threaded packaged wheels have not been built. Shared-loop tasks do not parallelize on either build.
-- Actors stay worker-only: local objects require the main interpreter. Supported isolated tasks accept plain top-level async byte functions, keep `Codec` encoding/decoding in the caller, and run in child processes. The runtime is pinned to erlang-python main merge `d60392c` ([PR #11](https://github.com/h0rv/erlang-python/pull/11)), including its pre-start cancellation fix; raw-context measurements remain historical, not task benchmarks.
+- Actors stay worker-only: local objects require the main interpreter. Supported isolated tasks accept plain top-level async byte functions, keep `Codec` encoding/decoding in the caller, and run in child processes. Raw-context measurements are not task benchmarks.
 - Isolated tasks contain confirmed child crashes as `TaskCrashed`, release admission, and never restart or retry the task. They do not provide durable jobs or a sandbox.
 - 3.14t task slowdown, resolved: the entry file's mortal `0xFFFFFFFF` constant, shared by every task, made four `dedicated_loop=True` tasks take 1.2-1.6 s each against 0.35 s alone. With the entry loaded through marshal, `examples/docs/execution.py`'s checksum took 318 / 425 / 433 ms elapsed work span at N=1 / 4 / 8 tasks (311-425 ms per task), and sum-of-squares 186 / 198 / 208 ms. Four plain threads inside one task took 390 ms against 321 ms for one.
 - Open: complete 3.14t integration acceptance, including the hang and `ws_session:send_sync/3` `undef`; the 3.14t owngil/isolated creation slowdown; the untraced ~1 s dedicated-loop completion latency.
@@ -269,9 +268,6 @@ A reviewed, parameterized version of these harnesses belongs in `benchmarks/` be
 [data-actor]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/src/py_data_actor.erl#L8-L20
 [object-actor]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/src/py_object_actor.erl#L40-L44
 [task]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/src/py_task.erl#L8-L42
-[bootstrap-import]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/priv/_erlang_impl/__init__.py#L69
-[bootstrap-supervision]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/priv/_erlang_impl/_supervision.py#L4
-[bootstrap-child]: https://github.com/h0rv/erlang-python/blob/54ccee8367341eb83acab1280b4316ba034e3bf4/priv/py_isolated_child.py#L185-L190
 [managed-loader]: https://github.com/h0rv/pybeam/blob/d4f63740bc773b09ac7ce7aea5c2004f2fc227d8/src/pybeam/runtime/loader.py#L93-L96
 [run-path]: https://github.com/python/cpython/blob/3.14/Lib/runpy.py#L257-L266
 [constant-compilation]: https://github.com/python/cpython/blob/3.14/Python/bltinmodule.c#L875-L887
@@ -282,7 +278,7 @@ A reviewed, parameterized version of these harnesses belongs in `benchmarks/` be
 
 ### Four-job fan-out and blast-radius reproduction
 
-The published fan-out and crash charts record earlier erlang-python `c007eb5` probes. Set `APP` to the matching native application directory containing `ebin` and `priv/py_nif.so`, following [development runtime setup](../development.md#use-a-development-runtime).
+The published fan-out and crash charts record erlang-python `c007eb5` probes. Set `APP` to the matching native application directory containing `ebin` and `priv/py_nif.so`, following [development runtime setup](../development.md#use-a-development-runtime).
 
 The in-repo modes lab implements both experiments; these commands rerun the same workloads, not guaranteed historical values:
 

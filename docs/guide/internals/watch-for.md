@@ -25,7 +25,7 @@ Every worker task without `dedicated_loop=True` runs on one event loop thread. A
 
 - Wrap blocking calls in `await asyncio.to_thread(...)`. A `ThreadPoolExecutor` used synchronously inside the method still blocks the loop until all its work finishes.
 - Give CPU-bound tasks `dedicated_loop=True`. Actors don't need it.
-- The runtime no longer caps in-flight calls per caller loop at 8,192. The limit without that cap has not been measured.
+- One caller loop has no fixed cap on calls in flight.
 
 ## Boundary copies
 
@@ -42,8 +42,7 @@ A context is not free to start.
 | Created | Time | Memory |
 | --- | --- | --- |
 | One worker context | 1.1–1.2 ms | under 0.1 MiB |
-| One actor in the pre-pool implementation | 2.3–3.0 ms | 50–60 KiB and one OS thread |
 | One isolated context | 61–132 ms | 21–27 MiB |
 
-- Create long-lived actors at startup and reuse them rather than spawning one per request. The earlier pre-pool implementation took about 24 s to start 10,000 actors; current pooled-actor costs have not been measured here.
+- Create long-lived actors at startup and reuse them rather than spawning one per request.
 - Cap concurrency with `TaskLimits` and `max_children`. Starting a task when its slots are full raises `Overloaded` instead of queuing it.
