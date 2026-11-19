@@ -339,6 +339,10 @@ run = "uv run --locked --extra hornbeam --extra pyview python -m examples.pyview
 description = "Serve PyBEAM agent nodes on 8810–8812 and the Redis/Celery stack on 8813"
 run = "uv run --locked --python 3.14.10t --extra agents --extra fastapi --extra hornbeam python -m examples.agents.launch"
 
+[tasks."example:agents-compare"]
+description = "Measure warm agent failure batches on PyBEAM and Redis/Celery"
+run = "uv run --locked --python 3.14.10t --extra agents --extra fastapi --extra hornbeam python -m examples.agents.compare"
+
 [tasks."test:distributed-model"]
 description = "Bounded source-only ingress model; requires explicit private native source and Alloy jar"
 run = '''

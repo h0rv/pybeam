@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 470" role="img" aria-labelledby="title">
+<title id="title">Maximum healthy completion time relative to warm baseline</title>
+<style>svg{background:#fff;color:#202124;font:15px system-ui,sans-serif}text{fill:currentColor}.py{fill:#246a9b}.usual{fill:#9a4c15}@media(prefers-color-scheme:dark){svg{background:#181a1b;color:#eee}.py{fill:#83bee7}.usual{fill:#efb180}}</style>
+<text x="16" y="28">Maximum healthy completion time relative to warm baseline (ratio)</text>
+<text x="16" y="76">stop · PyBEAM</text>
+<rect class="py" x="225" y="60" width="24.788812996287717" height="23"/>
+<text x="259.78881299628773" y="77">0.99</text>
+<text x="16" y="115">stop · Redis/Celery</text>
+<rect class="usual" x="225" y="99" width="25.004928846556545" height="23"/>
+<text x="260.00492884655654" y="116">1.00</text>
+<text x="16" y="154">hang · PyBEAM</text>
+<rect class="py" x="225" y="138" width="24.99214828081437" height="23"/>
+<text x="259.9921482808144" y="155">1.00</text>
+<text x="16" y="193">hang · Redis/Celery</text>
+<rect class="usual" x="225" y="177" width="25.095521010572842" height="23"/>
+<text x="260.09552101057284" y="194">1.00</text>
+<text x="16" y="232">burn · PyBEAM</text>
+<rect class="py" x="225" y="216" width="25.75508187208788" height="23"/>
+<text x="260.7550818720879" y="233">1.03</text>
+<text x="16" y="271">burn · Redis/Celery</text>
+<rect class="usual" x="225" y="255" width="25.149399472122376" height="23"/>
+<text x="260.14939947212235" y="272">1.00</text>
+<text x="16" y="310">crash · PyBEAM</text>
+<rect class="py" x="225" y="294" width="24.696810316314682" height="23"/>
+<text x="259.69681031631467" y="311">0.99</text>
+<text x="16" y="349">crash · Redis/Celery</text>
+<rect class="usual" x="225" y="333" width="24.9354460577326" height="23"/>
+<text x="259.9354460577326" y="350">1.00</text>
+<text x="16" y="388">kill · PyBEAM</text>
+<rect class="py" x="225" y="372" width="28.247982661423247" height="23"/>
+<text x="263.24798266142324" y="389">1.13</text>
+<text x="16" y="427">kill · Redis/Celery</text>
+<rect class="usual" x="225" y="411" width="365.0" height="23"/>
+<text x="600.0" y="428">14.58</text>
+</svg>
