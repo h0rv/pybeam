@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Agent sessions</h1>
+{% if usual %}<p>One agent turn per Celery task. Tools run inside a prefork worker process. Two worker containers provide four slots each; Redis stores snapshots and execution counts.</p>{% else %}<p>One deterministic agent per session. Tools run in separate OS processes. Session state is replicated across three local nodes.</p>{% endif %}
+<form method="post" action="/sessions" class="start">
+  <label>Scenario<select name="mode"><option value="normal">Normal · three lookups</option><option value="hang">Hang · lookup then wait</option><option value="burn">Burn · lookup then 30 s CPU</option><option value="crash">Crash · lookup then segfault</option></select></label>
+  <label>Sessions<input type="number" name="count" min="1" max="12" value="1" required></label>
+  {% if not usual %}<label>Owner<select name="placement"><option>a</option><option>b</option><option>c</option></select></label>{% endif %}
+  <button type="submit">Start sessions</button>
+</form>
+<h2>Sessions</h2>
+<p><a href="/">Refresh list</a> · Open sessions in separate tabs to compare streaming.</p>
+{% if sessions %}
+<div class="table-wrap"><table><thead><tr><th>Session</th><th>Scenario</th><th>{% if usual %}Worker{% else %}Node{% endif %}</th><th>State</th></tr></thead><tbody>
+{% for session in sessions %}<tr><td><a href="/sessions/{{ session.id }}" target="_blank" rel="noopener">{{ session.id[:8] }}</a></td><td>{{ session.prompt }}</td><td>{{ session.node }}</td><td>{{ session.state }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p>No sessions yet.</p>{% endif %}
+<details><summary>Node failure</summary>
+{% if usual %}<p>Open a session to see its owner. From the repository root, run <code>mise exec -- uv run python -m examples.agents.usual.launch kill SESSION_ID</code> to SIGKILL that worker container. Unacknowledged tasks may be redelivered after the 60 s visibility timeout; their turns start from the beginning.</p>{% else %}
+<p>Ports: a → 8810, b → 8811, c → 8812. Open a session on another node before killing its owner. SIGKILL drops this node's connections. Surviving tabs continue; a started tool is recorded as interrupted, not retried.</p>
+<form method="post" action="/node/kill"><button class="danger" type="submit">SIGKILL node {{ node }}</button></form>
+{% endif %}
+</details>
+{% endblock %}

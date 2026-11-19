@@ -335,6 +335,14 @@ run = "uv run --locked --project examples/fastapi_celery/original ruff check --c
 description = "Serve the local two-node PyView feed on ports 8771 and 8772"
 run = "uv run --locked --extra hornbeam --extra pyview python -m examples.pyview_cluster.launch"
 
+[tasks."example:agents"]
+description = "Serve PyBEAM agent nodes on 8810–8812 and the Redis/Celery stack on 8813"
+run = "uv run --locked --extra agents --extra fastapi --extra hornbeam python -m examples.agents.launch"
+
+[tasks."example:agents-compare"]
+description = "Measure warm agent failure batches on PyBEAM and Redis/Celery"
+run = "uv run --locked --extra agents --extra fastapi --extra hornbeam python -m examples.agents.compare"
+
 [tasks."test:distributed-model"]
 description = "Bounded source-only ingress model; requires explicit private native source and Alloy jar"
 run = '''

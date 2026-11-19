@@ -54,9 +54,15 @@ An `os.abort()` in asyncio or threads kills the app; in `worker`, it kills the V
 
 Each process makes one empty call, with at most 32 calls in flight. A million waiting processes used about 2.7 GB (2.7 KB each); the worker ceiling of about 32,000–43,000 calls per second was not traced.
 
-## Not measured
+## Other measurements
 
 Web serving on conventional and free-threaded Python has its own [ASGI benchmarks](https://github.com/h0rv/pybeam/blob/main/benchmarks/web/SCALE_RESULTS.md).
+
+The [agent sessions comparison](../../../benchmarks/AGENTS_COMPARISON.md) measures
+Stop, tool faults and node loss on PyBEAM and Redis/Celery, with warm baselines,
+execution counts and a rerun command.
+
+## Not measured
 
 - Actor throughput, memory and startup cost.
 

@@ -336,13 +336,14 @@ requires-dist = [
     { name = "jinja2", marker = "extra == 'showcase'", specifier = ">=3.1.6,<4" },
     { name = "litestar", extras = ["jinja"], marker = "extra == 'litestar'", specifier = "==2.25.0" },
     { name = "pydantic", marker = "extra == 'litestar'", specifier = "==2.14.3" },
+    { name = "pydantic-ai-slim", marker = "extra == 'agents'", specifier = ">=2.71.0" },
     { name = "python-multipart", marker = "extra == 'fastapi'", specifier = ">=0.0.20,<1" },
     { name = "python-multipart", marker = "extra == 'pyview'", specifier = ">=0.0.20,<1" },
     { name = "pyview-web", marker = "extra == 'pyview'", git = "https://github.com/ogrodnek/pyview.git?rev=d29dda1fb1f3a09c3c0a3c9102a8f0490f6f9972" },
     { name = "uvicorn", marker = "extra == 'fastapi'", specifier = "==0.54.0" },
     { name = "uvicorn", marker = "extra == 'showcase'", specifier = ">=0.41,<1" },
 ]
-provides-extras = ["genstage", "showcase", "hornbeam", "fastapi", "litestar", "pyview"]
+provides-extras = ["genstage", "showcase", "hornbeam", "fastapi", "litestar", "pyview", "agents"]
 
 [package.metadata.requires-dev]
 dev = [

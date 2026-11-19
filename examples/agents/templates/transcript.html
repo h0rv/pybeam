@@ -1,0 +1,10 @@
+<div class="status"><p>Owner: <strong>{{ snapshot.node }}</strong> · State: <strong>{{ snapshot.state }}</strong></p>
+{% if snapshot.state not in ['stopped', 'failed', 'completed'] %}<form method="post" action="/sessions/{{ snapshot.id }}/stop"><button type="submit">Stop session</button></form>{% endif %}</div>
+{% if snapshot.state == 'waiting' %}<p>{% if usual %}Queued for a worker slot.{% else %}Waiting for the owner to restore this session.{% endif %}</p>{% endif %}
+{% if usual %}<p>Turn attempts: {{ snapshot.attempts }}{% if snapshot.pid %} · Process: {{ snapshot.pid }}{% endif %}</p>{% if snapshot.stop_requested and snapshot.state not in ['stopped', 'failed', 'completed'] %}<p>Termination requested; awaiting worker acknowledgement.</p>{% endif %}{% endif %}
+<ol class="transcript">{% for entry in snapshot.transcript %}<li class="{{ entry.kind }}">{{ entry.text }}</li>{% endfor %}</ol>
+<details><summary>Tool ledger</summary>
+{% if snapshot.ledger %}<div class="table-wrap"><table><thead><tr><th>Call ID</th><th>Tool</th><th>State</th><th>Result</th></tr></thead><tbody>
+{% for id, entry in snapshot.ledger.items() %}<tr><td>{{ id }}</td><td>{{ entry.name }}</td><td>{{ entry.state }}</td><td>{{ entry.result }}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p>No tools started.</p>{% endif %}
+</details>

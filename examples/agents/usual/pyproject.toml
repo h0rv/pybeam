@@ -1,0 +1,26 @@
+[project]
+name = "agents-usual"
+version = "0.1.0"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "celery[redis]>=5.5,<6",
+    "fastapi==0.163.0",
+    "jinja2>=3.1.6,<4",
+    "pydantic-ai-slim==2.71.0",
+    "python-multipart>=0.0.20,<1",
+    "redis>=6,<8",
+    "uvicorn[standard]==0.54.0",
+]
+
+[dependency-groups]
+dev = ["celery-types>=0.26", "ty>=0.0.104", "pytest>=9,<10", "pytest-asyncio>=1,<2", "httpx>=0.28,<1"]
+
+[tool.uv]
+package = false
+
+[tool.ty.environment]
+python-version = "3.14"
+extra-paths = ["../../.."]
+
+[tool.ty.rules]
+all = "error"

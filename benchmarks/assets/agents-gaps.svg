@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 470" role="img" aria-labelledby="title">
+<title id="title">Maximum healthy token gap</title>
+<style>svg{background:#fff;color:#202124;font:15px system-ui,sans-serif}text{fill:currentColor}.py{fill:#246a9b}.usual{fill:#9a4c15}@media(prefers-color-scheme:dark){svg{background:#181a1b;color:#eee}.py{fill:#83bee7}.usual{fill:#efb180}}</style>
+<text x="16" y="28">Maximum healthy token gap (seconds)</text>
+<text x="16" y="76">stop · PyBEAM</text>
+<rect class="py" x="225" y="60" width="3.931144891773823" height="23"/>
+<text x="238.9311448917738" y="77">1.55</text>
+<text x="16" y="115">stop · Redis/Celery</text>
+<rect class="usual" x="225" y="99" width="2.697859261163336" height="23"/>
+<text x="237.69785926116333" y="116">1.06</text>
+<text x="16" y="154">hang · PyBEAM</text>
+<rect class="py" x="225" y="138" width="3.8602627220395607" height="23"/>
+<text x="238.86026272203955" y="155">1.52</text>
+<text x="16" y="193">hang · Redis/Celery</text>
+<rect class="usual" x="225" y="177" width="2.690952334574217" height="23"/>
+<text x="237.6909523345742" y="194">1.06</text>
+<text x="16" y="232">burn · PyBEAM</text>
+<rect class="py" x="225" y="216" width="3.888704494851427" height="23"/>
+<text x="238.88870449485142" y="233">1.53</text>
+<text x="16" y="271">burn · Redis/Celery</text>
+<rect class="usual" x="225" y="255" width="2.7034666691844778" height="23"/>
+<text x="237.70346666918448" y="272">1.07</text>
+<text x="16" y="310">crash · PyBEAM</text>
+<rect class="py" x="225" y="294" width="3.6564187526404752" height="23"/>
+<text x="238.65641875264046" y="311">1.44</text>
+<text x="16" y="349">crash · Redis/Celery</text>
+<rect class="usual" x="225" y="333" width="2.6887412078979223" height="23"/>
+<text x="237.68874120789792" y="350">1.06</text>
+<text x="16" y="388">kill · PyBEAM</text>
+<rect class="py" x="225" y="372" width="3.86084858036174" height="23"/>
+<text x="238.86084858036173" y="389">1.52</text>
+<text x="16" y="427">kill · Redis/Celery</text>
+<rect class="usual" x="225" y="411" width="365.0" height="23"/>
+<text x="600.0" y="428">143.98</text>
+</svg>

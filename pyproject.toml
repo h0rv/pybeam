@@ -31,6 +31,9 @@ pyview = [
     "python-multipart>=0.0.20,<1",
     "pyview-web>=0.9.0,<1",
 ]
+agents = [
+    "pydantic-ai-slim>=2.71.0",
+]
 
 [dependency-groups]
 dev = [
@@ -80,7 +83,7 @@ all = "error"
 
 [tool.ty.src]
 include = ["src", "tests", "examples", "tools"]
-exclude = ["examples/chat_load/conventional", "examples/fastapi_celery/original"]
+exclude = ["examples/chat_load/conventional", "examples/fastapi_celery/original", "examples/agents/usual"]
 
 [tool.ruff]
 target-version = "py314"
