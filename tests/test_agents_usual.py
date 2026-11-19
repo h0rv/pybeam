@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import time
 from collections.abc import Callable, Generator
@@ -75,6 +76,8 @@ class Stack:
 def stack(request: pytest.FixtureRequest, tmp_path: Path) -> Generator[Stack]:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and Docker")
+    if shutil.which("docker") is None:
+        pytest.skip("Docker CLI is not installed")
     with running(), httpx.Client(timeout=15) as client:
         try:
             yield Stack(client)
