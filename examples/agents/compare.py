@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
 from itertools import pairwise
-from pathlib import Path
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -25,7 +24,8 @@ from examples.agents.usual.launch import running as usual_running
 type Case = Literal["stop", "hang", "burn", "crash", "kill"]
 type StackName = Literal["PyBEAM", "Redis/Celery"]
 CASES: tuple[Case, ...] = ("stop", "hang", "burn", "crash", "kill")
-RESULTS = Path(__file__).with_name("results")
+RESULTS = ROOT / "benchmarks" / "results" / "agents"
+ASSETS = ROOT / "benchmarks" / "assets"
 KILL_TIMEOUT_S = 600
 
 
@@ -351,6 +351,29 @@ def summary(row: Measurement) -> str:
     )
 
 
+def write_report(report: Report) -> None:
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    (RESULTS / "comparison.json").write_text(report.model_dump_json(indent=2) + "\n")
+    charts: tuple[tuple[str, str, str, Callable[[Measurement], float]], ...] = (
+        (
+            "completion.svg",
+            "Maximum healthy completion time relative to warm baseline",
+            "ratio",
+            lambda row: row.max_relative_to_baseline,
+        ),
+        ("gaps.svg", "Maximum healthy token gap", "seconds", lambda row: row.max_token_gap_s),
+        (
+            "repeats.svg",
+            "Repeated tool executions, healthy and fault sessions",
+            "executions",
+            lambda row: row.healthy_repeats + row.fault_repeats,
+        ),
+    )
+    for filename, title, unit, metric in charts:
+        (ASSETS / ("agents-" + filename)).write_text(chart(report, title, unit, metric))
+
+
 def main() -> None:
     directory = ROOT / "_build" / "agents-compare" / uuid4().hex
     directory.mkdir(parents=True)
@@ -385,27 +408,9 @@ def main() -> None:
                     row = measure(Stack(name, client), case, sampling)
                     report.measurements.append(row)
                     print(summary(row), flush=True)
-    RESULTS.mkdir(exist_ok=True)
-    (RESULTS / "comparison.json").write_text(report.model_dump_json(indent=2) + "\n")
-    charts: tuple[tuple[str, str, str, Callable[[Measurement], float]], ...] = (
-        (
-            "completion.svg",
-            "Maximum healthy completion time relative to warm baseline",
-            "ratio",
-            lambda row: row.max_relative_to_baseline,
-        ),
-        ("gaps.svg", "Maximum healthy token gap", "seconds", lambda row: row.max_token_gap_s),
-        (
-            "repeats.svg",
-            "Repeated tool executions, healthy and fault sessions",
-            "executions",
-            lambda row: row.healthy_repeats + row.fault_repeats,
-        ),
-    )
-    for filename, title, unit, metric in charts:
-        (RESULTS / filename).write_text(chart(report, title, unit, metric))
+    write_report(report)
     print(
-        "Results: examples/agents/results/comparison.json and completion.svg, gaps.svg, repeats.svg",
+        "Results: benchmarks/results/agents/comparison.json and benchmarks/assets/agents-{completion,gaps,repeats}.svg",
         flush=True,
     )
 

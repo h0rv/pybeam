@@ -1,5 +1,6 @@
 import os
 import subprocess
+from pathlib import Path
 from xml.etree import ElementTree
 
 import httpx
@@ -7,6 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from examples.agents.compare import (
+    ASSETS,
+    RESULTS,
     Measurement,
     Report,
     Resources,
@@ -17,8 +20,43 @@ from examples.agents.compare import (
     repeats,
     resources,
     token_gap,
+    write_report,
 )
 from examples.agents.protocol import Execution
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_comparison_writes_benchmark_results(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, empty: bool
+) -> None:
+    report = Report.model_validate_json((RESULTS / "comparison.json").read_text())
+    if empty:
+        report.measurements.clear()
+    results, assets = tmp_path / "results" / "agents", tmp_path / "assets"
+    assert RESULTS.parts[-3:] == ("benchmarks", "results", "agents")
+    assert ASSETS.parts[-2:] == ("benchmarks", "assets")
+    monkeypatch.setattr("examples.agents.compare.RESULTS", results)
+    monkeypatch.setattr("examples.agents.compare.ASSETS", assets)
+    write_report(report)
+    assert Report.model_validate_json((results / "comparison.json").read_text()) == report
+    assert sorted(path.name for path in assets.iterdir()) == [
+        "agents-completion.svg",
+        "agents-gaps.svg",
+        "agents-repeats.svg",
+    ]
+    for path in assets.iterdir():
+        ElementTree.fromstring(path.read_text())  # noqa: S314
+
+
+def test_comparison_output_error_propagates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report = Report.model_validate_json((RESULTS / "comparison.json").read_text())
+    blocked = tmp_path / "blocked"
+    blocked.write_text("not a directory")
+    monkeypatch.setattr("examples.agents.compare.RESULTS", blocked)
+    with pytest.raises(FileExistsError):
+        write_report(report)
 
 
 @pytest.mark.parametrize("running", [True, False])

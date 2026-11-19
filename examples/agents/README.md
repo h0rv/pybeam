@@ -7,8 +7,15 @@ ledger and execution counters.
 
 ## Run both apps
 
-From a development checkout with the [development prerequisites](../../docs/development.md)
-and Docker available:
+The multi-node launcher uses conventional CPython 3.14 and the native runtime
+built by `mise run setup`. It requires the
+[development prerequisites](../../docs/development.md), a Hornbeam checkout
+linked at `_checkouts/hornbeam`, and Erlang's `epmd` and `escript` on `PATH`,
+like the [PyView cluster launcher](../pyview_cluster/launch.py).
+Docker with the Compose plugin runs the Redis/Celery stack. Tools run in
+isolated processes; free-threaded Python is not required.
+
+From the repository root:
 
 ```sh
 mise run example:agents
@@ -59,40 +66,10 @@ Stop the interactive demo, then run:
 mise run example:agents-compare
 ```
 
-The runner starts both stacks itself and replaces the JSON and SVG files in
-[`results/`](results/). Each case uses fresh stacks. On each stack, 12 normal
-sessions warm the workers, followed by a 12-session no-fault baseline and
-12 healthy sessions beside one fault. Both baseline and fault batches are warm.
-Stacks are measured sequentially on the same host, with the other stack idle.
-The kill case interrupts a burn after its first lookup.
-Its completion deadline is 600 seconds. Redis visibility is an eligibility
-threshold, not a delivery timer: this Celery transport checks every 10 seconds
-and scans expired deliveries every tenth check, about 100 seconds apart.
-Queueing and the restarted 30-second burn add to recovery time.
-
-![Maximum healthy completion time divided by the warm baseline maximum](results/completion.svg)
-
-![Maximum gap between healthy-session tokens, in seconds](results/gaps.svg)
-
-![Repeated tool executions across healthy and fault sessions](results/repeats.svg)
-
-[`comparison.json`](results/comparison.json) contains individual completion
-times, median and maximum baseline ratios, separate healthy/fault repeat
-counts, fault states, Stop and recovery timings, execution counts and resource
-samples. Fault states are recorded before cleanup; the runner then stops
-sessions that remain active.
-
-Completion, Stop and recovery timings use HTTP observations with a target
-50 ms polling interval. Token gaps use server timestamps, include intentional
-lookup pauses and exclude waiting for the first token. Memory is a sampled
-sum of process RSS initiated after healthy-batch submission, not a peak;
-shared pages are counted more than once.
-Docker's memory samples are also retained. These are local observations, not
-capacity or production-latency guarantees.
-
-PyBEAM starts a fresh isolated process for each tool call; token gaps include
-process startup, imports and replicated state writes. Celery runs tools inline
-in existing prefork workers. The comparison retains these isolation semantics.
+The runner starts both stacks and replaces the
+[comparison data](../../benchmarks/results/agents/comparison.json) and charts.
+The [agent comparison page](../../benchmarks/AGENTS_COMPARISON.md) contains the
+charts, measurement method, limitations and rerun command.
 
 ## Boundaries
 
