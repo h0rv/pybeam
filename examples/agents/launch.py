@@ -49,6 +49,8 @@ def running(
     directory: Path,
     ports: tuple[int, int, int] = PORTS,
     output: BinaryIO | None = None,
+    application: str = "examples.agents.app:app",
+    extra_paths: tuple[Path, ...] = (),
 ) -> Generator[list[subprocess.Popen[bytes]]]:
     directory.mkdir(parents=True, exist_ok=True)
     epmd_port = free_port()
@@ -104,9 +106,10 @@ def running(
                     "escript",
                     str(LAUNCHER),
                     str(ROOT / "_build" / "hornbeam"),
-                    "examples.agents.app:app",
+                    application,
                     "127.0.0.1:" + str(port),
                     "on",
+                    *(str(path) for path in extra_paths),
                     str(ROOT),
                     str(ROOT / "src"),
                     *site.getsitepackages(),

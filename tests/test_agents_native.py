@@ -3,6 +3,7 @@ import signal
 import subprocess
 import time
 from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
@@ -61,17 +62,75 @@ class Cluster:
         return self.wait(session, lambda value: value.snapshot.state == "stopped")
 
 
-@pytest.fixture
-def cluster(request: pytest.FixtureRequest, tmp_path: Path) -> Generator[Cluster]:
+@contextmanager
+def running_cluster(
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
+    *,
+    application: str = "examples.agents.app:app",
+) -> Generator[Cluster]:
     if request.config.getoption("run_runtime") is not True:
         pytest.skip("Requires --run-runtime and the agents, fastapi and hornbeam extras")
     ports = (free_port(), free_port(), free_port())
     with (
         (tmp_path / "nodes.log").open("wb") as output,
-        running(directory=tmp_path, ports=ports, output=output) as processes,
+        running(
+            directory=tmp_path,
+            ports=ports,
+            output=output,
+            application=application,
+            extra_paths=(Path(__file__).parent / "native",),
+        ) as processes,
         httpx.Client(timeout=15) as client,
     ):
         yield Cluster(client, ports, processes)
+
+
+@pytest.fixture
+def cluster(request: pytest.FixtureRequest, tmp_path: Path) -> Generator[Cluster]:
+    with running_cluster(request, tmp_path) as current:
+        yield current
+
+
+def streamed_states(response: httpx.Response) -> list[str]:
+    states: list[str] = []
+    for line in response.iter_lines():
+        if line.startswith("data:") and "State:" in line:
+            states.append(line)
+            if "<strong>completed</strong>" in line:
+                return states
+    raise AssertionError("SSE ended before completion")
+
+
+def test_snapshot_and_sse_overflow_leave_sessions_streaming(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> None:
+    with running_cluster(request, tmp_path, application="agents_overflow_app:app") as current:
+        affected, healthy = current.start("normal", count=2)
+        with (
+            current.client.stream("GET", current.url("/sessions/" + affected + "/events")) as slow,
+            current.client.stream("GET", current.url("/sessions/" + healthy + "/events")) as fast,
+        ):
+            assert slow.status_code == fast.status_code == 200
+            assert len(streamed_states(fast)) > 2
+            assert len(streamed_states(slow)) > 2
+        for node in range(3):
+            health = current.client.get(current.url("/health", node))
+            assert health.status_code == 200, health.text
+        response = current.client.get(current.url("/test/overflows"))
+        response.raise_for_status()
+        counts = TypeAdapter(dict[str, int]).validate_json(response.content)
+        assert counts["snapshot"] > 0 and counts["sse"] > 0, counts
+        for session in (affected, healthy):
+            value = current.wait(session, lambda value: value.snapshot.state == "completed")
+            assert all(len(events) == 1 for events in value.executions.values())
+        later = current.start("normal")[0]
+        with current.client.stream(
+            "GET", current.url("/sessions/" + later + "/events")
+        ) as response:
+            assert response.status_code == 200
+            assert len(streamed_states(response)) > 2
+        print("OVERFLOW_RECOVERY", counts, "HEALTHY_STREAMS_COMPLETED", 3)
 
 
 def gone(pid: int) -> bool:

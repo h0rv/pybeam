@@ -102,7 +102,10 @@ in existing prefork workers. The comparison retains these isolation semantics.
   interrupted tool produced no external side effect.
 - Each PyBEAM node budgets 1 MiB of pending data for the cluster-wide full-snapshot
   subscription. The default 64 KiB is too small for concurrent token updates
-  from these batches. Overflow remains an error, not dropped data or a retry.
+  from these batches. On overflow, the node logs a warning and resubscribes;
+  the next snapshot for a session resynchronizes its view. Each browser stream
+  also logs and resubscribes on overflow, sending a fresh transcript without
+  interrupting other streams or agent turns.
 - Recovery here covers same-host SIGKILL only, not network partitions,
   whole-cluster restart or loss of the machine. PyBEAM's session directory is
   in memory; execution audit files share the host filesystem.

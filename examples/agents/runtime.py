@@ -30,11 +30,12 @@ from examples.agents.tools import isolated
 from pybeam import ActorGroup
 from pybeam.codec import Json
 from pybeam.integrations.hornbeam import Services
+from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
 from pybeam.tasks import ExecutionMode, TaskCrashed, TaskFunction, TaskLimits, TaskSupervisor
 
 ANNOUNCEMENTS = "agents:new"
 SNAPSHOTS = "agents:snapshots"
-SNAPSHOT_PENDING_BYTES = 1024 * 1024
+SNAPSHOT_PENDING_BYTES: int = 1024 * 1024
 TOOL = TaskFunction(isolated, Json(str), Json(str), execution=ExecutionMode.ISOLATED)
 logger = logging.getLogger(__name__)
 
@@ -204,10 +205,16 @@ class Runtime:
                 self.placements[announcement.id] = Placement(task)
 
     async def updates(self, ready: asyncio.Event) -> None:
-        async with self.beam.subscribe(SNAPSHOTS, max_bytes=SNAPSHOT_PENDING_BYTES) as subscription:
-            ready.set()
-            async for payload in subscription:
-                await self.remember(Snapshot.model_validate_json(payload))
+        while True:
+            try:
+                async with self.beam.subscribe(
+                    SNAPSHOTS, max_bytes=SNAPSHOT_PENDING_BYTES
+                ) as subscription:
+                    ready.set()
+                    async for payload in subscription:
+                        await self.remember(Snapshot.model_validate_json(payload))
+            except SubscriptionOverflow:
+                logger.warning("Snapshot subscription overflow; resubscribing")
 
     async def place(self, announcement: Announcement) -> None:
         try:

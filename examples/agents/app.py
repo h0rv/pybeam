@@ -22,6 +22,9 @@ from examples.agents.views import templates, transcript
 from examples.chat_load.origin import require_same_origin
 from pybeam import ActorGroup
 from pybeam.integrations.hornbeam import Beam
+from pybeam.integrations.hornbeam.errors import SubscriptionOverflow
+
+TRANSCRIPT_PENDING_BYTES: int = 65536
 
 
 @dataclass(slots=True)
@@ -170,10 +173,16 @@ async def events(
 ) -> AsyncGenerator[ServerSentEvent]:
     session_snapshot(current, session)
     scoped = current.beam.for_scope(request.scope)
-    async with scoped.subscribe(topic(session.hex)) as subscription:
-        yield ServerSentEvent(raw_data=transcript(session_snapshot(current, session)))
-        async for fragment in subscription:
-            yield ServerSentEvent(raw_data=fragment.decode())
+    while True:
+        try:
+            async with scoped.subscribe(
+                topic(session.hex), max_bytes=TRANSCRIPT_PENDING_BYTES
+            ) as subscription:
+                yield ServerSentEvent(raw_data=transcript(session_snapshot(current, session)))
+                async for fragment in subscription:
+                    yield ServerSentEvent(raw_data=fragment.decode())
+        except SubscriptionOverflow:
+            logger.warning("Transcript subscription overflow; resubscribing session %s", session)
 
 
 @app.post("/node/kill", dependencies=[Depends(require_same_origin)])
