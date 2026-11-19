@@ -167,6 +167,18 @@ async def receive_until(connection: ClientConnection, target: int) -> list[int]:
     return counts
 
 
+async def receive_until_closed(connection: ClientConnection) -> list[int]:
+    counts: list[int] = []
+    async with asyncio.timeout(5):
+        try:
+            while True:
+                counts.append(Json(CounterReply).decode(await connection.recv()).count)
+        except ConnectionClosed:
+            pass
+        await connection.wait_closed()
+    return counts
+
+
 async def test_native__two_websocket_clients_share_state_and_pubsub(
     service_server: RunningServer,
 ) -> None:
@@ -191,8 +203,7 @@ async def test_native__two_websocket_clients_share_state_and_pubsub(
         assert first_seen.result()[-1] == target
         assert second_seen.result()[-1] == target
         await first.send(json.dumps({"action": "cancel"}))
-        async with asyncio.timeout(5):
-            await first.wait_closed()
+        assert set(await receive_until_closed(first)) <= {target}
         await wait_subscription_count(service_server, 1)
         await second.send(json.dumps({"action": "snapshot"}))
         assert Json(CounterReply).decode(await second.recv()).count == target
