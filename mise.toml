@@ -336,7 +336,7 @@ description = "Serve the local two-node PyView feed on ports 8771 and 8772"
 run = "uv run --locked --extra hornbeam --extra pyview python -m examples.pyview_cluster.launch"
 
 [tasks."example:agents"]
-description = "Serve three local agent nodes on ports 8810, 8811 and 8812"
+description = "Serve PyBEAM agent nodes on 8810–8812 and the Redis/Celery stack on 8813"
 run = "uv run --locked --python 3.14.10t --extra agents --extra fastapi --extra hornbeam python -m examples.agents.launch"
 
 [tasks."test:distributed-model"]

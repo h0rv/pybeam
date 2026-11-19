@@ -15,6 +15,9 @@ from uuid import uuid4
 
 import httpx
 
+from examples.agents.usual.launch import URL
+from examples.agents.usual.launch import running as usual_running
+
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "_checkouts" / "hornbeam" / "examples" / "run_asgi.escript"
 PORTS = (8810, 8811, 8812)
@@ -156,9 +159,13 @@ def main() -> None:
         number: signal.signal(number, interrupted) for number in (signal.SIGINT, signal.SIGTERM)
     }
     try:
-        with running(directory=ROOT / "_build" / "agents" / uuid4().hex) as processes:
+        with (
+            usual_running(),
+            running(directory=ROOT / "_build" / "agents" / uuid4().hex) as processes,
+        ):
             for node, port in zip("abc", PORTS, strict=True):
                 print("Node " + node + ": http://127.0.0.1:" + str(port) + "/", flush=True)
+            print("FastAPI + Redis + Celery: " + URL + "/", flush=True)
             print(
                 "Use Node failure on a node's page to SIGKILL it. Ctrl+C stops the cluster.",
                 flush=True,

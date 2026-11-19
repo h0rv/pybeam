@@ -9,7 +9,7 @@
   <script src="/static/sse.js"></script>
 </head>
 <body>
-  <header><a href="/">Agent sessions</a><span>Viewing node {{ node }}</span></header>
+  <header><a href="/">Agent sessions</a><span>{% if usual %}FastAPI + Redis + Celery{% else %}Viewing node {{ node }}{% endif %}</span></header>
   <main>{% block content %}{% endblock %}</main>
 </body>
 </html>

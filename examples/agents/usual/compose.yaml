@@ -1,0 +1,37 @@
+name: agents-usual
+
+x-service: &service
+  build:
+    context: ../../..
+    dockerfile: examples/agents/usual/Dockerfile
+  environment:
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    redis:
+      condition: service_healthy
+  stop_grace_period: 5s
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 1s
+      retries: 30
+
+  app:
+    <<: *service
+    command: uvicorn examples.agents.usual.app:app --host 0.0.0.0 --port 8000 --workers 2
+    ports:
+      - 127.0.0.1:8813:8000
+
+  worker-1:
+    <<: *service
+    hostname: worker-1
+    command: celery -A examples.agents.usual.worker:queue worker --hostname worker-1 --pool prefork --concurrency 4 --loglevel info
+
+  worker-2:
+    <<: *service
+    hostname: worker-2
+    command: celery -A examples.agents.usual.worker:queue worker --hostname worker-2 --pool prefork --concurrency 4 --loglevel info
