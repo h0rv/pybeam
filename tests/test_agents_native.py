@@ -1,0 +1,190 @@
+import os
+import signal
+import subprocess
+import time
+from collections.abc import Callable, Generator
+from dataclasses import dataclass
+from itertools import pairwise
+from pathlib import Path
+
+import httpx
+import pytest
+from pydantic import TypeAdapter
+
+from examples.agents.launch import free_port, running
+from examples.agents.protocol import Node, Scenario, SessionView, Snapshot
+
+pytestmark = pytest.mark.runtime
+
+
+@dataclass
+class Cluster:
+    client: httpx.Client
+    ports: tuple[int, int, int]
+    processes: list[subprocess.Popen[bytes]]
+
+    def url(self, path: str, node: int = 1) -> str:
+        return "http://127.0.0.1:" + str(self.ports[node]) + path
+
+    def snapshots(self) -> list[Snapshot]:
+        response = self.client.get(self.url("/api/sessions"))
+        response.raise_for_status()
+        return TypeAdapter(list[Snapshot]).validate_json(response.content)
+
+    def start(self, mode: Scenario, *, count: int = 1, owner: Node = "a") -> list[str]:
+        previous = {snapshot.id for snapshot in self.snapshots()}
+        response = self.client.post(
+            self.url("/sessions"), data={"mode": mode, "count": str(count), "placement": owner}
+        )
+        assert response.status_code == 303, response.text
+        return [snapshot.id for snapshot in self.snapshots() if snapshot.id not in previous]
+
+    def view(self, session: str, node: int = 1) -> SessionView:
+        response = self.client.get(self.url("/api/sessions/" + session, node))
+        response.raise_for_status()
+        return SessionView.model_validate_json(response.content)
+
+    def wait(
+        self, session: str, predicate: Callable[[SessionView], bool], *, timeout: float = 15
+    ) -> SessionView:
+        deadline = time.monotonic() + timeout
+        while True:
+            value = self.view(session)
+            if predicate(value):
+                return value
+            assert time.monotonic() < deadline, value.model_dump_json()
+            time.sleep(0.03)
+
+    def stop(self, session: str) -> SessionView:
+        response = self.client.post(self.url("/sessions/" + session + "/stop"))
+        assert response.status_code == 303, response.text
+        return self.wait(session, lambda value: value.snapshot.state == "stopped")
+
+
+@pytest.fixture
+def cluster(request: pytest.FixtureRequest, tmp_path: Path) -> Generator[Cluster]:
+    if request.config.getoption("run_runtime") is not True:
+        pytest.skip("Requires --run-runtime and the agents, fastapi and hornbeam extras")
+    ports = (free_port(), free_port(), free_port())
+    with (
+        (tmp_path / "nodes.log").open("wb") as output,
+        running(directory=tmp_path, ports=ports, output=output) as processes,
+        httpx.Client(timeout=15) as client,
+    ):
+        yield Cluster(client, ports, processes)
+
+
+def gone(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+def test_stop_terminates_isolated_tool_and_sse_reconnects(cluster: Cluster) -> None:
+    session = cluster.start("hang")[0]
+    value = cluster.wait(session, lambda value: bool(value.executions.get("step-2")))
+    pid = value.executions["step-2"][0].pid
+    assert not gone(pid)
+    started = time.monotonic()
+    stopped = cluster.stop(session)
+    elapsed = time.monotonic() - started
+    assert elapsed < 2
+    assert gone(pid), "Stop returned before the tool process exited"
+    assert stopped.snapshot.ledger["step-1"].state == "done"
+    assert stopped.snapshot.ledger["step-2"].state == "interrupted"
+    assert all(len(events) == 1 for events in stopped.executions.values())
+    with cluster.client.stream(
+        "GET", cluster.url("/sessions/" + session + "/events", 2)
+    ) as response:
+        assert response.status_code == 200
+        snapshot = ""
+        for line in response.iter_lines():
+            if not line:
+                break
+            snapshot += line
+        assert "stopped" in snapshot and "terminated" in snapshot
+    print("STOP_MS", round(elapsed * 1000, 3), "PID_GONE", gone(pid))
+
+
+@pytest.mark.parametrize("neighbor", ["crash", "burn"])
+def test_fault_isolation_and_healthy_token_gap(cluster: Cluster, neighbor: Scenario) -> None:
+    baseline_started = time.monotonic()
+    baseline = cluster.start("normal")[0]
+    cluster.wait(baseline, lambda value: value.snapshot.state == "completed")
+    baseline_elapsed = time.monotonic() - baseline_started
+    bad = cluster.start(neighbor)[0]
+    started = time.monotonic()
+    healthy = cluster.start("normal", count=2)
+    fault = cluster.wait(bad, lambda value: bool(value.executions.get("step-2")))
+    entered = fault.executions["step-2"][0].entered
+    pid = fault.executions["step-2"][0].pid
+    results = [
+        cluster.wait(session, lambda value: value.snapshot.state == "completed")
+        for session in healthy
+    ]
+    elapsed = time.monotonic() - started
+    assert elapsed < baseline_elapsed + 3, (baseline_elapsed, elapsed)
+    for value in results:
+        assert len(value.executions) == 3
+        assert all(len(events) == 1 for events in value.executions.values())
+        assert all(entry.state == "done" for entry in value.snapshot.ledger.values())
+    gaps = [
+        later - earlier
+        for value in results
+        for earlier, later in pairwise(value.snapshot.token_times)
+        if later >= entered
+    ]
+    assert gaps and max(gaps) < 2.5
+    if neighbor == "crash":
+        failed = cluster.wait(bad, lambda value: value.snapshot.state == "failed")
+        assert failed.snapshot.ledger["step-2"].state == "failed"
+        assert gone(pid)
+    else:
+        assert cluster.view(bad).snapshot.state == "running"
+        assert not gone(pid)
+        cluster.stop(bad)
+        assert gone(pid)
+    print(
+        "HEALTHY",
+        neighbor,
+        "BASELINE_S",
+        round(baseline_elapsed, 3),
+        "CONCURRENT_S",
+        round(elapsed, 3),
+        "MAX_TOKEN_GAP_S",
+        round(max(gaps), 6),
+    )
+
+
+def test_node_kill_resumes_without_repeating_tools(cluster: Cluster) -> None:
+    session = cluster.start("hang")[0]
+    active = cluster.wait(session, lambda value: bool(value.executions.get("step-2")))
+    assert active.snapshot.node == "a"
+    assert active.snapshot.ledger["step-1"].state == "done"
+    pid = active.executions["step-2"][0].pid
+    started = time.monotonic()
+    with pytest.raises(httpx.RemoteProtocolError):
+        cluster.client.post(cluster.url("/node/kill", 0))
+    cluster.processes[0].wait(timeout=5)
+    assert cluster.processes[0].returncode == -signal.SIGKILL
+    result = cluster.wait(session, lambda value: value.snapshot.state == "completed")
+    assert result.snapshot.node in ("b", "c")
+    assert result.snapshot.ledger["step-1"].state == "done"
+    assert result.snapshot.ledger["step-2"].state == "interrupted"
+    assert "not re-run" in result.snapshot.ledger["step-2"].result
+    assert len(result.executions) == 2
+    assert all(len(events) == 1 for events in result.executions.values())
+    assert gone(pid)
+    assert "interrupted" in result.snapshot.history.lower()
+    survivor = cluster.wait(session, lambda value: value.snapshot.state == "completed")
+    assert survivor.executions == result.executions
+    print(
+        "TAKEOVER_MS",
+        round((time.monotonic() - started) * 1000, 3),
+        "OWNER",
+        result.snapshot.node,
+        "COUNTS",
+        {call: len(events) for call, events in result.executions.items()},
+    )

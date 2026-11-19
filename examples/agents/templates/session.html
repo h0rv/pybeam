@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Session {{ snapshot.id[:8] }}{% endblock %}
+{% block content %}
+<h1>Session {{ snapshot.id[:8] }}</h1>
+<p>Scenario: {{ snapshot.prompt }}. This tab is connected to node {{ node }}.</p>
+<p>Open this session on a survivor: <a href="http://127.0.0.1:8810/sessions/{{ snapshot.id }}">a</a> · <a href="http://127.0.0.1:8811/sessions/{{ snapshot.id }}">b</a> · <a href="http://127.0.0.1:8812/sessions/{{ snapshot.id }}">c</a></p>
+<section hx-sse:connect="/sessions/{{ snapshot.id }}/events" hx-swap="innerHTML" aria-label="Session transcript" aria-live="polite">
+{% include "transcript.html" %}
+</section>
+<p><a href="/api/sessions/{{ snapshot.id }}">Execution counts and process IDs (JSON)</a></p>
+{% endblock %}
