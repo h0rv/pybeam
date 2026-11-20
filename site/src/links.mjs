@@ -6,7 +6,7 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
-  { source: "docs/guide/home.md", path: "", label: "Home", examples: ["examples/docs/counter_app.py"] },
+  { source: "docs/guide/home.md", path: "", label: "Home", examples: ["examples/docs/crash.py"] },
   { source: "docs/guide/index.md", path: "get-started/", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
   { source: "docs/guide/tradeoffs.md", path: "tradeoffs/", label: "Benefits and tradeoffs", examples: [] },

@@ -4,7 +4,7 @@ Tasks share one event loop by default. While one of them runs a blocking call or
 
 - Wrap a blocking call in `await asyncio.to_thread(...)`. The default executor runs a few calls at once, so many blocking calls still queue.
 - Give a CPU-bound task its own loop with `dedicated_loop=True`.
-- Run code that might crash the process, such as an unreliable C extension, with `execution=ExecutionMode.ISOLATED`. Isolated tasks run in separate Python processes; their functions must be importable top-level `async def` functions that take and return `bytes`. A child crash raises `TaskCrashed` and is not retried. External effects remain unknown. Process isolation adds startup and memory overhead; it is not a security sandbox.
+- Run code that might crash the process, such as an unreliable C extension, with [`pybeam.isolated`](#isolated-calls) or `execution=ExecutionMode.ISOLATED`. Each isolated task runs in a separate Python process; its function must be an importable top-level `async def` that takes and returns `bytes`. A child crash raises `TaskCrashed`. Execution runs once, with unknown external effects after a crash. Process isolation adds startup and memory overhead; application permissions determine access to the host.
 
 Actors have no `dedicated_loop` option and need none: each call already runs on a pooled worker. Parallel Python CPU work requires free-threaded Python. Don't keep loop-bound objects such as `asyncio.Lock` in actor state across calls, because the next call may run on another worker. Create and finalize those resources within one call. Closing a group releases actor state but leaves the shared pool running.
 
@@ -61,6 +61,14 @@ $ uv run execution.py
 On standard Python 3.14 the four CPU tasks take turns. Free-threaded Python can run them in parallel when dependencies support it. Keep mutable data inside each task rather than in shared module globals. Time your own workload before relying on a speedup.
 
 For how this works and the measurements behind it, see [How PyBEAM works](internals/index.md).
+
+## Isolated calls
+
+`await pybeam.isolated(fn, arg)` runs one byte entry in a fresh OS process and returns its bytes. Each call owns a supervisor with capacity 1, a 1 MiB request budget and a 3000 ms shutdown budget. Arguments and results are copied across the process boundary. Process startup adds latency and memory use. Use `TaskSupervisor` directly for configurable budgets and task handles.
+
+Entries must be importable top-level async functions. For a script, import its entry from the script's module, as in the [home example](home.md); a function defined only in `__main__` raises `TypeError`. The child resolves the entry by module and name. Keep startup code behind `if __name__ == "__main__"` because importing the module executes its top-level statements.
+
+The helper attempts each call once. A crash raises `pybeam.TaskCrashed` with the process exit reason; external effects remain unknown and may need reconciliation. The caller chooses any retry policy. Cancellation follows the existing task-supervisor cleanup contract; an uncooperative call may require explicit termination through a task handle.
 
 ## Inspect a running app
 

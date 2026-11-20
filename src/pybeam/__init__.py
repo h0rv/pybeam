@@ -8,3 +8,5 @@ from pybeam.actors.codec import ActorPayloadError as ActorPayloadError
 from pybeam.actors.groups import ActorGroup as ActorGroup
 from pybeam.actors.groups import spawn as spawn
 from pybeam.runtime.entrypoint import run as run
+from pybeam.tasks import TaskCrashed as TaskCrashed
+from pybeam.tasks import isolated as isolated

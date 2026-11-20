@@ -74,6 +74,37 @@ class ExecutionMode(StrEnum):
     ISOLATED = "isolated"
 
 
+class _BytesCodec:
+    def encode(self, value: bytes, /) -> bytes:
+        if not isinstance(value, bytes):
+            raise TypeError("isolated calls require bytes")
+        return value
+
+    def decode(self, payload: bytes, /) -> bytes:
+        return self.encode(payload)
+
+
+async def isolated(fn: Callable[[bytes], Awaitable[bytes]], arg: bytes) -> bytes:
+    """Run one importable byte entry in a fresh process, with unknown effects on crash.
+
+    Requests are bounded to 1 MiB and supervisor shutdown to 3000 ms. Each call
+    copies its bytes across the process boundary and runs once, including on failure.
+    Use TaskSupervisor directly for configurable budgets and task handles.
+    """
+    codec = _BytesCodec()
+    function = TaskFunction(fn, codec, codec, execution=ExecutionMode.ISOLATED)
+    if isinstance(fn, FunctionType) and fn.__module__ == "__main__":
+        raise TypeError(
+            "isolated entries must be importable; "
+            "import the entry from its module instead of __main__"
+        )
+    payload = codec.encode(arg)
+    async with TaskSupervisor(
+        TaskLimits(capacity=1, max_bytes=1024 * 1024, shutdown_ms=3000)
+    ) as supervisor:
+        return await (await supervisor.start(function, payload))
+
+
 class TaskFunction[Q, R]:
     """A typed request and result codec. Budgets cover requests, not closures.
 

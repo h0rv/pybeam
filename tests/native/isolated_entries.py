@@ -1,4 +1,5 @@
 import asyncio
+import ctypes
 import os
 
 from pydantic import __version__ as pydantic_version
@@ -27,3 +28,12 @@ async def imports(payload: bytes) -> bytes:
 async def crash(payload: bytes) -> bytes:
     await asyncio.sleep(0.01)
     os.abort()
+
+
+async def segfault(payload: bytes) -> bytes:
+    ctypes.string_at(0)
+    return payload
+
+
+async def echo(payload: bytes) -> bytes:
+    return payload

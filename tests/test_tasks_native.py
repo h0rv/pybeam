@@ -311,6 +311,30 @@ def test_tasks__isolated_module_import_failure_is_terminal(tmp_path: Path) -> No
     )
 
 
+def test_tasks__isolated_short_form_crash_then_healthy_call(tmp_path: Path) -> None:
+    named_program(
+        tmp_path,
+        """
+        from isolated_entries import segfault, echo
+        try:
+            await pybeam.isolated(segfault, b'')
+        except pybeam.TaskCrashed as error:
+            assert error.reason == ('signal', 11), repr(error.reason)
+        else:
+            raise AssertionError('The child crash was lost')
+        for payload in (b'', b'healthy'):
+            assert await pybeam.isolated(echo, payload) == payload
+        try:
+            await pybeam.isolated(echo, b'x' * (1024 * 1024 + 1))
+        except Overloaded:
+            pass
+        else:
+            raise AssertionError('The request budget was ignored')
+        """,
+        "isolated",
+    )
+
+
 def test_tasks__isolated_crash_releases_slot_and_vm_survives(tmp_path: Path) -> None:
     named_program(
         tmp_path,
