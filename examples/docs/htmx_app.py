@@ -1,26 +1,15 @@
 # htmx_app.py
 import asyncio
 from collections.abc import AsyncIterator
-from html import escape
-from string.templatelib import Template
 
-from starlette.applications import Starlette
-from starlette.requests import Request
-from starlette.responses import HTMLResponse, Response, StreamingResponse
-from starlette.routing import Route
+from fastapi import FastAPI
+from fastapi.responses import EventSourceResponse, HTMLResponse
 from uvicorn import Config, Server
 
-from pybeam.integrations.hornbeam import Beam, run
+from pybeam.integrations.fastapi.dependencies import Beam, provider
+from pybeam.integrations.hornbeam import run
 
-
-def html(template: Template) -> str:
-    out = (s if isinstance(s, str) else escape(str(s.value)) for s in template)
-    return "".join(out)
-
-
-async def index(request: Request) -> HTMLResponse:
-    return HTMLResponse(
-        html(t"""<!doctype html>
+PAGE = """<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,41 +22,32 @@ async def index(request: Request) -> HTMLResponse:
      hx-swap="innerHTML" aria-live="polite">Connecting…</output></p>
   <button hx-post="/increment" hx-swap="none">Increment</button>
 </main>
-</html>""")
-    )
+</html>"""
+
+app = FastAPI(lifespan=provider.lifespan)
 
 
-async def increment(request: Request) -> Response:
-    beam = await Beam.connect()
+@app.get("/", response_class=HTMLResponse)
+async def index() -> str:
+    return PAGE
+
+
+@app.post("/increment", status_code=204)
+async def increment(beam: Beam) -> None:
     await beam.incr("count", namespace="htmx")
     await beam.publish("htmx:changed", b"count")
-    return Response(status_code=204)
 
 
-async def events(request: Request) -> StreamingResponse:
-    beam = await Beam.connect()
-
-    async def snapshots() -> AsyncIterator[str]:
-        async with beam.subscribe("htmx:changed", max_bytes=4096) as changes:
-            while True:
-                count = await beam.incr("count", 0, namespace="htmx")
-                yield html(t"data: {count}\n\n")
-                await anext(changes)
-
-    return StreamingResponse(snapshots(), media_type="text/event-stream")
-
-
-app = Starlette(
-    routes=[
-        Route("/", index),
-        Route("/increment", increment, methods=["POST"]),
-        Route("/events", events),
-    ]
-)
+@app.get("/events", response_class=EventSourceResponse)
+async def events(beam: Beam) -> AsyncIterator[int]:
+    async with beam.subscribe("htmx:changed", max_bytes=4096) as changes:
+        while True:
+            yield await beam.incr("count", 0, namespace="htmx")
+            await anext(changes)
 
 
 async def main() -> None:
-    server = Server(Config(app, port=8770, timeout_graceful_shutdown=2))
+    server = Server(Config(app, port=8770, timeout_graceful_shutdown=1))
     try:
         await server.serve()
     except asyncio.CancelledError:
