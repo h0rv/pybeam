@@ -42,8 +42,20 @@ for (const file of htmlFiles) {
     assert.ok(html.includes('name="color-scheme"'), `Missing initial color scheme: ${page}`);
     assert.equal([...html.matchAll(/aria-current="page"/g)].length, page === "genstage/index.html" ? 0 : 1, `One current nav item: ${page}`);
     assert.match(html, /<main id="content">/, `Missing skip target: ${page}`);
-    for (const { path } of navigation) {
-      assert.ok(html.includes(`href="${withBase(path, base)}"`), `Missing static navigation: ${page}`);
+    if (page === "index.html") {
+      assert.doesNotMatch(html, /class="sidebar"|class="page-toc"/);
+      for (const path of ["get-started/", "why/", "tradeoffs/"]) {
+        assert.ok(html.includes(`href="${withBase(path, base)}"`), `Missing landing link: ${path}`);
+      }
+    } else {
+      for (const { path } of navigation) {
+        assert.ok(html.includes(`href="${withBase(path, base)}"`), `Missing static navigation: ${page}`);
+      }
+    }
+    for (const asset of ["wordmark", "favicon"]) {
+      for (const scheme of ["light", "dark"]) {
+        assert.ok(html.includes(`brand/pybeam-${asset}-${scheme}.svg`), `Missing ${asset} ${scheme}: ${page}`);
+      }
     }
     assert.ok(!/instructor\.zig|zig-orange|build-api/.test(html), `Template branding leaked: ${page}`);
   }

@@ -6,9 +6,10 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
+  { source: "docs/guide/home.md", path: "", label: "Home", examples: ["examples/docs/counter_app.py"] },
+  { source: "docs/guide/index.md", path: "get-started/", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
   { source: "docs/guide/tradeoffs.md", path: "tradeoffs/", label: "Benefits and tradeoffs", examples: [] },
-  { source: "docs/guide/index.md", path: "", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
   { source: "docs/guide/state.md", path: "state/", label: "Shared state", examples: ["examples/docs/state.py"] },
@@ -33,18 +34,18 @@ export const pages = [
 
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
-  { label: "Get started", pages: navigation.slice(0, 3) },
-  { label: "Guides", pages: navigation.slice(3, 12) },
-  { label: "Integrations", pages: navigation.slice(12, 16) },
-  { label: "Examples", pages: navigation.slice(16, 17) },
-  { label: "How PyBEAM works", pages: navigation.slice(17) },
+  { label: "Get started", pages: navigation.slice(0, 4) },
+  { label: "Guides", pages: navigation.slice(4, 13) },
+  { label: "Integrations", pages: navigation.slice(13, 17) },
+  { label: "Examples", pages: navigation.slice(17, 18) },
+  { label: "How PyBEAM works", pages: navigation.slice(18) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",
-  "quickstart/": "",
-  "runtime/": "",
+  "quickstart/": "get-started/",
+  "runtime/": "get-started/",
   "subscriptions/": "messaging/#notify-readers-of-a-changed-key",
-  "limits/": "",
+  "limits/": "get-started/",
   "chat-rooms/": "examples/chat-rooms/",
 };
 
