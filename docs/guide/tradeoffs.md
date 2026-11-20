@@ -30,7 +30,7 @@ The cost: an isolated task is a separate OS process, so it starts slower, uses m
 
 Each Uvicorn worker keeps its own counters and subscriber lists, so 400 increments end up split across workers and most subscribers miss a message. Worker apps add Redis to fix this. PyBEAM's counter and pub/sub live in the VM, so every run counts 400 and notifies 8 of 8. [Connected nodes](deploy.md) also exchange pub/sub and [presence through BEAM messaging](integrations/pyview.md#send-posts-between-two-local-nodes).
 
-The limits: state lives in memory and is lost on restart, presence is eventually consistent, and pub/sub delivers messages to current subscribers. Applications own recovery of missed messages. Cross-node behavior is tested between nodes on one host.
+The limits: counters and subscriber lists live in memory on one node and are lost on restart, presence is eventually consistent, and pub/sub delivers messages to current subscribers. Applications own recovery of missed messages. Cross-node behavior is tested between nodes on one host.
 
 ## Recovery after a node dies
 

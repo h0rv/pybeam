@@ -51,6 +51,6 @@ The runtime also prints native crash diagnostics. The static import gives the ch
 - **Less idle memory:** [165 MiB versus 2.3 GiB](tradeoffs.md#cost-to-run) for the FastAPI+Celery port with 64 task slots.
 - **Resume after a node is killed:** [0.13 s versus 144 s](tradeoffs.md#recovery-after-a-node-dies) for Redis/Celery in one recorded run per stack.
 
-The cost: [about 12–38% fewer requests per second](tradeoffs.md#what-pybeam-costs) than tuned Uvicorn/Granian in the HTTP probe. These small samples indicate direction; capacity depends on the workload. State is in memory and node-local.
+The cost: [about 12–38% fewer requests per second](tradeoffs.md#what-pybeam-costs) than tuned Uvicorn/Granian in the HTTP probe. These small samples indicate direction; capacity depends on the workload. Shared values and counters live in memory on one node; [actor snapshots](actors.md) and [durable tasks](durable-tasks.md) persist and replicate through Mnesia.
 
 [Get started](index.md) · [Why PyBEAM](why.md) · [Benefits and tradeoffs](tradeoffs.md)
