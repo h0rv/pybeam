@@ -14,7 +14,7 @@ test("root and project hosting paths preserve trailing slashes", () => {
 });
 
 test("only curated Markdown sources map to site pages", () => {
-  assert.deepEqual(pages.map(({ path }) => path), ["", "get-started/", "why/", "tradeoffs/", "actors/", "supervision/", "state/", "messaging/", "background/", "durable-tasks/", "execution/", "failures/", "deploy/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "integrations/htmx/", "examples/chat-rooms/", "internals/", "internals/calls/", "internals/parallelism/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
+  assert.deepEqual(pages.map(({ path }) => path), ["", "get-started/", "why/", "tradeoffs/", "actors/", "supervision/", "state/", "messaging/", "background/", "durable-tasks/", "execution/", "failures/", "deploy/", "integrations/fastapi/", "integrations/litestar/", "integrations/pyview/", "integrations/htmx/", "examples/chat-rooms/", "examples/crash-containment/", "internals/", "internals/calls/", "internals/parallelism/", "internals/measurements/", "internals/watch-for/", "genstage/"]);
   assert.equal(new Set(pages.map(({ path }) => path)).size, pages.length);
   for (const { source, path } of pages) {
     assert.equal(pagePath(source), path);
@@ -100,7 +100,7 @@ test("each concept has complete source-associated Python examples", () => {
       assert.match(markdown, /```html\n[\s\S]*?hx-sse:connect/);
       assert.match(markdown, /\(\.\.\/\.\.\/\.\.\/examples\/fastapi\/main\.py\)/);
     } else {
-      assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || source === "docs/guide/tradeoffs.md", source);
+      assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || ["docs/guide/home.md", "docs/guide/tradeoffs.md"].includes(source), source);
     }
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
@@ -117,23 +117,33 @@ test("each concept has complete source-associated Python examples", () => {
   }
 });
 
-test("the homepage shows crash containment, credits its foundations and links to getting started", () => {
+test("the homepage introduces capabilities and leaves code and measurements to linked pages", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/home.md"), "utf8");
-  assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 100);
+  assert.ok(markdown.split(/\s+/).length < 110);
   assert.equal(navigation.filter(({ label }) => label === "Get started").length, 1);
   for (const path of ["quickstart/", "runtime/", "limits/"]) assert.equal(redirects[path], "get-started/");
   assert.doesNotMatch(markdown, /quickstart|Overview/);
-  assert.match(markdown, /await pybeam\.isolated\(entries\.crash, b""\)/);
-  assert.match(markdown, /ctypes\.string_at\(0\)/);
-  assert.match(markdown, /except pybeam\.TaskCrashed/);
+  assert.doesNotMatch(markdown, /```python|```console|\d|\bversus\b|\b(?:no|not|without)\b/i);
+  assert.match(markdown, /isolated call contains a native crash/);
+  assert.match(markdown, /Shared state and pub\/sub live in the runtime/);
   assert.match(markdown, /replicate through Mnesia/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/erlang-python/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/hornbeam/);
   assert.match(markdown, /Erlang\/OTP/);
-  assert.match(markdown, /165 MiB versus 2\.3 GiB/);
-  assert.match(markdown, /12–38% fewer requests/);
-  for (const href of ["index.md", "why.md", "tradeoffs.md"]) assert.ok(markdown.includes(`](${href})`));
+  assert.match(markdown, /small memory footprint/);
+  assert.match(markdown, /```sh\nuv add python-beam\n```/);
+  for (const href of ["index.md", "why.md", "tradeoffs.md", "examples/crash-containment.md"]) assert.ok(markdown.includes(`](${href})`));
   assert.doesNotMatch(markdown, /\| Capability/);
+});
+
+test("crash containment compares asyncio, isolated calls and a broken process pool", () => {
+  const markdown = readFileSync(join(repositoryRoot, "docs/guide/examples/crash-containment.md"), "utf8");
+  assert.ok(markdown.indexOf("# crash_asyncio.py") < markdown.indexOf("# crash.py"));
+  assert.match(markdown, /\$ echo \$\?\n139/);
+  assert.match(markdown, /except pybeam\.TaskCrashed/);
+  assert.match(markdown, /Pending call: BrokenProcessPool/);
+  assert.match(markdown, /Later call: BrokenProcessPool/);
+  assert.match(markdown, /external effects after a crash remain unknown/);
 });
 
 test("state and supervision teach distinct operations without another introduction", () => {
@@ -150,10 +160,10 @@ test("state and supervision teach distinct operations without another introducti
 
 test("navigation groups getting started, guides, integrations, examples and internals", () => {
   assert.deepEqual(navigation.map(({ label }) => label), [
-    "Home", "Get started", "Why PyBEAM", "Benefits and tradeoffs", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "Startup and failures", "Deploy and connect nodes", "FastAPI", "Litestar", "PyView", "HTMX", "Chat rooms", "Overview", "Calls", "Parallel Python", "Measurements", "What to watch for",
+    "Home", "Get started", "Why PyBEAM", "Benefits and tradeoffs", "Actors", "Supervision", "Shared state", "Messaging", "Background services", "Durable tasks", "Blocking and CPU work", "Startup and failures", "Deploy and connect nodes", "FastAPI", "Litestar", "PyView", "HTMX", "Chat rooms", "Crash containment", "Overview", "Calls", "Parallel Python", "Measurements", "What to watch for",
   ]);
   assert.deepEqual(navigationSections.map(({ label }) => label), ["Get started", "Guides", "Integrations", "Examples", "How PyBEAM works"]);
-  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [4, 9, 4, 1, 5]);
+  assert.deepEqual(navigationSections.map(({ pages }) => pages.length), [4, 9, 4, 2, 5]);
   assert.ok(navigationSections.at(-1).pages.every(({ source }) => source.startsWith("docs/guide/internals/")));
   assert.ok(navigationSections.at(-2).pages.every(({ source }) => source.startsWith("docs/guide/examples/")));
   assert.deepEqual(navigationSections.flatMap(({ pages }) => pages), navigation);

@@ -6,7 +6,7 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
-  { source: "docs/guide/home.md", path: "", label: "Home", examples: ["examples/docs/crash.py"] },
+  { source: "docs/guide/home.md", path: "", label: "Home", examples: [] },
   { source: "docs/guide/index.md", path: "get-started/", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
   { source: "docs/guide/tradeoffs.md", path: "tradeoffs/", label: "Benefits and tradeoffs", examples: [] },
@@ -24,6 +24,7 @@ export const pages = [
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
   { source: "docs/guide/integrations/htmx.md", path: "integrations/htmx/", label: "HTMX", examples: [] },
   { source: "docs/guide/examples/chat-rooms.md", path: "examples/chat-rooms/", label: "Chat rooms", examples: ["examples/docs/chat_rooms.py"] },
+  { source: "docs/guide/examples/crash-containment.md", path: "examples/crash-containment/", label: "Crash containment", examples: ["examples/docs/crash_asyncio.py", "examples/docs/crash.py", "examples/docs/crash_pool.py"] },
   { source: "docs/guide/internals/index.md", path: "internals/", label: "Overview", examples: [] },
   { source: "docs/guide/internals/calls.md", path: "internals/calls/", label: "Calls", examples: [] },
   { source: "docs/guide/internals/parallelism.md", path: "internals/parallelism/", label: "Parallel Python", examples: [] },
@@ -37,8 +38,8 @@ export const navigationSections = [
   { label: "Get started", pages: navigation.slice(0, 4) },
   { label: "Guides", pages: navigation.slice(4, 13) },
   { label: "Integrations", pages: navigation.slice(13, 17) },
-  { label: "Examples", pages: navigation.slice(17, 18) },
-  { label: "How PyBEAM works", pages: navigation.slice(18) },
+  { label: "Examples", pages: navigation.slice(17, 19) },
+  { label: "How PyBEAM works", pages: navigation.slice(19) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",

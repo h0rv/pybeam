@@ -66,7 +66,7 @@ For how this works and the measurements behind it, see [How PyBEAM works](intern
 
 `await pybeam.isolated(fn, arg)` runs one byte entry in a fresh OS process and returns its bytes. Each call owns a supervisor with capacity 1, a 1 MiB request budget and a 3000 ms shutdown budget. Arguments and results are copied across the process boundary. Process startup adds latency and memory use. Use `TaskSupervisor` directly for configurable budgets and task handles.
 
-Entries must be importable top-level async functions. For a script, import its entry from the script's module, as in the [home example](home.md); a function defined only in `__main__` raises `TypeError`. The child resolves the entry by module and name. Keep startup code behind `if __name__ == "__main__"` because importing the module executes its top-level statements.
+Entries must be importable top-level async functions. For a script, import its entry from the script's module, as in the [crash containment example](examples/crash-containment.md); a function defined only in `__main__` raises `TypeError`. The child resolves the entry by module and name. Keep startup code behind `if __name__ == "__main__"` because importing the module executes its top-level statements.
 
 The helper attempts each call once. A crash raises `pybeam.TaskCrashed` with the process exit reason; external effects remain unknown and may need reconciliation. The caller chooses any retry policy. Cancellation follows the existing task-supervisor cleanup contract; an uncooperative call may require explicit termination through a task handle.
 
