@@ -44,10 +44,11 @@ async def main() -> None:
             await asyncio.sleep(0.5)
             timed_out = time.monotonic()
             await task.terminate()
+            terminated_at = time.monotonic()
             error = await task.exception()
             if not isinstance(error, TaskCrashed):
                 raise RuntimeError("Expected terminated isolated task, got " + repr(error))
-            terminate_s = time.monotonic() - timed_out
+            terminate_s = terminated_at - timed_out
             await asyncio.sleep(3)
             effects = [float(line) for line in path.read_text().splitlines()]
             print(
@@ -56,6 +57,9 @@ async def main() -> None:
                         "case": "terminate",
                         "terminate_s": terminate_s,
                         "effects_after_terminate_requested": sum(at > timed_out for at in effects),
+                        "effects_after_terminate_returned": sum(
+                            at > terminated_at for at in effects
+                        ),
                         "effects_total": len(effects),
                     }
                 )
