@@ -8,6 +8,7 @@ from typing import Literal, assert_type
 
 import pytest
 
+import pybeam
 from pybeam.codec import CodecError, Json
 from pybeam.tasks import ExecutionMode, TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 from tests.typechecking import TYPECHECK_CONFIG
@@ -15,6 +16,52 @@ from tests.typechecking import TYPECHECK_CONFIG
 
 async def byte_entry(payload: bytes) -> bytes:
     return payload
+
+
+async def test_isolated__rejects_main_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(byte_entry, "__module__", "__main__")
+    with pytest.raises(TypeError, match="import the entry from its module"):
+        await pybeam.isolated(byte_entry, b"")
+
+
+async def test_isolated__rejects_nested_entry() -> None:
+    async def nested(payload: bytes) -> bytes:
+        return payload
+
+    with pytest.raises(TypeError, match="importable top-level"):
+        await pybeam.isolated(nested, b"")
+
+
+async def test_isolated__rejects_sync_entry() -> None:
+    def entry(payload: bytes) -> Awaitable[bytes]:
+        return byte_entry(payload)
+
+    with pytest.raises(TypeError, match="plain async Python function"):
+        await pybeam.isolated(entry, b"")
+
+
+@pytest.mark.parametrize("argument", ["'text'", "bytearray()", "None"])
+def test_isolated__rejects_nonbytes(argument: str) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import asyncio, pybeam\n"
+            "from tests.test_tasks import byte_entry\n"
+            "async def main():\n"
+            "    try:\n"
+            "        await pybeam.isolated(byte_entry, " + argument + ")\n"
+            "    except TypeError as error:\n"
+            "        assert str(error) == 'isolated calls require bytes'\n"
+            "    else:\n"
+            "        raise AssertionError('Accepted a nonbytes argument')\n"
+            "asyncio.run(main())\n",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.fixture
