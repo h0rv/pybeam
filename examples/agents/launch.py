@@ -58,7 +58,12 @@ def running(
     for key in ("ERL_FLAGS", "ERL_AFLAGS", "ERL_ZFLAGS"):
         environment.pop(key, None)
     environment["PYTHONPATH"] = os.pathsep.join(
-        (str(ROOT), str(ROOT / "src"), *site.getsitepackages())
+        (
+            str(ROOT),
+            str(ROOT / "src"),
+            *(str(path) for path in extra_paths),
+            *site.getsitepackages(),
+        )
     )
     cookie = secrets.token_hex(32)
     with ExitStack() as cleanup:
