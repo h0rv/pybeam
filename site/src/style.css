@@ -65,12 +65,16 @@ article :not(pre) > code { background: var(--inline-bg); color: var(--fg); paddi
 article pre { max-inline-size: 100%; overflow-x: auto; padding: 1rem; font-size: .9rem; line-height: 1.6; border-radius: 0; border: 1px solid var(--graphical-fg); }
 article pre code { padding: 0; background: none; }
 .code-block { position: relative; margin-block: 1.25rem; border: 1px solid var(--graphical-fg); min-inline-size: 0; }
-.code-block pre { margin: 0; border: 0; padding-block-start: 2.6rem; }
+.code-block pre { margin: 0; border: 0; }
 
 .copy-code { position: absolute; inset-block-start: .3rem; inset-inline-end: .4rem; font-size: .75rem; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-block-size: 2rem; min-inline-size: 4.7rem; margin: 0; padding: .15rem .4rem; border: 0; border-radius: 0; background: var(--box-bg); color: var(--fg); cursor: pointer; }
 .copy-code, .copy-code:hover, .copy-code:focus-visible, .copy-code:active, .copy-code:disabled { box-shadow: none; filter: none; }
 .copy-code:hover { background: var(--box-bg); }
 .copy-code[data-copied] { color: var(--accent); }
+@media (hover: hover) and (pointer: fine) {
+  .copy-code { opacity: 0; pointer-events: none; }
+  .code-block:hover .copy-code, .code-block:focus-within .copy-code { opacity: 1; pointer-events: auto; }
+}
 table { display: block; max-inline-size: 100%; overflow-x: auto; font-size: .9rem; }
 th, td { padding: .5rem .75rem; }
 .page-toc { max-block-size: calc(100dvh - 4rem); overflow-y: auto; font-size: .8rem; }

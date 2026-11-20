@@ -78,9 +78,9 @@ try {
         if (["", "actors/", "genstage/", "web/"].includes(path)) {
           await page.screenshot({ path: `${screenshotRoot}-${path.replaceAll("/", "") || "home"}-${device}-${colorScheme}${base === "/" ? "" : "-base"}.png`, fullPage: true });
         }
-        if (!path) {
-          assert.ok(await page.locator("pre").first().evaluate((node) => node.getBoundingClientRect().bottom < innerHeight), "Home code must fit on the first screen");
-          if (device === "desktop") assert.ok(await page.getByRole("link", { name: "Actors", exact: true }).last().evaluate((node) => node.getBoundingClientRect().top < innerHeight), "Home Actors link must be on the first screen");
+        if (path === "get-started/") {
+          assert.ok(await page.locator("pre").first().evaluate((node) => node.getBoundingClientRect().bottom < innerHeight), "Get started code must fit on the first screen");
+          if (device === "desktop") assert.ok(await page.getByRole("link", { name: "Actors", exact: true }).last().evaluate((node) => node.getBoundingClientRect().top < innerHeight), "Get started Actors link must be on the first screen");
         }
         if (path === "genstage/") {
           const tokenColors = await page.locator("pre code span[style]").evaluateAll((nodes) => {
@@ -127,7 +127,7 @@ try {
   await page.locator(".docs-nav").getByRole("link", { name: "Get started", exact: true }).click();
   assert.match(await page.locator('pre[data-language="python"]').innerText(), /pybeam\.run\(main\)/);
   await page.goto(origin + withBase("quickstart/", base));
-  await page.waitForURL(origin + base);
+  await page.waitForURL(origin + withBase("get-started/", base));
   assert.equal(await page.locator("h1").innerText(), "Get started");
   assert.equal(await page.locator('.docs-nav a').filter({ hasText: /^Get started$/ }).count(), 1);
   assert.equal(await page.locator('.docs-nav a[href*="quickstart"]').count(), 0);
