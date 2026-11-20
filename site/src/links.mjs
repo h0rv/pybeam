@@ -22,7 +22,7 @@ export const pages = [
   { source: "docs/guide/integrations/fastapi.md", path: "integrations/fastapi/", label: "FastAPI", examples: ["examples/docs/fastapi_app.py"] },
   { source: "docs/guide/integrations/litestar.md", path: "integrations/litestar/", label: "Litestar", examples: ["examples/docs/litestar_app.py"] },
   { source: "docs/guide/integrations/pyview.md", path: "integrations/pyview/", label: "PyView", examples: ["examples/docs/pyview_app.py"] },
-  { source: "docs/guide/integrations/htmx.md", path: "integrations/htmx/", label: "HTMX", examples: [] },
+  { source: "docs/guide/integrations/htmx.md", path: "integrations/htmx/", label: "HTMX", examples: ["examples/docs/htmx_app.py"] },
   { source: "docs/guide/examples/chat-rooms.md", path: "examples/chat-rooms/", label: "Chat rooms", examples: ["examples/docs/chat_rooms.py"] },
   { source: "docs/guide/examples/crash-containment.md", path: "examples/crash-containment/", label: "Crash containment", examples: ["examples/docs/crash_asyncio.py", "examples/docs/crash.py", "examples/docs/crash_pool.py"] },
   { source: "docs/guide/internals/index.md", path: "internals/", label: "Overview", examples: [] },

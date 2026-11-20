@@ -113,12 +113,7 @@ test("each concept has complete source-associated Python examples", () => {
   for (const { source, examples } of pages) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
     const snippets = [...markdown.matchAll(/```python\n([\s\S]*?)```/g)].map((match) => match[1]);
-    if (source === "docs/guide/integrations/htmx.md") {
-      assert.match(markdown, /```html\n[\s\S]*?hx-sse:connect/);
-      assert.match(markdown, /\(\.\.\/\.\.\/\.\.\/examples\/fastapi\/main\.py\)/);
-    } else {
-      assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || ["docs/guide/home.md", "docs/guide/tradeoffs.md"].includes(source), source);
-    }
+    assert.ok(snippets.length > 0 || source.startsWith("docs/guide/internals/") || ["docs/guide/home.md", "docs/guide/tradeoffs.md"].includes(source), source);
     assert.equal(snippets.length, examples.length, source);
     snippets.forEach((snippet, index) => {
       assert.equal(snippet, readFileSync(join(repositoryRoot, examples[index]), "utf8"), source);

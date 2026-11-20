@@ -1,50 +1,109 @@
-# HTMX forms and server-sent events
+# HTMX shared counter
 
-Pair an HTMX 4 form with a server-sent event stream fed by PyBEAM pub/sub. In
-the [shared counter example](../../../examples/fastapi/README.md), an increment
-in one tab shows a confirmation there and updates both tabs without navigating.
+Use HTMX with Starlette to share a counter across browser tabs through PyBEAM state and pub/sub.
 
-## Give the form and the stream separate targets
-
-Load the matching HTMX 4 core and SSE extension in order, without `async` or
-`defer`. The extension must register before HTMX processes the page.
-
-```html
-<script src="/static/htmx.min.js"></script>
-<script src="/static/sse.js"></script>
+```sh
+uv add python-beam starlette uvicorn
 ```
 
-The form submits to `/increment` and puts the HTML response in `#confirmation`.
-The separate `#counter-region` receives HTML from `/events`.
+```python
+# htmx_app.py
+import asyncio
+from collections.abc import AsyncGenerator
+from html import escape
+from string.templatelib import Template
 
-```html
-<div id="counter-region" hx-sse:connect="/events" hx-swap="innerHTML" aria-live="polite">
-  <output id="count">0</output>
-</div>
-<form action="/increment" method="post"
-      hx-post="/increment" hx-target="#confirmation" hx-swap="innerHTML">
-  <label>Amount <input name="amount" type="number" min="1" max="10" value="1" required></label>
-  <button type="submit">Increment</button>
-</form>
-<p id="confirmation" role="status"></p>
+from starlette.applications import Starlette
+from starlette.background import BackgroundTask
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, Response, StreamingResponse
+from starlette.routing import Route
+from uvicorn import Config, Server
+
+from pybeam.integrations.hornbeam import Beam, run
+
+
+def html(template: Template) -> str:
+    parts: list[str] = []
+    for part in template:
+        value = part if isinstance(part, str) else escape(str(part.value))
+        parts.append(value)
+    return "".join(parts)
+
+
+async def index(request: Request) -> HTMLResponse:
+    return HTMLResponse(
+        html(t"""<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared counter</title>
+<script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"></script>
+<script src="https://unpkg.com/htmx.org@4.0.0/dist/ext/hx-sse.js"></script>
+<main>
+  <h1>Shared counter</h1>
+  <p>Count: <output id="count" hx-sse:connect="/events"
+     hx-config='{{"sse":{{"pauseOnBackground":false}}}}'
+     hx-swap="innerHTML" aria-live="polite">Connecting…</output></p>
+  <button hx-post="/increment" hx-swap="none">Increment</button>
+</main>
+</html>""")
+    )
+
+
+async def increment(request: Request) -> Response:
+    beam = await Beam.connect()
+    await beam.incr("count", namespace="htmx")
+    await beam.publish("htmx:changed", b"count")
+    return Response(status_code=204)
+
+
+async def events(request: Request) -> StreamingResponse:
+    beam = await Beam.connect()
+
+    async def snapshots() -> AsyncGenerator[str]:
+        async with beam.subscribe("htmx:changed", max_bytes=4096) as changes:
+            while True:
+                count = await beam.incr("count", 0, namespace="htmx")
+                yield html(t"data: {count}\n\n")
+                await anext(changes)
+
+    stream = snapshots()
+    return StreamingResponse(
+        stream,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+        background=BackgroundTask(stream.aclose),
+    )
+
+
+app = Starlette(
+    routes=[
+        Route("/", index),
+        Route("/increment", increment, methods=["POST"]),
+        Route("/events", events),
+    ]
+)
+
+
+async def main() -> None:
+    config = Config(app, host="127.0.0.1", port=8770, loop="none", http="h11")
+    server = Server(config)
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        if server.started:
+            await server.shutdown()
+        raise
+
+
+if __name__ == "__main__":
+    run(main)
 ```
 
-FastAPI validates the form, increments the PyBEAM counter, and publishes a
-change notification. If the request has `HX-Request: true`, the route returns
-only the confirmation fragment. A normal form submission redirects to the page.
+```console
+$ uv run htmx_app.py
+```
 
-## Send current state, not a replay
-
-The [SSE route](../../../examples/fastapi/main.py) subscribes to the PyBEAM topic
-before reading the counter. It sends an initial snapshot, then reads and renders
-the counter again when a notification arrives. FastAPI sends keepalive comments
-while the stream is quiet. Each subscription belongs to its HTTP request and
-closes when the stream ends.
-
-On reconnect, the route sends a fresh snapshot rather than replaying events.
-If the initial connection fails, reload the page to start a new stream. The
-example has no authentication, and restarting the server clears the counter.
-
-If the page also uses [PyView](pyview.md), keep the HTMX targets outside the
-PyView root. Don't let an HTMX swap replace that root or any of its ancestors.
-Share state through PyBEAM, not by having both libraries write to the same DOM.
+Open <http://127.0.0.1:8770/> in two tabs and click Increment: both show the updated count.
+Each SSE connection subscribes before reading a fresh snapshot, including on reconnect; the counter lives in memory until the node stops.
