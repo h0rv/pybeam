@@ -46,7 +46,7 @@ $ curl -X POST http://127.0.0.1:8767/increment
 {"count":2}
 ```
 
-## Measured tradeoffs
+## Measured results
 
 - **One crash stays in one isolated call:** [0 of 20 clients dropped](tradeoffs.md#one-failure-stays-in-one-call), versus every client on the crashed Uvicorn worker.
 - **Counters and pub/sub without Redis:** [400/400 increments and 8/8 subscribers](tradeoffs.md#shared-state-without-redis), versus Uvicorn's 188–286/400 and 1–5/8.
