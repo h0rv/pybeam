@@ -67,7 +67,7 @@ app = Starlette(
 
 
 async def main() -> None:
-    server = Server(Config(app, port=8770))
+    server = Server(Config(app, port=8770, timeout_graceful_shutdown=2))
     try:
         await server.serve()
     except asyncio.CancelledError:
