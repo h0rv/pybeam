@@ -36,6 +36,8 @@ Tasks on an asyncio loop can share mutable objects. A failed task stays failed u
 
 Consider PyBEAM when concurrent work shares state or needs supervised recovery: web apps with shared counters, live updates, and long-running services. For a script or batch job that needs none of those capabilities, start with plain asyncio.
 
+See [Benefits and tradeoffs](tradeoffs.md) for measured failure isolation, memory costs and throughput limits.
+
 ## How it works
 
 You write ordinary async Python. PyBEAM starts and stops its runtime for you. See [Blocking and CPU work](execution.md) before adding blocking operations, or [How PyBEAM works](internals/index.md) for implementation details.

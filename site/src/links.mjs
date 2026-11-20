@@ -7,6 +7,7 @@ export const repositoryURL = "https://github.com/h0rv/pybeam";
 // This is also the publication allowlist. Research and repository artifacts stay off-site.
 export const pages = [
   { source: "docs/guide/why.md", path: "why/", label: "Why PyBEAM", examples: ["examples/docs/messaging.py"] },
+  { source: "docs/guide/tradeoffs.md", path: "tradeoffs/", label: "Benefits and tradeoffs", examples: [] },
   { source: "docs/guide/index.md", path: "", label: "Get started", examples: ["examples/docs/hello.py"] },
   { source: "docs/guide/actors.md", path: "actors/", label: "Actors", examples: ["examples/docs/actors.py"] },
   { source: "docs/guide/supervision.md", path: "supervision/", label: "Supervision", examples: ["examples/docs/supervision.py"] },
@@ -32,11 +33,11 @@ export const pages = [
 
 export const navigation = pages.filter(({ hidden }) => !hidden);
 export const navigationSections = [
-  { label: "Get started", pages: navigation.slice(0, 2) },
-  { label: "Guides", pages: navigation.slice(2, 11) },
-  { label: "Integrations", pages: navigation.slice(11, 15) },
-  { label: "Examples", pages: navigation.slice(15, 16) },
-  { label: "How PyBEAM works", pages: navigation.slice(16) },
+  { label: "Get started", pages: navigation.slice(0, 3) },
+  { label: "Guides", pages: navigation.slice(3, 12) },
+  { label: "Integrations", pages: navigation.slice(12, 16) },
+  { label: "Examples", pages: navigation.slice(16, 17) },
+  { label: "How PyBEAM works", pages: navigation.slice(17) },
 ];
 export const redirects = {
   "web/": "integrations/fastapi/",

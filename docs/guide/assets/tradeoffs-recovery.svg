@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="228" viewBox="0 0 760 228" role="img" aria-labelledby="title desc">
+  <title id="title">Agent sessions resume after node loss</title>
+  <desc id="desc">One same-host SIGKILL run per stack. PyBEAM resumes in 0.13023 seconds with no repeated tool calls; Redis/Celery in 143.94724 seconds with 5 repeated calls. Logarithmic axis starts at 0.1 seconds.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <text x="12" y="26" class="heading">Time to resume · seconds, logarithmic axis</text>
+  <path class="axis" d="M220 66v99"/>
+  <text x="220" y="55" class="note">0.1</text>
+  <path class="axis" d="M330 66v99"/>
+  <text x="330" y="55" class="note">1</text>
+  <path class="axis" d="M440 66v99"/>
+  <text x="440" y="55" class="note">10</text>
+  <path class="axis" d="M550 66v99"/>
+  <text x="550" y="55" class="note">100</text>
+  <text x="12" y="95">PyBEAM</text>
+  <rect class="bar" x="220" y="80" width="12.618943715629484" height="18"/>
+  <text x="250" y="95" class="note">0.13 s · 0 repeated calls</text>
+  <text x="12" y="145">Redis/Celery</text>
+  <rect class="bar-alt" x="220" y="130" width="347.4023687350898" height="18"/>
+  <text x="580" y="145" class="note">143.95 s</text>
+  <text x="580" y="165" class="note">5 repeated calls</text>
+  <text x="12" y="212" class="note">1 recorded run per stack · same host, not host failure</text>
+</svg>
