@@ -1,4 +1,4 @@
-# Rerun: ~/painpoint-venv/bin/python docs/research/probes/painpoints/loop_stall_pybeam.py
+# Rerun: uv run --locked python docs/research/probes/painpoints/loop_stall_pybeam.py
 import asyncio
 import json
 import math

@@ -1,4 +1,8 @@
-# Rerun: ~/painpoint-venv/bin/python docs/research/probes/painpoints/uvicorn_faults.py crash|hog|runaway|state
+# Rerun: uv run --script docs/research/probes/painpoints/uvicorn_faults.py <case>
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["fastapi==0.165.0", "uvicorn==0.54.0", "gunicorn==27.0.1", "uvicorn-worker==0.4.0", "websockets==17.4"]
+# ///
 import argparse
 import asyncio
 import ctypes

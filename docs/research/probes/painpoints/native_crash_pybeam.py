@@ -1,4 +1,4 @@
-# Rerun: ~/painpoint-venv/bin/python docs/research/probes/painpoints/native_crash_pybeam.py
+# Rerun: uv run --locked python docs/research/probes/painpoints/native_crash_pybeam.py
 import asyncio
 import ctypes
 import json

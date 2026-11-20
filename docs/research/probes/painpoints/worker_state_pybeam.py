@@ -1,4 +1,4 @@
-# Rerun: ~/painpoint-venv/bin/python docs/research/probes/painpoints/worker_state_pybeam.py
+# Rerun: uv run --locked python docs/research/probes/painpoints/worker_state_pybeam.py
 import asyncio
 import json
 
