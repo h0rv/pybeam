@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="354" viewBox="0 0 760 354" role="img" aria-labelledby="title desc">
+  <title id="title">Shared state across requests</title>
+  <desc id="desc">Three-run medians and min–max whiskers. Highest counter after 400 increments: Uvicorn 195, range 188–286; PyBEAM 400. Subscribers notified out of 8: Uvicorn 1, range 1–5; PyBEAM 8.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <text x="12" y="26" class="heading">Highest count · 400 increments</text>
+  <path class="axis" d="M220 60v85"/>
+  <text x="220" y="50" class="note">0</text>
+  <path class="axis" d="M305 60v85"/>
+  <text x="305" y="50" class="note">100</text>
+  <path class="axis" d="M390 60v85"/>
+  <text x="390" y="50" class="note">200</text>
+  <path class="axis" d="M475 60v85"/>
+  <text x="475" y="50" class="note">300</text>
+  <path class="axis" d="M560 60v85"/>
+  <text x="560" y="50" class="note">400</text>
+  <text x="12" y="89">Uvicorn · 4 workers</text>
+  <rect class="bar-alt" x="220" y="76" width="165.75" height="16"/>
+  <path d="M379.79999999999995 84H463.1M379.79999999999995 78v12M463.1 78v12"/>
+  <text x="580" y="89" class="note">195 (188–286)</text>
+  <text x="12" y="129">PyBEAM</text>
+  <rect class="bar" x="220" y="116" width="340" height="16"/>
+
+  <text x="580" y="129" class="note">400</text>
+  <text x="12" y="193" class="heading">Subscribers notified · out of 8</text>
+  <path class="axis" d="M220 228v85"/>
+  <text x="220" y="218" class="note">0</text>
+  <path class="axis" d="M305 228v85"/>
+  <text x="305" y="218" class="note">2</text>
+  <path class="axis" d="M390 228v85"/>
+  <text x="390" y="218" class="note">4</text>
+  <path class="axis" d="M475 228v85"/>
+  <text x="475" y="218" class="note">6</text>
+  <path class="axis" d="M560 228v85"/>
+  <text x="560" y="218" class="note">8</text>
+  <text x="12" y="257">Uvicorn · 4 workers</text>
+  <rect class="bar-alt" x="220" y="244" width="42.5" height="16"/>
+  <path d="M262.5 252H432.5M262.5 246v12M432.5 246v12"/>
+  <text x="580" y="257" class="note">1 (1–5)</text>
+  <text x="12" y="297">PyBEAM</text>
+  <rect class="bar" x="220" y="284" width="340" height="16"/>
+
+  <text x="580" y="297" class="note">8</text>
+  <text x="12" y="342" class="note">Median bars · min–max whiskers · 3 runs</text>
+</svg>

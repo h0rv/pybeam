@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="279" viewBox="0 0 760 279" role="img" aria-labelledby="title desc">
+  <title id="title">Idle memory of the background task stacks</title>
+  <desc id="desc">Median idle proportional set size over 3 runs. PyBEAM port with 64 slots: 164.7 MiB in 3 processes. Celery default 8 workers: 510.3 MiB in 12 processes. Celery 64 workers: 2355.9 MiB in 68 processes.</desc>
+  <style>
+    svg { color: #24292f; font-family: system-ui, sans-serif; }
+    rect, path { fill: none; stroke: #6e7781; stroke-width: 1.25; }
+    text { fill: currentColor; font-size: 17px; }
+    .heading { font-size: 19px; font-weight: 600; }
+    .note { fill: #57606a; font-size: 15px; }
+    .bar { fill: #57606a; stroke: none; }
+    .bar-alt { fill: #8c959f; stroke: none; }
+    .axis { stroke: #d0d7de; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; }
+      rect, path { stroke: #8b949e; }
+      .note { fill: #adb6c0; }
+      .bar { fill: #adb6c0; }
+      .bar-alt { fill: #6e7781; }
+      .axis { stroke: #30363d; }
+    }
+  </style>
+  <text x="12" y="26" class="heading">Idle proportional memory · MiB</text>
+  <path class="axis" d="M220 65v138"/>
+  <text x="220" y="55" class="note">0</text>
+  <path class="axis" d="M305 65v138"/>
+  <text x="305" y="55" class="note">600</text>
+  <path class="axis" d="M390 65v138"/>
+  <text x="390" y="55" class="note">1200</text>
+  <path class="axis" d="M475 65v138"/>
+  <text x="475" y="55" class="note">1800</text>
+  <path class="axis" d="M560 65v138"/>
+  <text x="560" y="55" class="note">2400</text>
+  <text x="12" y="94">PyBEAM · 64 slots</text>
+  <rect class="bar" x="220" y="81" width="23.332499999999996" height="16"/>
+
+  <text x="580" y="94" class="note">164.7 MiB</text>
+  <text x="12" y="144">Celery · 8 workers</text>
+  <rect class="bar-alt" x="220" y="131" width="72.2925" height="16"/>
+
+  <text x="580" y="144" class="note">510.3 MiB</text>
+  <text x="12" y="194">Celery · 64 workers</text>
+  <rect class="bar-alt" x="220" y="181" width="333.75250000000005" height="16"/>
+
+  <text x="580" y="194" class="note">2355.9 MiB</text>
+  <text x="12" y="254" class="note">Median of 3 runs · whole stacks, excluding driver and container daemon</text>
+</svg>
