@@ -126,7 +126,7 @@ test("the homepage shows crash containment, credits its foundations and links to
   assert.match(markdown, /await pybeam\.isolated\(entries\.crash, b""\)/);
   assert.match(markdown, /ctypes\.string_at\(0\)/);
   assert.match(markdown, /except pybeam\.TaskCrashed/);
-  assert.match(markdown, /node-local/);
+  assert.match(markdown, /replicate through Mnesia/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/erlang-python/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/hornbeam/);
   assert.match(markdown, /Erlang\/OTP/);
