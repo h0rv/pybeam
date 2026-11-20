@@ -9,12 +9,11 @@ uv add python-beam starlette uvicorn
 ```python
 # htmx_app.py
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 from html import escape
 from string.templatelib import Template
 
 from starlette.applications import Starlette
-from starlette.background import BackgroundTask
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response, StreamingResponse
 from starlette.routing import Route
@@ -24,11 +23,8 @@ from pybeam.integrations.hornbeam import Beam, run
 
 
 def html(template: Template) -> str:
-    parts: list[str] = []
-    for part in template:
-        value = part if isinstance(part, str) else escape(str(part.value))
-        parts.append(value)
-    return "".join(parts)
+    out = (s if isinstance(s, str) else escape(str(s.value)) for s in template)
+    return "".join(out)
 
 
 async def index(request: Request) -> HTMLResponse:
@@ -43,7 +39,6 @@ async def index(request: Request) -> HTMLResponse:
 <main>
   <h1>Shared counter</h1>
   <p>Count: <output id="count" hx-sse:connect="/events"
-     hx-config='{{"sse":{{"pauseOnBackground":false}}}}'
      hx-swap="innerHTML" aria-live="polite">Connecting…</output></p>
   <button hx-post="/increment" hx-swap="none">Increment</button>
 </main>
@@ -61,20 +56,14 @@ async def increment(request: Request) -> Response:
 async def events(request: Request) -> StreamingResponse:
     beam = await Beam.connect()
 
-    async def snapshots() -> AsyncGenerator[str]:
+    async def snapshots() -> AsyncIterator[str]:
         async with beam.subscribe("htmx:changed", max_bytes=4096) as changes:
             while True:
                 count = await beam.incr("count", 0, namespace="htmx")
                 yield html(t"data: {count}\n\n")
                 await anext(changes)
 
-    stream = snapshots()
-    return StreamingResponse(
-        stream,
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache"},
-        background=BackgroundTask(stream.aclose),
-    )
+    return StreamingResponse(snapshots(), media_type="text/event-stream")
 
 
 app = Starlette(
@@ -87,8 +76,7 @@ app = Starlette(
 
 
 async def main() -> None:
-    config = Config(app, host="127.0.0.1", port=8770, loop="none", http="h11")
-    server = Server(config)
+    server = Server(Config(app, port=8770))
     try:
         await server.serve()
     except asyncio.CancelledError:
