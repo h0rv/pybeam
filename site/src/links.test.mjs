@@ -136,14 +136,17 @@ test("each concept has complete source-associated Python examples", () => {
 
 test("the homepage introduces capabilities and leaves code and measurements to linked pages", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/home.md"), "utf8");
-  assert.ok(markdown.split(/\s+/).length < 110);
+  assert.ok(markdown.split(/\s+/).length < 250);
   assert.equal(navigation.filter(({ label }) => label === "Get started").length, 1);
   for (const path of ["quickstart/", "runtime/", "limits/"]) assert.equal(redirects[path], "get-started/");
   assert.doesNotMatch(markdown, /quickstart|Overview/);
   assert.doesNotMatch(markdown, /```python|```console|\d|\bversus\b|\b(?:no|not|without)\b/i);
-  assert.match(markdown, /isolated call contains a native crash/);
-  assert.match(markdown, /Shared state and pub\/sub live in the runtime/);
-  assert.match(markdown, /replicate through Mnesia/);
+  assert.match(markdown, /runtime for async Python services on the Erlang VM/);
+  assert.match(markdown, /reports a native crash to its caller/);
+  assert.match(markdown, /in-memory state lasts until the node stops/);
+  assert.match(markdown, /Mnesia keeps/);
+  assert.match(markdown, /Durable tasks are a prototype with at-least-once execution/);
+  for (const bullet of markdown.split("\n").filter((line) => line.startsWith("- "))) assert.match(bullet, /\]\([^)]+\.md(?:#[^)]+)?\)/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/erlang-python/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/hornbeam/);
   assert.match(markdown, /Erlang\/OTP/);
@@ -151,6 +154,17 @@ test("the homepage introduces capabilities and leaves code and measurements to l
   assert.match(markdown, /```sh\nuv add python-beam\n```/);
   for (const href of ["index.md", "why.md", "tradeoffs.md", "examples/crash-containment.md"]) assert.ok(markdown.includes(`](${href})`));
   assert.doesNotMatch(markdown, /\| Capability/);
+});
+
+test("the README heading uses theme-aware repository wordmarks", () => {
+  const readme = readFileSync(join(repositoryRoot, "README.md"), "utf8");
+  assert.match(readme, /^<h1>\s*<picture>/);
+  assert.match(readme, /<img src="site\/public\/brand\/pybeam-wordmark-light.svg" alt="PyBEAM" width="304">/);
+  for (const scheme of ["light", "dark"]) {
+    const path = `site/public/brand/pybeam-wordmark-${scheme}.svg`;
+    assert.ok(readme.includes(`<source media="(prefers-color-scheme: ${scheme})" srcset="${path}">`));
+    assert.match(readFileSync(join(repositoryRoot, path), "utf8"), /<svg\b/);
+  }
 });
 
 test("crash containment compares asyncio, isolated calls and a broken process pool", () => {

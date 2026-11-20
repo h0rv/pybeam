@@ -1,4 +1,10 @@
-# PyBEAM
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/public/brand/pybeam-wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="site/public/brand/pybeam-wordmark-light.svg">
+    <img src="site/public/brand/pybeam-wordmark-light.svg" alt="PyBEAM" width="304">
+  </picture>
+</h1>
 
 Actors, shared state and messaging for async Python, without a separate broker.
 
