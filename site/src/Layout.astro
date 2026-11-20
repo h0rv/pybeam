@@ -14,6 +14,7 @@ interface Props {
 const { title, headings, source } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const sections = buildToc(headings);
+const home = source === "docs/guide/home.md";
 ---
 <!doctype html>
 <html lang="en">
@@ -25,13 +26,19 @@ const sections = buildToc(headings);
     <meta name="description" content="Actors, shared state and messaging for async Python, without locks or extra infrastructure." />
     <title>{title === "PyBEAM" ? title : `${title} · PyBEAM`}</title>
     <link rel="stylesheet" href={styles} />
-    <link rel="icon" type="image/svg+xml" href={withBase("favicon-braces.svg", base)} />
+    <link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: light)" href={withBase("brand/pybeam-favicon-light.svg", base)} />
+    <link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href={withBase("brand/pybeam-favicon-dark.svg", base)} />
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="wordmark" href={withBase("", base)}>PyBEAM</a>
+        <a class="wordmark" href={withBase("", base)} aria-current={home ? "page" : undefined}>
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset={withBase("brand/pybeam-wordmark-dark.svg", base)} />
+            <img src={withBase("brand/pybeam-wordmark-light.svg", base)} width="152" height="51" alt="PyBEAM" />
+          </picture>
+        </a>
         <nav aria-label="Project">
           <a class="project-link" href={withBase("get-started/", base)} aria-label="Get started">
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 5c-3-2-7-2-10-1v15c3-1 7-1 10 1 3-2 7-2 10-1V4c-3-1-7-1-10 1Zm0 0v15"/></svg>
@@ -41,8 +48,8 @@ const sections = buildToc(headings);
         </nav>
       </div>
     </header>
-    <div class="docs-layout">
-      <details class="sidebar">
+    <div class={home ? "home-layout" : "docs-layout"}>
+      {!home && <details class="sidebar">
         <summary>Browse documentation</summary>
         <nav class="docs-nav" aria-label="Documentation">
           {navigationSections.map(({ label, pages }) => <section class="nav-group">
@@ -52,12 +59,18 @@ const sections = buildToc(headings);
             </li>)}</ul>
           </section>)}
         </nav>
-      </details>
+      </details>}
       <main id="content">
-        <article><slot /></article>
+        <article>
+          {home && <picture class="home-mark">
+            <source media="(prefers-color-scheme: dark)" srcset={withBase("brand/pybeam-mark-dark.svg", base)} />
+            <img src={withBase("brand/pybeam-mark-light.svg", base)} width="96" height="96" alt="" />
+          </picture>}
+          <slot />
+        </article>
         <footer><a href={`${repositoryURL}/blob/main/${source}`}>Page source</a><span><a href="https://astro.build/">Astro</a></span></footer>
       </main>
-      {sections.length > 0 && <aside class="page-toc" aria-label="On this page">
+      {!home && sections.length > 0 && <aside class="page-toc" aria-label="On this page">
         <p class="nav-title">On this page</p>
         <nav><TableOfContents items={sections} /></nav>
       </aside>}
