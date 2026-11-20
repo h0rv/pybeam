@@ -1,6 +1,8 @@
 # Benefits and tradeoffs
 
-PyBEAM contains native failures inside isolated calls, provides shared state and messaging without Redis or a broker, and idles at a fraction of a worker-per-process stack's memory. It costs some raw request throughput. These rerunnable measurements mostly cover three runs on one shared VM, not production limits.
+PyBEAM is for Python services that must keep running and stay cheap to run. A failure stays inside the call that caused it, shared state and messaging need no Redis or broker, and an idle service uses a fraction of the memory of a worker-per-process stack. In exchange, it serves fewer requests per second than the fastest Python servers.
+
+Every number below comes from a probe you can rerun, listed in the [appendix](#appendix-reproduce). Most are three runs on one shared VM: read them as direction, not capacity limits.
 
 ## One failure stays in one call
 
@@ -10,11 +12,13 @@ PyBEAM contains native failures inside isolated calls, provides shared state and
 
 </div>
 
-A segfault drops every connection on the affected Uvicorn worker; a CPU-heavy request stalls that worker's clients for the loop's duration, about 3 seconds here. Other workers keep serving. Client assignment is uneven: the comparison is clients sharing a worker, not a fixed quarter of the users.
+With Uvicorn running 4 workers, a segfault drops every connection on the crashed worker, and a CPU-heavy request stalls every client on its worker for the whole loop, 3 seconds here. Other workers keep serving, so the fair comparison is the clients that share a worker with the fault. The kernel spreads clients unevenly, so that was 1 to 14 of 20, not a fixed quarter.
 
-PyBEAM's isolated child exits with signal 11 and drops none of the 20 observers. During CPU work, other clients' longest wait is 11.70 ms or less. The workloads differ: Uvicorn runs a timed loop over WebSockets; PyBEAM runs 40 million iterations in an isolated child over a TCP probe.
+In PyBEAM, the crash ends one isolated task and drops none of the 20 clients. During the CPU-heavy call, no other client waits longer than 12 ms. The two probes use different transports: WebSockets for Uvicorn, plain TCP for PyBEAM.
 
-Gunicorn's `--timeout 10` closes the stuck worker's connection after 10.713–10.922 seconds and loses all outstanding pings on that worker. PyBEAM's `terminate()` stops one call in 16.08–33.29 ms, with no effects after it returns in three runs. An isolated task is a separate OS process: startup and memory cost more, and arguments and results are copied. Embedded tasks do not contain native crashes.
+To stop a stuck call, Gunicorn's `--timeout 10` kills the whole worker after about 11 seconds, with every request on it. PyBEAM's `terminate()` stops one call in 16–33 ms, and the call has no effects after `terminate()` returns.
+
+The cost: an isolated task is a separate OS process, so it starts slower, uses more memory, and copies its arguments and results. Tasks that run inside the VM do not contain native crashes.
 
 ## Shared state without Redis
 
@@ -24,9 +28,9 @@ Gunicorn's `--timeout 10` closes the stuck worker's connection after 10.713–10
 
 </div>
 
-Per-worker memory splits counters and subscriber lists; worker apps need a shared store such as Redis to coordinate them. PyBEAM's counter and pub/sub live in the VM. [Connected nodes](deploy.md) also exchange pub/sub and [presence without a broker](integrations/pyview.md#send-posts-between-two-local-nodes).
+Each Uvicorn worker keeps its own counters and subscriber lists, so 400 increments end up split across workers and most subscribers miss a message. Worker apps add Redis to fix this. PyBEAM's counter and pub/sub live in the VM, so every run counts 400 and notifies 8 of 8. [Connected nodes](deploy.md) also exchange pub/sub and [presence without a broker](integrations/pyview.md#send-posts-between-two-local-nodes).
 
-State lives in memory and disappears on restart. Presence is eventually consistent; messages have no replay. Cross-node checks cover loopback nodes, not separate hosts.
+The limits: state lives in memory and is lost on restart, presence is eventually consistent, and missed messages are not replayed. Cross-node behavior is tested between nodes on one host.
 
 ## Recovery after a node dies
 
@@ -36,7 +40,9 @@ State lives in memory and disappears on restart. Presence is eventually consiste
 
 </div>
 
-The replicated agent example resumes in 0.13 seconds with no repeated tool calls; Redis/Celery takes 144 seconds and repeats five calls. This is one recorded run per stack after same-host SIGKILL, not host loss or a network partition. The example does not rerun interrupted tools without committed results; that policy does not establish absence of external effects.
+When one node of the [agent sessions example](https://github.com/h0rv/pybeam/blob/main/examples/agents/README.md) is killed, its sessions resume on another node in 0.13 seconds with no repeated tool calls. The Redis/Celery version takes 144 seconds and repeats five tool calls.
+
+This is one recorded run per stack, killing a process on one host, not losing a host or a network partition. A tool call interrupted by the kill is reported, not rerun, so effects it had already made may need cleanup.
 
 ## Cost to run
 
@@ -46,17 +52,17 @@ The replicated agent example resumes in 0.13 seconds with no repeated tool calls
 
 </div>
 
-The FastAPI/Celery port uses three processes versus 68 with 64 Celery workers. Proportional set size (PSS) accounts for shared pages. These blocking-sleep tasks do not establish CPU throughput, and the port loses tasks and results on process death; the original stack retains queued work across worker restarts.
+Porting a FastAPI and Celery app to PyBEAM takes it from 68 processes to 3 and from 2.3 GiB to 165 MiB idle, with the same 64 concurrent task slots. Memory is proportional set size (PSS), which counts shared pages once.
 
-A separate actor probe fits 1,000 PyBEAM actors in 125 MiB tree RSS; Ray reaches 91 actors at the probe's 8 GiB budget. This is not an equal-actor-count comparison or a Ray capacity limit; summed RSS double-counts shared pages.
+The tasks sleep, so this measures overhead, not CPU throughput. The port also keeps tasks in memory: unlike Celery with Redis, it loses queued tasks when its process dies.
+
+1,000 PyBEAM actors fit in 125 MiB. Ray reached 91 actors when it hit the probe's 8 GiB memory budget, which is the probe's limit, not Ray's.
 
 ## What PyBEAM costs
 
 - **HTTP throughput:** on two CPUs, PyBEAM's server delivers 20% fewer requests per second than tuned single-worker Uvicorn and 28% fewer than Granian at 64 connections; at 256 connections, the gaps are 12% and 38%.
-- **High socket counts:** at 20,000 open WebSockets, clean conventional-build runs show 1.8–2.1 seconds p99 echo latency versus at most 46 ms for the peers. Two runs are clean; one has 51 echo timeouts. A separate forced full GC consumes 1.1 seconds of CPU and reclaims no objects; this is not a measured pause duration or proof that GC alone causes the latency.
-- **CPU parallelism:** conventional-build actors run CPU jobs one at a time in the actor probe: 1.0× speedup versus Ray's 7.9×. Use isolated tasks or free-threaded Python with [separate execution loops](execution.md), not a shared asyncio loop, for parallel CPU tasks.
-- **Process isolation:** each isolated task needs one OS process, with copying, startup and memory overhead; the fault probe measures containment, not process creation throughput.
-- **Uncertain limits:** most comparisons have only three runs on a noisy shared VM. Treat them as direction, not capacity or latency guarantees.
+- **High socket counts:** at 20,000 open WebSockets, clean conventional-build runs show 1.8–2.1 seconds p99 echo latency versus at most 46 ms for the peers. Two runs are clean; one has 51 echo timeouts. A forced full garbage collection at that size takes 1.1 seconds of CPU, the likely but unproven cause.
+- **CPU parallelism:** on the standard Python build, actors run CPU-bound jobs one at a time: 1.0× speedup versus Ray's 7.9×. Use isolated tasks or free-threaded Python with [separate execution loops](execution.md), not a shared asyncio loop, for parallel CPU tasks.
 
 ## Appendix: reproduce
 
@@ -73,7 +79,7 @@ Run from the repository root. Linked sources include setup, topology and recorde
   ```
 
 - **Node recovery:** `mise run example:agents-compare`; [recorded results and method](https://github.com/h0rv/pybeam/blob/main/benchmarks/AGENTS_COMPARISON.md).
-- **Idle memory:** use the [three-configuration sampling recipe](https://github.com/h0rv/pybeam/blob/main/examples/fastapi_celery/README.md#measured-results). It defines `measure` and `original`, starts the stacks and selects worker counts. Run `measure http://127.0.0.1:8810 "$(pgrep -nf 'python -m examples[.]fastapi_celery[.]app --port 8810 --task-unit 1')"` for the port and `original` for each Celery configuration. These wrappers include idle PSS sampling; the comparison driver alone does not.
+- **Idle memory:** the [three-configuration sampling recipe](https://github.com/h0rv/pybeam/blob/main/examples/fastapi_celery/README.md#measured-results).
 - **Actors and CPU speedup:** `bash docs/research/probes/ray/run.sh`; [environment setup and limits](https://github.com/h0rv/pybeam/blob/main/docs/research/probes/ray/README.md).
 - **HTTP:** `mise exec oha@1.17.0 -- uv run --no-sync python -m benchmarks.web.run --host-http --output "$HOME/web-http-granian"`; [pinned build setup](https://github.com/h0rv/pybeam/blob/main/benchmarks/web/RESULTS.md#reproduce-the-comparison-with-granian).
 - **Sockets:** `mise exec oha@1.17.0 -- uv run --locked --project benchmarks python -m benchmarks.web.scale --output "$HOME/web-scale"`; [setup and diagnostics](https://github.com/h0rv/pybeam/blob/main/benchmarks/web/SCALE_RESULTS.md#appendix). The source describes the separate forced-GC diagnostic but supplies no standalone command for it.
