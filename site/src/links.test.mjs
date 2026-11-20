@@ -117,13 +117,16 @@ test("each concept has complete source-associated Python examples", () => {
   }
 });
 
-test("the homepage shows recovery, credits its foundations and links to getting started", () => {
+test("the homepage shows native-crash containment, credits its foundations and links to getting started", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/home.md"), "utf8");
   assert.ok(markdown.slice(0, markdown.indexOf("```python")).split(/\s+/).length < 80);
   assert.equal(navigation.filter(({ label }) => label === "Get started").length, 1);
   for (const path of ["quickstart/", "runtime/", "limits/"]) assert.equal(redirects[path], "get-started/");
   assert.doesNotMatch(markdown, /quickstart|Overview/);
-  assert.match(markdown, /actors\.crash[\s\S]*actors\.rejoin/);
+  assert.match(markdown, /ctypes\.string_at\(0\)/);
+  assert.match(markdown, /import crash as entries/);
+  assert.match(markdown, /execution=tasks\.ExecutionMode\.ISOLATED/);
+  assert.match(markdown, /except tasks\.TaskCrashed/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/erlang-python/);
   assert.match(markdown, /https:\/\/github.com\/benoitc\/hornbeam/);
   assert.match(markdown, /Erlang\/OTP/);

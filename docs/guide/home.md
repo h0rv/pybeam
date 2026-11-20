@@ -2,7 +2,7 @@
 
 <!-- Logo slot: place the mark beside the heading when an asset is available. -->
 
-Isolate failing calls, share state and messages without Redis or a broker, and keep idle memory small.
+PyBEAM runs Python services that keep working when one call crashes, share state and messages without Redis or a broker, and stay small in memory.
 
 Built on [erlang-python](https://github.com/benoitc/erlang-python), [Hornbeam](https://github.com/benoitc/hornbeam) and [Erlang/OTP](https://www.erlang.org/).
 
@@ -10,45 +10,52 @@ Built on [erlang-python](https://github.com/benoitc/erlang-python), [Hornbeam](h
 uv add python-beam
 ```
 
-A supervisor replaces a crashed actor with fresh state. The caller continues:
+A native segfault kills one isolated call. A second call still succeeds:
 
 ```python
-# recovery.py
-import pybeam
+# crash.py
+import ctypes
+
+import crash as entries
+
+from pybeam import run, tasks
+from pybeam.codec import Json
 
 
-@pybeam.actor
-class Counter:
-    value: int = 0
-
-    async def increment(self) -> int:
-        self.value += 1
-        return self.value
+async def parse(payload: bytes) -> bytes:
+    if Json(str).decode(payload) == "bad":
+        ctypes.string_at(0)
+    return payload
 
 
 async def main() -> None:
-    async with pybeam.ActorGroup() as actors:
-        counter = await actors.spawn(Counter)
-        print("Before crash:", await counter.increment())
-        await actors.crash(counter)
-        replacement = await actors.rejoin(counter)
-        print("After restart:", await replacement.increment())
-    print("Caller keeps running")
+    job = tasks.TaskFunction(
+        entries.parse,
+        Json(str),
+        Json(str),
+        execution=tasks.ExecutionMode.ISOLATED,
+    )
+    limits = tasks.TaskLimits(capacity=1, max_bytes=4096, shutdown_ms=3000)
+    async with tasks.TaskSupervisor(limits) as supervisor:
+        try:
+            await (await supervisor.start(job, "bad"))
+        except tasks.TaskCrashed as error:
+            print("Call crashed:", error.reason)
+        print(await (await supervisor.start(job, "Still running")))
 
 
 if __name__ == "__main__":
-    pybeam.run(main)
+    run(main)
 ```
 
-The supervisor also emits a crash diagnostic; application output:
+The runtime also emits native crash diagnostics; application output:
 
 ```console
-$ uv run recovery.py
-Before crash: 1
-After restart: 1
-Caller keeps running
+$ uv run crash.py
+Call crashed: ('signal', 11)
+Still running
 ```
 
-Restarting an actor loses its state and in-flight calls; it does not replay methods. Native-crash containment requires [isolated tasks](execution.md).
+Isolated tasks run in a separate OS process, so arguments and results are copied and startup costs more. See [Blocking and CPU work](execution.md).
 
 [Get started](index.md) · [Why PyBEAM](why.md) · [Benefits and tradeoffs](tradeoffs.md)
