@@ -4,6 +4,19 @@ import { readFileSync } from "node:fs";
 import { pages, navigation, navigationSections, redirects, pagePath, rewriteLink, withBase, repositoryRoot } from "./links.mjs";
 import { join } from "node:path";
 
+test("page source uses the header link styling and accessible icon treatment", () => {
+  const layout = readFileSync(new URL("./Layout.astro", import.meta.url), "utf8");
+  const css = readFileSync(new URL("./style.css", import.meta.url), "utf8");
+  const header = layout.match(/<header\b[\s\S]*?<\/header>/)[0];
+  assert.match(header, /class="project-link" href=\{`\$\{repositoryURL\}\/blob\/main\/\$\{source\}`\} aria-label="Page source"/);
+  assert.match(header, /aria-label="Page source">\s*<svg aria-hidden="true"[^>]+stroke="currentColor"/);
+  assert.ok(header.indexOf('aria-label="GitHub"') < header.indexOf('aria-label="Page source"'));
+  assert.match(header, /<span class="header-label">Page source<\/span>/);
+  assert.match(css, /@media \(max-width: 28rem\) \{\s*\.header-label \{ display: none; \}/);
+  assert.doesNotMatch(layout, /<footer\b|https:\/\/astro\.build\//);
+  assert.doesNotMatch(css, /\bfooter\b/);
+});
+
 test("root and project hosting paths preserve trailing slashes", () => {
   for (const base of ["/", "/pybeam/", "pybeam", "/preview/docs/"]) {
     const prefix = base === "/" ? "/" : `/${base.replace(/^\/+|\/+$/g, "")}/`;

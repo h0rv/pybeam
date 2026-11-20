@@ -92,7 +92,6 @@ th, td { padding: .5rem .75rem; }
 .page-toc li { margin: 0; }
 .page-toc a:any-link { display: block; padding: .3rem .6rem; color: var(--muted-fg); text-decoration: none; line-height: 1.5; }
 .page-toc a:hover { color: var(--accent); }
-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; margin-block-start: 3rem; padding-block-start: 1rem; border-block-start: 1px solid var(--graphical-fg); font-size: .85rem; }
 .skip-link { position: absolute; inset-inline-start: -10000px; }
 .skip-link:focus { inset-inline-start: 1rem; inset-block-start: 1rem; background: var(--bg); padding: .5rem; z-index: 1; }
 .visually-hidden { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

@@ -45,6 +45,10 @@ const home = source === "docs/guide/home.md";
             <span class="header-label">Get started</span>
           </a>
           <a class="project-link" href={repositoryURL} aria-label="GitHub"><GithubIcon /><span class="header-label">GitHub</span></a>
+          <a class="project-link" href={`${repositoryURL}/blob/main/${source}`} aria-label="Page source">
+            <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6v20h12V6Zm0 0v5h4M9 12h6m-6 4h6"/></svg>
+            <span class="header-label">Page source</span>
+          </a>
         </nav>
       </div>
     </header>
@@ -68,7 +72,6 @@ const home = source === "docs/guide/home.md";
           </picture>}
           <slot />
         </article>
-        <footer><a href={`${repositoryURL}/blob/main/${source}`}>Page source</a><span><a href="https://astro.build/">Astro</a></span></footer>
       </main>
       {!home && sections.length > 0 && <aside class="page-toc" aria-label="On this page">
         <p class="nav-title">On this page</p>

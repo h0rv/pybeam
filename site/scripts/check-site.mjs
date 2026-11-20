@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pages, navigation, redirects, withBase } from "../src/links.mjs";
+import { pages, navigation, redirects, withBase, repositoryURL } from "../src/links.mjs";
 
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const base = (process.env.DOCS_BASE || "/").replace(/\/?$/, "/");
@@ -29,6 +29,12 @@ for (const file of htmlFiles) {
     assert.match(html, /http-equiv="refresh"/i);
     assert.doesNotMatch(html, /<pre\b/);
   } else {
+    const { source } = pages.find(({ path }) => `${path}index.html` === page);
+    const header = html.match(/<header\b[\s\S]*?<\/header>/)?.[0] || "";
+    assert.ok(header.includes(`href="${repositoryURL}/blob/main/${source}"`), `Missing page source in header: ${page}`);
+    assert.match(header, /aria-label="Page source"/, `Missing accessible source label: ${page}`);
+    assert.equal([...html.matchAll(/aria-label="Page source"/g)].length, 1, `One source link: ${page}`);
+    assert.doesNotMatch(html, /<footer\b|https:\/\/astro\.build\//, `Footer must be absent: ${page}`);
     const blocks = [...html.matchAll(/<pre\b/g)].length;
     assert.ok(blocks > 0 || page.startsWith("internals/"), `Every guide needs an executable example: ${page}`);
     for (const [block] of html.matchAll(/<pre\b[\s\S]*?<\/pre>/g)) {
