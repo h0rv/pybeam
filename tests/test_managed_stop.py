@@ -211,10 +211,10 @@ def test_managed_stop__guardian_waits_only_for_a_managed_ack(
         "while not (d/'stop.request').exists(): time.sleep(.005)\n"
         + (
             "while not (d/'registration.closed').exists(): time.sleep(.005)\n"
-            "(d/'unit-ack').touch()\n"
-            if case == "ack"
+            if case in {"ack", "no_ack"}
             else ""
         )
+        + ("(d/'unit-ack').touch()\n" if case == "ack" else "")
         + ("time.sleep(5)\n" if case in {"legacy", "measurement", "timeout"} else "")
     )
     config = Config(
