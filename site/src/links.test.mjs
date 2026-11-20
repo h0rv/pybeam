@@ -78,7 +78,11 @@ test("user guides leave runtime internals to How PyBEAM works", () => {
   const internals = /\b(?:GIL|BEAM process(?:es)?|interpreters?|subinterpreters?|erlang-python|ErlangEventLoop|worker contexts?|Python contexts?|schedulers?)\b/;
   for (const { source } of pages.filter(({ source }) => !source.startsWith("docs/guide/internals/"))) {
     const markdown = readFileSync(join(repositoryRoot, source), "utf8");
-    const content = source === "docs/guide/home.md" ? markdown.replace("[erlang-python](https://github.com/benoitc/erlang-python)", "") : markdown;
+    const content = source === "docs/guide/home.md"
+      ? markdown.replace("[erlang-python](https://github.com/benoitc/erlang-python)", "")
+      : source === "docs/guide/examples/crash-containment.md"
+        ? markdown.replace(/## How it works\n[\s\S]*?(?=\n## )/, "")
+        : markdown;
     assert.doesNotMatch(content, internals, source);
   }
 });
@@ -138,12 +142,17 @@ test("the homepage introduces capabilities and leaves code and measurements to l
 
 test("crash containment compares asyncio, isolated calls and a broken process pool", () => {
   const markdown = readFileSync(join(repositoryRoot, "docs/guide/examples/crash-containment.md"), "utf8");
+  assert.ok(markdown.startsWith("# Survive a segfault\n"));
+  assert.match(markdown, /## How it works/);
+  assert.match(markdown, /execution-of-python-signal-handlers/);
+  assert.match(markdown, /next call starts a fresh child/);
+  assert.match(markdown, /examples\/docs\/isolated_cost\.py/);
   assert.ok(markdown.indexOf("# crash_asyncio.py") < markdown.indexOf("# crash.py"));
   assert.match(markdown, /\$ echo \$\?\n139/);
   assert.match(markdown, /except pybeam\.TaskCrashed/);
   assert.match(markdown, /Pending call: BrokenProcessPool/);
   assert.match(markdown, /Later call: BrokenProcessPool/);
-  assert.match(markdown, /external effects after a crash remain unknown/);
+  assert.match(markdown, /External effects after a crash remain unknown/);
 });
 
 test("state and supervision teach distinct operations without another introduction", () => {
