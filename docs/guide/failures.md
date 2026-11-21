@@ -21,9 +21,8 @@ integration for resource setup.
 
 ## Rebuild a view after reconnect
 
-A WebSocket reconnect, a PyView live view reconnect, and a new SSE stream request
-run application code again. They do not migrate the previous connection or replay
-missed pub/sub messages. Authenticate and authorize each new connection or request,
+A WebSocket reconnect and a new SSE stream request run application code again.
+They do not migrate the previous connection or replay missed pub/sub messages. Authenticate and authorize each new connection or request,
 even if the previous one was accepted. Subscribe to the authorized data, then read
 current state to render a fresh view. Re-read state on each notification.
 
@@ -34,9 +33,6 @@ transport and your application's authorization policy:
   by this example, the client receives HTTP `403` and no WebSocket connection.
   With PyBEAM's native web server, the same close-before-accept pattern completes
   the handshake and then delivers close code `1008`.
-- **PyView:** session authorization using PyView's required-scope check runs again
-  before the connected mount. A rejected join closes with code `1000` and sends
-  no mounted view. An accepted reconnect mounts a new view from current state.
 - **SSE:** reject unauthorized requests before opening the event stream. A handler
   that raises HTTP `403` returns that status, not a stream or a current-state event.
   An accepted request should send current state as its first event.
@@ -125,8 +121,7 @@ does not recover them. If your application needs a history, store it separately
 and authorize reads of that history. An SSE `Last-Event-ID` header does not make
 pub/sub durable: a snapshot-and-subscribe handler without a history lookup sends
 current state, not events since that ID. Implement history lookup explicitly if
-you need replay. See [Messaging](messaging.md) and the
-[PyView integration](integrations/pyview.md).
+you need replay. See [Messaging](messaging.md).
 
 ## Allow time for SSE disconnect cleanup
 
