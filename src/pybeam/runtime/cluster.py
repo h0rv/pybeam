@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -464,13 +465,15 @@ def _node(path: Path) -> None:
             extra_environment=descriptor.environment,
         )
     except BootstrapError:
+        traceback.print_exc()
+        sys.stderr.flush()
         durable_write(
             directory / (alias + ".stopped.json"),
             NODE_EXIT.encode(
                 NodeExit(alias=alias, launcher=launcher, clean=False, status=1)
             ).decode(),
         )
-        raise
+        raise SystemExit(1) from None
     durable_write(
         directory / (alias + ".stopped.json"),
         NODE_EXIT.encode(

@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -7,9 +8,11 @@ from examples.distributed import jobs
 from examples.distributed.config import configuration
 from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, Reply, Request
+from pybeam.runtime import cluster as cluster_runtime
+from pybeam.runtime.assets import RuntimeAssets
 from pybeam.runtime.cluster import NODE_EXIT, LocalCluster, NodeExit
-from pybeam.runtime.config import BootstrapError
-from pybeam.runtime.ownership import Identity, identity
+from pybeam.runtime.config import BootstrapError, Config
+from pybeam.runtime.ownership import Identity, durable_write, identity
 
 
 @pytest.fixture
@@ -72,6 +75,39 @@ def test_node_check__successful_exit_is_not_a_missing_event(cluster: LocalCluste
 
 class Published(Exception):
     pass
+
+
+def test_launcher__flushes_traceback_before_publishing_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = cluster_runtime._NodeLaunch(
+        entry=tmp_path / "entry.py",
+        config=Config(),
+        options=(),
+        environment={"PYBEAM_CLUSTER_DIRECTORY": str(tmp_path), "PYBEAM_NODE_ALIAS": "b"},
+    )
+    path = tmp_path / "b.launch.json"
+    path.write_bytes(cluster_runtime._NODE_LAUNCH.encode(descriptor))
+    log = tmp_path / "b.stderr.log"
+
+    def unavailable(_config: Config) -> RuntimeAssets:
+        raise BootstrapError("controlled launcher bootstrap failure")
+
+    def publish(path: Path, text: str) -> None:
+        output = log.read_text()
+        assert "Traceback (most recent call last):" in output
+        assert "BootstrapError: controlled launcher bootstrap failure" in output
+        durable_write(path, text)
+
+    monkeypatch.setattr(cluster_runtime, "discover_assets", unavailable)
+    monkeypatch.setattr(cluster_runtime, "durable_write", publish)
+    with log.open("w") as stderr, monkeypatch.context() as patch:
+        patch.setattr(sys, "stderr", stderr)
+        with pytest.raises(SystemExit) as caught:
+            cluster_runtime._node(path)
+        assert caught.value.code == 1
+    outcome = NODE_EXIT.decode((tmp_path / "b.stopped.json").read_bytes())
+    assert outcome.status == 1 and not outcome.clean
 
 
 async def test_recipient__identity_and_birth_are_complete_before_publication(
