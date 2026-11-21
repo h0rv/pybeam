@@ -85,7 +85,6 @@ KERL_CONFIGURE_OPTIONS="--disable-dynamic-ssl-lib --without-termcap --without-ja
   MISE_ALL_COMPILE=true mise install
 mkdir -p _checkouts
 ln -sfn ../../erlang-python _checkouts/erlang_python
-ln -sfn ../../hornbeam _checkouts/hornbeam
 mise exec -- uv sync --locked --all-extras
 mise exec -- uv run --locked python tools/build_native.py
 mkdir -p build
