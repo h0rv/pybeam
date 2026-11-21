@@ -2,6 +2,8 @@
 
 Consume a fixed sample of transformed messages. In `stream(2, uppercase)`, `2` is the number of sample requests. The count must be 1 to 16. This API supplies its own `héllo` requests; it does not accept your records.
 
+Run this sample from the macOS arm64 `python-beam` wheel. On Linux wheels, which omit the GenStage payload, `stream` raises `BootstrapError`.
+
 ```python
 # genstage_transform.py
 from dataclasses import dataclass

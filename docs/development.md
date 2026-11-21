@@ -83,15 +83,18 @@ which PyPI rejects. Releases build on Ubuntu 22.04.
 ```sh
 KERL_CONFIGURE_OPTIONS="--disable-dynamic-ssl-lib --without-termcap --without-javac --without-wx --without-odbc" \
   MISE_ALL_COMPILE=true mise install
+mkdir -p _checkouts
+ln -sfn ../../erlang-python _checkouts/erlang_python
+ln -sfn ../../hornbeam _checkouts/hornbeam
 mise exec -- uv sync --locked --all-extras
 mise exec -- uv run --locked python tools/build_native.py
 mkdir -p build
 curl -fL https://raw.githubusercontent.com/erlang/otp/OTP-29.1.2/LICENSE.txt -o build/OTP-LICENSE.txt
 mise exec -- uv run --locked python tools/build_runtime.py \
   --otp-root "$(mise where erlang)" \
-  --native-app _build/default/lib/erlang_python \
+  --native-app _build/hornbeam/checkouts/erlang_python \
   --otp-license build/OTP-LICENSE.txt \
-  --native-license _build/default/lib/erlang_python/LICENSE
+  --native-license ../erlang-python/LICENSE
 mise exec -- uv build --wheel
 ```
 
