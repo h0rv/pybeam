@@ -398,7 +398,12 @@ def supervise(directory: Path, owner: Identity) -> None:
                 record(directory, owned, "spawning")
                 index = str(len(children))
                 stdout = streams.enter_context((directory / (index + ".stdout.log")).open("wb"))
-                stderr = streams.enter_context((directory / (index + ".stderr.log")).open("wb"))
+                stderr_name = (
+                    command.entry.alias if isinstance(command.entry, LauncherEntry) else index
+                )
+                stderr = streams.enter_context(
+                    (directory / (stderr_name + ".stderr.log")).open("wb")
+                )
                 child = subprocess.Popen(  # noqa: S603
                     [sys.executable, "-m", "pybeam.runtime.guardian", "gate", *command.argv],
                     start_new_session=True,

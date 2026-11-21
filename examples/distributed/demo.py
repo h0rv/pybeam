@@ -15,7 +15,6 @@ from examples.distributed.models import (
 )
 from pybeam.codec import Json
 from pybeam.distribution import HandlerIdentity, LocalCluster, Reply
-from pybeam.runtime.cluster import NODE_EXIT
 from pybeam.runtime.guardian import GuardianEndpoint
 from pybeam.runtime.ownership import Identity, durable_write
 
@@ -61,10 +60,7 @@ def demonstration(
     def read(name: str) -> str:
         def running() -> None:
             active()
-            stopped = cluster.directory / "a.stopped.json"
-            if stopped.exists():
-                outcome = NODE_EXIT.decode(stopped.read_bytes())
-                raise RuntimeError("Node A exited with status " + str(outcome.status))
+            cluster.check_running()
 
         return wait_file(cluster.directory / name, check=running)
 

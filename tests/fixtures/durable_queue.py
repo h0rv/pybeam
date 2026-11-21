@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pybeam
 from pybeam.queues import DurableQueue, LeaseExpired
+from pybeam.runtime.ownership import durable_write
 
 
 async def proof() -> None:
@@ -54,7 +55,7 @@ async def main() -> None:
         await proof()
     elif sys.argv[1] == "put":
         assert await queue.put(b"persisted", key="crash-key")
-        await asyncio.to_thread(Path("stored.pid").write_text, str(os.getpid()))
+        await asyncio.to_thread(durable_write, Path("stored.pid"), str(os.getpid()))
         await asyncio.Event().wait()
     else:
         async with queue.get() as item:

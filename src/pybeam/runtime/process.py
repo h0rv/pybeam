@@ -16,6 +16,7 @@ from pybeam.runtime.assets import RuntimeAssets
 from pybeam.runtime.attach import EPMD, LOOPBACK, App, announce, node_name
 from pybeam.runtime.config import BootstrapError, CleanupError, Config
 from pybeam.runtime.discovery import cluster
+from pybeam.runtime.ownership import IDENTITY, durable_write, identity, resolve
 
 
 @dataclass(slots=True)
@@ -167,7 +168,7 @@ def launch(
                 state.received = number
                 if state.deadline is None:
                     state.deadline = time.monotonic() + config.shutdown_timeout
-                shutdown.write_text(str(number))
+                durable_write(shutdown, str(number))
             if process is not None:
                 _send(process, number)
 
@@ -197,13 +198,10 @@ def launch(
                     App(name, name + "@127.0.0.1", process.pid, str(entry), str(Path.cwd()))
                 )
             while True:
-                if guardian is not None:
-                    from pybeam.runtime.ownership import IDENTITY, resolve
-
-                    if resolve(IDENTITY.decode(guardian)) is None:
-                        raise BootstrapError(
-                            "Guardian exited; managed execution ownership is uncertain"
-                        )
+                if guardian is not None and resolve(IDENTITY.decode(guardian)) is None:
+                    raise BootstrapError(
+                        "Guardian exited; managed execution ownership is uncertain"
+                    )
                 if completion_status is None:
                     completion_status = _completion(completed)
                     if completion_status is not None and state.deadline is None:
@@ -243,8 +241,6 @@ def launch(
                             )
                     return entry_status
                 if not announced and ready.exists() and "PYBEAM_CLUSTER_READY" in environment:
-                    from pybeam.runtime.ownership import IDENTITY, durable_write, identity
-
                     durable_write(
                         Path(environment["PYBEAM_CLUSTER_READY"]),
                         IDENTITY.encode(identity(process.pid)).decode(),

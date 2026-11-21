@@ -1067,8 +1067,9 @@ def test_native__signals_cancel_main_and_reap_vm(
     stopped = tmp_path / "stopped"
     entry.write_text(
         "import asyncio, os\nfrom pathlib import Path\nfrom pybeam import run\n"
+        "from pybeam.runtime.ownership import durable_write\n"
         "async def main() -> None:\n"
-        + "    Path({!r}).write_text(str(os.getpid()))\n".format(str(started))
+        + "    durable_write(Path({!r}), str(os.getpid()))\n".format(str(started))
         + "    try:\n        await asyncio.Event().wait()\n    finally:\n"
         + "        task = asyncio.current_task()\n"
         + "        assert task is not None and task.cancelling() == 1\n"
