@@ -304,12 +304,32 @@ class LocalCluster:
         self.identities.append(value)
         deadline = time.monotonic() + self.config.startup_timeout
         while not ready.exists():
+            self.check_running(alias)
             if resolve(value) is None or time.monotonic() > deadline:
                 raise BootstrapError("Owned node did not acknowledge managed startup: " + alias)
             time.sleep(0.02)
         self.nodes[alias] = IDENTITY.decode(ready.read_text())
         self.identities.append(self.nodes[alias])
         return self.nodes[alias]
+
+    def check_running(self, alias: str = "a") -> None:
+        if alias not in {node.alias for node in self.distribution.nodes}:
+            raise ValueError("Unknown configured node alias")
+        marker = self.directory / (alias + ".stopped.json")
+        if not marker.exists():
+            return
+        outcome = NODE_EXIT.decode(marker.read_bytes())
+        message = "Node " + alias.upper() + " exited with status " + str(outcome.status)
+        if outcome.status != 0:
+            try:
+                with (self.directory / (alias + ".stderr.log")).open("rb") as stream:
+                    stream.seek(0, os.SEEK_END)
+                    stream.seek(max(0, stream.tell() - 4096))
+                    tail = stream.read(4096).decode("utf-8", errors="replace")
+            except OSError as error:
+                tail = "Captured stderr unavailable: " + str(error)
+            message += "\nCaptured stderr (last 4096 bytes):\n" + (tail or "(empty)")
+        raise BootstrapError(message)
 
     def stop(self, alias: str) -> None:
         if self._phase not in {_Phase.STARTING, _Phase.ACTIVE}:
@@ -330,6 +350,8 @@ class LocalCluster:
             raise BootstrapError("Owned launcher did not acknowledge VM cleanup: " + alias)
         outcome = NODE_EXIT.decode(marker.read_text())
         if outcome.alias != alias or outcome.launcher != value or not outcome.clean:
+            if outcome.status != 0:
+                self.check_running(alias)
             raise BootstrapError("Owned VM cleanup failed: " + alias)
         if outcome not in self.shutdowns:
             self.shutdowns.append(outcome)

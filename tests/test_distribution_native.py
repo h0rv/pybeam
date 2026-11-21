@@ -70,7 +70,9 @@ def test_distribution__join_budget_starts_after_peer_application_is_ready(
     config, distribution = configuration()
     cluster = LocalCluster(distribution, config=config)
     with cluster:
-        first = Json(Reply).decode(wait_file(cluster.directory / "first.json"))
+        first = Json(Reply).decode(
+            wait_file(cluster.directory / "first.json", check=cluster.check_running)
+        )
         assert first.status == "ok"
         assert first.worker_dead
     clean(cluster)
@@ -80,7 +82,7 @@ def test_distribution__wrong_cookie_never_produces_success_receipt() -> None:
     config, distribution = configuration()
     cluster = LocalCluster(distribution, config=config)
     with cluster:
-        wait_file(cluster.directory / "first.json")
+        wait_file(cluster.directory / "first.json", check=cluster.check_running)
         with pytest.raises(RuntimeError, match="only once"):
             cluster.__enter__()
         epmd = resolve(cluster.identities[0])
@@ -130,13 +132,13 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
     bad.write_text(
         "import os\nfrom pathlib import Path\n"
         "from pybeam.codec import Json\n"
-        "from pybeam.runtime.ownership import Identity, identity, Registry\n"
+        "from pybeam.runtime.ownership import Identity, identity, Registry, durable_write\n"
         "directory = Path(os.environ['PYBEAM_OWNER_DIRECTORY'])\n"
         "registry = Json(Registry).decode((directory / 'ownership.json').read_text())\n"
         "assert identity(os.getpid()) in registry.owned\n"
-        + "Path("
+        + "durable_write(Path("
         + repr(str(marker))
-        + ").write_text(Json(Identity).encode(identity(os.getpid())).decode())\n"
+        + "), Json(Identity).encode(identity(os.getpid())).decode())\n"
         + "raise RuntimeError('finite controlled entry failure')\n"
     )
     idle = tmp_path / "idle.py"
@@ -160,6 +162,9 @@ def test_distribution__partial_startup_is_owned_before_any_entry_code(tmp_path: 
             while resolve(value) is not None:
                 assert time.monotonic() < deadline
                 time.sleep(0.02)
+            wait_file(cluster.directory / "b.stopped.json", seconds=5)
+            with pytest.raises(BootstrapError, match="finite controlled entry failure"):
+                cluster.check_running("b")
     except BootstrapError:
         pass
     assert marker.exists(), "Failure must occur only after guardian-owned entry execution"
@@ -203,7 +208,8 @@ def test_distribution__parent_exit_reaps_private_epmd_and_both_native_vms() -> N
         "from pybeam.runtime.cluster import LocalCluster\n"
         "config, distribution = configuration()\n"
         "cluster = LocalCluster(distribution, config=config)\n"
-        "cluster.__enter__()\nwait_file(cluster.directory / 'first.json')\n"
+        "cluster.__enter__()\n"
+        "wait_file(cluster.directory / 'first.json', check=cluster.check_running)\n"
         "print(str(cluster.directory), flush=True)\nos._exit(0)\n"
     )
     parent = subprocess.run(
@@ -229,7 +235,7 @@ def test_distribution__guardian_exit_closes_live_vm_execution() -> None:
     config, distribution = configuration()
     cluster = LocalCluster(distribution, config=config)
     with pytest.raises(BootstrapError), cluster:
-        wait_file(cluster.directory / "first.json")
+        wait_file(cluster.directory / "first.json", check=cluster.check_running)
         births = [
             Json(Identity).decode((cluster.directory / (alias + ".birth.json")).read_text())
             for alias in ("a", "b")

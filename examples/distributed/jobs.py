@@ -7,7 +7,7 @@ from typing import Literal
 
 from pybeam.codec import Json
 from pybeam.distribution import Reply, Request, local
-from pybeam.runtime.ownership import Identity, identity
+from pybeam.runtime.ownership import Identity, durable_write, identity
 from pybeam.tasks import TaskFunction, TaskLimits, TaskRef, TaskSupervisor
 
 
@@ -71,9 +71,9 @@ async def serve() -> None:
         registered = await local(Request(op="register", definition="double"))
         if registered.status != "ok":
             raise RuntimeError("Recipient definition registration failed")
-        (directory / "b.identity.json").write_text(Json(type(handler)).encode(handler).decode())
-        (directory / "b.birth.json").write_text(
-            Json(Identity).encode(identity(os.getpid())).decode()
+        durable_write(directory / "b.identity.json", Json(type(handler)).encode(handler).decode())
+        durable_write(
+            directory / "b.birth.json", Json(Identity).encode(identity(os.getpid())).decode()
         )
         async with asyncio.TaskGroup() as observers:
 

@@ -7,6 +7,7 @@ from pathlib import Path
 import pybeam
 from pybeam.codec import Json
 from pybeam.queues import DurableTasks
+from pybeam.runtime.ownership import durable_write
 
 try:
     import erlang
@@ -34,7 +35,7 @@ async def write_report(payload: bytes) -> bytes:
     await erlang.async_call("durable_body_started", payload)
     destination = Path(payload.decode())
     await asyncio.to_thread(wait_release, destination.with_suffix(".release"))
-    await asyncio.to_thread(destination.write_text, "__main__ " + str(os.getpid()))
+    await asyncio.to_thread(durable_write, destination, "__main__ " + str(os.getpid()))
     return b""
 
 

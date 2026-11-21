@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pybeam
 from pybeam.queues import DurableTasks
+from pybeam.runtime.ownership import durable_write
 from tests.fixtures.durable_tasks_body import cluster_complete, complete
 
 try:
@@ -47,7 +48,7 @@ async def main() -> None:
     elif mode == "put":
         for i in range(count):
             assert await tasks.submit(complete, str(directory / str(i)).encode(), key=str(i))
-        await asyncio.to_thread(Path("stored.pid").write_text, str(os.getpid()))
+        await asyncio.to_thread(durable_write, Path("stored.pid"), str(os.getpid()))
         await asyncio.Event().wait()
     else:
         async with tasks.serve(concurrency=3):
