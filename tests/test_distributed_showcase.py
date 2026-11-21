@@ -212,14 +212,15 @@ def test_demo__controlled_receipt_boundary_callback_and_cli_compatibility(
 
 
 @pytest.mark.parametrize("status", [0, 7])
-def test_demo__reports_sender_exit_instead_of_missing_event(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int
+@pytest.mark.parametrize("alias", ["a", "b"])
+def test_demo__reports_node_exit_instead_of_missing_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int, alias: str
 ) -> None:
     config, distribution = demo.configuration()
     cluster = ControlledCluster(distribution, config=config, directory=tmp_path)
-    (tmp_path / "a.stopped.json").write_bytes(
+    (tmp_path / (alias + ".stopped.json")).write_bytes(
         NODE_EXIT.encode(
-            NodeExit(alias="a", launcher=identity(os.getpid()), clean=True, status=status)
+            NodeExit(alias=alias, launcher=identity(os.getpid()), clean=True, status=status)
         )
     )
 
@@ -232,7 +233,9 @@ def test_demo__reports_sender_exit_instead_of_missing_event(
         return cluster
 
     monkeypatch.setattr(demo, "LocalCluster", factory)
-    with pytest.raises(RuntimeError, match="Node A exited with status " + str(status)):
+    with pytest.raises(
+        RuntimeError, match="Node " + alias.upper() + " exited with status " + str(status)
+    ):
         demonstration()
     assert cluster.closed
 

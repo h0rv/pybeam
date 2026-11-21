@@ -313,24 +313,29 @@ class LocalCluster:
         self.identities.append(self.nodes[alias])
         return self.nodes[alias]
 
-    def check_running(self, alias: str = "a") -> None:
-        if alias not in {node.alias for node in self.distribution.nodes}:
+    def check_running(self, alias: str | None = None) -> None:
+        """Check all nodes except acknowledged stops, or one explicit alias."""
+        aliases = tuple(node.alias for node in self.distribution.nodes)
+        if alias is not None and alias not in aliases:
             raise ValueError("Unknown configured node alias")
-        marker = self.directory / (alias + ".stopped.json")
-        if not marker.exists():
-            return
-        outcome = NODE_EXIT.decode(marker.read_bytes())
-        message = "Node " + alias.upper() + " exited with status " + str(outcome.status)
-        if outcome.status != 0:
-            try:
-                with (self.directory / (alias + ".stderr.log")).open("rb") as stream:
-                    stream.seek(0, os.SEEK_END)
-                    stream.seek(max(0, stream.tell() - 4096))
-                    tail = stream.read(4096).decode("utf-8", errors="replace")
-            except OSError as error:
-                tail = "Captured stderr unavailable: " + str(error)
-            message += "\nCaptured stderr (last 4096 bytes):\n" + (tail or "(empty)")
-        raise BootstrapError(message)
+        for name in aliases if alias is None else (alias,):
+            marker = self.directory / (name + ".stopped.json")
+            if not marker.exists():
+                continue
+            outcome = NODE_EXIT.decode(marker.read_bytes())
+            if alias is None and outcome in self.shutdowns:
+                continue
+            message = "Node " + name.upper() + " exited with status " + str(outcome.status)
+            if outcome.status != 0:
+                try:
+                    with (self.directory / (name + ".stderr.log")).open("rb") as stream:
+                        stream.seek(0, os.SEEK_END)
+                        stream.seek(max(0, stream.tell() - 4096))
+                        tail = stream.read(4096).decode("utf-8", errors="replace")
+                except OSError as error:
+                    tail = "Captured stderr unavailable: " + str(error)
+                message += "\nCaptured stderr (last 4096 bytes):\n" + (tail or "(empty)")
+            raise BootstrapError(message)
 
     def stop(self, alias: str) -> None:
         if self._phase not in {_Phase.STARTING, _Phase.ACTIVE}:

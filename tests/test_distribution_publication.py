@@ -32,9 +32,35 @@ def stopped(cluster: LocalCluster, status: int) -> None:
 
 
 def test_node_check__running_and_unknown_alias(cluster: LocalCluster) -> None:
+    cluster.check_running()
     cluster.check_running("b")
     with pytest.raises(ValueError, match="Unknown configured node alias"):
         cluster.check_running("unknown")
+
+
+@pytest.mark.parametrize("alias", ["a", "b"])
+def test_node_check__default_checks_every_node(cluster: LocalCluster, alias: str) -> None:
+    (cluster.directory / (alias + ".stopped.json")).write_bytes(
+        NODE_EXIT.encode(
+            NodeExit(alias=alias, launcher=identity(os.getpid()), clean=False, status=1)
+        )
+    )
+    (cluster.directory / (alias + ".stderr.log")).write_text("failed before identity publication")
+    with pytest.raises(BootstrapError) as caught:
+        cluster.check_running()
+    assert "Node " + alias.upper() + " exited with status 1" in str(caught.value)
+    assert "failed before identity publication" in str(caught.value)
+
+
+def test_node_check__acknowledged_stop_does_not_hide_fresh_failure(cluster: LocalCluster) -> None:
+    stopped(cluster, 0)
+    cluster.shutdowns.append(NODE_EXIT.decode((cluster.directory / "b.stopped.json").read_bytes()))
+    cluster.check_running()
+    with pytest.raises(BootstrapError, match="Node B exited with status 0"):
+        cluster.check_running("b")
+    stopped(cluster, 1)
+    with pytest.raises(BootstrapError, match="Node B exited with status 1"):
+        cluster.check_running()
 
 
 def test_node_check__stderr_tail_is_bounded_and_decodes_invalid_utf8(cluster: LocalCluster) -> None:
