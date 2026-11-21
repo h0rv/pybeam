@@ -2,8 +2,10 @@
 
 Keep a shared counter behind a PyView page. Each click updates the counter atomically and renders the result with PyView's template engine.
 
-For per-connection authorization, fresh mounts, and missed-message boundaries, see
-[Startup, reconnects, and failures](../failures.md#rebuild-a-view-after-reconnect).
+For a view that declares required scopes, a reconnect runs PyView's session check
+again before the connected mount. A rejected join closes with code `1000` and sends no mounted view; an
+accepted reconnect mounts a new view from current state. For missed-message
+boundaries, see [Startup, reconnects, and failures](../failures.md#rebuild-a-view-after-reconnect).
 
 ```sh
 uv add 'python-beam[pyview]' uvicorn
